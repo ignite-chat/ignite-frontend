@@ -16,7 +16,7 @@ const LoginPage = () => {
   const navigate = useNavigate();
 
   const [submitError, setSubmitError] = useState(null);
-  
+
   const onSubmit = useCallback(async (data) => {
     try {
       const response = await api.post('login', data);
