@@ -18,11 +18,9 @@ export const RolesService = {
             if (guild.roles) {
                 // Use existing roles from guild object
                 setGuildRoles(guild.id, guild.roles);
-
-                console.log(`Loaded roles for guild ${guild.id} from existing data.`);
             } else {
                 // Unimplemented: Fetch roles from Ignite API
-                console.error(`Roles for guild ${guild.id} not found locally. Fetching from Ignite API is unimplemented.`);
+                // Backend fetch would go here
             }
         }
     },
@@ -39,10 +37,15 @@ export const RolesService = {
             const response = await api.post(`/guilds/${guildId}/roles`, roleData);
             const newRole = response.data;
 
-            // Update local store
+            // Optimistically update or update after response
+            // We rely on WS for the canonical update, but we can update here if WS is slow.
+            // To prevent duplicates, we check if it already exists.
             const { guildRoles, setGuildRoles } = useRolesStore.getState();
             const roles = guildRoles[guildId] || [];
-            setGuildRoles(guildId, [...roles, newRole]);
+
+            if (!roles.find(r => String(r.id) === String(newRole.id))) {
+                setGuildRoles(guildId, [...roles, newRole]);
+            }
 
             toast.success('Role created successfully');
         }
@@ -67,7 +70,7 @@ export const RolesService = {
         const { guildRoles, setGuildRoles } = useRolesStore.getState();
         const roles = guildRoles[guildId] || [];
         const updatedRoles = roles.map(role =>
-            role.id === roleId ? { ...role, ...updates } : role
+            String(role.id) === String(roleId) ? { ...role, ...updates } : role
         );
         setGuildRoles(guildId, updatedRoles);
     },
@@ -86,7 +89,7 @@ export const RolesService = {
             // Remove role from local store
             const { guildRoles, setGuildRoles } = useRolesStore.getState();
             const roles = guildRoles[guildId] || [];
-            const updatedRoles = roles.filter(role => role.id !== roleId);
+            const updatedRoles = roles.filter(role => String(role.id) !== String(roleId));
             setGuildRoles(guildId, updatedRoles);
 
             toast.success('Role deleted successfully');
@@ -194,13 +197,11 @@ export const RolesService = {
 
         const guild = guilds.find(g => g.id === guildId);
         if (!guild) {
-            console.error('Guild not found');
             return false;
         }
 
         const member = guildMembers[guildId].find(m => m.user_id === memberId);
         if (!member) {
-            console.error('Member not found');
             return false;
         }
 
@@ -210,15 +211,69 @@ export const RolesService = {
 
     /**
      * Handle role-related events from the WebSocket and update the local store accordingly.
-     * 
-     * @param event The role event received from the WebSocket.
-     * @returns void
      */
     handleRoleCreated(event: any) {
         const { role } = event;
+        if (!role) return;
         const guildId = role.guild_id;
         const { guildRoles, setGuildRoles } = useRolesStore.getState();
         const roles = guildRoles[guildId] || [];
+
+        // Use strong idempotency check
+        if (roles.find(r => String(r.id) === String(role.id))) return;
+
         setGuildRoles(guildId, [...roles, role]);
+    },
+
+    handleRoleUpdated(event: any) {
+        const { role } = event;
+        if (!role) return;
+        const guildId = role.guild_id;
+        const { guildRoles, setGuildRoles } = useRolesStore.getState();
+        const roles = guildRoles[guildId] || [];
+
+        const updatedRoles = roles.map(r =>
+            String(r.id) === String(role.id) ? role : r
+        );
+        setGuildRoles(guildId, updatedRoles);
+    },
+
+    handleRoleDeleted(event: any) {
+        // Handle both possible event formats: { role_id, guild_id } or { guild: {id}, role: {id} }
+        const roleId = event.role_id || event.role?.id;
+        const guildId = event.guild_id || event.guild?.id || event.role?.guild_id;
+
+        if (!roleId || !guildId) {
+            return;
+        }
+
+        const { guildRoles, setGuildRoles } = useRolesStore.getState();
+        const roles = guildRoles[guildId] || [];
+
+        const updatedRoles = roles.filter(r => String(r.id) !== String(roleId));
+        setGuildRoles(guildId, updatedRoles);
+    },
+
+    async updateRolePositions(guildId: string, positions: { id: string, position: number }[]) {
+        try {
+            await api.patch(`/guilds/${guildId}/roles`, {
+                roles: positions
+            });
+
+            const { guildRoles, setGuildRoles } = useRolesStore.getState();
+            const roles = [...(guildRoles[guildId] || [])];
+
+            positions.forEach(p => {
+                const role = roles.find(r => String(r.id) === String(p.id));
+                if (role) role.position = p.position;
+            });
+
+            roles.sort((a, b) => b.position - a.position);
+            setGuildRoles(guildId, roles);
+            toast.success('Role order updated');
+        } catch (error) {
+            console.error('Failed to update role positions:', error);
+            toast.error('Failed to update role order');
+        }
     }
 };

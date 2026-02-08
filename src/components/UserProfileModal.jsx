@@ -143,7 +143,7 @@ const UserProfileModal = ({ user, isOpen, setIsOpen }) => {
                                     <button
                                         onClick={handleAddFriend}
                                         disabled={isSending}
-                                        className="flex h-8 grow items-center justify-center gap-2 rounded bg-[#5865f2] px-4 text-sm font-bold text-white transition hover:bg-[#4752c4] disabled:opacity-50"
+                                        className="flex h-8 grow items-center justify-center gap-2 rounded bg-orange-500 px-4 text-sm font-bold text-white transition hover:bg-orange-600 disabled:opacity-50"
                                     >
                                         <UserPlus size={16} weight="bold" />
                                         {isSending ? 'Sending...' : 'Add Friend'}

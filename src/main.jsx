@@ -48,7 +48,7 @@ function WindowBar() {
           aria-label="Minimize"
           onClick={() => window.IgniteNative.minimize()}
           style={{ width: 40, height: 32, background: 'none', border: 'none', color: '#fff', fontSize: 18 }}
-        >—</button>
+        >-</button>
         <button
           aria-label="Maximize"
           onClick={() => window.IgniteNative.maximize()}
@@ -79,12 +79,12 @@ window.Echo = new Echo({
           socket_id: socketId,
           channel_name: channel.name
         })
-        .then(response => {
-          callback(false, response.data);
-        })
-        .catch(error => {
-          callback(true, error);
-        });
+          .then(response => {
+            callback(false, response.data);
+          })
+          .catch(error => {
+            callback(true, error);
+          });
       }
     };
   },

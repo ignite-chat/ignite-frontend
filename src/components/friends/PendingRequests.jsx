@@ -24,7 +24,7 @@ const PendingRequests = ({ requests, currentUser }) => {
     return (
         <div className="space-y-1">
             <div className="mb-4 text-[10px] font-semibold uppercase text-gray-400">
-                Pending — {requests.length}
+                Pending - {requests.length}
             </div>
             {requests.length === 0 && (
                 <div className="flex h-64 flex-col items-center justify-center">

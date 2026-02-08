@@ -85,7 +85,7 @@ export const GuildsService = {
     const { guildMembers, setGuildMembers } = useGuildsStore.getState();
     const members = guildMembers[guildId] || [];
     if (members.length === 0) return;
-    
+
     setGuildMembers(guildId, [...members, member]);
   },
 
@@ -120,5 +120,86 @@ export const GuildsService = {
 
     const updatedMembers = members.filter(member => member.user_id !== memberId);
     setGuildMembers(guildId, updatedMembers);
-  }
+  },
+
+  async kickMember(guildId: string, memberId: string) {
+    try {
+      await api.delete(`/guilds/${guildId}/members/${memberId}`);
+      toast.success('Member kicked successfully.');
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to kick member.');
+    }
+  },
+
+  async updateMemberNickname(guildId: string, memberId: string, nickname: string) {
+    try {
+      await api.patch(`/guilds/${guildId}/members/${memberId}`, { nickname });
+      toast.success('Nickname updated successfully.');
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to update nickname.');
+    }
+  },
+
+  async createInvite(guildId: string, channelId: string, options: { max_uses?: number, expires_at?: string } = {}) {
+    try {
+      const { data } = await api.post(`/guilds/${guildId}/invites`, {
+        channel_id: channelId,
+        max_uses: options.max_uses,
+        expires_at: options.expires_at
+      });
+      toast.success('Invite link created.');
+      return data;
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to create invite.');
+    }
+  },
+
+  async pauseInvites(guildId: string, paused: boolean) {
+    try {
+      await api.patch(`/guilds/${guildId}/invites/settings`, { paused });
+      toast.success(paused ? 'Invites paused.' : 'Invites resumed.');
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to update invite settings.');
+    }
+  },
+
+  async updateGuildProfile(guildId: string, profileData: any) {
+    const { guilds, setGuilds } = useGuildsStore.getState();
+
+    try {
+      // Backend expects profile updates as query params, not body
+      // We also need to strip banner_color if it exists as it causes issues
+      const { banner_color, ...paramsToSend } = profileData;
+
+      const { data } = await api.patch(`/guilds/${guildId}/profile`, null, {
+        params: paramsToSend
+      });
+
+      // Update local store
+      const updatedGuilds = guilds.map((g) => {
+        if (g.id === guildId) {
+          return { ...g, ...data };
+        }
+        return g;
+      });
+
+      setGuilds(updatedGuilds);
+
+      toast.success('Server profile updated successfully');
+      return data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        const errorMessage = error.response.data?.message || 'Failed to update server profile';
+        toast.error(errorMessage);
+        throw error; // Re-throw to handle in component
+      } else {
+        toast.error('Failed to update server profile');
+        throw error;
+      }
+    }
+  },
 };
