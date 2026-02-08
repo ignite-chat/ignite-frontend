@@ -175,6 +175,8 @@ export const GuildsService = {
       // We also need to strip banner_color if it exists as it causes issues
       const { banner_color, ...paramsToSend } = profileData;
 
+      /* backend logic goes here for server profile picture and banner color */
+
       const { data } = await api.patch(`/guilds/${guildId}/profile`, null, {
         params: paramsToSend
       });
