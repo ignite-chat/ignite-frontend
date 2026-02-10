@@ -31,7 +31,7 @@ const FriendsList = ({ friends, filter }) => {
     return (
         <div className="space-y-1">
             <div className="mb-4 text-[10px] font-semibold uppercase text-gray-400">
-                {filter} — {friends.length}
+                {filter} - {friends.length}
             </div>
             {friends.map(friend => (
                 <div key={friend.id} className="group flex items-center justify-between border-t border-gray-600/30 px-2 py-3 hover:bg-gray-600/30 hover:rounded-lg cursor-pointer">

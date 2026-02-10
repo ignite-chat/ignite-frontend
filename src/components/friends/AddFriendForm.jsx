@@ -27,7 +27,7 @@ const AddFriendForm = () => {
         <div className="w-full border-b border-gray-700 pb-5">
             <h2 className="text-lg font-semibold text-white mb-2">Add Friend</h2>
             <p className="text-xs text-gray-300 mb-4">You can add a friend with their Ignite username.</p>
-            <form onSubmit={sendFriendRequest} className="relative flex items-center bg-[#1e1f22] rounded-lg p-2 border border-black/10 focus-within:border-[#00a8fc] ring-1 ring-transparent focus-within:ring-[#00a8fc]">
+            <form onSubmit={sendFriendRequest} className="relative flex items-center bg-[#1e1f22] rounded-lg p-2 border border-black/10 focus-within:border-orange-500 ring-1 ring-transparent focus-within:ring-orange-500">
                 <Input
                     value={friendUsername}
                     onChange={e => setFriendUsername(e.target.value)}
@@ -37,7 +37,7 @@ const AddFriendForm = () => {
                 <Button
                     type="submit"
                     disabled={!friendUsername}
-                    className="bg-[#5865f2] hover:bg-[#4752c4] h-8 text-xs font-medium ml-2 px-4 transition-colors disabled:opacity-50"
+                    className="bg-orange-500 hover:bg-orange-600 h-8 text-xs font-medium ml-2 px-4 transition-colors disabled:opacity-50"
                 >
                     Send Friend Request
                 </Button>

@@ -200,8 +200,6 @@ export const ChannelsService = {
         const { channels, setChannels, channelMessages, channelPendingMessages, setChannelMessages, setChannelPendingMessages } = useChannelsStore.getState();
         const channelId = event.channel.id;
 
-        console.log('New message event received on channel', channelId);
-
         if (channelPendingMessages[channelId]?.some((m) => m.nonce === event.message.nonce)) {
             setChannelPendingMessages(channelId, channelPendingMessages[channelId].filter((m) => m.nonce !== event.message.nonce));
         }
@@ -216,15 +214,14 @@ export const ChannelsService = {
         const newChannels = channels.map((c) =>
             c.channel_id === channelId ? { ...c, last_message_id: event.message.id } : c
         );
-        console.log('Updating channel last_message_id:', newChannels.find(c => c.channel_id === channelId));
         setChannels(newChannels);
 
         /**
          * Play notification sound for incoming messages not sent by the current user
          */
         if (event.message.author.id !== user.id) {
-            new Audio(notificationSound).play().catch((err) => {
-                console.log('Failed to play notification sound.', err);
+            new Audio(notificationSound).play().catch(() => {
+                // Audio play failed (e.g. user interacting with document)
             });
         }
     },
@@ -267,6 +264,70 @@ export const ChannelsService = {
             setChannelMessages(channelId, channelMessages[channelId].map((m) =>
                 m.id === event.message.id ? { ...m, content: event.message.content, updated_at: event.message.updated_at } : m
             ));
+        }
+    },
+
+    async updateGuildChannel(guildId: string, channelId: string, updates: { name?: string, description?: string }) {
+        const { editGuildChannel } = useGuildsStore.getState();
+        try {
+            const { data } = await api.patch(`/guilds/${guildId}/channels/${channelId}`, updates);
+            editGuildChannel(guildId, channelId, updates);
+            return data;
+        } catch (error) {
+            console.error('Failed to update guild channel', error);
+            throw error;
+        }
+    },
+
+    async updateChannelPermissions(guildId: string, channelId: string, roleId: string, permissions: { allowed_permissions: number, denied_permissions: number }) {
+        const { guilds, setGuilds } = useGuildsStore.getState();
+        try {
+            await api.put(`/channels/${channelId}/permissions/${roleId}`, permissions);
+
+            // Complex store update for permissions
+            const newGuilds = guilds.map(g => {
+                if (g.id !== guildId) return g;
+
+                const newChannels = (g.channels || []).map((c: any) => {
+                    if (c.channel_id !== channelId) return c;
+
+                    const existingRolePerms = c.role_permissions || [];
+                    const newRolePerms = (() => {
+                        const updated = existingRolePerms.map((rp: any) => {
+                            if (rp.role_id !== roleId) return rp;
+                            return {
+                                ...rp,
+                                allowed_permissions: permissions.allowed_permissions,
+                                denied_permissions: permissions.denied_permissions,
+                            };
+                        });
+                        const hasRole = existingRolePerms.some((rp: any) => rp.role_id === roleId);
+                        if (hasRole) return updated;
+                        return [
+                            ...updated,
+                            {
+                                role_id: roleId,
+                                allowed_permissions: permissions.allowed_permissions,
+                                denied_permissions: permissions.denied_permissions,
+                            },
+                        ];
+                    })();
+
+                    return {
+                        ...c,
+                        role_permissions: newRolePerms,
+                    };
+                });
+
+                return {
+                    ...g,
+                    channels: newChannels,
+                };
+            });
+            setGuilds(newGuilds);
+        } catch (error) {
+            console.error('Failed to update channel permissions', error);
+            throw error;
         }
     }
 };

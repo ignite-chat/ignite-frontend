@@ -32,7 +32,7 @@ export const PermissionsService = {
         if (!member) return false;
 
         // Get all role IDs assigned to the member
-        const memberRoleIds = member.roles.map(role => role.id);
+        const memberRoleIds = (member.roles || []).map(role => role.id);
 
         // Get roles from the roles store
         const memberRoles = guildRoles.filter(role => memberRoleIds.includes(role.id));

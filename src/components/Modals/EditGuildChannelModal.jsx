@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Info, Lock, FloppyDisk, Check } from '@phosphor-icons/react';
 import { InputGroup, InputGroupInput } from '../ui/input-group';
-import api from '../../api';
 import { useGuildsStore } from '../../store/guilds.store';
+import { ChannelsService } from '../../services/channels.service';
 import { Slash } from 'lucide-react';
 
 const permissions = {
@@ -15,7 +15,7 @@ const permissions = {
 
 const OverviewTab = ({ guild, channel }) => {
     const store = useGuildsStore();
-    
+
     const [name, setName] = useState(channel?.name || '');
     const [description, setDescription] = useState(channel?.description || '');
     const [isSaving, setIsSaving] = useState(false);
@@ -34,32 +34,15 @@ const OverviewTab = ({ guild, channel }) => {
         if (!hasChanged) return;
         setIsSaving(true);
 
-        api.patch(`/guilds/${guild.id}/channels/${channel.channel_id}`, {
+        ChannelsService.updateGuildChannel(guild.id, channel.channel_id, {
             name,
             description,
         })
-            .then((response) => {
-                console.log('Channel updated successfully:', response.data);
-
-                // Update the channel in the store
-                const newGuilds = store.guilds.map(g => {
-                    if (g.id === guild.id) {
-                        return {
-                            ...g,
-                            channels: g.channels.map(c => {
-                                if (c.channel_id === channel.channel_id) {
-                                    return { ...c, name, description };
-                                }
-                                return c;
-                            }),
-                        };
-                    }
-                    return g;
-                });
-                store.setGuilds(newGuilds);
+            .then(() => {
+                // Success feedback handled by parent or toast
             })
-            .catch((error) => {
-                console.error('Error updating channel:', error);
+            .catch(() => {
+                // Error handling via service logs or toast
             })
             .finally(() => {
                 setIsSaving(false);
@@ -120,11 +103,10 @@ const OverviewTab = ({ guild, channel }) => {
                     <button
                         onClick={handleSave}
                         disabled={!hasChanged || isSaving}
-                        className={`flex items-center gap-2 rounded px-4 py-2 text-sm font-medium text-white transition-colors ${
-                            hasChanged 
-                                ? 'bg-green-600 hover:bg-green-500 shadow-lg shadow-green-900/20' 
-                                : 'bg-gray-700 cursor-not-allowed opacity-50'
-                        }`}
+                        className={`flex items-center gap-2 rounded px-4 py-2 text-sm font-medium text-white transition-colors ${hasChanged
+                            ? 'bg-green-600 hover:bg-green-500 shadow-lg shadow-green-900/20'
+                            : 'bg-gray-700 cursor-not-allowed opacity-50'
+                            }`}
                     >
                         <FloppyDisk size={18} />
                         {isSaving ? 'Saving...' : 'Save Changes'}
@@ -145,8 +127,8 @@ const PermissionRow = ({ label, state, onAllow, onDeny, onReset }) => {
                     type="button"
                     onClick={onDeny}
                     className={`flex h-8 w-8 items-center justify-center rounded-l border border-r-0 transition-all ${state === 0
-                            ? 'bg-red-500/20 border-red-500 text-red-500'
-                            : 'bg-gray-800 border-gray-700 text-gray-500 hover:bg-gray-700 hover:text-red-400'
+                        ? 'bg-red-500/20 border-red-500 text-red-500'
+                        : 'bg-gray-800 border-gray-700 text-gray-500 hover:bg-gray-700 hover:text-red-400'
                         }`}
                 >
                     <X weight="bold" size={14} />
@@ -157,8 +139,8 @@ const PermissionRow = ({ label, state, onAllow, onDeny, onReset }) => {
                     type="button"
                     onClick={onReset}
                     className={`flex h-8 w-8 items-center justify-center border transition-all ${state === 1
-                            ? 'bg-gray-600/30 border-gray-500 text-gray-200'
-                            : 'bg-gray-800 border-gray-700 text-gray-500 hover:bg-gray-700 hover:text-gray-300'
+                        ? 'bg-gray-600/30 border-gray-500 text-gray-200'
+                        : 'bg-gray-800 border-gray-700 text-gray-500 hover:bg-gray-700 hover:text-gray-300'
                         }`}
                 >
                     <Slash weight="bold" size={14} />
@@ -169,8 +151,8 @@ const PermissionRow = ({ label, state, onAllow, onDeny, onReset }) => {
                     type="button"
                     onClick={onAllow}
                     className={`flex h-8 w-8 items-center justify-center rounded-r border border-l-0 transition-all ${state === 2
-                            ? 'bg-green-500/20 border-green-500 text-green-500'
-                            : 'bg-gray-800 border-gray-700 text-gray-500 hover:bg-gray-700 hover:text-green-400'
+                        ? 'bg-green-500/20 border-green-500 text-green-500'
+                        : 'bg-gray-800 border-gray-700 text-gray-500 hover:bg-gray-700 hover:text-green-400'
                         }`}
                 >
                     <Check weight="bold" size={14} />
@@ -185,7 +167,7 @@ const PermissionsTab = ({ guild, channel }) => {
     const [selectedRoleId, setSelectedRoleId] = useState();
     const rolesList = guild?.roles ?? [];
     const [savedPermissionsByRole, setSavedPermissionsByRole] = useState({});
-    
+
     // Track if changes have been made locally
     const [isSaving, setIsSaving] = useState(false);
 
@@ -200,7 +182,7 @@ const PermissionsTab = ({ guild, channel }) => {
             return allowedPermissions !== 0 || deniedPermissions !== 0;
         }
         return allowedPermissions !== Number(baselinePerm.allowed_permissions) ||
-                deniedPermissions !== Number(baselinePerm.denied_permissions);
+            deniedPermissions !== Number(baselinePerm.denied_permissions);
     }, [allowedPermissions, deniedPermissions, selectedRoleId, channel, savedPermissionsByRole]);
 
     // Load initial permissions when role changes
@@ -250,66 +232,27 @@ const PermissionsTab = ({ guild, channel }) => {
 
     const handleSave = () => {
         setIsSaving(true);
-        api.put(`/channels/${channel.channel_id}/permissions/${selectedRoleId}`, {
+        const permissions = {
             allowed_permissions: allowedPermissions,
             denied_permissions: deniedPermissions,
-        })
-        .then((response) => {
-            console.log('Permissions updated successfully:', response.data);
-            setSavedPermissionsByRole(prev => ({
-                ...prev,
-                [selectedRoleId]: {
-                    allowed_permissions: allowedPermissions,
-                    denied_permissions: deniedPermissions,
-                },
-            }));
-            const newGuilds = store.guilds.map(g => {
-                if (g.id !== guild.id) return g;
+        };
 
-                const newChannels = (g.channels || []).map(c => {
-                    if (c.channel_id !== channel.channel_id) return c;
-
-                    const existingRolePerms = c.role_permissions || [];
-                    const newRolePerms = (() => {
-                        const updated = existingRolePerms.map(rp => {
-                            if (rp.role_id !== selectedRoleId) return rp;
-                            return {
-                                ...rp,
-                                allowed_permissions: allowedPermissions,
-                                denied_permissions: deniedPermissions,
-                            };
-                        });
-                        const hasRole = existingRolePerms.some(rp => rp.role_id === selectedRoleId);
-                        if (hasRole) return updated;
-                        return [
-                            ...updated,
-                            {
-                                role_id: selectedRoleId,
-                                allowed_permissions: allowedPermissions,
-                                denied_permissions: deniedPermissions,
-                            },
-                        ];
-                    })();
-
-                    return {
-                        ...c,
-                        role_permissions: newRolePerms,
-                    };
-                });
-
-                return {
-                    ...g,
-                    channels: newChannels,
-                };
+        ChannelsService.updateChannelPermissions(guild.id, channel.channel_id, selectedRoleId, permissions)
+            .then(() => {
+                setSavedPermissionsByRole(prev => ({
+                    ...prev,
+                    [selectedRoleId]: {
+                        allowed_permissions: allowedPermissions,
+                        denied_permissions: deniedPermissions,
+                    },
+                }));
+            })
+            .catch(() => {
+                // Error handling
+            })
+            .finally(() => {
+                setIsSaving(false);
             });
-            store.setGuilds(newGuilds);
-        })
-        .catch((error) => {
-            console.error('Error updating permissions:', error);
-        })
-        .finally(() => {
-            setIsSaving(false);
-        });
     };
 
     return (
@@ -324,11 +267,10 @@ const PermissionsTab = ({ guild, channel }) => {
                         <button
                             key={role.id}
                             onClick={() => setSelectedRoleId(role.id)}
-                            className={`mb-1 flex w-full items-center justify-between rounded px-3 py-2 text-sm font-medium transition-colors ${
-                                selectedRoleId === role.id
-                                    ? 'bg-gray-800 text-white shadow-sm'
-                                    : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
-                            }`}
+                            className={`mb-1 flex w-full items-center justify-between rounded px-3 py-2 text-sm font-medium transition-colors ${selectedRoleId === role.id
+                                ? 'bg-gray-800 text-white shadow-sm'
+                                : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                                }`}
                         >
                             <span className="truncate">{role.name}</span>
                         </button>
@@ -371,11 +313,10 @@ const PermissionsTab = ({ guild, channel }) => {
                         <button
                             onClick={handleSave}
                             disabled={!hasChanged || isSaving}
-                            className={`flex items-center gap-2 rounded px-4 py-2 text-sm font-medium text-white transition-colors ${
-                                hasChanged 
-                                    ? 'bg-green-600 hover:bg-green-500 shadow-lg shadow-green-900/20' 
-                                    : 'bg-gray-700 cursor-not-allowed opacity-50'
-                            }`}
+                            className={`flex items-center gap-2 rounded px-4 py-2 text-sm font-medium text-white transition-colors ${hasChanged
+                                ? 'bg-green-600 hover:bg-green-500 shadow-lg shadow-green-900/20'
+                                : 'bg-gray-700 cursor-not-allowed opacity-50'
+                                }`}
                         >
                             <FloppyDisk size={18} />
                             {isSaving ? 'Saving...' : 'Save Changes'}

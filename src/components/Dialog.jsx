@@ -1,7 +1,17 @@
 import { Fragment } from 'react';
 import { Dialog, DialogPanel, Transition, TransitionChild } from '@headlessui/react';
+import { cn } from '../lib/utils';
 
-const MyDialog = ({ isOpen, setIsOpen, children, outsideChildren = '', title = '', closeOnOutsideClick = true }) => {
+const MyDialog = ({
+  isOpen,
+  setIsOpen,
+  children,
+  outsideChildren = '',
+  title = '',
+  closeOnOutsideClick = true,
+  transparent = false,
+  noPadding = false
+}) => {
   const handleOutsideClick = () => {
     if (closeOnOutsideClick) {
       setIsOpen(false);
@@ -34,13 +44,16 @@ const MyDialog = ({ isOpen, setIsOpen, children, outsideChildren = '', title = '
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-xl rounded-lg bg-gray-900 text-left align-middle text-white shadow-xl transition-all">
+              <DialogPanel className={cn(
+                "w-full max-w-xl rounded-lg text-left align-middle text-white shadow-xl transition-all",
+                transparent ? "bg-transparent shadow-none" : "bg-gray-900",
+              )}>
                 {title && (
                   <div className="border-b border-white/5 px-6 py-4">
                     <h2 className="text-lg font-medium text-white">{title}</h2>
                   </div>
                 )}
-                <div className="px-6 py-4">
+                <div className={cn(noPadding ? "p-0" : "px-6 py-4")}>
                   {children}
                 </div>
                 {outsideChildren}

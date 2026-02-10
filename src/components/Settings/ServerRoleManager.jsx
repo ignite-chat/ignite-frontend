@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { CircleNotch, FloppyDisk } from '@phosphor-icons/react';
 import { Plus, Shield, Users, Monitor, Trash2, Check, GripVertical } from 'lucide-react';
+import { CircleNotch, FloppyDisk, Shield as ShieldDT, Users as UsersDT, Monitor as MonitorDT } from '@phosphor-icons/react';
 import api from '../../api';
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
@@ -22,6 +22,8 @@ import {
 import { RolesService } from '../../services/roles.service';
 import { useRolesStore } from '../../store/roles.store';
 import { toast } from 'sonner';
+import { cn } from '../../lib/utils';
+import { hexToInt, intToHex } from '../../lib/colors';
 
 const PERMISSIONS_LIST = Object.freeze({
   [1n << 0n]: "Create Instant Invite",
@@ -162,14 +164,6 @@ const COLORS = [
   { name: 'Emerald', value: '#10b981' },
 ];
 
-const hexToInt = (hex) => {
-  if (!hex) return 0;
-  return parseInt(hex.replace('#', ''), 16);
-};
-
-const intToHex = (intColor) => {
-  return `#${intColor.toString(16).padStart(6, '0')}`;
-};
 
 const ServerRoleManager = ({ guild }) => {
   const [localRoles, setLocalRoles] = useState([]);
@@ -203,7 +197,7 @@ const ServerRoleManager = ({ guild }) => {
 
   useEffect(() => {
     const roleToSelect = selectedRoleId
-      ? localRoles.find(r => r.id === selectedRoleId)
+      ? localRoles.find(r => r.id == selectedRoleId)
       : localRoles[0];
 
     if (roleToSelect) {
@@ -211,7 +205,7 @@ const ServerRoleManager = ({ guild }) => {
       if (!selectedRoleId) setSelectedRoleId(roleToSelect.id);
 
       // Update editor fields if we switched roles
-      if (selectedRoleId !== roleToSelect.id) {
+      if (selectedRoleId != roleToSelect.id) {
         const selectedRoleColor = intToHex(roleToSelect.color);
 
         setActivePermissions(Number(roleToSelect.permissions || 0));
@@ -321,6 +315,7 @@ const ServerRoleManager = ({ guild }) => {
     if (isDeleting || !selectedRoleId) return;
     setIsDeleting(true);
     try {
+      console.log('Attempting to delete role:', selectedRoleId, 'in guild:', guild.id);
       await RolesService.deleteGuildRole(guild.id, selectedRoleId);
       toast.success("Role deleted");
       setSelectedRoleId(null);
@@ -348,7 +343,7 @@ const ServerRoleManager = ({ guild }) => {
     return detailsChanged || orderChanged;
   }, [activePermissions, originalPermissions, roleName, originalName, roleColor, originalColor, localRoles, originalRoleOrder]);
 
-  const activeRole = localRoles.find((role) => role.id === selectedRoleId);
+  const activeRole = localRoles.find((role) => role.id == selectedRoleId);
 
   return (
     <div className="w-full space-y-6 min-w-0">
@@ -362,19 +357,19 @@ const ServerRoleManager = ({ guild }) => {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
         {/* Left Column: Role List */}
         <div className="rounded-lg border border-border p-5 h-fit">
-          <div className="flex items-center justify-between mb-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Roles &mdash; <span className="text-[10px] normal-case opacity-70">Drag to reorder</span>
+          <div className="flex items-center justify-between mb-2 px-1">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-50">
+              Roles &mdash; <span className="font-medium normal-case">Drag to reorder</span>
             </div>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={handleCreateRole}
-              className="gap-2"
+              className="h-8 gap-1.5 border-orange-500/50 hover:bg-orange-500/10 hover:text-orange-500 transition-all font-bold text-xs"
               disabled={isCreating}
             >
-              {isCreating ? <CircleNotch size={14} className="animate-spin" /> : <Plus size={14} />}
+              {isCreating ? <CircleNotch size={14} className="animate-spin" /> : <Plus size={14} weight="bold" />}
               New Role
             </Button>
           </div>
@@ -388,9 +383,9 @@ const ServerRoleManager = ({ guild }) => {
                   onDragEnter={() => (dragOverItem.current = index)}
                   onDragEnd={handleSort}
                   onDragOver={(e) => e.preventDefault()}
-                  className="flex items-center gap-1 group"
+                  className="relative flex items-center group"
                 >
-                  <div className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground p-1 rounded transition-colors opacity-0 group-hover:opacity-100">
+                  <div className="absolute -left-2 cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-orange-500 p-1 rounded transition-all opacity-0 group-hover:opacity-100 z-10">
                     <GripVertical size={14} />
                   </div>
 
@@ -408,14 +403,19 @@ const ServerRoleManager = ({ guild }) => {
                       setRoleColor(selectedRoleColor);
                       setOriginalColor(selectedRoleColor);
                     }}
-                    className={`flex-1 justify-start gap-3 ${selectedRoleId === role.id ? 'bg-primary/10 text-primary' : ''}`}
+                    className={cn(
+                      "flex-1 justify-start gap-3 h-9 px-3 transition-all",
+                      selectedRoleId == role.id
+                        ? "bg-orange-500/10 text-orange-500 shadow-sm"
+                        : "hover:bg-white/5 opacity-70 hover:opacity-100"
+                    )}
                   >
                     <div
-                      className="h-3 w-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: role.id === selectedRoleId ? roleColor : intToHex(role.color) }}
+                      className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: role.id == selectedRoleId ? roleColor : intToHex(role.color) }}
                     />
-                    <span className="truncate">
-                      {role.id === selectedRoleId ? roleName : role.name}
+                    <span className="truncate text-sm font-semibold tracking-tight">
+                      {role.id == selectedRoleId ? roleName : role.name}
                     </span>
                   </Button>
                 </div>
@@ -429,14 +429,22 @@ const ServerRoleManager = ({ guild }) => {
           <Tabs value={selectedRoleId ? undefined : "display"} defaultValue="display" className="flex flex-col h-full">
             <div className="px-5 pt-5">
               <div className="mb-4 text-sm font-bold truncate">
-                Editing Role: <span className="text-primary">{activeRole?.name || 'Select a role'}</span>
+                Editing Role: <span className="text-orange-500">{activeRole?.name || 'Select a role'}</span>
               </div>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="display" className="gap-2">
-                  <Monitor size={14} /> Display
+              <TabsList className="bg-transparent border-b border-white/5 w-full justify-start rounded-none h-auto p-0 gap-6">
+                <TabsTrigger
+                  value="display"
+                  className="gap-2 px-0 py-2 text-sm font-bold bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-orange-500 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-none shadow-none border-none transition-all opacity-60 data-[state=active]:opacity-100"
+                >
+                  <Monitor size={16} weight="duotone" />
+                  Display
                 </TabsTrigger>
-                <TabsTrigger value="permissions" className="gap-2">
-                  <Shield size={14} /> Permissions
+                <TabsTrigger
+                  value="permissions"
+                  className="gap-2 px-0 py-2 text-sm font-bold bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-orange-500 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-none shadow-none border-none transition-all opacity-60 data-[state=active]:opacity-100"
+                >
+                  <Shield size={16} weight="duotone" />
+                  Permissions
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -487,7 +495,7 @@ const ServerRoleManager = ({ guild }) => {
 
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm" className="gap-2" disabled={isDeleting}>
+                        <Button variant="destructive" size="sm" className="h-8 gap-1.5 px-3 text-xs" disabled={isDeleting}>
                           {isDeleting ? <CircleNotch size={14} className="animate-spin" /> : <Trash2 size={14} />}
                           Delete
                         </Button>
@@ -551,8 +559,8 @@ const ServerRoleManager = ({ guild }) => {
 
             {/* Floating Save Bar */}
             {hasChanged && (
-              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-2 rounded-md border border-primary/20 bg-primary/5 backdrop-blur-md px-4 py-3 animate-in fade-in slide-in-from-bottom-2 z-50">
-                <span className="text-xs font-medium text-primary">Careful — you have unsaved changes!</span>
+              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-2 rounded-md border border-orange-500/20 bg-orange-500/10 backdrop-blur-md px-4 py-3 animate-in fade-in slide-in-from-bottom-2 z-50 shadow-2xl">
+                <span className="text-xs font-bold text-orange-500 tracking-wide">Careful - you have unsaved changes!</span>
                 <div className="flex gap-2">
                   <Button
                     variant="ghost"
@@ -573,11 +581,11 @@ const ServerRoleManager = ({ guild }) => {
                   <Button
                     variant="default"
                     size="sm"
-                    className="gap-2"
+                    className="gap-1.5 bg-orange-500 hover:bg-orange-600 text-white border-none font-bold px-4 h-8 shadow-lg shadow-orange-500/20 active:scale-95 transition-all text-sm"
                     onClick={handleSave}
                     disabled={isSaving}
                   >
-                    {isSaving ? <CircleNotch size={14} className="animate-spin" /> : <FloppyDisk size={14} />}
+                    {isSaving ? <CircleNotch size={14} className="animate-spin" /> : <FloppyDisk size={14} weight="duotone" />}
                     Save Changes
                   </Button>
                 </div>

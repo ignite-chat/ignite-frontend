@@ -7,6 +7,7 @@ import LoginPage from './pages/Login';
 import RegisterPage from './pages/Register';
 import DirectMessagesPage from './pages/DirectMessages';
 import GuildChannelPage from './pages/GuildChannel';
+import InvitePage from './pages/Invite';
 import { GuildsService } from './services/guilds.service';
 import { FriendsService } from './services/friends.service';
 import { useGuildsStore } from './store/guilds.store';
@@ -256,6 +257,15 @@ function App() {
         }
       />
     </Route>
+    <Route
+      path="/invite/:code"
+      element={
+        <>
+          <PageTitle title="Join Server" />
+          <InvitePage />
+        </>
+      }
+    />
   </Routes>;
 }
 

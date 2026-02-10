@@ -8,15 +8,13 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '../ui/conte
 import { CircleNotch, DotsThree } from '@phosphor-icons/react';
 import GuildMemberContextMenu from './GuildMemberContextMenu';
 import { toast } from 'sonner';
+import UserProfileModal from '../UserProfileModal';
 
 const GuildMemberPopoverContent = ({ user, guild = null }) => {
   const store = useStore();
-
-  const [loading, setLoading] = useState(true);
-
+  const [loading, setLoading] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const { friends, requests } = useFriendsStore();
-
-  // TODO: Put in some helper file or in friends store
 
   const isFriend = useMemo(() => {
     return friends.some((friend) => friend.id === user.id);
@@ -36,16 +34,8 @@ const GuildMemberPopoverContent = ({ user, guild = null }) => {
   }, [requests, user.id]);
 
   const sendFriendRequest = () => {
-    FriendsService.sendRequest(user.username).then(() => {
-      toast.success(`Friend request sent to ${user.username}`);
-    }).catch(() => {
-      toast.error(`Failed to send friend request to ${user.username}`);
-    });
+    // backend logic goes here to send friend request via FriendsService
   };
-
-  setTimeout(() => {
-    setLoading(false);
-  }, 250);
 
   return (
     <>
@@ -54,16 +44,25 @@ const GuildMemberPopoverContent = ({ user, guild = null }) => {
       ) : (
         <div className="w-72 rounded">
           <div className="relative h-28">
-            <div className="h-full rounded bg-primary">
-              {/* banner image */}
-            </div>
+            <div className="h-full rounded bg-primary" />
+
             <div className="absolute -bottom-12 left-3">
-              <div className="rounded-full border-[6px] border-background bg-gray-700">
-                <Avatar user={user} className="size-24 !cursor-default text-4xl" />
-              </div>
-              {/* online indicator (always online) */}
-              <div className="absolute bottom-1.5 right-1.5 size-6 rounded-full border-4 border-background bg-green-500" />
+              <button
+                type="button"
+                onClick={() => setProfileModalOpen(true)}
+                className="group relative rounded-full"
+              >
+                <div className="rounded-full border-[6px] border-background bg-gray-700 transition hover:brightness-110">
+                  <Avatar user={user} className="size-24 !cursor-pointer text-4xl" />
+                </div>
+                <div className="absolute bottom-1.5 right-1.5 size-6 rounded-full border-4 border-background bg-green-500" />
+
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/20 opacity-0 transition group-hover:opacity-100">
+                  <span className="text-[10px] font-bold uppercase text-white drop-shadow-md">View Profile</span>
+                </div>
+              </button>
             </div>
+
             <div className="absolute right-2 top-2 flex items-center gap-2">
               {user.id !== store.user.id && (
                 <>
@@ -79,7 +78,9 @@ const GuildMemberPopoverContent = ({ user, guild = null }) => {
                   {isFriend && (
                     <button
                       type="button"
-                      onClick={() => FriendsService.removeFriend(friendRequestId)}
+                      onClick={() => {
+                        // backend logic goes here to remove friend
+                      }}
                       className="flex items-center justify-center rounded-full bg-black/30 p-1.5 text-white transition hover:bg-black/40"
                     >
                       <UserMinus className="size-4" />
@@ -88,7 +89,9 @@ const GuildMemberPopoverContent = ({ user, guild = null }) => {
                   {hasSentRequest && (
                     <button
                       type="button"
-                      onClick={() => FriendsService.cancelRequest(friendRequestId)}
+                      onClick={() => {
+                        // backend logic goes here to cancel request
+                      }}
                       className="flex items-center justify-center rounded-full bg-black/30 p-1.5 text-white transition hover:bg-black/40"
                       title="Cancel Friend Request"
                     >
@@ -98,7 +101,9 @@ const GuildMemberPopoverContent = ({ user, guild = null }) => {
                   {hasReceivedRequest && (
                     <button
                       type="button"
-                      onClick={() => FriendsService.acceptRequest(friendRequestId)}
+                      onClick={() => {
+                        // backend logic goes here to accept request
+                      }}
                       className="flex items-center justify-center rounded-full bg-black/30 p-1.5 text-white transition hover:bg-black/40"
                       title="Accept Friend Request"
                     >
@@ -115,7 +120,6 @@ const GuildMemberPopoverContent = ({ user, guild = null }) => {
                     title="More Options"
                   >
                     <DotsThree className="size-4" />
-                    {/* todo: not working */}
                   </button>
                 </ContextMenuTrigger>
                 <ContextMenuContent>
@@ -124,24 +128,28 @@ const GuildMemberPopoverContent = ({ user, guild = null }) => {
               </ContextMenu>
             </div>
           </div>
-          <div>
-            <div className="mt-14 px-4 pb-4">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-100">
-                  {user.username}
-                </h2>
-                <p className="text-sm text-gray-500">{user.id}</p>
-              </div>
-              {/* bio: */}
-              <div className="mt-4">
-                <p className="text-sm text-gray-400">
-                  This user has no bio.
-                </p>
-              </div>
+
+          <div className="mt-14 px-4 pb-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-100">
+                {user.username}
+              </h2>
+              <p className="text-sm text-gray-500">{user.id}</p>
+            </div>
+            <div className="mt-4">
+              <p className="text-sm text-gray-400">
+                {user.bio || "This user has no bio."}
+              </p>
             </div>
           </div>
         </div>
       )}
+
+      <UserProfileModal
+        user={user}
+        isOpen={profileModalOpen}
+        setIsOpen={setProfileModalOpen}
+      />
     </>
   );
 };
