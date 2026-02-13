@@ -16,6 +16,7 @@ import { PermissionsService } from '../../services/permissions.service';
 import { Permissions } from '../../enums/Permissions';
 import { toast } from 'sonner';
 import { emojiMap, registerEmoji } from '../../utils/emoji.utils';
+import { useEmojisStore } from '../../store/emojis.store';
 
 const MAX_MESSAGE_LENGTH = 2000;
 const SUGGESTIONS_LIMIT = 10;
@@ -198,6 +199,8 @@ const ChannelInput = ({ channel }) => {
 
   const { guildId } = useGuildContext();
   const guildsStore = useGuildsStore();
+  const { guildEmojis } = useEmojisStore();
+  const customEmojis = guildEmojis[guildId] || [];
   const currentUser = useStore((s) => s.user);
   const members = guildsStore.guildMembers[guildId] || [];
   const channelMessages = useChannelsStore(s => s.channelMessages);
@@ -253,16 +256,28 @@ const ChannelInput = ({ channel }) => {
 
   const filteredEmojis = useMemo(() => {
     if (!emojiQuery) return [];
+    const q = emojiQuery.toLowerCase();
 
-    const results = [];
+    // Custom guild emojis first
+    const results = customEmojis
+      .filter((e) => e.name.toLowerCase().includes(q))
+      .slice(0, SUGGESTIONS_LIMIT)
+      .map((e) => ({
+        shortcode: `:${e.name}:`,
+        emoji: null,
+        custom: true,
+        imageUrl: `${import.meta.env.VITE_CDN_BASE_URL}/emojis/${e.id}`,
+      }));
+
+    // Fill remaining slots with standard emojis
     for (const [shortcode, emoji] of emojiMap) {
-      if (shortcode.toLowerCase().includes(`:${emojiQuery.toLowerCase()}`)) {
-        results.push({ shortcode, emoji });
-      }
       if (results.length >= SUGGESTIONS_LIMIT) break;
+      if (shortcode.toLowerCase().includes(`:${q}`)) {
+        results.push({ shortcode, emoji, custom: false });
+      }
     }
     return results;
-  }, [emojiQuery]);
+  }, [emojiQuery, customEmojis]);
 
   /* ---------------- handlers ---------------- */
 
@@ -492,7 +507,10 @@ const ChannelInput = ({ channel }) => {
                     syncValue();
                   }}
                 >
-                  <div className="text-xl flex-shrink-0">{item.emoji}</div>
+                  {item.custom
+                    ? <img src={item.imageUrl} alt={item.shortcode} className="h-6 w-6 object-contain flex-shrink-0" />
+                    : <div className="text-xl flex-shrink-0">{item.emoji}</div>
+                  }
                   <div className="flex-1 truncate text-gray-200 font-medium">{item.shortcode}</div>
                 </button>
               ))}

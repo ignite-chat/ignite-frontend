@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { GuildsService } from '../services/guilds.service';
+import { EmojisService } from '../services/emojis.service';
 import { useGuildsStore } from '../store/guilds.store';
 import GuildLayout from '../layouts/GuildLayout';
 import Channel from '../components/Channel/Channel';
@@ -30,6 +31,12 @@ const GuildChannelPage = () => {
       GuildsService.loadGuildChannels(guild.id);
     }
   }, [guild]);
+
+  useEffect(() => {
+    if (guild) {
+      EmojisService.loadGuildEmojis(guild.id);
+    }
+  }, [guild?.id]);
 
   // if no channel id in url redirect to first channel
   useEffect(() => {

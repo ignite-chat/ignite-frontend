@@ -10,6 +10,19 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ExternalLink from './ExternalLink.jsx';
 import { convertEmojiShortcodes } from '../../utils/emoji.utils';
+import { useEmojisStore } from '../../store/emojis.store';
+
+const EMOJI_CDN_PREFIX = `${import.meta.env.VITE_CDN_BASE_URL}/emojis/`;
+
+const convertCustomEmojis = (text, emojis) => {
+    if (!emojis || emojis.length === 0) return text;
+    return text.replace(/:[\w_+-]+:/g, (match) => {
+        const name = match.slice(1, -1);
+        const emoji = emojis.find((e) => e.name === name);
+        if (emoji) return `![${name}](${EMOJI_CDN_PREFIX}${emoji.id})`;
+        return match;
+    });
+};
 
 const MentionText = ({ userId }) => {
     const { getUser, users } = useUsersStore();
@@ -63,6 +76,10 @@ const MentionText = ({ userId }) => {
 };
 
 const MessageContent = ({ content }) => {
+    const { guildId } = useGuildContext();
+    const { guildEmojis } = useEmojisStore();
+    const emojis = guildEmojis[guildId] || [];
+
     // Parse the content and split by mentions
     // Regex to match <@userid> pattern
     const mentionRegex = /<@(\d+)>/g;
@@ -117,13 +134,18 @@ const MessageContent = ({ content }) => {
                         components={{
                             // Override paragraph to render inline
                             p: ({ children }) => <>{children}</>,
-                            // Disable image rendering - show as plain text
-                            img: ({ src, alt }) => <span className="text-gray-500">[{alt || 'image'}]({src})</span>,
+                            // Render custom emojis as inline images, disable other images
+                            img: ({ src, alt }) => {
+                                if (src?.startsWith(EMOJI_CDN_PREFIX)) {
+                                    return <img src={src} alt={alt} className="inline h-10 w-10 object-contain align-text-bottom" />;
+                                }
+                                return <span className="text-gray-500">[{alt || 'image'}]({src})</span>;
+                            },
                             // External links with confirmation dialog
                             a: ({ href, children }) => href ? <ExternalLink href={href}>{children}</ExternalLink> : <>{children}</>,
                         }}
                     >
-                        {convertEmojiShortcodes(part.content)}
+                        {convertEmojiShortcodes(convertCustomEmojis(part.content, emojis))}
                     </Markdown>
                 );
             })}
