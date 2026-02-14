@@ -18,7 +18,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { useGuildsStore } from '../store/guilds.store';
 import GuildDialog from '../components/GuildDialog';
-import UserBar from '../components/UserBar';
+
 import { useUnreadsStore } from '../store/unreads.store';
 import { useChannelsStore } from '../store/channels.store';
 import useStore from '../hooks/useStore';
@@ -333,7 +333,6 @@ const DefaultLayout = ({ children }) => {
             {children}
           </div>
         </div>
-        <UserBar />
       </div>
     </GuildContextProvider>
   );

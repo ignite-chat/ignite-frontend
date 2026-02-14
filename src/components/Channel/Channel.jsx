@@ -7,9 +7,20 @@ import ChannelInput from './ChannelInput';
 import ChannelMessages from './ChannelMessages';
 import { ChannelType } from '../../enums/ChannelType';
 import MemberList from './MemberList';
+import VoiceChannelView from '../Voice/VoiceChannelView';
 
 const Channel = ({ channel }) => {
   const { guildId } = useGuildContext();
+
+  if (channel?.type === ChannelType.GUILD_VOICE) {
+    return (
+      <div className="relative flex min-h-0 w-full flex-1 flex-col bg-gray-700">
+        <ChannelBar channel={channel} />
+        <hr className="m-0 w-full border border-gray-900 bg-gray-900 p-0" />
+        <VoiceChannelView channel={channel} />
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col bg-gray-700">

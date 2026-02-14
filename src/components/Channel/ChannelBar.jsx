@@ -1,4 +1,4 @@
-import { Bell, Chats, Hash, MagnifyingGlass, PushPin, Question, Tray, Users } from '@phosphor-icons/react';
+import { Bell, Chats, Hash, MagnifyingGlass, PushPin, Question, SpeakerHigh, Tray, Users } from '@phosphor-icons/react';
 import { useState } from 'react';
 import SearchModal from '../Modals/SearchModal';
 import { useGuildContext } from '../../contexts/GuildContext';
@@ -80,6 +80,13 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
                   {otherRecipient?.name}
                 </h1>
               </>
+            ) : channel?.type === ChannelType.GUILD_VOICE ? (
+              <>
+                <SpeakerHigh className="mr-2 size-5 text-gray-500 sm:size-6" />
+                <h1 className="truncate text-sm font-semibold text-gray-100 sm:text-base">
+                  {channel?.name}
+                </h1>
+              </>
             ) : (
               <>
                 <Hash className="mr-2 size-5 text-gray-500 sm:size-6" />
@@ -91,10 +98,12 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-4">
-            {channel?.type !== ChannelType.DM && (
+            {channel?.type !== ChannelType.DM && channel?.type !== ChannelType.GUILD_VOICE && (
               <IconButton icon="users" tooltipText="Show Member List" onClick={() => setMemberListOpen(!memberListOpen)} />
             )}
-            <IconButton icon="search" tooltipText="Search" onClick={() => setSearchOpen(true)} />
+            {channel?.type !== ChannelType.GUILD_VOICE && (
+              <IconButton icon="search" tooltipText="Search" onClick={() => setSearchOpen(true)} />
+            )}
           </div>
         </div>
       </div>

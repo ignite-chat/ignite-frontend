@@ -1,7 +1,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Hash, Plus, CaretDown, CaretRight } from '@phosphor-icons/react';
+import { Hash, Plus, CaretDown, CaretRight, SpeakerHigh } from '@phosphor-icons/react';
 import { toast } from 'sonner'
 import {
     DndContext,
@@ -30,33 +30,46 @@ import { useUnreadsStore } from '@/store/unreads.store';
 import { UnreadsService } from '@/services/unreads.service';
 import { ChannelsService } from '@/services/channels.service';
 import { useChannelsStore } from '@/store/channels.store';
+import { useVoiceStore } from '@/store/voice.store';
+import { VoiceService } from '@/services/voice.service';
+import { ChannelType } from '@/enums/ChannelType';
+import { useUsersStore } from '@/store/users.store';
+import useStore from '@/hooks/useStore';
+import VoiceControls from '@/components/Voice/VoiceControls';
+import VoiceParticipant from '@/components/Voice/VoiceParticipant';
+import UserBar from '@/components/UserBar';
 import GuildSidebarHeader from './GuildSidebarHeader';
 
 // Presentational channel row, used both in SortableChannel and DragOverlay
-const ChannelRow = ({ channel, isActive, isUnread, mentionsCount, isDragOverlay }) => (
-    <div
-        className={`relative mx-2 my-0.5 flex items-center rounded px-2 py-1 transition-colors ${isDragOverlay
-            ? 'bg-gray-600 text-gray-100 shadow-md shadow-black/40 ring-1 ring-gray-500/40'
-            : isActive
-                ? 'bg-gray-600 text-gray-100'
-                : isUnread
-                    ? 'text-gray-100 hover:bg-gray-700'
-                    : 'text-gray-500 hover:bg-gray-700 hover:text-gray-400'
-            }`}
-    >
-        <Hash className={`size-5 shrink-0 ${isDragOverlay ? 'text-gray-300' : isActive || isUnread ? 'text-gray-200' : 'text-gray-500 group-hover:text-gray-400'
-            }`} />
-        <p className={`ml-1 flex-1 truncate text-base select-none ${isDragOverlay ? 'font-medium text-gray-100' : isActive || isUnread ? 'font-semibold text-white' : 'font-medium'
-            }`}>
-            {channel.name}
-        </p>
-        {mentionsCount > 0 && (
-            <div className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white shadow-sm">
-                {mentionsCount}
-            </div>
-        )}
-    </div>
-);
+const ChannelRow = ({ channel, isActive, isUnread, mentionsCount, isDragOverlay }) => {
+    const isVoice = channel.type === ChannelType.GUILD_VOICE;
+    const Icon = isVoice ? SpeakerHigh : Hash;
+
+    return (
+        <div
+            className={`relative mx-2 my-0.5 flex items-center rounded px-2 py-1 transition-colors ${isDragOverlay
+                ? 'bg-gray-600 text-gray-100 shadow-md shadow-black/40 ring-1 ring-gray-500/40'
+                : isActive
+                    ? 'bg-gray-600 text-gray-100'
+                    : isUnread
+                        ? 'text-gray-100 hover:bg-gray-700'
+                        : 'text-gray-500 hover:bg-gray-700 hover:text-gray-400'
+                }`}
+        >
+            <Icon className={`size-5 shrink-0 ${isDragOverlay ? 'text-gray-300' : isActive || isUnread ? 'text-gray-200' : 'text-gray-500 group-hover:text-gray-400'
+                }`} />
+            <p className={`ml-1 flex-1 truncate text-base select-none ${isDragOverlay ? 'font-medium text-gray-100' : isActive || isUnread ? 'font-semibold text-white' : 'font-medium'
+                }`}>
+                {channel.name}
+            </p>
+            {mentionsCount > 0 && (
+                <div className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white shadow-sm">
+                    {mentionsCount}
+                </div>
+            )}
+        </div>
+    );
+};
 
 const SortableChannel = ({
     channel,
@@ -68,7 +81,9 @@ const SortableChannel = ({
     onEditChannel,
     handleDeleteChannel,
     navigate,
-    globalIsDragging
+    globalIsDragging,
+    guild,
+    voiceParticipants,
 }) => {
     const {
         attributes,
@@ -112,37 +127,85 @@ const SortableChannel = ({
         }
     };
 
+    const isVoice = channel.type === ChannelType.GUILD_VOICE;
+
+    const handleVoiceClick = (e) => {
+        if (isDragging) return;
+        VoiceService.joinVoiceChannel(
+            channel.channel_id,
+            channel.guild_id,
+            guild?.name || '',
+            channel.name
+        );
+    };
+
+    const channelContent = (
+        <>
+            {/* Unread indicator bar */}
+            {isUnread && !isActive && (
+                <div className="absolute left-0 top-1/2 h-2 w-1 -translate-y-1/2 rounded-r-full bg-white" />
+            )}
+
+            <ChannelRow
+                channel={channel}
+                isActive={isActive}
+                isUnread={isUnread}
+                mentionsCount={mentionsCount}
+            />
+        </>
+    );
+
     return (
         <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
             <ContextMenu>
                 <ContextMenuTrigger>
-                    <Link
-                        to={`/channels/${channel.guild_id}/${channel.channel_id}`}
-                        className={`${!expanded && !isActive ? 'hidden' : ''} group relative block`}
-                        draggable="false"
-                        style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
-                    >
-                        {/* Unread indicator bar */}
-                        {isUnread && !isActive && (
-                            <div className="absolute left-0 top-1/2 h-2 w-1 -translate-y-1/2 rounded-r-full bg-white" />
-                        )}
-
-                        <ChannelRow
-                            channel={channel}
-                            isActive={isActive}
-                            isUnread={isUnread}
-                            mentionsCount={mentionsCount}
-                        />
-                    </Link>
+                    {isVoice ? (
+                        <div>
+                            <Link
+                                to={`/channels/${channel.guild_id}/${channel.channel_id}`}
+                                onClick={handleVoiceClick}
+                                className={`${!expanded && !isActive ? 'hidden' : ''} group relative block`}
+                                draggable="false"
+                                style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
+                            >
+                                {channelContent}
+                            </Link>
+                            {/* Voice participants */}
+                            {voiceParticipants?.length > 0 && (
+                                <div className="pb-1">
+                                    {voiceParticipants.map((p) => (
+                                        <VoiceParticipant key={p.identity} participant={p} />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <Link
+                            to={`/channels/${channel.guild_id}/${channel.channel_id}`}
+                            className={`${!expanded && !isActive ? 'hidden' : ''} group relative block`}
+                            draggable="false"
+                            style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
+                        >
+                            {channelContent}
+                        </Link>
+                    )}
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-52">
-                    <ContextMenuItem disabled={!isUnread} onSelect={handleMarkAsRead}>
-                        Mark as Read
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onSelect={() => navigate(`/channels/${channel.guild_id}/${channel.channel_id}`)}>
-                        Go to Channel
-                    </ContextMenuItem>
+                    {!isVoice && (
+                        <ContextMenuItem disabled={!isUnread} onSelect={handleMarkAsRead}>
+                            Mark as Read
+                        </ContextMenuItem>
+                    )}
+                    {!isVoice && <ContextMenuSeparator />}
+                    {isVoice ? (
+                        <ContextMenuItem onSelect={() => { handleVoiceClick(); navigate(`/channels/${channel.guild_id}/${channel.channel_id}`); }}>
+                            Join Voice Channel
+                        </ContextMenuItem>
+                    ) : (
+                        <ContextMenuItem onSelect={() => navigate(`/channels/${channel.guild_id}/${channel.channel_id}`)}>
+                            Go to Channel
+                        </ContextMenuItem>
+                    )}
                     <ContextMenuItem onSelect={handleCopyLink}>
                         Copy Link
                     </ContextMenuItem>
@@ -184,6 +247,9 @@ const GuildSidebarCategory = ({
     const navigate = useNavigate();
     const sectionName = category?.name;
     const { channelUnreads, channelUnreadsLoaded } = useUnreadsStore();
+    const { channelId: voiceChannelId, participants: voiceParticipants } = useVoiceStore();
+    const currentUser = useStore((s) => s.user);
+    const usersStore = useUsersStore();
 
     const { setNodeRef } = useDroppable({
         id: category?.channel_id,
@@ -200,7 +266,7 @@ const GuildSidebarCategory = ({
     // Filter and sort initially based on props
     useEffect(() => {
         const filtered = [...(channels || [])]
-            .filter((c) => c.type === 0)
+            .filter((c) => c.type === ChannelType.GUILD_TEXT || c.type === ChannelType.GUILD_VOICE)
             .filter((c) => c.parent_id == category?.channel_id)
             .sort((a, b) => {
                 const aPos = Number(a.position ?? 0);
@@ -319,9 +385,11 @@ const GuildSidebarCategory = ({
                 strategy={verticalListSortingStrategy}
             >
                 {sortedChannels.map((channel) => {
-                    const isUnread = isChannelUnread(channel);
-                    const isActive = channel.channel_id == activeChannelId;
-                    const mentionsCount = getMentionsCount(channel);
+                    const isUnread = channel.type === ChannelType.GUILD_VOICE ? false : isChannelUnread(channel);
+                    const isActive = channel.type === ChannelType.GUILD_VOICE
+                        ? channel.channel_id == activeChannelId || voiceChannelId === String(channel.channel_id)
+                        : channel.channel_id == activeChannelId;
+                    const mentionsCount = channel.type === ChannelType.GUILD_VOICE ? 0 : getMentionsCount(channel);
 
                     return (
                         <SortableChannel
@@ -336,6 +404,24 @@ const GuildSidebarCategory = ({
                             handleDeleteChannel={handleDeleteChannel}
                             navigate={navigate}
                             globalIsDragging={globalIsDragging}
+                            guild={guild}
+                            voiceParticipants={
+                                channel.type === ChannelType.GUILD_VOICE
+                                    ? voiceChannelId === String(channel.channel_id)
+                                        ? voiceParticipants
+                                        : (channel.voice_states || []).map((vs) => {
+                                            const user = String(vs.user_id) === String(currentUser?.id)
+                                                ? currentUser
+                                                : usersStore.getUser(String(vs.user_id));
+                                            return {
+                                                identity: String(vs.user_id),
+                                                name: user?.name || user?.username || String(vs.user_id),
+                                                isSpeaking: false,
+                                                isMuted: vs.self_mute,
+                                            };
+                                        })
+                                    : []
+                            }
                         />
                     );
                 })}
@@ -459,7 +545,7 @@ const GuildSidebar = ({
 
         // Recalculate positions for all sibling channels in the target parent group
         // Filter to only text channels (type 0) in the same parent, preserving array order
-        const siblingsInOrder = newChannels.filter(c => c.parent_id === newParentId && c.type === 0);
+        const siblingsInOrder = newChannels.filter(c => c.parent_id === newParentId && (c.type === 0 || c.type === 2));
 
         // Update position fields on the channel objects so the UI sorts correctly
         siblingsInOrder.forEach((sibling, index) => {
@@ -501,7 +587,7 @@ const GuildSidebar = ({
             <ContextMenu>
                 <ContextMenuTrigger>
                     <div className="relative top-0 flex h-full min-w-[240px] flex-col bg-gray-800 text-gray-100">
-                        <div className="flex flex-1 flex-col items-center overflow-y-auto">
+                        <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto">
                             <GuildSidebarHeader
                                 guildName={guild?.name}
                                 guild={guild}
@@ -538,6 +624,8 @@ const GuildSidebar = ({
                                 />
                             ))}
                         </div>
+                        <VoiceControls />
+                        <UserBar />
                     </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-52">

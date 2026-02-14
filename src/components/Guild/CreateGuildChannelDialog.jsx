@@ -88,10 +88,10 @@ const CreateGuildChannelDialog = ({ isOpen, setIsOpen, guild, categoryId }) => {
                 </Label>
 
                 {/* Voice Channel Option */}
-                {/* <Label
+                <Label
                   className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-all ${
-                    field.value === "2" 
-                      ? 'bg-accent border-primary ring-1 ring-primary' 
+                    field.value === "2"
+                      ? 'bg-accent border-primary ring-1 ring-primary'
                       : 'hover:bg-accent/50 border-transparent bg-secondary/40 opacity-80'
                   }`}
                 >
@@ -103,7 +103,7 @@ const CreateGuildChannelDialog = ({ isOpen, setIsOpen, guild, categoryId }) => {
                       Hang out with voice and video.
                     </span>
                   </div>
-                </Label> */}
+                </Label>
               </RadioGroup>
             )}
           />
@@ -115,7 +115,10 @@ const CreateGuildChannelDialog = ({ isOpen, setIsOpen, guild, categoryId }) => {
             Channel Name
           </Label>
           <div className="relative">
-            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4" />
+            {selectedType === "2"
+              ? <SpeakerHigh className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4" />
+              : <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4" />
+            }
             <Input
               id="channel-name"
               placeholder="new-channel"

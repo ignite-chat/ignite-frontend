@@ -16,6 +16,7 @@ import { UnreadsService } from './services/unreads.service';
 import { RolesService } from './services/roles.service';
 import { ChannelsService } from './services/channels.service';
 import { useUsersStore } from './store/users.store';
+import VoiceAudioRenderer from './components/Voice/VoiceAudioRenderer';
 
 const AuthRoute = ({ children }) => {
   const store = useStore();
@@ -267,7 +268,9 @@ function App() {
     };
   }, []);
 
-  return <Routes>
+  return <>
+    <VoiceAudioRenderer />
+    <Routes>
     <Route
       index
       element={
@@ -334,7 +337,8 @@ function App() {
         }
       />
     </Route>
-  </Routes>;
+  </Routes>
+  </>;
 }
 
 export default App;
