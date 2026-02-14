@@ -1,39 +1,21 @@
-
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner'
 import api from '@/api';
 import { GuildsService } from '@/services/guilds.service';
 import { PermissionsService } from '@/services/permissions.service';
 import { Permissions } from '@/enums/Permissions';
-import { CaretDown, Gear, UserPlus, SignOut } from '@phosphor-icons/react';
+import { CaretDown, Gear, UserPlus, SignOut, Hash, FolderPlus, Bell, Lock } from '@phosphor-icons/react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Separator } from '@/components/ui/separator';
 import InviteDialog from './InviteDialog';
 
-const GuildSidebarHeader = ({ guildName = '', guild, onOpenServerSettings }) => {
+const GuildSidebarHeader = ({ guildName = '', guild, onOpenServerSettings, onCreateChannel, onCreateCategory }) => {
     const navigate = useNavigate();
 
-    const [menuOpen, setMenuOpen] = useState(false);
+    const [popoverOpen, setPopoverOpen] = useState(false);
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
     const [leaving, setLeaving] = useState(false);
-
-    const containerRef = useRef(null);
-
-    useEffect(() => {
-        if (!menuOpen) return;
-        const onDown = (e) => {
-            if (!containerRef.current) return;
-            if (!containerRef.current.contains(e.target)) setMenuOpen(false);
-        };
-        const onKey = (e) => {
-            if (e.key === 'Escape') setMenuOpen(false);
-        };
-        document.addEventListener('mousedown', onDown);
-        document.addEventListener('keydown', onKey);
-        return () => {
-            document.removeEventListener('mousedown', onDown);
-            document.removeEventListener('keydown', onKey);
-        };
-    }, [menuOpen]);
 
     const canOpenServerSettings = useMemo(() => {
         return PermissionsService.hasPermission(guild?.id, null, Permissions.MANAGE_GUILD)
@@ -53,7 +35,7 @@ const GuildSidebarHeader = ({ guildName = '', guild, onOpenServerSettings }) => 
             try {
                 await api.delete(`@me/guilds/${guild.id}/`);
                 toast.success('Left server.');
-                setMenuOpen(false);
+                setPopoverOpen(false);
                 navigate('/channels/@me');
                 await GuildsService.loadGuilds();
             } catch (err) {
@@ -66,67 +48,125 @@ const GuildSidebarHeader = ({ guildName = '', guild, onOpenServerSettings }) => 
         [guild?.id, leaving, navigate]
     );
 
+    const handleInviteClick = () => {
+        setPopoverOpen(false);
+        setInviteDialogOpen(true);
+    };
+
+    const handleQuickInvite = (e) => {
+        e.stopPropagation();
+        setInviteDialogOpen(true);
+    };
+
     return (
-        <div className="relative w-full" ref={containerRef}>
-            <button
-                type="button"
-                className="w-full cursor-pointer px-4 py-3 text-left transition-colors duration-100 hover:bg-gray-700"
-                onClick={() => setMenuOpen((open) => !open)}
-            >
-                <div className="flex h-6 items-center">
-                    <div className="flex-1 truncate text-base font-semibold">{guildName}</div>
-                    <CaretDown className={`size-5 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
-                </div>
-            </button>
-
-            {menuOpen && (
-                <div className="absolute inset-x-2 top-12 z-10 rounded bg-gray-700 py-2 shadow-lg border border-white/5">
-                    {canInvite && (<>
+        <div className="relative w-full">
+            <div className="flex w-full justify-between gap-2 p-2">
+                <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                    <PopoverTrigger asChild>
                         <button
                             type="button"
-                            className="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-gray-100 hover:bg-gray-600"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setMenuOpen(false);
-                                setInviteDialogOpen(true);
-                            }}
+                            className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left transition-colors duration-100 hover:bg-[#1d1d1e]"
                         >
-                            <span>Invite People</span>
-                            <UserPlus className="size-4 ml-2" />
+                            <div className="flex-1 truncate text-base font-semibold">{guildName}</div>
+                            <CaretDown className={`size-4 transition-transform ${popoverOpen ? 'rotate-180' : ''}`} />
                         </button>
+                    </PopoverTrigger>
 
-                        <hr className="my-1 border-white/5" /></>
-                    )}
+                    <PopoverContent className="w-56 border-white/5 bg-[#28282d] p-2" align="start">
+                        {canInvite && (
+                            <button
+                                type="button"
+                                className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-primary hover:bg-white/5"
+                                onClick={handleInviteClick}
+                            >
+                                <span>Invite People</span>
+                                <UserPlus className="ml-2 size-4" />
+                            </button>
+                        )}
 
-                    {canOpenServerSettings && (<>
+                        {canOpenServerSettings && (
+                            <>
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-gray-100 hover:bg-white/5"
+                                    onClick={() => {
+                                        setPopoverOpen(false);
+                                        onOpenServerSettings();
+                                    }}
+                                >
+                                    <span>Server Settings</span>
+                                    <Gear className="ml-2 size-4" />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-gray-100 hover:bg-white/5"
+                                    onClick={() => {
+                                        setPopoverOpen(false);
+                                        onCreateChannel(null);
+                                    }}
+                                >
+                                    <span>Create Channel</span>
+                                    <Hash className="ml-2 size-4" />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-gray-100 hover:bg-white/5"
+                                    onClick={() => {
+                                        setPopoverOpen(false);
+                                        onCreateCategory();
+                                    }}
+                                >
+                                    <span>Create Category</span>
+                                    <FolderPlus className="ml-2 size-4" />
+                                </button>
+
+                                <Separator className="my-1 bg-white/5" />
+                            </>
+                        )}
+
                         <button
                             type="button"
-                            className="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-gray-100 hover:bg-gray-600 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-gray-700"
-                            onClick={() => {
-                                setMenuOpen(false);
-                                onOpenServerSettings?.();
-                            }}
+                            className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-gray-400 hover:bg-white/5 disabled:cursor-not-allowed"
+                            disabled
                         >
-                            <span>Server Settings</span>
-                            <Gear className="size-4 ml-2" />
+                            <span>Notification Settings</span>
+                            <Bell className="ml-2 size-4" />
                         </button>
 
-                        <hr className="my-1 border-white/5" />
-                    </>
-                    )}
+                        <button
+                            type="button"
+                            className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-gray-400 hover:bg-white/5 disabled:cursor-not-allowed"
+                            disabled
+                        >
+                            <span>Privacy Settings</span>
+                            <Lock className="ml-2 size-4" />
+                        </button>
 
+                        <Separator className="my-1 bg-white/5" />
 
+                        <button
+                            type="button"
+                            className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-red-300 hover:bg-white/5 disabled:opacity-60"
+                            onClick={handleLeave}
+                            disabled={leaving}
+                        >
+                            <span>{leaving ? 'Leaving…' : 'Leave Server'}</span>
+                            <SignOut className="ml-2 size-4" />
+                        </button>
+                    </PopoverContent>
+                </Popover>
+              {canInvite && (
                     <button
                         type="button"
-                        className="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-red-300 hover:bg-gray-600 disabled:opacity-60"
-                        onClick={handleLeave}
-                        disabled={leaving}
+                        className="ml-auto mr-2 rounded p-1 transition-colors hover:bg-white/5"
+                        onClick={handleQuickInvite}
                     >
-                        <span>{leaving ? 'Leaving…' : 'Leave Server'}</span>
-                        <SignOut className="size-4 ml-2" />
+                        <UserPlus className="size-4" />
                     </button>
-                </div>
-            )}
+                )}
+            </div>
 
             <InviteDialog
                 open={inviteDialogOpen}

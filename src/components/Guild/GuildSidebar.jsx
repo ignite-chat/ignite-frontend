@@ -593,6 +593,8 @@ const GuildSidebar = ({
                                 guild={guild}
                                 onOpenServerSettings={onOpenServerSettings}
                                 canOpenServerSettings={canOpenServerSettings}
+                                onCreateChannel={onCreateChannel}
+                                onCreateCategory={onCreateCategory}
                             />
                             <hr className="m-0 w-full border border-white/5 bg-[#121214] p-0" />
 
