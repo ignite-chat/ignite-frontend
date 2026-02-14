@@ -124,18 +124,18 @@ const startUpdate = async () => {
     return;
   }
 
-  try {
-    const updateResult = await require('./asarUpdater')();
+  // try {
+  //   const updateResult = await require('./asarUpdater')();
 
-    if (updateResult === 'restart') {
-      // App will restart via app.relaunch(), don't continue
-      return;
-    }
+  //   if (updateResult === 'restart') {
+  //     // App will restart via app.relaunch(), don't continue
+  //     return;
+  //   }
 
-    // 'no-update', 'failed', or 'error' - continue to startCore()
-  } catch (e) {
-    console.error('Update check failed:', e);
-  }
+  //   // 'no-update', 'failed', or 'error' - continue to startCore()
+  // } catch (e) {
+  //   console.error('Update check failed:', e);
+  // }
 
   startCore();
 };
