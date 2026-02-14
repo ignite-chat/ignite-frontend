@@ -30,9 +30,10 @@ function RouteLogger() {
 }
 
 const WindowControlButton = ({ icon: Icon, onClick, variant = 'default', ariaLabel }) => {
-  const colorClasses = variant === 'close'
-    ? 'text-red-400 hover:text-red-200 hover:bg-red-900/40'
-    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700';
+  const colorClasses =
+    variant === 'close'
+      ? 'text-red-400 hover:text-red-200 hover:bg-red-900/40'
+      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700';
 
   return (
     <button
@@ -56,7 +57,7 @@ function WindowBar() {
       style={{
         WebkitAppRegion: 'drag',
         userSelect: 'none',
-        zIndex: 100
+        zIndex: 100,
       }}
     >
       {/* Centered app name */}
@@ -96,17 +97,18 @@ window.Echo = new Echo({
   authorizer: (channel) => {
     return {
       authorize: (socketId, callback) => {
-        api.post('broadcasting/auth', {
-          socket_id: socketId,
-          channel_name: channel.name
-        })
-        .then(response => {
-          callback(false, response.data);
-        })
-        .catch(error => {
-          callback(true, error);
-        });
-      }
+        api
+          .post('broadcasting/auth', {
+            socket_id: socketId,
+            channel_name: channel.name,
+          })
+          .then((response) => {
+            callback(false, response.data);
+          })
+          .catch((error) => {
+            callback(true, error);
+          });
+      },
     };
   },
 });
@@ -119,5 +121,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <Toaster />
       <RouteLogger />
     </BrowserRouter>
-  </React.StrictMode>,
+  </React.StrictMode>
 );

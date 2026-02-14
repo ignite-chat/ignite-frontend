@@ -4,10 +4,7 @@ import ServerRoleManager from './ServerRoleManager';
 import ServerMemberManager from './ServerMemberManager';
 import ServerInviteManager from './ServerInviteManager';
 import { Button } from '../ui/button';
-import {
-  Dialog,
-  DialogContent,
-} from '../ui/dialog';
+import { Dialog, DialogContent } from '../ui/dialog';
 import { ScrollArea } from '../ui/scroll-area';
 import { Info, Shield, Users, Mail, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -134,9 +131,7 @@ const ServerSettings = ({ isOpen, onClose, guild, initialTab = 'info' }) => {
           <div className="flex flex-1 flex-col">
             {/* Header */}
             <div className="flex h-14 items-center justify-between border-b border-border px-10">
-              <h1 className="text-base font-semibold">
-                {activeItem?.label || 'Server Settings'}
-              </h1>
+              <h1 className="text-base font-semibold">{activeItem?.label || 'Server Settings'}</h1>
               <Button
                 type="button"
                 variant="ghost"
@@ -150,9 +145,7 @@ const ServerSettings = ({ isOpen, onClose, guild, initialTab = 'info' }) => {
 
             {/* Content */}
             <ScrollArea className="flex-1">
-              <div className="px-10 py-14">
-                {activeItem?.component}
-              </div>
+              <div className="px-10 py-14">{activeItem?.component}</div>
             </ScrollArea>
           </div>
         </div>

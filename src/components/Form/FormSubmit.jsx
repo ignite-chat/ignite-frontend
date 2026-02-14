@@ -1,6 +1,11 @@
 import { CircleNotch, FloppyDisk } from '@phosphor-icons/react';
 
-const FormSubmit = ({ form, label = 'Save', icon = <FloppyDisk className="size-4" />, className = '' }) => {
+const FormSubmit = ({
+  form,
+  label = 'Save',
+  icon = <FloppyDisk className="size-4" />,
+  className = '',
+}) => {
   return (
     <button
       type="submit"

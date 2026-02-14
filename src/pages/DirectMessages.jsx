@@ -17,14 +17,11 @@ const DirectMessagesPage = () => {
   const isFriendsView = !channelId || channelId === 'friends';
 
   // Find active channel object if we aren't in friends view
-  const activeChannel = !isFriendsView
-    ? channels.find(c => c.channel_id === channelId)
-    : null;
+  const activeChannel = !isFriendsView ? channels.find((c) => c.channel_id === channelId) : null;
 
   return (
     <DefaultLayout>
       <div className="flex h-screen w-screen overflow-hidden bg-gray-700 text-gray-100">
-
         {/* Sidebar Component */}
         <DMSidebar
           activeChannelId={channelId || 'friends'}
@@ -43,7 +40,6 @@ const DirectMessagesPage = () => {
             </ChannelContextProvider>
           )}
         </main>
-
       </div>
     </DefaultLayout>
   );

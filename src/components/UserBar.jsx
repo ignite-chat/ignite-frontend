@@ -20,9 +20,7 @@ const UserBar = () => {
           )}
         </div>
         <div className="flex min-w-0 flex-col">
-          <span className="truncate text-sm font-semibold text-gray-100">
-            {store.user?.name}
-          </span>
+          <span className="truncate text-sm font-semibold text-gray-100">{store.user?.name}</span>
           <span className="truncate text-[11px] text-gray-500">
             {store.user?.status || 'Online'}
           </span>

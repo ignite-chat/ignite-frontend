@@ -88,9 +88,9 @@ const SearchModal = ({ open, onClose, channel, onPick }) => {
 
         <div className="mt-4">
           {grouped.length === 0 ? (
-            <div className="text-gray-400 text-xs">No results.</div>
+            <div className="text-xs text-gray-400">No results.</div>
           ) : (
-            <div className="space-y-2 max-h-72 overflow-y-auto">
+            <div className="max-h-72 space-y-2 overflow-y-auto">
               {grouped.map((msg) => (
                 <button
                   key={msg.id}
@@ -98,8 +98,11 @@ const SearchModal = ({ open, onClose, channel, onPick }) => {
                   onClick={() => handlePick(msg.id)}
                   className="w-full rounded bg-gray-900/60 p-2 text-left text-xs text-gray-100 hover:bg-primary/20"
                 >
-                  <span className="font-semibold">{msg.author?.name || msg.author?.username}:</span> {msg.content}
-                  <span className="ml-2 text-gray-500">{new Date(msg.created_at).toLocaleString()}</span>
+                  <span className="font-semibold">{msg.author?.name || msg.author?.username}:</span>{' '}
+                  {msg.content}
+                  <span className="ml-2 text-gray-500">
+                    {new Date(msg.created_at).toLocaleString()}
+                  </span>
                   <span className="ml-2 text-primary underline">Jump</span>
                 </button>
               ))}

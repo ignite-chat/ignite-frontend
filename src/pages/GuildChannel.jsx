@@ -48,18 +48,25 @@ const GuildChannelPage = () => {
     }
   }, [channelId, guild, navigate]);
 
-  const channel = useMemo(() => guild?.channels?.find((c) => c.channel_id == channelId), [guild, channelId]);
+  const channel = useMemo(
+    () => guild?.channels?.find((c) => c.channel_id == channelId),
+    [guild, channelId]
+  );
 
   const [isChannelDialogOpen, setIsChannelDialogOpen] = useState(false);
 
   return (
-      <GuildLayout guild={guild}>
-        <ChannelContextProvider>
-          <Channel channel={channel} />
-        </ChannelContextProvider>
+    <GuildLayout guild={guild}>
+      <ChannelContextProvider>
+        <Channel channel={channel} />
+      </ChannelContextProvider>
 
-        <ChannelDialog isOpen={isChannelDialogOpen} setIsOpen={setIsChannelDialogOpen} guild={guild} />
-      </GuildLayout>
+      <ChannelDialog
+        isOpen={isChannelDialogOpen}
+        setIsOpen={setIsChannelDialogOpen}
+        guild={guild}
+      />
+    </GuildLayout>
   );
 };
 

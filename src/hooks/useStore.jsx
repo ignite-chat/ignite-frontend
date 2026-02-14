@@ -3,7 +3,7 @@ import { create } from 'zustand';
 const useStore = create((set) => ({
   user: null,
   token: null,
-  
+
   login: (user, token) => {
     localStorage.setItem('token', token);
     set({ user, token });

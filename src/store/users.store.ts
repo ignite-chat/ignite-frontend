@@ -29,10 +29,13 @@ export const useUsersStore = create<UsersStore>((set, get) => ({
 
   setUsers: (users) =>
     set((state) => {
-      const usersMap = users.reduce((acc, user) => {
-        acc[user.id] = user;
-        return acc;
-      }, {} as { [userId: string]: User });
+      const usersMap = users.reduce(
+        (acc, user) => {
+          acc[user.id] = user;
+          return acc;
+        },
+        {} as { [userId: string]: User }
+      );
 
       return {
         users: {

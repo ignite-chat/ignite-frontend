@@ -82,8 +82,8 @@ const ServerInviteManager = ({ guild }) => {
         {loading && <div className="text-sm text-muted-foreground">Loading invites...</div>}
         {!loading && (
           <>
-            <div className="rounded-md border border-border overflow-hidden">
-              <div className="overflow-auto max-h-[calc(100vh-20rem)]">
+            <div className="overflow-hidden rounded-md border border-border">
+              <div className="max-h-[calc(100vh-20rem)] overflow-auto">
                 <table className="w-full">
                   <thead className="border-b border-border bg-muted/30">
                     <tr>
@@ -107,7 +107,10 @@ const ServerInviteManager = ({ guild }) => {
                   <tbody className="divide-y divide-border">
                     {paginatedInvites.length === 0 ? (
                       <tr>
-                        <td colSpan="5" className="px-4 py-12 text-center text-sm text-muted-foreground">
+                        <td
+                          colSpan="5"
+                          className="px-4 py-12 text-center text-sm text-muted-foreground"
+                        >
                           No active invites found.
                         </td>
                       </tr>
@@ -116,9 +119,9 @@ const ServerInviteManager = ({ guild }) => {
                         const inviteId = invite.id || invite.code;
                         const inviteCode = invite.code || inviteId;
                         return (
-                          <tr key={inviteId} className="hover:bg-muted/20 transition-colors">
+                          <tr key={inviteId} className="transition-colors hover:bg-muted/20">
                             <td className="px-4 py-3">
-                              <code className="rounded bg-muted px-2 py-1 text-xs font-mono">
+                              <code className="rounded bg-muted px-2 py-1 font-mono text-xs">
                                 {inviteCode}
                               </code>
                             </td>
@@ -166,9 +169,10 @@ const ServerInviteManager = ({ guild }) => {
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm text-muted-foreground text-center sm:text-left">
-                  Showing {startIndex + 1} to {Math.min(startIndex + ITEMS_PER_PAGE, invites.length)} of{' '}
-                  {invites.length} invites
+                <div className="text-center text-sm text-muted-foreground sm:text-left">
+                  Showing {startIndex + 1} to{' '}
+                  {Math.min(startIndex + ITEMS_PER_PAGE, invites.length)} of {invites.length}{' '}
+                  invites
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
                   <Button
@@ -180,7 +184,7 @@ const ServerInviteManager = ({ guild }) => {
                   >
                     Previous
                   </Button>
-                  <div className="flex items-center gap-1 overflow-x-auto max-w-full">
+                  <div className="flex max-w-full items-center gap-1 overflow-x-auto">
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                       if (
                         page === 1 ||
@@ -201,7 +205,7 @@ const ServerInviteManager = ({ guild }) => {
                         );
                       } else if (page === currentPage - 2 || page === currentPage + 2) {
                         return (
-                          <span key={page} className="px-2 text-muted-foreground shrink-0">
+                          <span key={page} className="shrink-0 px-2 text-muted-foreground">
                             ...
                           </span>
                         );

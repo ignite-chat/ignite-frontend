@@ -2,7 +2,17 @@ import { useCallback, useState } from 'react';
 import api from '../api';
 import useStore from '../hooks/useStore';
 import { DialogContent, DialogTitle } from './ui/dialog';
-import { SidebarProvider, Sidebar, SidebarGroup, SidebarHeader, SidebarGroupLabel, SidebarGroupContent, SidebarMenuItem, SidebarMenuButton, SidebarMenu } from './ui/sidebar';
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarMenu,
+} from './ui/sidebar';
 import Avatar from './Avatar';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/card';
 import { Button } from './ui/button';
@@ -26,21 +36,24 @@ const TabAccount = () => {
     },
   });
 
-  const onSubmitUserProfile = useCallback(async (data) => {
-    // console.log('User Profile Data:', data);
-    try {
-      await api.patch('/users/@me', data);
-      // TODO: 
-      store.setUser({
-        ...store.user,
-        name: data.name,
-        avatar_url: data.avatar_url,
-      });
-      toast.success('Profile updated successfully');
-    } catch (error) {
-      console.error('Failed to update user profile:', error);
-    }
-  }, [store]);
+  const onSubmitUserProfile = useCallback(
+    async (data) => {
+      // console.log('User Profile Data:', data);
+      try {
+        await api.patch('/users/@me', data);
+        // TODO:
+        store.setUser({
+          ...store.user,
+          name: data.name,
+          avatar_url: data.avatar_url,
+        });
+        toast.success('Profile updated successfully');
+      } catch (error) {
+        console.error('Failed to update user profile:', error);
+      }
+    },
+    [store]
+  );
 
   const userEmailForm = useForm({
     defaultValues: {
@@ -75,16 +88,12 @@ const TabAccount = () => {
             <Card className="w-full">
               <CardHeader>
                 <CardTitle>User Profile</CardTitle>
-                <CardDescription>
-                  Update your account information
-                </CardDescription>
+                <CardDescription>Update your account information</CardDescription>
               </CardHeader>
               <CardContent>
                 <FieldGroup>
                   <Field>
-                    <FieldLabel htmlFor="name">
-                      Display Name
-                    </FieldLabel>
+                    <FieldLabel htmlFor="name">Display Name</FieldLabel>
                     <Controller
                       name="name"
                       rules={{
@@ -99,25 +108,20 @@ const TabAccount = () => {
                         },
                         pattern: {
                           value: /^[a-zA-Z0-9 _-]+$/,
-                          message: 'Display Name can only contain letters, numbers, spaces, underscores, and hyphens.',
+                          message:
+                            'Display Name can only contain letters, numbers, spaces, underscores, and hyphens.',
                         },
                       }}
                       render={({ field, formState }) => (
                         <>
-                          <Input
-                            id="name"
-                            placeholder="Your display name"
-                            {...field}
-                          />
+                          <Input id="name" placeholder="Your display name" {...field} />
                           <FieldError>{formState.errors.name?.message}</FieldError>
                         </>
                       )}
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="bio">
-                      About Me
-                    </FieldLabel>
+                    <FieldLabel htmlFor="bio">About Me</FieldLabel>
                     <Controller
                       name="bio"
                       rules={{
@@ -128,20 +132,14 @@ const TabAccount = () => {
                       }}
                       render={({ field, formState }) => (
                         <>
-                          <Textarea
-                            id="bio"
-                            placeholder="A short bio about yourself"
-                            {...field}
-                          />
+                          <Textarea id="bio" placeholder="A short bio about yourself" {...field} />
                           <FieldError>{formState.errors.bio?.message}</FieldError>
                         </>
                       )}
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="avatar_url">
-                      Avatar
-                    </FieldLabel>
+                    <FieldLabel htmlFor="avatar_url">Avatar</FieldLabel>
                     <Controller
                       name="avatar_url"
                       rules={{
@@ -189,19 +187,13 @@ const TabAccount = () => {
           <form onSubmit={userEmailForm.handleSubmit(onSubmitUserEmail)}>
             <Card className="w-full">
               <CardHeader>
-                <CardTitle>
-                  Update E-mail Address
-                </CardTitle>
-                <CardDescription>
-                  Change your account e-mail address
-                </CardDescription>
+                <CardTitle>Update E-mail Address</CardTitle>
+                <CardDescription>Change your account e-mail address</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col gap-6">
                   <div className="grid gap-3">
-                    <Label htmlFor="email">
-                      E-mail Address
-                    </Label>
+                    <Label htmlFor="email">E-mail Address</Label>
                     <Controller
                       name="email"
                       rules={{
@@ -213,20 +205,14 @@ const TabAccount = () => {
                       }}
                       render={({ field }) => (
                         <>
-                          <Input
-                            id="email"
-                            placeholder="Your e-mail address"
-                            {...field}
-                          />
+                          <Input id="email" placeholder="Your e-mail address" {...field} />
                           <FieldError>{userEmailForm.formState.errors.email?.message}</FieldError>
                         </>
                       )}
                     />
                   </div>
                   <div className="grid gap-3">
-                    <Label htmlFor="currentPassword">
-                      Current Password
-                    </Label>
+                    <Label htmlFor="currentPassword">Current Password</Label>
                     <Controller
                       name="currentPassword"
                       rules={{
@@ -239,7 +225,9 @@ const TabAccount = () => {
                             placeholder="Your current password"
                             {...field}
                           />
-                          <FieldError>{userEmailForm.formState.errors.currentPassword?.message}</FieldError>
+                          <FieldError>
+                            {userEmailForm.formState.errors.currentPassword?.message}
+                          </FieldError>
                         </>
                       )}
                     />
@@ -267,19 +255,13 @@ const TabAccount = () => {
           <form onSubmit={userPasswordForm.handleSubmit(onSubmitUserPassword)}>
             <Card className="w-full">
               <CardHeader>
-                <CardTitle>
-                  Update Password
-                </CardTitle>
-                <CardDescription>
-                  Change your account password
-                </CardDescription>
+                <CardTitle>Update Password</CardTitle>
+                <CardDescription>Change your account password</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col gap-6">
                   <div className="grid gap-3">
-                    <Label htmlFor="currentPassword">
-                      Current Password
-                    </Label>
+                    <Label htmlFor="currentPassword">Current Password</Label>
                     <Controller
                       name="currentPassword"
                       rules={{
@@ -292,15 +274,15 @@ const TabAccount = () => {
                             placeholder="Your current password"
                             {...field}
                           />
-                          <FieldError>{userPasswordForm.formState.errors.currentPassword?.message}</FieldError>
+                          <FieldError>
+                            {userPasswordForm.formState.errors.currentPassword?.message}
+                          </FieldError>
                         </>
                       )}
                     />
                   </div>
                   <div className="grid gap-3">
-                    <Label htmlFor="newPassword">
-                      New Password
-                    </Label>
+                    <Label htmlFor="newPassword">New Password</Label>
                     <Controller
                       name="newPassword"
                       rules={{
@@ -316,20 +298,16 @@ const TabAccount = () => {
                       }}
                       render={({ field }) => (
                         <>
-                          <Input
-                            id="newPassword"
-                            placeholder="Your new password"
-                            {...field}
-                          />
-                          <FieldError>{userPasswordForm.formState.errors.newPassword?.message}</FieldError>
+                          <Input id="newPassword" placeholder="Your new password" {...field} />
+                          <FieldError>
+                            {userPasswordForm.formState.errors.newPassword?.message}
+                          </FieldError>
                         </>
                       )}
                     />
                   </div>
                   <div className="grid gap-3">
-                    <Label htmlFor="confirmNewPassword">
-                      Confirm New Password
-                    </Label>
+                    <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
                     <Controller
                       name="confirmNewPassword"
                       rules={{
@@ -342,8 +320,7 @@ const TabAccount = () => {
                           value: 64,
                           message: 'Password must be at most 64 characters long',
                         },
-                        validate: value =>
-                          value === newPasswordValue || 'Passwords do not match',
+                        validate: (value) => value === newPasswordValue || 'Passwords do not match',
                       }}
                       render={({ field }) => (
                         <>
@@ -352,7 +329,9 @@ const TabAccount = () => {
                             placeholder="Confirm your new password"
                             {...field}
                           />
-                          <FieldError>{userPasswordForm.formState.errors.confirmNewPassword?.message}</FieldError>
+                          <FieldError>
+                            {userPasswordForm.formState.errors.confirmNewPassword?.message}
+                          </FieldError>
                         </>
                       )}
                     />
@@ -377,25 +356,21 @@ const TabAccount = () => {
       </div>
     </div>
   );
-}
+};
 
 const TabBots = () => {
   return <div>Bots Settings</div>;
-}
+};
 
 const groups = [
   {
     title: 'User Settings',
-    items: [
-      { id: 'account', title: 'My Account', component: TabAccount },
-    ],
+    items: [{ id: 'account', title: 'My Account', component: TabAccount }],
   },
   {
     title: 'Bots & Integrations',
-    items: [
-      { id: 'bots', title: 'Bots', component: TabBots },
-    ],
-  }
+    items: [{ id: 'bots', title: 'Bots', component: TabBots }],
+  },
 ];
 
 const UserSettingsDialogContent = () => {
@@ -411,7 +386,7 @@ const UserSettingsDialogContent = () => {
 
   const getActiveTitle = () => {
     for (const group of groups) {
-      const found = group.items.find(i => i.id === tab);
+      const found = group.items.find((i) => i.id === tab);
       if (found) return found.title;
     }
     return 'Settings';
@@ -423,19 +398,17 @@ const UserSettingsDialogContent = () => {
       <SheetDescription className="sr-only">
         Manage your user settings and preferences.
       </SheetDescription>
-      <SidebarProvider className={`h-full !min-h-0 w-auto ${isMobileMenuOpen ? 'flex w-full' : 'hidden md:flex'}`}>
-        <Sidebar collapsible="none" className="h-full rounded-lg p-4 w-full">
+      <SidebarProvider
+        className={`h-full !min-h-0 w-auto ${isMobileMenuOpen ? 'flex w-full' : 'hidden md:flex'}`}
+      >
+        <Sidebar collapsible="none" className="h-full w-full rounded-lg p-4">
           <SidebarHeader className="flex-row gap-4">
             <div>
               <Avatar user={store.user} className="size-12 text-xl" />
             </div>
             <div>
-              <p className="text-lg font-medium text-sidebar-foreground">
-                {store.user.username}
-              </p>
-              <p className="text-xs text-sidebar-foreground/70">
-                Manage Your Settings
-              </p>
+              <p className="text-lg font-medium text-sidebar-foreground">{store.user.username}</p>
+              <p className="text-xs text-sidebar-foreground/70">Manage Your Settings</p>
             </div>
           </SidebarHeader>
           {groups.map((item) => (
@@ -446,7 +419,10 @@ const UserSettingsDialogContent = () => {
                   {item.items.map((item) => (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton asChild isActive={tab === item.id}>
-                        <button onClick={() => handleTabChange(item.id)} className="w-full text-left">
+                        <button
+                          onClick={() => handleTabChange(item.id)}
+                          className="w-full text-left"
+                        >
                           {item.title}
                         </button>
                       </SidebarMenuButton>
@@ -458,20 +434,25 @@ const UserSettingsDialogContent = () => {
           ))}
         </Sidebar>
       </SidebarProvider>
-      <div className={`flex-1 flex flex-col h-full bg-background overflow-hidden rounded-lg ${isMobileMenuOpen ? 'hidden md:flex' : 'flex'}`}>
-        <div className="flex items-center gap-2 p-4 border-b md:hidden flex-shrink-0">
-          <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)} className="-ml-2">
+      <div
+        className={`flex h-full flex-1 flex-col overflow-hidden rounded-lg bg-background ${isMobileMenuOpen ? 'hidden md:flex' : 'flex'}`}
+      >
+        <div className="flex flex-shrink-0 items-center gap-2 border-b p-4 md:hidden">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="-ml-2"
+          >
             <Menu className="h-5 w-5" />
             <span className="sr-only">Open Menu</span>
           </Button>
-          <span className="font-semibold text-lg">{getActiveTitle()}</span>
+          <span className="text-lg font-semibold">{getActiveTitle()}</span>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {groups.map((group) =>
-            group.items.map((item) =>
-              item.id === tab ? <item.component key={item.id} /> : null
-            )
+            group.items.map((item) => (item.id === tab ? <item.component key={item.id} /> : null))
           )}
         </div>
       </div>

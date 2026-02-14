@@ -12,190 +12,188 @@ import { GuildsService } from '@/services/guilds.service.ts';
 import { CircleNotch, CaretDown, CaretRight } from '@phosphor-icons/react';
 
 const MemberListItem = ({ member }) => {
-    const userFromStore = useUsersStore((state) => state.users[member.user.id]);
-    const status = userFromStore?.status ?? member.user.status;
+  const userFromStore = useUsersStore((state) => state.users[member.user.id]);
+  const status = userFromStore?.status ?? member.user.status;
 
-    const topColor = useMemo(() => {
-        if (!member.roles || member.roles.length === 0) return 'inherit';
+  const topColor = useMemo(() => {
+    if (!member.roles || member.roles.length === 0) return 'inherit';
 
-        // Sort by position descending (highest position first)
-        const sorted = [...member.roles].sort((a, b) => b.position - a.position);
+    // Sort by position descending (highest position first)
+    const sorted = [...member.roles].sort((a, b) => b.position - a.position);
 
-        // Find the first role that has a non-zero color
-        const topRole = sorted.find((r) => r.color && r.color !== 0);
+    // Find the first role that has a non-zero color
+    const topRole = sorted.find((r) => r.color && r.color !== 0);
 
-        if (!topRole) return 'inherit';
+    if (!topRole) return 'inherit';
 
-        // Convert integer color to Hex (e.g., 16711680 -> #ff0000)
-        return `#${topRole.color.toString(16).padStart(6, '0')}`;
-    }, [member.roles]);
+    // Convert integer color to Hex (e.g., 16711680 -> #ff0000)
+    return `#${topRole.color.toString(16).padStart(6, '0')}`;
+  }, [member.roles]);
 
-    return (
-        <Popover>
-            <ContextMenu>
-                <PopoverTrigger className="w-full text-left">
-                    <ContextMenuTrigger>
-                        <div className="flex items-center gap-3 rounded-md p-2 transition hover:bg-gray-700/50">
-                            <div className="relative flex-shrink-0">
-                                <Avatar user={member.user} className="size-8" />
-                                {status === 'online' && (
-                                    <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-green-500 border-2 border-white/5" />
-                                )}
-                            </div>
-                            <p
-                                className="truncate text-sm font-medium min-w-0 flex-1"
-                                style={{ color: topColor }}
-                            >
-                                {member.user.name ?? member.user.username}
-                            </p>
-                        </div>
-                    </ContextMenuTrigger>
-                </PopoverTrigger>
-                <ContextMenuContent>
-                    <GuildMemberContextMenu user={member.user} />
-                </ContextMenuContent>
-            </ContextMenu>
-            <PopoverContent className="w-auto p-2" align="start" alignOffset={0}>
-                <GuildMemberPopoverContent userId={member.user.id} guild={null} />
-            </PopoverContent>
-        </Popover>
-    );
+  return (
+    <Popover>
+      <ContextMenu>
+        <PopoverTrigger className="w-full text-left">
+          <ContextMenuTrigger>
+            <div className="flex items-center gap-3 rounded-md p-2 transition hover:bg-gray-700/50">
+              <div className="relative flex-shrink-0">
+                <Avatar user={member.user} className="size-8" />
+                {status === 'online' && (
+                  <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white/5 bg-green-500" />
+                )}
+              </div>
+              <p
+                className="min-w-0 flex-1 truncate text-sm font-medium"
+                style={{ color: topColor }}
+              >
+                {member.user.name ?? member.user.username}
+              </p>
+            </div>
+          </ContextMenuTrigger>
+        </PopoverTrigger>
+        <ContextMenuContent>
+          <GuildMemberContextMenu user={member.user} />
+        </ContextMenuContent>
+      </ContextMenu>
+      <PopoverContent className="w-auto p-2" align="start" alignOffset={0}>
+        <GuildMemberPopoverContent userId={member.user.id} guild={null} />
+      </PopoverContent>
+    </Popover>
+  );
 };
 
 const MemberList = ({ guildId }) => {
-    const { memberListOpen } = useChannelContext();
-    const { guildMembers } = useGuildsStore();
-    const users = useUsersStore((state) => state.users);
-    const [membersByRole, setMembersByRole] = useState({});
-    const [membersWithoutRoles, setMembersWithoutRoles] = useState([]);
-    const [offlineMembers, setOfflineMembers] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [collapsedRoles, setCollapsedRoles] = useState({});
+  const { memberListOpen } = useChannelContext();
+  const { guildMembers } = useGuildsStore();
+  const users = useUsersStore((state) => state.users);
+  const [membersByRole, setMembersByRole] = useState({});
+  const [membersWithoutRoles, setMembersWithoutRoles] = useState([]);
+  const [offlineMembers, setOfflineMembers] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [collapsedRoles, setCollapsedRoles] = useState({});
 
-    const activeGuildMembers = guildMembers[guildId];
+  const activeGuildMembers = guildMembers[guildId];
 
-    useEffect(() => {
-        if (!guildId) return;
+  useEffect(() => {
+    if (!guildId) return;
 
-        setIsLoading(true);
+    setIsLoading(true);
 
-        GuildsService.loadGuildMembers(guildId).finally(() => setIsLoading(false));
-    }, [guildId]);
+    GuildsService.loadGuildMembers(guildId).finally(() => setIsLoading(false));
+  }, [guildId]);
 
-    const roles = useRolesStore().guildRoles[guildId] || [];
+  const roles = useRolesStore().guildRoles[guildId] || [];
 
-    const toggleRole = useCallback((roleId) => {
-        setCollapsedRoles((prev) => ({
-            ...prev,
-            [roleId]: !prev[roleId]
-        }));
-    }, []);
+  const toggleRole = useCallback((roleId) => {
+    setCollapsedRoles((prev) => ({
+      ...prev,
+      [roleId]: !prev[roleId],
+    }));
+  }, []);
 
-    useEffect(() => {
-        const tempMembersByRole = {};
-        const tempMembersWithoutRoles = [];
-        const tempOfflineMembers = []
-        const assignedMemberIds = new Set();
+  useEffect(() => {
+    const tempMembersByRole = {};
+    const tempMembersWithoutRoles = [];
+    const tempOfflineMembers = [];
+    const assignedMemberIds = new Set();
 
-        activeGuildMembers?.forEach((member) => {
-            const userStatus = users[member.user.id]?.status ?? member.user.status;
-            // Offline members
-            if (userStatus === 'offline') {
-                tempOfflineMembers.push(member);
-                return;
-            }
+    activeGuildMembers?.forEach((member) => {
+      const userStatus = users[member.user.id]?.status ?? member.user.status;
+      // Offline members
+      if (userStatus === 'offline') {
+        tempOfflineMembers.push(member);
+        return;
+      }
 
-            if (member.roles && member.roles.length > 0) {
-                // Map member's role ids to role objects, filter out missing, sort by position
-                const firstRole = member.roles.sort((a, b) => b.position - a.position)[0];
-                if (firstRole && !assignedMemberIds.has(member.user.id)) {
-                    if (!tempMembersByRole[firstRole.id]) tempMembersByRole[firstRole.id] = [];
-                    tempMembersByRole[firstRole.id].push(member);
-                    assignedMemberIds.add(member.user.id);
-                }
-            } else {
-                tempMembersWithoutRoles.push(member);
-            }
-        });
-
-        setMembersByRole(tempMembersByRole);
-        setMembersWithoutRoles(tempMembersWithoutRoles);
-        setOfflineMembers(tempOfflineMembers);
-
-        // Auto-collapse groups with more than 100 members
-        const autoCollapsed = {};
-        for (const [roleId, members] of Object.entries(tempMembersByRole)) {
-            if (members.length > 100) autoCollapsed[roleId] = true;
+      if (member.roles && member.roles.length > 0) {
+        // Map member's role ids to role objects, filter out missing, sort by position
+        const firstRole = member.roles.sort((a, b) => b.position - a.position)[0];
+        if (firstRole && !assignedMemberIds.has(member.user.id)) {
+          if (!tempMembersByRole[firstRole.id]) tempMembersByRole[firstRole.id] = [];
+          tempMembersByRole[firstRole.id].push(member);
+          assignedMemberIds.add(member.user.id);
         }
-        if (tempMembersWithoutRoles.length > 100) autoCollapsed['no-role'] = true;
-        if (Object.keys(autoCollapsed).length > 0) {
-            setCollapsedRoles((prev) => ({ ...autoCollapsed, ...prev }));
-        }
-    }, [activeGuildMembers, roles, users]);
+      } else {
+        tempMembersWithoutRoles.push(member);
+      }
+    });
 
-    return (
-        <div className={`relative z-0 transition-all duration-300 ${memberListOpen ? 'w-60 md:w-72' : 'w-0'}`}>
-            {memberListOpen && (
-                <div className="flex h-full flex-col border-l border-white/5 bg-[#1a1a1e]">
-                    <div className="flex h-12 items-center border-b border-white/5 px-4 text-sm font-semibold text-gray-300">
-                        Members - {activeGuildMembers?.length}
-                    </div>
-                    <div className="flex flex-1 flex-col gap-2 p-2 text-gray-400 overflow-y-auto">
-                        {isLoading ? (
-                            <CircleNotch size={32} className="mx-auto animate-spin text-gray-500" />
+    setMembersByRole(tempMembersByRole);
+    setMembersWithoutRoles(tempMembersWithoutRoles);
+    setOfflineMembers(tempOfflineMembers);
+
+    // Auto-collapse groups with more than 100 members
+    const autoCollapsed = {};
+    for (const [roleId, members] of Object.entries(tempMembersByRole)) {
+      if (members.length > 100) autoCollapsed[roleId] = true;
+    }
+    if (tempMembersWithoutRoles.length > 100) autoCollapsed['no-role'] = true;
+    if (Object.keys(autoCollapsed).length > 0) {
+      setCollapsedRoles((prev) => ({ ...autoCollapsed, ...prev }));
+    }
+  }, [activeGuildMembers, roles, users]);
+
+  return (
+    <div
+      className={`relative z-0 transition-all duration-300 ${memberListOpen ? 'w-60 md:w-72' : 'w-0'}`}
+    >
+      {memberListOpen && (
+        <div className="flex h-full flex-col border-l border-white/5 bg-[#1a1a1e]">
+          <div className="flex h-12 items-center border-b border-white/5 px-4 text-sm font-semibold text-gray-300">
+            Members - {activeGuildMembers?.length}
+          </div>
+          <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2 text-gray-400">
+            {isLoading ? (
+              <CircleNotch size={32} className="mx-auto animate-spin text-gray-500" />
+            ) : (
+              <>
+                {roles.map((role) =>
+                  membersByRole[role.id] && membersByRole[role.id].length > 0 ? (
+                    <div key={role.id}>
+                      <div
+                        className="flex cursor-pointer items-center gap-1 px-2 py-1 text-xs font-bold text-gray-400 transition hover:text-gray-300"
+                        onClick={() => toggleRole(role.id)}
+                      >
+                        {collapsedRoles[role.id] ? (
+                          <CaretRight size={12} weight="bold" />
                         ) : (
-                            <>
-                                {roles.map((role) =>
-                                    membersByRole[role.id] && membersByRole[role.id].length > 0 ? (
-                                        <div key={role.id}>
-                                            <div
-                                                className="flex items-center gap-1 px-2 py-1 text-xs font-bold text-gray-400 cursor-pointer hover:text-gray-300 transition"
-                                                onClick={() => toggleRole(role.id)}
-                                            >
-                                                {collapsedRoles[role.id] ? (
-                                                    <CaretRight size={12} weight="bold" />
-                                                ) : (
-                                                    <CaretDown size={12} weight="bold" />
-                                                )}
-                                                {role.name} &mdash; {membersByRole[role.id].length}
-                                            </div>
-                                            {!collapsedRoles[role.id] && membersByRole[role.id].map((member) => (
-                                                <MemberListItem
-                                                    key={member.user.id}
-                                                    member={member}
-                                                />
-                                            ))}
-                                        </div>
-                                    ) : null
-                                )}
-                                {membersWithoutRoles.length > 0 && (
-                                    <div>
-                                        <div
-                                            className="flex items-center gap-1 px-2 py-1 text-xs font-bold text-gray-400 cursor-pointer hover:text-gray-300 transition"
-                                            onClick={() => toggleRole('no-role')}
-                                        >
-                                            {collapsedRoles['no-role'] ? (
-                                                <CaretRight size={12} weight="bold" />
-                                            ) : (
-                                                <CaretDown size={12} weight="bold" />
-                                            )}
-                                            Members &mdash; {membersWithoutRoles.length}
-                                        </div>
-                                        {!collapsedRoles['no-role'] && membersWithoutRoles.map((member) => (
-                                            <MemberListItem
-                                                key={member.user.id}
-                                                member={member}
-                                            />
-                                        ))}
-                                    </div>
-                                )}
-                            </>
+                          <CaretDown size={12} weight="bold" />
                         )}
+                        {role.name} &mdash; {membersByRole[role.id].length}
+                      </div>
+                      {!collapsedRoles[role.id] &&
+                        membersByRole[role.id].map((member) => (
+                          <MemberListItem key={member.user.id} member={member} />
+                        ))}
                     </div>
-                </div>
+                  ) : null
+                )}
+                {membersWithoutRoles.length > 0 && (
+                  <div>
+                    <div
+                      className="flex cursor-pointer items-center gap-1 px-2 py-1 text-xs font-bold text-gray-400 transition hover:text-gray-300"
+                      onClick={() => toggleRole('no-role')}
+                    >
+                      {collapsedRoles['no-role'] ? (
+                        <CaretRight size={12} weight="bold" />
+                      ) : (
+                        <CaretDown size={12} weight="bold" />
+                      )}
+                      Members &mdash; {membersWithoutRoles.length}
+                    </div>
+                    {!collapsedRoles['no-role'] &&
+                      membersWithoutRoles.map((member) => (
+                        <MemberListItem key={member.user.id} member={member} />
+                      ))}
+                  </div>
+                )}
+              </>
             )}
+          </div>
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
 export default MemberList;

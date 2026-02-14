@@ -1,4 +1,4 @@
-import { toast } from 'sonner'
+import { toast } from 'sonner';
 import { useGuildsStore } from '../store/guilds.store';
 import { useUsersStore } from '../store/users.store';
 import api from '../api.js';
@@ -83,7 +83,7 @@ export const GuildsService = {
 
   /**
    * Add a guild member to the local store
-   * 
+   *
    * @param guildId The ID of the guild where the member will be added.
    * @param member The member to be added.
    */
@@ -103,7 +103,7 @@ export const GuildsService = {
 
   /**
    * Update a guild member in the local store
-   * 
+   *
    * @param guildId The ID of the guild where the member exists.
    * @param memberId The ID of the member to be updated.
    * @param updates The updates to be applied to the member.
@@ -113,7 +113,7 @@ export const GuildsService = {
     const members = guildMembers[guildId] || [];
     if (members.length === 0) return;
 
-    const updatedMembers = members.map(member =>
+    const updatedMembers = members.map((member) =>
       member.user_id === memberId ? { ...member, ...updates } : member
     );
     setGuildMembers(guildId, updatedMembers);
@@ -121,7 +121,7 @@ export const GuildsService = {
 
   /**
    * Delete a guild member from the local store
-   * 
+   *
    * @param guildId The ID of the guild where the member exists.
    * @param memberId The ID of the member to be deleted.
    */
@@ -130,7 +130,7 @@ export const GuildsService = {
     const members = guildMembers[guildId] || [];
     if (members.length === 0) return;
 
-    const updatedMembers = members.filter(member => member.user_id !== memberId);
+    const updatedMembers = members.filter((member) => member.user_id !== memberId);
     setGuildMembers(guildId, updatedMembers);
-  }
+  },
 };

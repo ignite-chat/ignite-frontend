@@ -1,6 +1,11 @@
 import * as Popover from '@radix-ui/react-popover';
 import { InputGroup } from '../ui/input-group';
-import { EmojiPicker, EmojiPickerContent, EmojiPickerFooter, EmojiPickerSearch } from '../ui/emoji-picker';
+import {
+  EmojiPicker,
+  EmojiPickerContent,
+  EmojiPickerFooter,
+  EmojiPickerSearch,
+} from '../ui/emoji-picker';
 import { useChannelInputContext, useChannelContext } from '../../contexts/ChannelContext.jsx';
 import { useChannelsStore } from '../../store/channels.store';
 import { X } from '@phosphor-icons/react';
@@ -152,13 +157,8 @@ const replaceAtQueryWithMention = (query, user, resolveUser) => {
   mention.textContent = resolved.label;
   mention.className = 'inline-flex rounded px-1.5 py-0.5 mx-[1px] select-none';
   mention.style.background =
-    resolved.color !== 'inherit'
-      ? `${resolved.color}33`
-      : 'rgba(88,101,242,0.18)';
-  mention.style.color =
-    resolved.color !== 'inherit'
-      ? resolved.color
-      : 'rgb(88,101,242)';
+    resolved.color !== 'inherit' ? `${resolved.color}33` : 'rgba(88,101,242,0.18)';
+  mention.style.color = resolved.color !== 'inherit' ? resolved.color : 'rgb(88,101,242)';
 
   range.insertNode(mention);
   mention.after(document.createTextNode(' '));
@@ -203,11 +203,11 @@ const ChannelInput = ({ channel }) => {
   const customEmojis = guildEmojis[guildId] || [];
   const currentUser = useStore((s) => s.user);
   const members = guildsStore.guildMembers[guildId] || [];
-  const channelMessages = useChannelsStore(s => s.channelMessages);
+  const channelMessages = useChannelsStore((s) => s.channelMessages);
 
   const replyingMessage = useMemo(() => {
     if (!replyingId || !channel?.channel_id) return null;
-    return (channelMessages[channel.channel_id] || []).find(m => m.id === replyingId);
+    return (channelMessages[channel.channel_id] || []).find((m) => m.id === replyingId);
   }, [replyingId, channel?.channel_id, channelMessages]);
 
   // Check if user can send messages in this channel
@@ -229,7 +229,7 @@ const ChannelInput = ({ channel }) => {
 
       return {
         label: `@${m.user.username}`,
-        color: role ? `#${role.color.toString(16).padStart(6, '0')}` : 'inherit'
+        color: role ? `#${role.color.toString(16).padStart(6, '0')}` : 'inherit',
       };
     },
     [members]
@@ -243,8 +243,10 @@ const ChannelInput = ({ channel }) => {
   const filteredMembers = useMemo(() => {
     if (!mentionQuery) return [];
     return members
-      .filter((m) =>
-        m.user.username.toLowerCase().includes(mentionQuery.toLowerCase()) || m.user.name.toLowerCase().includes(mentionQuery.toLowerCase())
+      .filter(
+        (m) =>
+          m.user.username.toLowerCase().includes(mentionQuery.toLowerCase()) ||
+          m.user.name.toLowerCase().includes(mentionQuery.toLowerCase())
       )
       .slice(0, SUGGESTIONS_LIMIT);
   }, [members, mentionQuery]);
@@ -368,11 +370,7 @@ const ChannelInput = ({ channel }) => {
 
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
-        replaceAtQueryWithMention(
-          mentionQuery,
-          filteredMembers[mentionIndex],
-          resolveUser
-        );
+        replaceAtQueryWithMention(mentionQuery, filteredMembers[mentionIndex], resolveUser);
         setMentionQuery(null);
         syncValue();
         return;
@@ -406,21 +404,22 @@ const ChannelInput = ({ channel }) => {
     editorRef.current.innerHTML = '';
   };
 
-  const otherRecipient = channel?.type === ChannelType.DM ? (channel.recipients || []).find(r => r.id !== currentUser?.id) : {}
+  const otherRecipient =
+    channel?.type === ChannelType.DM
+      ? (channel.recipients || []).find((r) => r.id !== currentUser?.id)
+      : {};
 
   /* ---------------- render ---------------- */
 
   return (
-    <div className="bg-gray-[#1a1a1e] px-2 pt-2 pb-2">
+    <div className="bg-gray-[#1a1a1e] px-2 pb-2 pt-2">
       {replyingMessage && (
         <div className="flex items-center gap-2 rounded-t-md bg-gray-800 px-3 py-2 text-sm text-gray-300">
-          <span className="text-gray-400 shrink-0">Replying to</span>
-          <span className="font-semibold text-white shrink-0">
+          <span className="shrink-0 text-gray-400">Replying to</span>
+          <span className="shrink-0 font-semibold text-white">
             {replyingMessage.author.name || replyingMessage.author.username}
           </span>
-          <span className="truncate text-gray-400">
-            {replyingMessage.content}
-          </span>
+          <span className="truncate text-gray-400">{replyingMessage.content}</span>
           <button
             type="button"
             onClick={() => setReplyingId(null)}
@@ -437,11 +436,8 @@ const ChannelInput = ({ channel }) => {
           pointer-events: none;
         }
       `}</style>
-      <InputGroup className="relative flex items-center bg-[#222327] h-auto border border-white/5">
-        <Popover.Root
-          open={!!mentionQuery && filteredMembers.length > 0}
-          modal={false}
-        >
+      <InputGroup className="relative flex h-auto items-center border border-white/5 bg-[#222327]">
+        <Popover.Root open={!!mentionQuery && filteredMembers.length > 0} modal={false}>
           <Popover.Anchor asChild>
             <div
               ref={editorRef}
@@ -452,8 +448,9 @@ const ChannelInput = ({ channel }) => {
               onKeyUp={saveSelection}
               onClick={saveSelection}
               onPaste={handlePaste}
-              className={`min-h-[44px] w-full px-3 py-3 text-sm outline-none max-h-[50vh] overflow-y-auto ${!canSendMessages ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+              className={`max-h-[50vh] min-h-[44px] w-full overflow-y-auto px-3 py-3 text-sm outline-none ${
+                !canSendMessages ? 'cursor-not-allowed opacity-50' : ''
+              }`}
               data-placeholder={
                 canSendMessages
                   ? channel?.type === ChannelType.DM
@@ -474,8 +471,9 @@ const ChannelInput = ({ channel }) => {
               {filteredMembers.map((m, i) => (
                 <button
                   key={m.user_id}
-                  className={`flex w-full items-center gap-2 rounded px-2 py-2 text-left ${i === mentionIndex ? 'bg-gray-700' : 'hover:bg-gray-700/60'
-                    }`}
+                  className={`flex w-full items-center gap-2 rounded px-2 py-2 text-left ${
+                    i === mentionIndex ? 'bg-gray-700' : 'hover:bg-gray-700/60'
+                  }`}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     replaceAtQueryWithMention(mentionQuery, m, resolveUser);
@@ -492,14 +490,17 @@ const ChannelInput = ({ channel }) => {
         </Popover.Root>
 
         {emojiQuery && filteredEmojis.length > 0 && (
-          <div className="absolute left-0 right-0 bottom-full mb-2 z-50 w-full max-h-[300px] rounded bg-[#2c2f33] shadow-lg flex flex-col border border-white/5">
-            <div className="text-xs font-bold text-gray-400 px-4 py-3 border-b border-white/5 flex-shrink-0">EMOJI MATCHING :{emojiQuery}</div>
-            <div className="overflow-y-auto flex-1">
+          <div className="absolute bottom-full left-0 right-0 z-50 mb-2 flex max-h-[300px] w-full flex-col rounded border border-white/5 bg-[#2c2f33] shadow-lg">
+            <div className="flex-shrink-0 border-b border-white/5 px-4 py-3 text-xs font-bold text-gray-400">
+              EMOJI MATCHING :{emojiQuery}
+            </div>
+            <div className="flex-1 overflow-y-auto">
               {filteredEmojis.map((item, i) => (
                 <button
                   key={item.shortcode}
-                  className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors ${i === emojiIndex ? 'bg-gray-700' : 'hover:bg-gray-700/50'
-                    }`}
+                  className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors ${
+                    i === emojiIndex ? 'bg-gray-700' : 'hover:bg-gray-700/50'
+                  }`}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     replaceEmojiQueryWithEmoji(emojiQuery, item.shortcode);
@@ -507,11 +508,16 @@ const ChannelInput = ({ channel }) => {
                     syncValue();
                   }}
                 >
-                  {item.custom
-                    ? <img src={item.imageUrl} alt={item.shortcode} className="h-6 w-6 object-contain flex-shrink-0" />
-                    : <div className="text-xl flex-shrink-0">{item.emoji}</div>
-                  }
-                  <div className="flex-1 truncate text-gray-200 font-medium">{item.shortcode}</div>
+                  {item.custom ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.shortcode}
+                      className="h-6 w-6 flex-shrink-0 object-contain"
+                    />
+                  ) : (
+                    <div className="flex-shrink-0 text-xl">{item.emoji}</div>
+                  )}
+                  <div className="flex-1 truncate font-medium text-gray-200">{item.shortcode}</div>
                 </button>
               ))}
             </div>
@@ -520,7 +526,7 @@ const ChannelInput = ({ channel }) => {
 
         <Popover.Root modal={false}>
           <Popover.Trigger asChild>
-            <Button variant="ghost" className="h-8 w-8 text-gray-400 self-start mt-2 mr-2">
+            <Button variant="ghost" className="mr-2 mt-2 h-8 w-8 self-start text-gray-400">
               <Smile className="size-5" />
             </Button>
           </Popover.Trigger>
@@ -529,7 +535,7 @@ const ChannelInput = ({ channel }) => {
             align="end"
             sideOffset={8}
             collisionPadding={16}
-            className="p-0 w-[350px] h-[400px] flex flex-col overflow-hidden"
+            className="flex h-[400px] w-[350px] flex-col overflow-hidden p-0"
           >
             <EmojiPicker
               onEmojiSelect={({ label, emoji }) => {

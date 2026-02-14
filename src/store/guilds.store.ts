@@ -28,9 +28,7 @@ export const useGuildsStore = create<GuildsStore>((set) => ({
   addGuild: (guild) => set((state) => ({ guilds: [...state.guilds, guild] })),
   editGuild: (guildId, updates) =>
     set((state) => ({
-      guilds: state.guilds.map((g) =>
-        g.id === guildId ? { ...g, ...updates } : g
-      ),
+      guilds: state.guilds.map((g) => (g.id === guildId ? { ...g, ...updates } : g)),
     })),
   editGuildChannel: (guildId, channelId, updates) =>
     set((state) => ({
@@ -44,6 +42,6 @@ export const useGuildsStore = create<GuildsStore>((set) => ({
           };
         }
         return g;
-      })
+      }),
     })),
 }));

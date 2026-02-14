@@ -2,46 +2,38 @@ import { toast } from 'sonner';
 import { ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '../ui/context-menu';
 
 const MessageContextMenu = ({ message, canEdit, canDelete, onEdit, onDelete, onReply }) => {
-    const handleCopyText = () => {
-        navigator.clipboard.writeText(message.content);
-        toast.success('Message text copied to clipboard.');
-    };
+  const handleCopyText = () => {
+    navigator.clipboard.writeText(message.content);
+    toast.success('Message text copied to clipboard.');
+  };
 
-    const handleCopyId = () => {
-        navigator.clipboard.writeText(message.id);
-        toast.success('Message link copied to clipboard.');
-    };
+  const handleCopyId = () => {
+    navigator.clipboard.writeText(message.id);
+    toast.success('Message link copied to clipboard.');
+  };
 
-    return (
-        <ContextMenuContent className="w-52">
-            <ContextMenuItem onSelect={onReply}>
-                Reply
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            {canEdit && (
-                <>
-                    <ContextMenuItem onSelect={onEdit}>
-                        Edit Message
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                </>
-            )}
-            <ContextMenuItem onSelect={handleCopyText}>
-                Copy Text
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={handleCopyId}>
-                Copy Message ID
-            </ContextMenuItem>
-            {canDelete && (
-                <>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onSelect={onDelete} className="text-red-500 hover:bg-red-600/20">
-                        Delete Message
-                    </ContextMenuItem>
-                </>
-            )}
-        </ContextMenuContent>
-    );
+  return (
+    <ContextMenuContent className="w-52">
+      <ContextMenuItem onSelect={onReply}>Reply</ContextMenuItem>
+      <ContextMenuSeparator />
+      {canEdit && (
+        <>
+          <ContextMenuItem onSelect={onEdit}>Edit Message</ContextMenuItem>
+          <ContextMenuSeparator />
+        </>
+      )}
+      <ContextMenuItem onSelect={handleCopyText}>Copy Text</ContextMenuItem>
+      <ContextMenuItem onSelect={handleCopyId}>Copy Message ID</ContextMenuItem>
+      {canDelete && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={onDelete} className="text-red-500 hover:bg-red-600/20">
+            Delete Message
+          </ContextMenuItem>
+        </>
+      )}
+    </ContextMenuContent>
+  );
 };
 
 export default MessageContextMenu;

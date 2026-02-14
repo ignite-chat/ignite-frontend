@@ -1,4 +1,4 @@
-import { toast } from 'sonner'
+import { toast } from 'sonner';
 import api from '../api.js';
 import useStore from '../hooks/useStore';
 
@@ -29,7 +29,8 @@ export const AuthService = {
         return data;
       }
     } catch (error) {
-      const message = error.response?.data?.message || 'An unknown error occurred during registration.';
+      const message =
+        error.response?.data?.message || 'An unknown error occurred during registration.';
       toast.error(message);
       throw error;
     }
@@ -42,5 +43,5 @@ export const AuthService = {
     } catch (error) {
       throw error;
     }
-  }
+  },
 };

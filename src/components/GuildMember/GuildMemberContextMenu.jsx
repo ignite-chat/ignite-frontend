@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner'
+import { toast } from 'sonner';
 import useStore from '../../hooks/useStore';
 import api from '../../api';
 import { FriendsService } from '../../services/friends.service';
@@ -11,7 +11,7 @@ import {
   ContextMenuSub,
   ContextMenuSubTrigger,
   ContextMenuSubContent,
-  ContextMenuCheckboxItem // Using CheckboxItem is standard for toggling roles
+  ContextMenuCheckboxItem, // Using CheckboxItem is standard for toggling roles
 } from '../ui/context-menu';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useRolesStore } from '../../store/roles.store';
@@ -42,7 +42,7 @@ const GuildMemberContextMenu = ({ user }) => {
 
   const memberHasRole = (roleId) => {
     return userRoles.some((r) => r.id === roleId);
-  }
+  };
 
   const toggleRole = (roleId) => {
     if (memberHasRole(roleId)) {
@@ -72,26 +72,35 @@ const GuildMemberContextMenu = ({ user }) => {
   }, [guildMembers, guildId, store.user.id, availableRoles, userRoles]);
 
   const isFriend = useMemo(() => friends.some((f) => f.id === user.id), [friends, user.id]);
-  const hasSentRequest = useMemo(() => requests.some((r) => r.receiver_id === user.id), [requests, user.id]);
-  const hasReceivedRequest = useMemo(() => requests.some((r) => r.sender_id === user.id), [requests, user.id]);
+  const hasSentRequest = useMemo(
+    () => requests.some((r) => r.receiver_id === user.id),
+    [requests, user.id]
+  );
+  const hasReceivedRequest = useMemo(
+    () => requests.some((r) => r.sender_id === user.id),
+    [requests, user.id]
+  );
 
   const friendRequestId = useMemo(() => {
     const request = requests.find((r) => r.sender_id === user.id || r.receiver_id === user.id);
     return request ? request.id : null;
   }, [requests, user.id]);
 
-  const onSendMessage = useCallback(async (author) => {
-    if (author.id === store.user.id) {
-      toast.info('You cannot DM yourself.');
-      return;
-    }
-    try {
-      await api.post('@me/channels', { recipients: [author.id] });
-      navigate('/channels/@me');
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Could not create direct message.');
-    }
-  }, [navigate, store.user.id]);
+  const onSendMessage = useCallback(
+    async (author) => {
+      if (author.id === store.user.id) {
+        toast.info('You cannot DM yourself.');
+        return;
+      }
+      try {
+        await api.post('@me/channels', { recipients: [author.id] });
+        navigate('/channels/@me');
+      } catch (error) {
+        toast.error(error.response?.data?.message || 'Could not create direct message.');
+      }
+    },
+    [navigate, store.user.id]
+  );
 
   // Handler shortcuts
   const handleFriendsAction = (action, username) => {
@@ -107,9 +116,7 @@ const GuildMemberContextMenu = ({ user }) => {
       </ContextMenuItem>
 
       {user.id !== store.user.id && (
-        <ContextMenuItem onSelect={() => onSendMessage(user)}>
-          Send Message
-        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => onSendMessage(user)}>Send Message</ContextMenuItem>
       )}
 
       {user.id !== store.user.id && (
@@ -121,7 +128,9 @@ const GuildMemberContextMenu = ({ user }) => {
           </ContextMenuItem>
 
           {!isFriend && !hasSentRequest && !hasReceivedRequest && (
-            <ContextMenuItem onSelect={() => handleFriendsAction(FriendsService.sendRequest, user.username)}>
+            <ContextMenuItem
+              onSelect={() => handleFriendsAction(FriendsService.sendRequest, user.username)}
+            >
               Add Friend
             </ContextMenuItem>
           )}
@@ -141,7 +150,10 @@ const GuildMemberContextMenu = ({ user }) => {
             </ContextMenuItem>
           )}
 
-          <ContextMenuItem className="text-red-500" onSelect={() => toast.info('Block feature coming soon.')}>
+          <ContextMenuItem
+            className="text-red-500"
+            onSelect={() => toast.info('Block feature coming soon.')}
+          >
             Block
           </ContextMenuItem>
         </>
@@ -163,7 +175,7 @@ const GuildMemberContextMenu = ({ user }) => {
             >
               <div className="flex items-center gap-2">
                 <div
-                  className="w-3 h-3 rounded-full"
+                  className="h-3 w-3 rounded-full"
                   style={{ backgroundColor: intToHex(role.color) }}
                 />
                 {role.name}
@@ -173,11 +185,14 @@ const GuildMemberContextMenu = ({ user }) => {
         </ContextMenuSubContent>
       </ContextMenuSub>
 
-      {canKickMember &&
-        <ContextMenuItem className="text-red-500" onSelect={() => toast.info('Block feature coming soon.')}>
+      {canKickMember && (
+        <ContextMenuItem
+          className="text-red-500"
+          onSelect={() => toast.info('Block feature coming soon.')}
+        >
           Kick {user.username}
         </ContextMenuItem>
-      }
+      )}
 
       {/* <ContextMenuItem className="text-red-500" onSelect={() => toast.info('Block feature coming soon.')}>
         Ban {user.username}

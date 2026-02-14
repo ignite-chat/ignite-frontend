@@ -8,7 +8,7 @@ type RolesStore = {
 
 export const useRolesStore = create<RolesStore>((set) => ({
   guildRoles: {},
-  
+
   setGuildRoles: (guildId, roles) =>
     set((state) => ({
       guildRoles: {

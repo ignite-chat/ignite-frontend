@@ -7,7 +7,13 @@ import { FriendsService } from '../../services/friends.service';
 import { ChannelsService } from '../../services/channels.service';
 import { useFriendsStore } from '../../store/friends.store';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { CircleNotch, DotsThree, Prohibit, UserCircle, ChatTeardropText } from '@phosphor-icons/react';
+import {
+  CircleNotch,
+  DotsThree,
+  Prohibit,
+  UserCircle,
+  ChatTeardropText,
+} from '@phosphor-icons/react';
 import GuildMemberContextMenu from './GuildMemberContextMenu';
 import { toast } from 'sonner';
 import UserProfileModal from '../UserProfileModal';
@@ -35,7 +41,9 @@ const GuildMemberPopoverContent = ({ userId, guild = null }) => {
   }, [requests, user.id]);
 
   const friendRequestId = useMemo(() => {
-    const request = requests.find((request) => request.sender_id === user.id || request.receiver_id === user.id);
+    const request = requests.find(
+      (request) => request.sender_id === user.id || request.receiver_id === user.id
+    );
     return request ? request.id : null;
   }, [requests, user.id]);
 
@@ -104,7 +112,7 @@ const GuildMemberPopoverContent = ({ userId, guild = null }) => {
       {loading ? (
         <CircleNotch className="mx-auto animate-spin text-gray-500" />
       ) : (
-        <div className="w-80 rounded-lg bg-[#111214] shadow-xl overflow-hidden border border-white/5">
+        <div className="w-80 overflow-hidden rounded-lg border border-white/5 bg-[#111214] shadow-xl">
           <div className="relative h-28">
             <div
               className="h-full bg-primary"
@@ -112,7 +120,7 @@ const GuildMemberPopoverContent = ({ userId, guild = null }) => {
                 backgroundColor: user.banner_color,
                 backgroundImage: user.banner_url ? `url(${user.banner_url})` : 'none',
                 backgroundSize: 'cover',
-                backgroundPosition: 'center'
+                backgroundPosition: 'center',
               }}
             />
 
@@ -125,10 +133,14 @@ const GuildMemberPopoverContent = ({ userId, guild = null }) => {
                 <div className="rounded-full border-[6px] border-white/5 bg-[#111214] transition hover:brightness-110">
                   <Avatar user={user} className="size-20 !cursor-pointer text-3xl" />
                 </div>
-                {user.status === 'online' && (<div className="absolute bottom-1 right-1 size-6 rounded-full border-4 border-white/5 bg-[#23a559] z-10" />)}
+                {user.status === 'online' && (
+                  <div className="absolute bottom-1 right-1 z-10 size-6 rounded-full border-4 border-white/5 bg-[#23a559]" />
+                )}
 
                 <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100">
-                  <span className="text-[10px] font-bold uppercase text-white drop-shadow-md">View Profile</span>
+                  <span className="text-[10px] font-bold uppercase text-white drop-shadow-md">
+                    View Profile
+                  </span>
                 </div>
               </button>
             </div>
@@ -188,13 +200,16 @@ const GuildMemberPopoverContent = ({ userId, guild = null }) => {
                     <DotsThree className="size-4" weight="bold" />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-48 bg-[#111214] border-white/5 p-1 shadow-xl rounded-md">
+                <PopoverContent
+                  align="end"
+                  className="w-48 rounded-md border-white/5 bg-[#111214] p-1 shadow-xl"
+                >
                   <div className="flex flex-col gap-0.5">
                     {/* Reuse logic from UserProfileModal */}
                     {isFriend && (
                       <button
                         onClick={handleRemoveFriend}
-                        className="flex items-center justify-between w-full px-2 py-1.5 text-xs font-medium text-red-400 rounded hover:bg-red-500/10 transition-colors"
+                        className="flex w-full items-center justify-between rounded px-2 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10"
                       >
                         Remove Friend
                         <UserMinus size={14} />
@@ -203,7 +218,7 @@ const GuildMemberPopoverContent = ({ userId, guild = null }) => {
                     {hasSentRequest && (
                       <button
                         onClick={handleCancelRequest}
-                        className="flex items-center justify-between w-full px-2 py-1.5 text-xs font-medium text-red-400 rounded hover:bg-red-500/10 transition-colors"
+                        className="flex w-full items-center justify-between rounded px-2 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10"
                       >
                         Cancel Friend Request
                         <UserMinus size={14} />
@@ -211,15 +226,15 @@ const GuildMemberPopoverContent = ({ userId, guild = null }) => {
                     )}
                     <button
                       onClick={handleBlock}
-                      className="flex items-center justify-between w-full px-2 py-1.5 text-xs font-medium text-red-500 rounded hover:bg-red-500/10 transition-colors"
+                      className="flex w-full items-center justify-between rounded px-2 py-1.5 text-xs font-medium text-red-500 transition-colors hover:bg-red-500/10"
                     >
                       Block
                       <Prohibit size={14} />
                     </button>
-                    <div className="h-px bg-white/5 my-0.5" />
+                    <div className="my-0.5 h-px bg-white/5" />
                     <button
                       onClick={handleCopyId}
-                      className="flex items-center justify-between w-full px-2 py-1.5 text-xs font-medium text-gray-300 rounded hover:bg-white/5 transition-colors"
+                      className="flex w-full items-center justify-between rounded px-2 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-white/5"
                     >
                       Copy User ID
                       <UserCircle size={14} />
@@ -232,26 +247,32 @@ const GuildMemberPopoverContent = ({ userId, guild = null }) => {
 
           <div className="mt-14 px-4 pb-4">
             <div className="rounded-md bg-[#111214] p-1">
-              <h2 className="text-lg font-bold text-white flex items-center gap-1.5">
+              <h2 className="flex items-center gap-1.5 text-lg font-bold text-white">
                 {user.name}
               </h2>
               <p className="text-xs font-medium text-gray-300">{user.username}</p>
 
               <div className="mt-3">
-                <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                   About Me
                 </h3>
-                <p className="text-[13px] text-gray-300 leading-relaxed">
-                  {user.bio || "No description provided."}
+                <p className="text-[13px] leading-relaxed text-gray-300">
+                  {user.bio || 'No description provided.'}
                 </p>
               </div>
 
               <div className="mt-3">
-                <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                   Member Since
                 </h3>
                 <p className="text-[13px] text-gray-300">
-                  {user.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Feb 8, 2026'}
+                  {user.created_at
+                    ? new Date(user.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })
+                    : 'Feb 8, 2026'}
                 </p>
               </div>
             </div>
@@ -259,11 +280,7 @@ const GuildMemberPopoverContent = ({ userId, guild = null }) => {
         </div>
       )}
 
-      <UserProfileModal
-        user={user}
-        isOpen={profileModalOpen}
-        setIsOpen={setProfileModalOpen}
-      />
+      <UserProfileModal user={user} isOpen={profileModalOpen} setIsOpen={setProfileModalOpen} />
     </>
   );
 };

@@ -28,7 +28,8 @@ const ServerInfo = ({ guild }) => {
     setLoading(true);
     setError('');
 
-    api.get(`/guilds/${guild.id}/profile`)
+    api
+      .get(`/guilds/${guild.id}/profile`)
       .then((response) => {
         if (!active) return;
         setProfile(response.data);
@@ -104,7 +105,10 @@ const ServerInfo = ({ guild }) => {
             className="space-y-4"
           >
             <div className="space-y-2">
-              <Label htmlFor="profile-name" className="text-xs font-bold uppercase text-muted-foreground">
+              <Label
+                htmlFor="profile-name"
+                className="text-xs font-bold uppercase text-muted-foreground"
+              >
                 Server Name
               </Label>
               {editingField === 'name' ? (
@@ -138,7 +142,9 @@ const ServerInfo = ({ guild }) => {
                 </div>
               ) : (
                 <div className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2">
-                  <span className="text-sm">{profile?.name || guild?.name || 'Unnamed Server'}</span>
+                  <span className="text-sm">
+                    {profile?.name || guild?.name || 'Unnamed Server'}
+                  </span>
                   <Button
                     type="button"
                     variant="ghost"
@@ -158,17 +164,18 @@ const ServerInfo = ({ guild }) => {
           <form
             onSubmit={descriptionForm.handleSubmit(async (data) => {
               const description = data.description?.trim();
-              const saved = await handleSave(
-                { description: description || '' },
-                (nextProfile) =>
-                  descriptionForm.reset({ description: nextProfile?.description || '' })
+              const saved = await handleSave({ description: description || '' }, (nextProfile) =>
+                descriptionForm.reset({ description: nextProfile?.description || '' })
               );
               if (saved) setEditingField(null);
             })}
             className="space-y-4"
           >
             <div className="space-y-2">
-              <Label htmlFor="profile-description" className="text-xs font-bold uppercase text-muted-foreground">
+              <Label
+                htmlFor="profile-description"
+                className="text-xs font-bold uppercase text-muted-foreground"
+              >
                 Server Description
               </Label>
               <p className="text-xs text-muted-foreground">
@@ -224,16 +231,18 @@ const ServerInfo = ({ guild }) => {
           <form
             onSubmit={iconForm.handleSubmit(async (data) => {
               const icon = data.icon?.trim();
-              const saved = await handleSave(
-                { icon: icon || '' },
-                (nextProfile) => iconForm.reset({ icon: nextProfile?.icon || '' })
+              const saved = await handleSave({ icon: icon || '' }, (nextProfile) =>
+                iconForm.reset({ icon: nextProfile?.icon || '' })
               );
               if (saved) setEditingField(null);
             })}
             className="space-y-4"
           >
             <div className="space-y-2">
-              <Label htmlFor="profile-icon" className="text-xs font-bold uppercase text-muted-foreground">
+              <Label
+                htmlFor="profile-icon"
+                className="text-xs font-bold uppercase text-muted-foreground"
+              >
                 Server Icon
               </Label>
               <p className="text-xs text-muted-foreground">
@@ -296,20 +305,21 @@ const ServerInfo = ({ guild }) => {
                 setOwnerWarning('Confirm the ownership transfer to continue.');
                 return;
               }
-              const saved = await handleSave(
-                { owner_id: nextOwnerId },
-                (nextProfile) =>
-                  ownerForm.reset({
-                    owner_id: nextProfile?.owner_id ? String(nextProfile.owner_id) : '',
-                    confirm_transfer: false,
-                  })
+              const saved = await handleSave({ owner_id: nextOwnerId }, (nextProfile) =>
+                ownerForm.reset({
+                  owner_id: nextProfile?.owner_id ? String(nextProfile.owner_id) : '',
+                  confirm_transfer: false,
+                })
               );
               if (saved) setEditingField(null);
             })}
             className="space-y-4"
           >
             <div className="space-y-2">
-              <Label htmlFor="profile-owner" className="text-xs font-bold uppercase text-muted-foreground">
+              <Label
+                htmlFor="profile-owner"
+                className="text-xs font-bold uppercase text-muted-foreground"
+              >
                 Server Owner
               </Label>
               <p className="text-xs text-muted-foreground">

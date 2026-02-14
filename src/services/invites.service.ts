@@ -1,4 +1,4 @@
-import { toast } from 'sonner'
+import { toast } from 'sonner';
 import api from '../api.js';
 import useStore from '../hooks/useStore';
 import { GuildsService } from './guilds.service';
@@ -44,5 +44,5 @@ export const InvitesService = {
       toast.error(error.response?.data?.message || 'Failed to create account and join.');
       throw error;
     }
-  }
+  },
 };

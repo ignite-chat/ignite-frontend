@@ -1,4 +1,14 @@
-import { Bell, Chats, Hash, MagnifyingGlass, PushPin, Question, SpeakerHigh, Tray, Users } from '@phosphor-icons/react';
+import {
+  Bell,
+  Chats,
+  Hash,
+  MagnifyingGlass,
+  PushPin,
+  Question,
+  SpeakerHigh,
+  Tray,
+  Users,
+} from '@phosphor-icons/react';
 import { useState } from 'react';
 import SearchModal from '../Modals/SearchModal';
 import { useGuildContext } from '../../contexts/GuildContext';
@@ -53,7 +63,11 @@ const IconButton = ({ icon, tooltipText, onClick }) => {
   }
 
   return (
-    <button type="button" onClick={onClick} className="group relative flex h-6 items-center justify-center">
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative flex h-6 items-center justify-center"
+    >
       {iconEl}
       <Tooltip text={tooltipText} />
     </button>
@@ -64,7 +78,10 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
   const { guildId } = useGuildContext();
   const { memberListOpen, setMemberListOpen } = useChannelContext();
   const currentUser = useStore((s) => s.user);
-  const otherRecipient = channel?.type === ChannelType.DM ? (channel.recipients || []).find(r => r.id !== currentUser?.id) : {}
+  const otherRecipient =
+    channel?.type === ChannelType.DM
+      ? (channel.recipients || []).find((r) => r.id !== currentUser?.id)
+      : {};
 
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -75,7 +92,7 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
           <div className="relative flex min-w-0 flex-auto items-center overflow-hidden">
             {channel?.type === ChannelType.DM ? (
               <>
-                <Avatar user={otherRecipient} className="size-8 mr-2" />
+                <Avatar user={otherRecipient} className="mr-2 size-8" />
                 <h1 className="truncate text-sm font-semibold text-gray-100 sm:text-base">
                   {otherRecipient?.name}
                 </h1>
@@ -99,7 +116,11 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
 
           <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-4">
             {channel?.type !== ChannelType.DM && channel?.type !== ChannelType.GUILD_VOICE && (
-              <IconButton icon="users" tooltipText="Show Member List" onClick={() => setMemberListOpen(!memberListOpen)} />
+              <IconButton
+                icon="users"
+                tooltipText="Show Member List"
+                onClick={() => setMemberListOpen(!memberListOpen)}
+              />
             )}
             {channel?.type !== ChannelType.GUILD_VOICE && (
               <IconButton icon="search" tooltipText="Search" onClick={() => setSearchOpen(true)} />

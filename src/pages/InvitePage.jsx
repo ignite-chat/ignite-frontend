@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { toast } from 'sonner'
+import { toast } from 'sonner';
 import { Users, Clock, XCircle, CheckCircle } from '@phosphor-icons/react';
 import useStore from '../hooks/useStore';
 import { useGuildsStore } from '../store/guilds.store';
@@ -55,7 +55,7 @@ const InvitePage = () => {
   // Check if user is already a member and redirect
   useEffect(() => {
     if (invite && store.user && guilds.length > 0) {
-      const guild = guilds.find(g => g.id === invite.guild.id);
+      const guild = guilds.find((g) => g.id === invite.guild.id);
       if (guild) {
         navigate(`/channels/${guild.id}`, { replace: true });
       }
@@ -72,7 +72,7 @@ const InvitePage = () => {
 
       // Navigate to the guild's first channel
       const { guilds } = useGuildsStore.getState();
-      const guild = guilds.find(g => g.id === invite.guild.id);
+      const guild = guilds.find((g) => g.id === invite.guild.id);
       if (guild && guild.channels && guild.channels.length > 0) {
         const firstChannel = guild.channels[0];
         navigate(`/channels/${guild.id}/${firstChannel.channel_id}`, { replace: true });
@@ -161,8 +161,10 @@ const InvitePage = () => {
                 <div>
                   <h2 className="text-xl font-bold">{error.message}</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    {error.type === 'not_found' && 'The invite link you used is invalid or has been deleted.'}
-                    {error.type === 'expired' && 'This invite may have expired or reached its maximum uses.'}
+                    {error.type === 'not_found' &&
+                      'The invite link you used is invalid or has been deleted.'}
+                    {error.type === 'expired' &&
+                      'This invite may have expired or reached its maximum uses.'}
                     {error.type === 'server_error' && 'Please try again later.'}
                   </p>
                 </div>
@@ -206,7 +208,9 @@ const InvitePage = () => {
               {/* Guild Info */}
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
-                  {invite.user ? `${invite.user.username} has invited you to join` : "You've been invited to join"}
+                  {invite.user
+                    ? `${invite.user.username} has invited you to join`
+                    : "You've been invited to join"}
                 </p>
                 <h1 className="mt-2 text-2xl font-bold">{invite.guild.name}</h1>
               </div>
@@ -239,7 +243,9 @@ const InvitePage = () => {
                       <Clock className="size-4" />
                       Expires in:
                     </span>
-                    <span className="font-medium text-foreground">{formatExpiry(invite.expires_at)}</span>
+                    <span className="font-medium text-foreground">
+                      {formatExpiry(invite.expires_at)}
+                    </span>
                   </div>
                 </div>
               )}
@@ -247,12 +253,7 @@ const InvitePage = () => {
               <div className="w-full space-y-3 border-t pt-4">
                 {store.user ? (
                   // Logged in user
-                  <Button
-                    onClick={handleJoin}
-                    disabled={joining}
-                    className="w-full"
-                    size="lg"
-                  >
+                  <Button onClick={handleJoin} disabled={joining} className="w-full" size="lg">
                     {joining ? 'Joining...' : 'Join Server'}
                   </Button>
                 ) : (

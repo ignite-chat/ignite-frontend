@@ -1,4 +1,4 @@
-import { toast } from 'sonner'
+import { toast } from 'sonner';
 import { useFriendsStore } from '../store/friends.store';
 import api from '../api.js';
 
@@ -25,7 +25,7 @@ export const FriendsService = {
 
   /**
    * Send a friend request to a user by username and sync local store.
-   * 
+   *
    * @param username The username of the user to send a friend request to.
    * @returns void
    */
@@ -56,7 +56,7 @@ export const FriendsService = {
 
   /**
    * Accept a friend request by ID and sync local store.
-   * 
+   *
    * @param id The ID of the friend request to accept.
    */
   async acceptRequest(id: string) {
@@ -70,7 +70,7 @@ export const FriendsService = {
 
   /**
    * Cancel a friend request by ID and sync local store.
-   * 
+   *
    * @param id The ID of the friend request to cancel.
    */
   async cancelRequest(id: string) {
@@ -84,7 +84,7 @@ export const FriendsService = {
 
   /**
    * Delete a friend by ID and sync local store.
-   * 
+   *
    * @param id The ID of the friend to delete.
    */
   async deleteFriend(id: string) {

@@ -8,7 +8,13 @@ import { AuthService } from '../services/auth.service';
 const HCAPTCHA_SITE_KEY = '78b0437e-9a22-4e50-aae6-26ae467445d8';
 import GuestLayout from '../layouts/GuestLayout';
 import { Card, CardContent } from '../components/ui/card';
-import { Field, FieldGroup, FieldLabel, FieldDescription, FieldError } from '../components/ui/field';
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldDescription,
+  FieldError,
+} from '../components/ui/field';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 
@@ -30,23 +36,28 @@ const RegisterPage = () => {
     }
   }, [searchParams, form]);
 
-  const onSubmit = useCallback(async (data) => {
-    if (!captchaToken) {
-      setSubmitError('Please complete the captcha.');
-      return;
-    }
+  const onSubmit = useCallback(
+    async (data) => {
+      if (!captchaToken) {
+        setSubmitError('Please complete the captcha.');
+        return;
+      }
 
-    try {
-      await AuthService.register({ ...data, hcaptcha_captcha_token: captchaToken });
-      const redirectTo = searchParams.get('redirect') || '/channels/@me';
-      navigate(redirectTo, { replace: true });
-    } catch (error) {
-      console.error(error);
-      setSubmitError(error.response?.data?.message || 'An unknown error occurred during registration.');
-      captchaRef.current?.resetCaptcha();
-      setCaptchaToken(null);
-    }
-  }, [navigate, searchParams, captchaToken]);
+      try {
+        await AuthService.register({ ...data, hcaptcha_captcha_token: captchaToken });
+        const redirectTo = searchParams.get('redirect') || '/channels/@me';
+        navigate(redirectTo, { replace: true });
+      } catch (error) {
+        console.error(error);
+        setSubmitError(
+          error.response?.data?.message || 'An unknown error occurred during registration.'
+        );
+        captchaRef.current?.resetCaptcha();
+        setCaptchaToken(null);
+      }
+    },
+    [navigate, searchParams, captchaToken]
+  );
 
   const passwordValue = form.watch('password');
 
@@ -60,17 +71,13 @@ const RegisterPage = () => {
                 <div className="p-6 md:p-8">
                   <FieldGroup>
                     <div className="flex flex-col items-center gap-2 text-center">
-                      <h1 className="text-2xl font-bold">
-                        Create your account
-                      </h1>
+                      <h1 className="text-2xl font-bold">Create your account</h1>
                       <p className="text-balance text-muted-foreground">
                         Register for a new Ignite account
                       </p>
                     </div>
                     <Field>
-                      <FieldLabel htmlFor="username">
-                        Username
-                      </FieldLabel>
+                      <FieldLabel htmlFor="username">Username</FieldLabel>
                       <Controller
                         name="username"
                         rules={{
@@ -78,12 +85,10 @@ const RegisterPage = () => {
                         }}
                         render={({ field, formState }) => (
                           <>
-                            <Input
-                              id="username"
-                              placeholder="Enter your username"
-                              {...field}
-                            />
-                            <FieldError>{formState.errors.username && formState.errors.username.message}</FieldError>
+                            <Input id="username" placeholder="Enter your username" {...field} />
+                            <FieldError>
+                              {formState.errors.username && formState.errors.username.message}
+                            </FieldError>
                           </>
                         )}
                       />
@@ -96,7 +101,10 @@ const RegisterPage = () => {
                             name="password"
                             rules={{
                               required: 'Password is required',
-                              minLength: { value: 8, message: 'Password must be at least 8 characters long' },
+                              minLength: {
+                                value: 8,
+                                message: 'Password must be at least 8 characters long',
+                              },
                             }}
                             render={({ field, formState }) => (
                               <>
@@ -105,21 +113,25 @@ const RegisterPage = () => {
                                   placeholder="Enter your password"
                                   {...field}
                                 />
-                                <FieldError>{formState.errors.password && formState.errors.password.message}</FieldError>
+                                <FieldError>
+                                  {formState.errors.password && formState.errors.password.message}
+                                </FieldError>
                               </>
                             )}
                           />
                         </Field>
                         <Field>
-                          <FieldLabel htmlFor="confirmPassword">
-                            Confirm Password
-                          </FieldLabel>
+                          <FieldLabel htmlFor="confirmPassword">Confirm Password</FieldLabel>
                           <Controller
                             name="confirmPassword"
                             rules={{
                               required: 'Password confirmation is required',
-                              minLength: { value: 8, message: 'Password must be at least 8 characters long' },
-                              validate: (value) => value === passwordValue || 'Passwords do not match',
+                              minLength: {
+                                value: 8,
+                                message: 'Password must be at least 8 characters long',
+                              },
+                              validate: (value) =>
+                                value === passwordValue || 'Passwords do not match',
                             }}
                             render={({ field, formState }) => (
                               <>
@@ -128,7 +140,10 @@ const RegisterPage = () => {
                                   placeholder="Confirm your password"
                                   {...field}
                                 />
-                                <FieldError>{formState.errors.confirmPassword && formState.errors.confirmPassword.message}</FieldError>
+                                <FieldError>
+                                  {formState.errors.confirmPassword &&
+                                    formState.errors.confirmPassword.message}
+                                </FieldError>
                               </>
                             )}
                           />
@@ -147,21 +162,17 @@ const RegisterPage = () => {
                         onExpire={() => setCaptchaToken(null)}
                       />
                     </Field>
-                    {submitError && (
-                      <FieldError>
-                        {submitError}
-                      </FieldError>
-                    )}
+                    {submitError && <FieldError>{submitError}</FieldError>}
                     <Field>
-                      <Button
-                        type="submit"
-                        disabled={form.formState.isSubmitting || !captchaToken}
-                      >
+                      <Button type="submit" disabled={form.formState.isSubmitting || !captchaToken}>
                         {form.formState.isSubmitting ? 'Creating account...' : 'Create Account'}
                       </Button>
                     </Field>
                     <FieldDescription className="text-center">
-                      Already have an account? <Link to="/login" className="underline">Log in</Link>
+                      Already have an account?{' '}
+                      <Link to="/login" className="underline">
+                        Log in
+                      </Link>
                     </FieldDescription>
                   </FieldGroup>
                 </div>
@@ -175,8 +186,8 @@ const RegisterPage = () => {
               </CardContent>
             </Card>
             <FieldDescription className="px-6 text-center">
-              By registering, you agree to our <a href="#">Terms of Service</a>{" "}
-              and <a href="#">Privacy Policy</a>.
+              By registering, you agree to our <a href="#">Terms of Service</a> and{' '}
+              <a href="#">Privacy Policy</a>.
             </FieldDescription>
           </div>
         </form>

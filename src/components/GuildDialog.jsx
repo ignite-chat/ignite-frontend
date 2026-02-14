@@ -36,7 +36,8 @@ const GuildDialog = ({ isOpen, setIsOpen }) => {
     async (data) => {
       GuildsService.createGuild(data);
       closeAll();
-    }, [closeAll]
+    },
+    [closeAll]
   );
 
   const onJoin = useCallback(
@@ -47,7 +48,8 @@ const GuildDialog = ({ isOpen, setIsOpen }) => {
       } catch (error) {
         console.error(error);
       }
-    }, [closeAll]
+    },
+    [closeAll]
   );
 
   const activeIndex = view === 'menu' ? 0 : view === 'create' ? 1 : 2;

@@ -4,9 +4,7 @@ const FormLabel = ({ htmlFor, help, children }) => {
       <label htmlFor={htmlFor} className="text-base font-medium text-white">
         {children}
       </label>
-      <p className="min-h-[1.5rem] truncate text-xs text-gray-text">
-        {help || ''}
-      </p>
+      <p className="text-gray-text min-h-[1.5rem] truncate text-xs">{help || ''}</p>
     </div>
   );
 };

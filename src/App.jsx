@@ -39,7 +39,7 @@ const AuthRoute = ({ children }) => {
         const localToken = localStorage.getItem('token');
         if (localToken) {
           const { data: user } = await api.get('@me', {
-            headers: { Authorization: `Bearer ${localToken}` }
+            headers: { Authorization: `Bearer ${localToken}` },
           });
 
           if (user?.username) {
@@ -52,7 +52,7 @@ const AuthRoute = ({ children }) => {
               UnreadsService.loadUnreads(),
             ]);
 
-            await ChannelsService.loadChannels()
+            await ChannelsService.loadChannels();
             await RolesService.initializeGuildRoles();
           } else {
             localStorage.removeItem('token');
@@ -203,7 +203,7 @@ const PublicRoute = ({ children }) => {
         const localToken = localStorage.getItem('token');
         if (localToken) {
           const { data: user } = await api.get('@me', {
-            headers: { Authorization: `Bearer ${localToken}` }
+            headers: { Authorization: `Bearer ${localToken}` },
           });
 
           if (user?.username) {
@@ -216,7 +216,7 @@ const PublicRoute = ({ children }) => {
               UnreadsService.loadUnreads(),
             ]);
 
-            await ChannelsService.loadChannels()
+            await ChannelsService.loadChannels();
             await RolesService.initializeGuildRoles();
           } else {
             localStorage.removeItem('token');
@@ -268,77 +268,79 @@ function App() {
     };
   }, []);
 
-  return <>
-    <VoiceAudioRenderer />
-    <Routes>
-    <Route
-      index
-      element={
-        store.user ? <Navigate to="/channels/@me" replace /> : <Navigate to="/login" replace />
-      }
-    />
-    <Route element={<PublicRoute />}>
-      <Route
-        path="/invite/:code"
-        element={
-          <>
-            <PageTitle title="Server Invite" />
-            <InvitePage />
-          </>
-        }
-      />
-    </Route>
-    <Route element={<GuestRoute />}>
-      <Route
-        path="login"
-        element={
-          <>
-            <PageTitle title="Login" />
-            <LoginPage />
-          </>
-        }
-      />
-      <Route
-        path="register"
-        element={
-          <>
-            <PageTitle title="Register" />
-            <RegisterPage />
-          </>
-        }
-      />
-    </Route>
-    <Route element={<AuthRoute />}>
-      <Route
-        path="/channels/@me"
-        element={
-          <>
-            <PageTitle title="Direct Messages" />
-            <DirectMessagesPage />
-          </>
-        }
-      />
-      <Route
-        path="/channels/@me/:channelId"
-        element={
-          <>
-            <PageTitle title="Direct Messages" />
-            <DirectMessagesPage />
-          </>
-        }
-      />
-      <Route
-        path="/channels/:guildId/:channelId?"
-        element={
-          <>
-            <PageTitle title="Guild Channel" />
-            <GuildChannelPage />
-          </>
-        }
-      />
-    </Route>
-  </Routes>
-  </>;
+  return (
+    <>
+      <VoiceAudioRenderer />
+      <Routes>
+        <Route
+          index
+          element={
+            store.user ? <Navigate to="/channels/@me" replace /> : <Navigate to="/login" replace />
+          }
+        />
+        <Route element={<PublicRoute />}>
+          <Route
+            path="/invite/:code"
+            element={
+              <>
+                <PageTitle title="Server Invite" />
+                <InvitePage />
+              </>
+            }
+          />
+        </Route>
+        <Route element={<GuestRoute />}>
+          <Route
+            path="login"
+            element={
+              <>
+                <PageTitle title="Login" />
+                <LoginPage />
+              </>
+            }
+          />
+          <Route
+            path="register"
+            element={
+              <>
+                <PageTitle title="Register" />
+                <RegisterPage />
+              </>
+            }
+          />
+        </Route>
+        <Route element={<AuthRoute />}>
+          <Route
+            path="/channels/@me"
+            element={
+              <>
+                <PageTitle title="Direct Messages" />
+                <DirectMessagesPage />
+              </>
+            }
+          />
+          <Route
+            path="/channels/@me/:channelId"
+            element={
+              <>
+                <PageTitle title="Direct Messages" />
+                <DirectMessagesPage />
+              </>
+            }
+          />
+          <Route
+            path="/channels/:guildId/:channelId?"
+            element={
+              <>
+                <PageTitle title="Guild Channel" />
+                <GuildChannelPage />
+              </>
+            }
+          />
+        </Route>
+      </Routes>
+    </>
+  );
 }
 
 export default App;
