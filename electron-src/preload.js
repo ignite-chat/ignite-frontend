@@ -15,6 +15,7 @@ if (window.opener === null) {
         maximize: () => ipcRenderer.invoke('window:maximize'),
         close: () => ipcRenderer.invoke('window:close'),
         getDesktopSources: () => ipcRenderer.invoke('desktop:getSources'),
+        openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
     };
     contextBridge.exposeInMainWorld('IgniteNative', IgniteNative);
 }

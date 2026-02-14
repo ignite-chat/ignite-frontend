@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, desktopCapturer, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, desktopCapturer, Menu, shell } = require('electron');
 const { join } = require('path');
 
 let tray = null;
@@ -99,6 +99,12 @@ const startCore = () => {
   ipcMain.handle('window:close', () => {
     if (mainWindow) {
       mainWindow.close(); // This will trigger the 'close' event and hide the window
+    }
+  });
+
+  ipcMain.handle('shell:openExternal', async (_event, url) => {
+    if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))) {
+      await shell.openExternal(url);
     }
   });
 
