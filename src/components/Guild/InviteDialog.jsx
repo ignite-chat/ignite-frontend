@@ -75,7 +75,7 @@ const InviteDialog = ({ open, onOpenChange, guildId }) => {
         <Dialog open={open} onOpenChange={handleClose}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Invite People</DialogTitle>
+                    <DialogTitle>Invite to Server</DialogTitle>
                     <DialogDescription>
                         Create an invite link to share with others.
                     </DialogDescription>

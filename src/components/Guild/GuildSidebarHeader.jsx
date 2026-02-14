@@ -76,10 +76,10 @@ const GuildSidebarHeader = ({ guildName = '', guild, onOpenServerSettings, onCre
                         {canInvite && (
                             <button
                                 type="button"
-                                className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-primary hover:bg-white/5"
+                                className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-100 hover:bg-white/5"
                                 onClick={handleInviteClick}
                             >
-                                <span>Invite People</span>
+                                <span>Invite to Server</span>
                                 <UserPlus className="ml-2 size-4" />
                             </button>
                         )}
@@ -88,7 +88,7 @@ const GuildSidebarHeader = ({ guildName = '', guild, onOpenServerSettings, onCre
                             <>
                                 <button
                                     type="button"
-                                    className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-gray-100 hover:bg-white/5"
+                                    className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-100 hover:bg-white/5"
                                     onClick={() => {
                                         setPopoverOpen(false);
                                         onOpenServerSettings();
@@ -100,7 +100,7 @@ const GuildSidebarHeader = ({ guildName = '', guild, onOpenServerSettings, onCre
 
                                 <button
                                     type="button"
-                                    className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-gray-100 hover:bg-white/5"
+                                    className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-100 hover:bg-white/5"
                                     onClick={() => {
                                         setPopoverOpen(false);
                                         onCreateChannel(null);
@@ -112,7 +112,7 @@ const GuildSidebarHeader = ({ guildName = '', guild, onOpenServerSettings, onCre
 
                                 <button
                                     type="button"
-                                    className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-gray-100 hover:bg-white/5"
+                                    className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-100 hover:bg-white/5"
                                     onClick={() => {
                                         setPopoverOpen(false);
                                         onCreateCategory();
@@ -128,7 +128,7 @@ const GuildSidebarHeader = ({ guildName = '', guild, onOpenServerSettings, onCre
 
                         <button
                             type="button"
-                            className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-gray-400 hover:bg-white/5 disabled:cursor-not-allowed"
+                            className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-400 hover:bg-white/5 disabled:cursor-not-allowed"
                             disabled
                         >
                             <span>Notification Settings</span>
@@ -137,7 +137,7 @@ const GuildSidebarHeader = ({ guildName = '', guild, onOpenServerSettings, onCre
 
                         <button
                             type="button"
-                            className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-gray-400 hover:bg-white/5 disabled:cursor-not-allowed"
+                            className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-400 hover:bg-white/5 disabled:cursor-not-allowed"
                             disabled
                         >
                             <span>Privacy Settings</span>
@@ -148,7 +148,7 @@ const GuildSidebarHeader = ({ guildName = '', guild, onOpenServerSettings, onCre
 
                         <button
                             type="button"
-                            className="flex w-full items-center justify-between rounded p-2 text-left text-sm text-red-300 hover:bg-white/5 disabled:opacity-60"
+                            className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-red-300 hover:bg-white/5 disabled:opacity-60"
                             onClick={handleLeave}
                             disabled={leaving}
                         >
