@@ -10,64 +10,40 @@ import { Switch } from '../ui/switch';
 import { Search } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../ui/input-group';
+import { useGuildsStore } from '../../store/guilds.store';
+import { useRolesStore } from '../../store/roles.store';
 
 const ITEMS_PER_PAGE = 10;
 
 const ServerMemberManager = ({ guild }) => {
-  const [members, setMembers] = useState([]);
-  const [roles, setRoles] = useState([]);
+  const guildMembers = useGuildsStore((state) => state.guildMembers);
+  const guildRoles = useRolesStore((state) => state.guildRoles);
+
+  const members = guild?.id ? guildMembers[guild.id] || [] : [];
+  const roles = guild?.id ? guildRoles[guild.id] || [] : [];
+
   const [memberRoles, setMemberRoles] = useState({});
   const [editingMemberId, setEditingMemberId] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
-    if (!guild?.id) return;
+    if (!guild?.id || members.length === 0) return;
 
-    let active = true;
-    setLoading(true);
-    setError('');
-
-    Promise.all([api.get(`/guilds/${guild.id}/members/`), api.get(`/guilds/${guild.id}/roles`)])
-      .then(([membersResponse, rolesResponse]) => {
-        if (!active) return;
-
-        const membersData = Array.isArray(membersResponse.data) ? membersResponse.data : [];
-        const rolesData = Array.isArray(rolesResponse.data) ? rolesResponse.data : [];
-
-        setMembers(membersData);
-        setRoles(rolesData);
-
-        const initialRoles = membersData.reduce((acc, member) => {
-          const roleIds = Array.isArray(member.roles)
-            ? member.roles.map((role) => role.id || role.role_id).filter(Boolean)
-            : [];
-          const memberId = member.user_id || member.id;
-          if (memberId) {
-            acc[memberId] = new Set(roleIds);
-          }
-          return acc;
-        }, {});
-        setMemberRoles(initialRoles);
-      })
-      .catch((err) => {
-        if (!active) return;
-        const msg =
-          err.response?.data?.message || err.message || 'Could not load members or roles.';
-        setError(msg);
-      })
-      .finally(() => {
-        if (!active) return;
-        setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [guild?.id]);
+    const initialRoles = members.reduce((acc, member) => {
+      const roleIds = Array.isArray(member.roles)
+        ? member.roles.map((role) => role.id || role.role_id).filter(Boolean)
+        : [];
+      const memberId = member.user_id || member.id;
+      if (memberId) {
+        acc[memberId] = new Set(roleIds);
+      }
+      return acc;
+    }, {});
+    setMemberRoles(initialRoles);
+  }, [guild?.id, members]);
 
   const memberOptions = useMemo(
     () =>
@@ -159,16 +135,13 @@ const ServerMemberManager = ({ guild }) => {
         </div>
       </div>
 
-      {loading && <div className="text-sm text-muted-foreground">Loading members...</div>}
       {error && (
         <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      {!loading && (
-        <>
-          {/* Members Table */}
+      {/* Members Table */}
           <div className="overflow-hidden rounded-md border border-border">
             <div className="max-h-[calc(100vh-20rem)] overflow-auto">
               <table className="w-full">
@@ -316,8 +289,6 @@ const ServerMemberManager = ({ guild }) => {
               </div>
             </div>
           )}
-        </>
-      )}
 
       {/* Edit Roles Dialog */}
       <Dialog open={!!editingMemberId} onOpenChange={(open) => !open && setEditingMemberId(null)}>
