@@ -24,6 +24,9 @@ import { Field, FieldError, FieldGroup, FieldLabel } from './ui/field';
 import { toast } from 'sonner';
 import { SheetDescription } from './ui/sheet';
 import { Menu } from 'lucide-react';
+import { Room } from 'livekit-client';
+import { useVoiceStore } from '../store/voice.store';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 const TabAccount = () => {
   const store = useStore();
@@ -358,6 +361,114 @@ const TabAccount = () => {
   );
 };
 
+const TabVoiceAudio = () => {
+  const [inputDevices, setInputDevices] = useState([]);
+  const [outputDevices, setOutputDevices] = useState([]);
+  const audioInputDeviceId = useVoiceStore((s) => s.audioInputDeviceId);
+  const audioOutputDeviceId = useVoiceStore((s) => s.audioOutputDeviceId);
+  const room = useVoiceStore((s) => s.room);
+
+  const loadDevices = useCallback(async () => {
+    try {
+      const inputs = await Room.getLocalDevices('audioinput', true);
+      const outputs = await Room.getLocalDevices('audiooutput', true);
+      setInputDevices(inputs);
+      setOutputDevices(outputs);
+    } catch (err) {
+      console.warn('Failed to enumerate audio devices:', err);
+    }
+  }, []);
+
+  useState(() => {
+    loadDevices();
+  });
+
+  const handleInputChange = useCallback(
+    async (deviceId) => {
+      const id = deviceId === 'default' ? null : deviceId;
+      useVoiceStore.getState().setAudioInputDeviceId(id);
+      if (room) {
+        try {
+          await room.switchActiveDevice('audioinput', deviceId);
+        } catch (err) {
+          console.warn('Failed to switch audio input device:', err);
+        }
+      }
+    },
+    [room]
+  );
+
+  const handleOutputChange = useCallback(
+    async (deviceId) => {
+      const id = deviceId === 'default' ? null : deviceId;
+      useVoiceStore.getState().setAudioOutputDeviceId(id);
+      if (room) {
+        try {
+          await room.switchActiveDevice('audiooutput', deviceId);
+        } catch (err) {
+          console.warn('Failed to switch audio output device:', err);
+        }
+      }
+    },
+    [room]
+  );
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="mx-auto w-full max-w-lg">
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Voice & Audio</CardTitle>
+            <CardDescription>Configure your audio input and output devices</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Input Device</FieldLabel>
+                <Select
+                  value={audioInputDeviceId || 'default'}
+                  onValueChange={handleInputChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Default" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Default</SelectItem>
+                    {inputDevices.map((device) => (
+                      <SelectItem key={device.deviceId} value={device.deviceId}>
+                        {device.label || `Microphone (${device.deviceId.slice(0, 8)}...)`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabel>Output Device</FieldLabel>
+                <Select
+                  value={audioOutputDeviceId || 'default'}
+                  onValueChange={handleOutputChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Default" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Default</SelectItem>
+                    {outputDevices.map((device) => (
+                      <SelectItem key={device.deviceId} value={device.deviceId}>
+                        {device.label || `Speaker (${device.deviceId.slice(0, 8)}...)`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </FieldGroup>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
 const TabBots = () => {
   return <div>Bots Settings</div>;
 };
@@ -366,6 +477,10 @@ const groups = [
   {
     title: 'User Settings',
     items: [{ id: 'account', title: 'My Account', component: TabAccount }],
+  },
+  {
+    title: 'App Settings',
+    items: [{ id: 'voice', title: 'Voice & Audio', component: TabVoiceAudio }],
   },
   {
     title: 'Bots & Integrations',

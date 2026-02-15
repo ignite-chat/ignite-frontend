@@ -146,12 +146,18 @@ const AuthRoute = ({ children }) => {
             useUsersStore.getState().setUser(event.user.id, event.user);
           })
           .listen('.voice_state.joined', (event) => {
+            if (event.voice_state.user_id == store.user.id) return;
+
             useChannelsStore.getState().updateChannelVoiceState(event.channel_id, event);
           })
           .listen('.voice_state.update', (event) => {
+            if (event.voice_state.user_id == store.user.id) return;
+            
             useChannelsStore.getState().updateChannelVoiceState(event.channel_id, event, false);
           })
           .listen('.voice_state.left', (event) => {
+            if (event.voice_state.user_id == store.user.id) return;
+
             useChannelsStore.getState().removeUserVoiceState(event.user_id);
           });
 

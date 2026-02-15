@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import { Track } from 'livekit-client';
 import { useVoiceStore } from '@/store/voice.store';
 import { useUsersStore } from '@/store/users.store';
@@ -61,6 +61,7 @@ const VoiceChannelView = ({ channel }) => {
   }, [voiceStates, currentUser, usersStore]);
 
   const screenSharer = useMemo(() => participants.find((p) => p.isScreenSharing), [participants]);
+  const [isWatchingScreen, setIsWatchingScreen] = useState(false);
 
   // Not connected — show a join prompt with current voice state users
   if (connectionState === 'disconnected') {
@@ -120,35 +121,65 @@ const VoiceChannelView = ({ channel }) => {
   // Connected — show participants
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-gray-700 p-4">
-      {screenSharer ? (
+      {screenSharer && isWatchingScreen ? (
         // Screenshare layout: main screenshare + participant strip
-        <div className="flex flex-1 gap-3 overflow-hidden">
-          <ScreenShareView participantIdentity={screenSharer.identity} />
-          <div className="flex w-60 shrink-0 flex-col gap-2 overflow-y-auto">
-            {participants.map((p) => (
-              <div key={p.identity} className="aspect-video">
-                <ParticipantTile participant={p} />
-              </div>
-            ))}
+        <div className="flex flex-1 flex-col gap-3 overflow-hidden">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-300">
+              {screenSharer.name} is sharing their screen
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsWatchingScreen(false)}
+              className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-red-700"
+            >
+              Stop Watching
+            </button>
+          </div>
+          <div className="flex flex-1 gap-3 overflow-hidden">
+            <ScreenShareView participantIdentity={screenSharer.identity} />
+            <div className="flex w-60 shrink-0 flex-col gap-2 overflow-y-auto">
+              {participants.map((p) => (
+                <div key={p.identity} className="aspect-video">
+                  <ParticipantTile participant={p} />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       ) : (
         // Grid layout
-        <div
-          className={`grid flex-1 gap-3 ${
-            participants.length === 1
-              ? 'grid-cols-1'
-              : participants.length <= 4
-                ? 'grid-cols-2'
-                : 'grid-cols-3'
-          }`}
-          style={{
-            gridAutoRows: participants.length <= 2 ? '1fr' : 'minmax(0, 1fr)',
-          }}
-        >
-          {participants.map((p) => (
-            <ParticipantTile key={p.identity} participant={p} />
-          ))}
+        <div className="flex flex-1 flex-col gap-3 overflow-hidden">
+          {screenSharer && (
+            <div className="flex items-center justify-between rounded-md bg-gray-600 px-3 py-2">
+              <p className="text-sm text-gray-300">
+                {screenSharer.name} is sharing their screen
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsWatchingScreen(true)}
+                className="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700"
+              >
+                Watch Stream
+              </button>
+            </div>
+          )}
+          <div
+            className={`grid flex-1 gap-3 ${
+              participants.length === 1
+                ? 'grid-cols-1'
+                : participants.length <= 4
+                  ? 'grid-cols-2'
+                  : 'grid-cols-3'
+            }`}
+            style={{
+              gridAutoRows: participants.length <= 2 ? '1fr' : 'minmax(0, 1fr)',
+            }}
+          >
+            {participants.map((p) => (
+              <ParticipantTile key={p.identity} participant={p} />
+            ))}
+          </div>
         </div>
       )}
     </div>

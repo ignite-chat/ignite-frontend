@@ -78,7 +78,13 @@ export const VoiceService = {
       const { data } = await api.post(`/channels/${channelId}/join_call`);
       const { token, url } = data;
 
-      const room = new Room();
+      const audioInputDeviceId = useVoiceStore.getState().audioInputDeviceId;
+      const audioOutputDeviceId = useVoiceStore.getState().audioOutputDeviceId;
+
+      const room = new Room({
+        audioCaptureDefaults: audioInputDeviceId ? { deviceId: audioInputDeviceId } : undefined,
+        audioOutput: audioOutputDeviceId ? { deviceId: audioOutputDeviceId } : undefined,
+      });
 
       // Participant events
       room.on(RoomEvent.ParticipantConnected, () => refreshParticipants(room));

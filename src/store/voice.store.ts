@@ -23,6 +23,8 @@ interface VoiceState {
   isScreenSharing: boolean;
   isScreenSharePickerOpen: boolean;
   connectionState: 'disconnected' | 'connecting' | 'connected';
+  audioInputDeviceId: string | null;
+  audioOutputDeviceId: string | null;
 
   setRoom: (room: Room | null) => void;
   setChannel: (
@@ -38,6 +40,8 @@ interface VoiceState {
   setCameraOn: (on: boolean) => void;
   setScreenSharing: (on: boolean) => void;
   setScreenSharePickerOpen: (open: boolean) => void;
+  setAudioInputDeviceId: (id: string | null) => void;
+  setAudioOutputDeviceId: (id: string | null) => void;
   reset: () => void;
 }
 
@@ -54,6 +58,8 @@ export const useVoiceStore = create<VoiceState>((set) => ({
   isScreenSharing: false,
   isScreenSharePickerOpen: false,
   connectionState: 'disconnected',
+  audioInputDeviceId: localStorage.getItem('audioInputDeviceId') || null,
+  audioOutputDeviceId: localStorage.getItem('audioOutputDeviceId') || null,
 
   setRoom: (room) => set({ room }),
   setChannel: (channelId, guildId, guildName, channelName) =>
@@ -65,6 +71,22 @@ export const useVoiceStore = create<VoiceState>((set) => ({
   setCameraOn: (isCameraOn) => set({ isCameraOn }),
   setScreenSharing: (isScreenSharing) => set({ isScreenSharing }),
   setScreenSharePickerOpen: (isScreenSharePickerOpen) => set({ isScreenSharePickerOpen }),
+  setAudioInputDeviceId: (audioInputDeviceId) => {
+    if (audioInputDeviceId) {
+      localStorage.setItem('audioInputDeviceId', audioInputDeviceId);
+    } else {
+      localStorage.removeItem('audioInputDeviceId');
+    }
+    set({ audioInputDeviceId });
+  },
+  setAudioOutputDeviceId: (audioOutputDeviceId) => {
+    if (audioOutputDeviceId) {
+      localStorage.setItem('audioOutputDeviceId', audioOutputDeviceId);
+    } else {
+      localStorage.removeItem('audioOutputDeviceId');
+    }
+    set({ audioOutputDeviceId });
+  },
   reset: () =>
     set({
       room: null,
