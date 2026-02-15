@@ -13,7 +13,7 @@ import { convertEmojiShortcodes } from '../../utils/emoji.utils';
 import { useEmojisStore } from '../../store/emojis.store';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Hash, Megaphone } from '@phosphor-icons/react';
+import { Hash, Megaphone, SpeakerHigh } from '@phosphor-icons/react';
 import { visit } from 'unist-util-visit';
 
 const EMOJI_CDN_PREFIX = `${import.meta.env.VITE_CDN_BASE_URL}/emojis/`;
@@ -54,7 +54,7 @@ const remarkMentions = () => {
         children.push({
           type: 'link',
           url: href,
-          children: [{ type: 'text', value: match[0] }]
+          children: [{ type: 'text', value: match[0] }],
         });
 
         lastIndex = match.index + match[0].length;
@@ -159,7 +159,9 @@ const ChannelMention = ({ channelId }) => {
       onClick={handleClick}
       className="inline-flex cursor-pointer items-center gap-0.5 rounded bg-blue-500/10 px-1 py-0.5 align-baseline text-blue-400 hover:bg-blue-500/20 hover:text-blue-300"
     >
-      {channel.type === 5 ? (
+      {channel.type === 2 ? (
+        <SpeakerHigh className="size-3.5" />
+      ) : channel.type === 5 ? (
         <Megaphone weight="fill" className="size-3.5" />
       ) : (
         <Hash weight="bold" className="size-3.5" />
@@ -197,12 +199,16 @@ const MessageContent = ({ content }) => {
         p: ({ children }) => <>{children}</>,
         // Render custom emojis as inline images, disable other images
         img: ({ src, alt }) => {
-          if (src?.startsWith(EMOJI_CDN_PREFIX)) {
+          const isTwemoji = src?.startsWith('https://cdn.jsdelivr.net/gh/twitter/twemoji');
+          if (src?.startsWith(EMOJI_CDN_PREFIX) || isTwemoji) {
             return (
               <img
                 src={src}
                 alt={alt}
-                className="inline h-10 w-10 object-contain align-text-bottom"
+                className={`inline object-contain align-text-bottom ${
+                  isTwemoji ? 'h-6 w-6' : 'h-8 w-8'
+                }`}
+                loading="lazy"
               />
             );
           }

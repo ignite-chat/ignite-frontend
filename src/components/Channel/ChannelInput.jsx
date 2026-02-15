@@ -5,23 +5,36 @@ import {
   EmojiPickerContent,
   EmojiPickerFooter,
   EmojiPickerSearch,
+  EmojiPickerSidebar,
 } from '../ui/emoji-picker';
 import { useChannelInputContext, useChannelContext } from '../../contexts/ChannelContext.jsx';
 import { useChannelsStore } from '../../store/channels.store';
-import { X, Hash, Megaphone, ChatText } from '@phosphor-icons/react';
+import { X, Hash, Megaphone, ChatText, SpeakerHigh } from '@phosphor-icons/react';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { ChannelType } from '../../enums/ChannelType';
 import useStore from '../../hooks/useStore';
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Button } from '../ui/button';
-import { Smile } from 'lucide-react';
+import {
+  Smile,
+  Clock,
+  User,
+  PawPrint,
+  Pizza,
+  Trophy,
+  Plane,
+  Lightbulb,
+  Shapes,
+  Flag as FlagIcon,
+} from 'lucide-react';
 import { ChannelsService } from '../../services/channels.service';
 import { PermissionsService } from '../../services/permissions.service';
 import { Permissions } from '../../enums/Permissions';
 import { toast } from 'sonner';
-import { emojiMap, registerEmoji } from '../../utils/emoji.utils';
+import { emojiMap, registerEmoji, getTwemojiUrl } from '../../utils/emoji.utils';
 import { useEmojisStore } from '../../store/emojis.store';
+import emojisData from '../../assets/emojis/emojis.json';
 import { useTypingStore } from '../../store/typing.store';
 
 const MAX_MESSAGE_LENGTH = 2000;
@@ -330,8 +343,6 @@ const ChannelInput = ({ channel }) => {
 
   /* ---------------- channel mentions ---------------- */
 
-  /* ---------------- channel mentions ---------------- */
-
   const [channelQuery, setChannelQuery] = useState(null);
   const [channelIndex, setChannelIndex] = useState(0);
 
@@ -368,8 +379,10 @@ const ChannelInput = ({ channel }) => {
   }, [channels, channelQuery]);
 
   /* ---------------- emojis ---------------- */
-
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [hoveredEmoji, setHoveredEmoji] = useState(null);
   const [emojiQuery, setEmojiQuery] = useState(null);
+  const [emojiSearch, setEmojiSearch] = useState('');
   const [emojiIndex, setEmojiIndex] = useState(0);
 
   const filteredEmojis = useMemo(() => {
@@ -436,12 +449,22 @@ const ChannelInput = ({ channel }) => {
   const handleInput = () => {
     saveSelection();
     syncValue();
-    setMentionQuery(getMentionQuery(editorRef.current));
-    setChannelQuery(getChannelQuery(editorRef.current));
-    setEmojiQuery(getEmojiQuery(editorRef.current));
+
+    const mq = getMentionQuery(editorRef.current);
+    const cq = getChannelQuery(editorRef.current);
+    const eq = getEmojiQuery(editorRef.current);
+
+    setMentionQuery(mq);
+    setChannelQuery(cq);
+    setEmojiQuery(eq);
     setMentionIndex(0);
     setChannelIndex(0);
     setEmojiIndex(0);
+
+    // If any suggestion is active, close the full emoji picker to prevent overlapping
+    if (mq !== null || cq !== null || eq !== null) {
+      if (isEmojiPickerOpen) setIsEmojiPickerOpen(false);
+    }
 
     // Clean up empty editor to show placeholder
     if (editorRef.current && editorRef.current.textContent.trim() === '') {
@@ -661,7 +684,9 @@ const ChannelInput = ({ channel }) => {
                       syncValue();
                     }}
                   >
-                    {c.type === 5 ? (
+                    {c.type === 2 ? (
+                      <SpeakerHigh className="size-4 text-gray-400" />
+                    ) : c.type === 5 ? (
                       <Megaphone className="size-4 text-gray-400" />
                     ) : (
                       <Hash className="size-4 text-gray-400" />
@@ -680,9 +705,9 @@ const ChannelInput = ({ channel }) => {
         </Popover.Root>
 
         {emojiQuery && filteredEmojis.length > 0 && (
-          <div className="absolute bottom-full left-0 right-0 z-50 mb-2 flex max-h-[300px] w-full flex-col rounded border border-white/5 bg-[#2c2f33] shadow-lg">
-            <div className="flex-shrink-0 border-b border-white/5 px-4 py-3 text-xs font-bold text-gray-400">
-              EMOJI MATCHING :{emojiQuery}
+          <div className="absolute bottom-full left-0 right-0 z-[1001] mb-2 flex max-h-[300px] w-full flex-col rounded border border-white/5 bg-[#2c2f33] shadow-lg">
+            <div className="flex-shrink-0 border-b border-white/5 px-4 py-3 text-xs font-bold uppercase text-[#949ba4]">
+              Emoji matching :{emojiQuery}
             </div>
             <div className="flex-1 overflow-y-auto">
               {filteredEmojis.map((item, i) => (
@@ -703,9 +728,15 @@ const ChannelInput = ({ channel }) => {
                       src={item.imageUrl}
                       alt={item.shortcode}
                       className="h-6 w-6 flex-shrink-0 object-contain"
+                      loading="lazy"
                     />
                   ) : (
-                    <div className="flex-shrink-0 text-xl">{item.emoji}</div>
+                    <img
+                      src={getTwemojiUrl(item.emoji)}
+                      alt={item.emoji}
+                      className="h-6 w-6 flex-shrink-0 object-contain"
+                      loading="lazy"
+                    />
                   )}
                   <div className="flex-1 truncate font-medium text-gray-200">{item.shortcode}</div>
                 </button>
@@ -714,9 +745,9 @@ const ChannelInput = ({ channel }) => {
           </div>
         )}
 
-        <Popover.Root modal={false}>
+        <Popover.Root open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen} modal={false}>
           <Popover.Trigger asChild>
-            <Button variant="ghost" className="mr-2 mt-2 h-8 w-8 self-start text-gray-400">
+            <Button variant="ghost" className="mr-2 mt-2 h-8 w-8 self-start text-[#b5bac1] hover:text-[#dbdee1]">
               <Smile className="size-5" />
             </Button>
           </Popover.Trigger>
@@ -725,25 +756,88 @@ const ChannelInput = ({ channel }) => {
             align="end"
             sideOffset={8}
             collisionPadding={16}
-            className="flex h-[400px] w-[350px] flex-col overflow-hidden p-0"
+            className="flex h-[430px] w-[452px] border-none bg-transparent p-0 shadow-none"
           >
-            <EmojiPicker
-              onEmojiSelect={({ label, emoji }) => {
-                // Register the emoji in our map for conversion
-                registerEmoji(label, emoji);
+            <EmojiPicker className="flex h-full w-full flex-row">
+              <EmojiPickerSidebar
+                activeCategory="custom" // Should be dynamic, but defaulting for now
+                onCategorySelect={(id) => {
+                  const viewport = document.querySelector('[data-slot="emoji-picker-viewport"]');
+                  if (!viewport) return;
 
-                // Restore focus and selection to the editor
-                restoreSelection();
+                  if (id === 'recent') {
+                    viewport.scrollTo({ top: 0, behavior: 'smooth' });
+                    return;
+                  }
 
-                // Convert label to Discord-style shortcode
-                const shortcode = `:${label.toLowerCase().replace(/\s+/g, '_')}:`;
-                insertTextAtCaret(shortcode);
-                syncValue();
-              }}
-            >
-              <EmojiPickerSearch />
-              <EmojiPickerContent />
-              <EmojiPickerFooter />
+                  const el = document.getElementById(`category-${id}`);
+                  if (el) {
+                    viewport.scrollTo({ top: el.offsetTop, behavior: 'smooth' });
+                  }
+                }}
+                categories={[
+                  { id: 'recent', label: 'Recent', icon: <Clock className="size-[20px]" /> },
+                  {
+                    id: 'custom',
+                    label: guild?.name || 'Server',
+                    icon: guild?.icon ? (
+                      <img
+                        src={`${import.meta.env.VITE_CDN_BASE_URL}/icons/${guild.id}`}
+                        className="size-5 rounded-full"
+                      />
+                    ) : (
+                      <Hash className="size-[20px]" />
+                    ),
+                  },
+                  { id: 'people', label: 'People', icon: <Smile className="size-[20px]" /> },
+                  { id: 'nature', label: 'Nature', icon: <PawPrint className="size-[20px]" /> },
+                  { id: 'food', label: 'Food', icon: <Pizza className="size-[20px]" /> },
+                  { id: 'activity', label: 'Activities', icon: <Trophy className="size-[20px]" /> },
+                  { id: 'travel', label: 'Travel', icon: <Plane className="size-[20px]" /> },
+                  { id: 'objects', label: 'Objects', icon: <Lightbulb className="size-[20px]" /> },
+                  { id: 'symbols', label: 'Symbols', icon: <Shapes className="size-[20px]" /> },
+                  { id: 'flags', label: 'Flags', icon: <FlagIcon className="size-[20px]" /> },
+                ]}
+              />
+              <div className="flex min-w-0 flex-1 flex-col bg-[#2b2d31]">
+                <EmojiPickerSearch
+                  value={emojiSearch}
+                  onChange={(e) => setEmojiSearch(e.target.value)}
+                />
+                <EmojiPickerContent
+                  searchValue={emojiSearch}
+                  standardEmojis={emojisData}
+                  customEmojis={customEmojis.map((e) => ({
+                    id: e.id,
+                    name: e.name,
+                    url: `${import.meta.env.VITE_CDN_BASE_URL}/emojis/${e.id}`,
+                  }))}
+                  serverName={guild?.name}
+                  onHoverEmojiChange={setHoveredEmoji}
+                  serverIcon={
+                    guild?.icon ? `${import.meta.env.VITE_CDN_BASE_URL}/icons/${guild.id}` : null
+                  }
+                  onEmojiSelect={({ label, emoji }) => {
+                    // Register the emoji in our map for conversion (standard emojis)
+                    if (emoji) registerEmoji(label, emoji);
+
+                    // Restore focus and selection to the editor
+                    restoreSelection();
+
+                    // Convert label to shortcode (:label:)
+                    const shortcode = `:${label}:`;
+                    insertTextAtCaret(shortcode);
+                    syncValue();
+                  }}
+                  onCustomEmojiSelect={({ label }) => {
+                    restoreSelection();
+                    const shortcode = `:${label}:`;
+                    insertTextAtCaret(shortcode);
+                    syncValue();
+                  }}
+                />
+                <EmojiPickerFooter hoveredEmoji={hoveredEmoji} />
+              </div>
             </EmojiPicker>
           </Popover.Content>
         </Popover.Root>

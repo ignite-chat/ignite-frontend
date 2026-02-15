@@ -1,39 +1,31 @@
+import emojisData from '../assets/emojis/emojis.json';
+
 // Shared emoji shortcode ↔ unicode mapping
-
 export const emojiMap = new Map();
-let emojiDataLoaded = false;
 
-export const loadEmojiData = async () => {
-  if (emojiDataLoaded) return;
-
-  try {
-    const response = await fetch('https://cdn.jsdelivr.net/npm/emojibase-data@latest/en/data.json');
-    const data = await response.json();
-
-    data.forEach((emoji) => {
-      if (emoji.emoji && emoji.label) {
-        const shortcode = `:${emoji.label.toLowerCase().replace(/\s+/g, '_')}:`;
-        emojiMap.set(shortcode, emoji.emoji);
-      }
-
-      if (emoji.emoji && emoji.aliases) {
-        emoji.aliases.forEach((alias) => {
-          const shortcode = `:${alias.toLowerCase().replace(/\s+/g, '_')}:`;
+// Populate map synchronously from local JSON
+try {
+  Object.values(emojisData).forEach((categoryEmojis) => {
+    categoryEmojis.forEach((emoji) => {
+      // Map each name to the surrogate
+      if (emoji.names && emoji.surrogates) {
+        emoji.names.forEach((name) => {
+          const shortcode = `:${name}:`;
           if (!emojiMap.has(shortcode)) {
-            emojiMap.set(shortcode, emoji.emoji);
+            emojiMap.set(shortcode, emoji.surrogates);
           }
         });
       }
     });
+  });
+} catch (error) {
+  console.error('Failed to load local emoji data:', error);
+}
 
-    emojiDataLoaded = true;
-  } catch (error) {
-    console.warn('Failed to load emoji data from CDN:', error);
-  }
+// Legacy function - kept for compatibility but does nothing now
+export const loadEmojiData = async () => {
+  // Data is already loaded synchronously
 };
-
-// Start loading emoji data on module load (non-blocking)
-loadEmojiData();
 
 export const registerEmoji = (label, emoji) => {
   const shortcode = `:${label.toLowerCase().replace(/\s+/g, '_')}:`;
@@ -44,6 +36,18 @@ export const registerEmoji = (label, emoji) => {
 
 export const convertEmojiShortcodes = (text) => {
   return text.replace(/:[\w_+-]+:/g, (match) => {
-    return emojiMap.get(match) || match;
+    const surrogate = emojiMap.get(match);
+    if (surrogate) {
+      return `![${match}](${getTwemojiUrl(surrogate)})`;
+    }
+    return match;
   });
+};
+
+export const getTwemojiUrl = (emoji) => {
+  const code = [...emoji]
+    .map((char) => char.codePointAt(0).toString(16))
+    .filter((hex) => hex !== 'fe0f') // Remove VS16
+    .join('-');
+  return `https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/${code}.svg`;
 };
