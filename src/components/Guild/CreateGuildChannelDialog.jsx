@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { ChannelsService } from '@/services/channels.service';
 
-const CreateGuildChannelDialog = ({ isOpen, setIsOpen, guild, categoryId }) => {
+const CreateGuildChannelDialog = ({ open, onOpenChange, guild, categoryId }) => {
   const {
     register,
     handleSubmit,
@@ -46,17 +46,17 @@ const CreateGuildChannelDialog = ({ isOpen, setIsOpen, guild, categoryId }) => {
           parent_id: categoryId,
         });
 
-        setIsOpen(false);
+        onOpenChange(false);
         reset();
       } catch (error) {
         console.error('Failed to create channel', error);
       }
     },
-    [guild.id, categoryId, setIsOpen, reset]
+    [guild.id, categoryId, onOpenChange, reset]
   );
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create Channel</DialogTitle>
@@ -154,7 +154,7 @@ const CreateGuildChannelDialog = ({ isOpen, setIsOpen, guild, categoryId }) => {
               type="button"
               variant="ghost"
               onClick={() => {
-                setIsOpen(false);
+                onOpenChange(false);
                 reset();
               }}
             >

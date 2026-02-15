@@ -121,14 +121,14 @@ const GuildLayout = ({ children, guild }) => {
         channel={channels.find((c) => String(c.channel_id) === String(editChannelId))}
       />
       <CreateGuildChannelDialog
-        isOpen={isCreateChannelDialogOpen}
-        setIsOpen={setIsCreateChannelDialogOpen}
+        open={isCreateChannelDialogOpen}
+        onOpenChange={setIsCreateChannelDialogOpen}
         guild={guild}
         categoryId={createChannelCategoryId}
       />
       <CreateGuildCategoryDialog
-        isOpen={isCreateCategoryDialogOpen}
-        setIsOpen={setIsCreateCategoryDialogOpen}
+        open={isCreateCategoryDialogOpen}
+        onOpenChange={setIsCreateCategoryDialogOpen}
         guild={guild}
       />
     </DefaultLayout>

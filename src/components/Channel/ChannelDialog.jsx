@@ -1,5 +1,12 @@
-import React, { useState } from 'react';
-import './ChannelDialog.css'; // Assuming you have a CSS file for styling
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import { Button } from '../ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import api from '../../api';
 
 // Sample roles and permissions data structure
@@ -7,7 +14,6 @@ const rolesList = [
   { id: 'role1', name: 'Admin' },
   { id: 'role2', name: 'Moderator' },
   { id: 'role3', name: 'Member' },
-  // Add more roles as needed
 ];
 
 const permissionsList = [
@@ -26,70 +32,46 @@ const PermissionsList = ({ permissions, onPermissionChange }) => {
   };
 
   return (
-    <>
+    <div className="space-y-3">
       {permissionsList.map((permission, index) => (
-        <div key={index}>
-          <span>{permission.name}</span>
-          <input
-            type="radio"
-            name={permission.name}
-            checked={getPermissionState(index) == 'revoke'}
-            onChange={() => onPermissionChange(index, 'revoke')}
-          />{' '}
-          Revoke
-          <input
-            type="radio"
-            name={permission.name}
-            checked={getPermissionState(index) == null}
-            onChange={() => onPermissionChange(index, null)}
-          />{' '}
-          Inherit
-          <input
-            type="radio"
-            name={permission.name}
-            checked={getPermissionState(index) == 'grant'}
-            onChange={() => onPermissionChange(index, 'grant')}
-          />{' '}
-          Grant
+        <div key={index} className="flex items-center justify-between rounded-lg border border-white/5 bg-background p-3">
+          <span className="text-sm font-medium">{permission.name}</span>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={getPermissionState(index) === 'revoke' ? 'destructive' : 'outline'}
+              size="sm"
+              onClick={() => onPermissionChange(index, 'revoke')}
+            >
+              Revoke
+            </Button>
+            <Button
+              type="button"
+              variant={getPermissionState(index) === null ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => onPermissionChange(index, null)}
+            >
+              Inherit
+            </Button>
+            <Button
+              type="button"
+              variant={getPermissionState(index) === 'grant' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => onPermissionChange(index, 'grant')}
+            >
+              Grant
+            </Button>
+          </div>
         </div>
       ))}
-    </>
+    </div>
   );
 };
 
-const ChannelDialog = ({ isOpen, setIsOpen }) => {
+const ChannelDialog = ({ open, onOpenChange }) => {
   const [activeTab, setActiveTab] = useState('overview');
-  const [selectedRole, setSelectedRole] = useState(rolesList[0].id); // Default to the first role
+  const [selectedRole, setSelectedRole] = useState(rolesList[0].id);
   const [permissions, setPermissions] = useState({});
-
-  // const handlePermissionChange = (role, index, state) => {
-  //     // const newPermissions = { ...permissions };
-  //     // newPermissions[role][index].state = state;
-  //     // setPermissions(newPermissions);
-
-  //     // const newPermissions = permissionBits;
-  //     // newPermissions[role] = permissionBits[role] || 0;
-  //     // const bit = 1 << index;
-  //     // if (state === 'revoke') {
-  //     //     permissionBits[role] &= ~bit;
-  //     // } else if (state === 'grant') {
-  //     //     permissionBits[role] |= bit;
-  //     // }
-
-  //     const newPermissions = permissions;
-  //     const newRolePermissions = newPermissions[role] || {};
-  //     newRolePermissions[index] = state;
-
-  //     newPermissions[role] = newRolePermissions;
-
-  //     console.log(newPermissions);
-  //     setPermissions(newPermissions);
-  // };
-
-  // const savePermissions = () => {
-  //     // Modify this function to handle permissions for the selected role
-  //     // This example assumes you have a way to identify the channel and roles on your backend
-  // };
 
   const handlePermissionChange = (index, state) => {
     const newRolePermissions = permissions[selectedRole] || {};
@@ -103,7 +85,6 @@ const ChannelDialog = ({ isOpen, setIsOpen }) => {
   };
 
   const savePermissions = () => {
-    // Iterate over the permissions object and send the data to the backend
     for (const role in permissions) {
       const permissionData = permissions[role];
 
@@ -119,7 +100,6 @@ const ChannelDialog = ({ isOpen, setIsOpen }) => {
         }
       }
 
-      // Send the data to the backend
       api
         .put(`/channels/${selectedRole}/permissions/${selectedRole}`, {
           granted: grantedPermissionBits,
@@ -134,75 +114,60 @@ const ChannelDialog = ({ isOpen, setIsOpen }) => {
     }
 
     console.log(permissions);
-
-    // api.put(`/channels/${selectedRole}/permissions/${selectedRole}`, permissions[selectedRole]).then((response) => {
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="modal">
-      <div className="modal-content">
-        <div className="tabs">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={activeTab === 'overview' ? 'active' : ''}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => setActiveTab('permissions')}
-            className={activeTab === 'permissions' ? 'active' : ''}
-          >
-            Permissions
-          </button>
-          <button
-            onClick={() => setActiveTab('delete')}
-            className={activeTab === 'delete' ? 'active' : ''}
-          >
-            Delete Channel
-          </button>
-        </div>
-        <div className="tab-content">
-          {activeTab === 'overview' && <div>Overview content here</div>}
-          {activeTab === 'permissions' && (
-            <div className="permissions-container">
-              <div className="role-tabs">
-                {rolesList.map((role) => (
-                  <button
-                    key={role.id}
-                    onClick={() => setSelectedRole(role.id)}
-                    className={selectedRole === role.id ? 'active' : ''}
-                  >
-                    {role.name}
-                  </button>
-                ))}
-              </div>
-              <div className="role-permissions">
-                {/* {permissionsList.map((permission, index) => (
-                                    <div key={index}>
-                                        <span>{permission.name}</span>
-                                        <input type="radio" name={permission.name} checked={permissions[selectedRole][index] == 'revoke'} onChange={() => handlePermissionChange(selectedRole, index, 'revoke')} /> Revoke
-                                        <input type="radio" name={permission.name} checked={permissions[selectedRole][index] == null} onChange={() => handlePermissionChange(selectedRole, index, null)} /> Inherit
-                                        <input type="radio" name={permission.name} checked={permissions[selectedRole][index] == 'grant'} onChange={() => handlePermissionChange(selectedRole, index, 'grant')} /> Grant
-                                    </div>
-                                ))} */}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Channel Settings</DialogTitle>
+        </DialogHeader>
 
-                <PermissionsList
-                  permissions={permissions[selectedRole]}
-                  onPermissionChange={handlePermissionChange}
-                />
-              </div>
-              <button onClick={savePermissions}>Save Permissions</button>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="permissions">Permissions</TabsTrigger>
+            <TabsTrigger value="delete">Delete Channel</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="mt-4">
+            <div className="rounded-lg border border-white/5 bg-background p-4">
+              <p className="text-sm text-muted-foreground">Overview content here</p>
             </div>
-          )}
-          {activeTab === 'delete' && <div>Delete Channel content here</div>}
-        </div>
-      </div>
-      <button className="close-btn" onClick={() => setIsOpen(false)}>
-        Close
-      </button>
-    </div>
+          </TabsContent>
+
+          <TabsContent value="permissions" className="mt-4 space-y-4">
+            <div className="flex gap-2 overflow-x-auto">
+              {rolesList.map((role) => (
+                <Button
+                  key={role.id}
+                  type="button"
+                  variant={selectedRole === role.id ? 'default' : 'outline'}
+                  onClick={() => setSelectedRole(role.id)}
+                >
+                  {role.name}
+                </Button>
+              ))}
+            </div>
+
+            <PermissionsList
+              permissions={permissions[selectedRole]}
+              onPermissionChange={handlePermissionChange}
+            />
+
+            <div className="flex justify-end">
+              <Button onClick={savePermissions}>Save Permissions</Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="delete" className="mt-4">
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+              <p className="text-sm text-destructive">Delete Channel content here</p>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 };
 

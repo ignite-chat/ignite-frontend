@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MagnifyingGlass, X } from '@phosphor-icons/react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
 import api from '../../api';
 
-const SearchModal = ({ open, onClose, channel, onPick }) => {
+const SearchModal = ({ open, onOpenChange, channel, onPick }) => {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
@@ -19,11 +27,11 @@ const SearchModal = ({ open, onClose, channel, onPick }) => {
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onOpenChange(false);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
+  }, [open, onOpenChange]);
 
   const normalizeResults = (data) => {
     if (Array.isArray(data)) return data;
@@ -50,45 +58,39 @@ const SearchModal = ({ open, onClose, channel, onPick }) => {
 
   const handlePick = (id) => {
     onPick(id);
-    onClose();
+    onOpenChange(false);
   };
 
   const grouped = useMemo(() => results, [results]);
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-24">
-      <button type="button" onClick={onClose} className="absolute inset-0 bg-black/60" />
-      <div className="relative w-full max-w-2xl rounded-lg bg-gray-800 p-4 shadow-xl">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-100">Search messages</h2>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-200">
-            <X className="size-5" />
-          </button>
-        </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Search Messages</DialogTitle>
+        </DialogHeader>
 
-        <form onSubmit={handleSearch} className="mt-3 flex items-center gap-2">
-          <input
+        <form onSubmit={handleSearch} className="flex items-center gap-2">
+          <Input
             ref={inputRef}
             type="text"
             placeholder="Type to search in this guild..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-10 w-full rounded bg-gray-900 px-3 text-sm text-gray-100 outline-none placeholder:text-gray-500"
+            className="flex-1"
           />
-          <button
+          <Button
             type="submit"
             disabled={loading}
-            className="flex h-10 items-center justify-center rounded bg-gray-700 px-3 text-gray-100 hover:bg-gray-600 disabled:opacity-60"
+            size="icon"
           >
             <MagnifyingGlass className="size-5" />
-          </button>
+          </Button>
         </form>
 
         <div className="mt-4">
           {grouped.length === 0 ? (
-            <div className="text-xs text-gray-400">No results.</div>
+            <div className="text-sm text-muted-foreground">No results.</div>
           ) : (
             <div className="max-h-72 space-y-2 overflow-y-auto">
               {grouped.map((msg) => (
@@ -96,21 +98,23 @@ const SearchModal = ({ open, onClose, channel, onPick }) => {
                   key={msg.id}
                   type="button"
                   onClick={() => handlePick(msg.id)}
-                  className="w-full rounded bg-gray-900/60 p-2 text-left text-xs text-gray-100 hover:bg-primary/20"
+                  className="w-full rounded-lg border border-white/5 bg-background p-3 text-left text-sm transition hover:bg-accent"
                 >
-                  <span className="font-semibold">{msg.author?.name || msg.author?.username}:</span>{' '}
-                  {msg.content}
-                  <span className="ml-2 text-gray-500">
-                    {new Date(msg.created_at).toLocaleString()}
-                  </span>
-                  <span className="ml-2 text-primary underline">Jump</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">{msg.author?.name || msg.author?.username}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(msg.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-foreground">{msg.content}</p>
+                  <span className="mt-2 inline-block text-xs text-primary">Jump to message →</span>
                 </button>
               ))}
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

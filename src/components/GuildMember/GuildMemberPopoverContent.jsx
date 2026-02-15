@@ -280,7 +280,7 @@ const GuildMemberPopoverContent = ({ userId, guild = null }) => {
         </div>
       )}
 
-      <UserProfileModal user={user} isOpen={profileModalOpen} setIsOpen={setProfileModalOpen} />
+      <UserProfileModal user={user} open={profileModalOpen} onOpenChange={setProfileModalOpen} />
     </>
   );
 };

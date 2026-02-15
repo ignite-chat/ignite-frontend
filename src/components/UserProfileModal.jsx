@@ -1,5 +1,8 @@
 import { useState, useContext, useMemo } from 'react';
-import Dialog from './Dialog';
+import {
+  Dialog,
+  DialogContent,
+} from './ui/dialog';
 import Avatar from './Avatar';
 import {
   UserCircle,
@@ -24,7 +27,7 @@ import { useGuildsStore } from '../store/guilds.store';
 import { ChannelsService } from '../services/channels.service';
 import { useNavigate } from 'react-router-dom';
 
-const UserProfileModal = ({ user, isOpen, setIsOpen }) => {
+const UserProfileModal = ({ user, open, onOpenChange }) => {
   const store = useStore();
   const navigate = useNavigate();
   const { friends, requests } = useFriendsStore();
@@ -117,7 +120,7 @@ const UserProfileModal = ({ user, isOpen, setIsOpen }) => {
     try {
       const channel = await ChannelsService.createPrivateChannel([user.id]);
       if (channel) {
-        setIsOpen(false);
+        onOpenChange(false);
         navigate(`/channels/@me/${channel.channel_id}`);
       }
     } catch (error) {
@@ -131,10 +134,11 @@ const UserProfileModal = ({ user, isOpen, setIsOpen }) => {
   };
 
   return (
-    <Dialog isOpen={isOpen} setIsOpen={setIsOpen} outsideChildren="" transparent noPadding>
-      <div className="w-full max-w-xl overflow-hidden rounded-xl border border-white/5 bg-[#111214] shadow-2xl">
-        {/* Banner */}
-        <div
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl border-white/5 bg-transparent p-0 shadow-2xl [&>button]:hidden">
+        <div className="w-full overflow-hidden rounded-xl border border-white/5 bg-[#111214]">
+          {/* Banner */}
+          <div
           className={cn('h-[120px] w-full', !user.banner_color && 'bg-primary')}
           style={{
             backgroundColor: user.banner_color,
@@ -325,7 +329,8 @@ const UserProfileModal = ({ user, isOpen, setIsOpen }) => {
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      </DialogContent>
     </Dialog>
   );
 };

@@ -62,8 +62,8 @@ const GuildChannelPage = () => {
       </ChannelContextProvider>
 
       <ChannelDialog
-        isOpen={isChannelDialogOpen}
-        setIsOpen={setIsChannelDialogOpen}
+        open={isChannelDialogOpen}
+        onOpenChange={setIsChannelDialogOpen}
         guild={guild}
       />
     </GuildLayout>

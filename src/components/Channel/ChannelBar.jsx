@@ -131,7 +131,7 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
 
       <SearchModal
         open={searchOpen}
-        onClose={() => setSearchOpen(false)}
+        onOpenChange={setSearchOpen}
         channel={channel}
         onPick={onJumpToMessage}
       />

@@ -3,12 +3,17 @@ import { FormProvider, useForm } from 'react-hook-form';
 import { ArrowLeft, ArrowRight } from '@phosphor-icons/react';
 import { GuildsService } from '../services/guilds.service';
 import { InvitesService } from '../services/invites.service';
-import Dialog from './Dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
 import FormInput from './Form/FormInput';
 import FormError from './Form/FormError';
 import FormSubmit from './Form/FormSubmit';
 
-const GuildDialog = ({ isOpen, setIsOpen }) => {
+const GuildDialog = ({ open, onOpenChange }) => {
   const [view, setView] = useState('menu');
   const createForm = useForm({ mode: 'onChange', defaultValues: { name: '' } });
   const joinForm = useForm({ mode: 'onChange', defaultValues: { invite: '' } });
@@ -20,11 +25,11 @@ const GuildDialog = ({ isOpen, setIsOpen }) => {
   }, [view]);
 
   const closeAll = useCallback(() => {
-    setIsOpen(false);
+    onOpenChange(false);
     setView('menu');
     createForm.reset();
     joinForm.reset();
-  }, [setIsOpen, createForm, joinForm]);
+  }, [onOpenChange, createForm, joinForm]);
 
   const goBack = useCallback(() => {
     setView('menu');
@@ -57,17 +62,21 @@ const GuildDialog = ({ isOpen, setIsOpen }) => {
   const isJoinSubmitting = joinForm.formState.isSubmitting;
 
   return (
-    <Dialog isOpen={isOpen} setIsOpen={setIsOpen} title={title}>
-      <div className="max-h-[75vh] w-full max-w-[520px] overflow-y-auto overflow-x-hidden">
-        <div
-          className="flex transition-transform duration-200 ease-out"
-          style={{ transform: `translateX(-${activeIndex * 100}%)` }}
-        >
-          <div className="w-full shrink-0">
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Create a new server or join one with an invite code.
-              </p>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[520px]">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[75vh] w-full overflow-y-auto overflow-x-hidden">
+          <div
+            className="flex transition-transform duration-200 ease-out"
+            style={{ transform: `translateX(-${activeIndex * 100}%)` }}
+          >
+            <div className="w-full shrink-0">
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Create a new server or join one with an invite code.
+                </p>
 
               <div className="grid gap-3">
                 <button
@@ -188,6 +197,7 @@ const GuildDialog = ({ isOpen, setIsOpen }) => {
           </div>
         </div>
       </div>
+      </DialogContent>
     </Dialog>
   );
 };

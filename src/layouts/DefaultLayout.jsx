@@ -347,7 +347,7 @@ const Sidebar = () => {
           <SidebarIcon icon={<Plus className="size-6" />} text="Add a Server" />
         </button>
       </div>
-      <GuildDialog isOpen={isGuildDialogOpen} setIsOpen={setIsGuildDialogOpen} />
+      <GuildDialog open={isGuildDialogOpen} onOpenChange={setIsGuildDialogOpen} />
     </>
   );
 };

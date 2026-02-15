@@ -7,12 +7,18 @@ import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Button } from '../ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/dialog';
 
 import { GuildsService } from '../../services/guilds.service';
-import Dialog from '../Dialog';
 import { ChannelsService } from '../../services/channels.service';
 
-const CreateGuildCategoryDialog = ({ isOpen, setIsOpen, guild }) => {
+const CreateGuildCategoryDialog = ({ open, onOpenChange, guild }) => {
   const {
     register,
     handleSubmit,
@@ -45,18 +51,22 @@ const CreateGuildCategoryDialog = ({ isOpen, setIsOpen, guild }) => {
           type: 3,
         });
 
-        setIsOpen(false);
+        onOpenChange(false);
         reset();
       } catch (error) {
         console.error('Failed to create category', error);
       }
     },
-    [guild.id, setIsOpen, reset]
+    [guild.id, reset]
   );
 
   return (
-    <Dialog isOpen={isOpen} setIsOpen={setIsOpen} title="Create Category">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create Category</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Category Name Input */}
         <div className="space-y-2">
           <Label
@@ -84,24 +94,25 @@ const CreateGuildCategoryDialog = ({ isOpen, setIsOpen, guild }) => {
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex justify-end gap-3 pt-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setIsOpen(false);
-              reset();
-            }}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isSubmitting} className="px-6 text-white">
-            {isSubmitting ? 'Creating...' : 'Create Category'}
-            {!isSubmitting && <ArrowRight className="ml-2 size-4" />}
-          </Button>
-        </div>
-      </form>
+          {/* Footer Actions */}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                onOpenChange(false);
+                reset();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting} className="px-6 text-white">
+              {isSubmitting ? 'Creating...' : 'Create Category'}
+              {!isSubmitting && <ArrowRight className="ml-2 size-4" />}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
     </Dialog>
   );
 };
