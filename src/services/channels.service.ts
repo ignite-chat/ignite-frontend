@@ -154,14 +154,11 @@ export const ChannelsService = {
 
   handleMemberTyping(event: any) {
     const currentUser = useStore.getState().user;
-    console.log("Member", event);
-    if (!event.member.user) return;
-    console.log("Adding");
+    if (!event.user || event.member.user.id === currentUser?.id) return;
     useTypingStore.getState().addTypingUser(event.channel.id, {
       user_id: event.member.user.id,
       username: event.member.user.username,
     });
-    console.log("Added typing user", event.member.user);
   },
 
   async sendTypingIndicator(channelId: string) {
