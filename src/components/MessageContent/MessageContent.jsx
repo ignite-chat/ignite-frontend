@@ -199,12 +199,16 @@ const MessageContent = ({ content }) => {
         p: ({ children }) => <>{children}</>,
         // Render custom emojis as inline images, disable other images
         img: ({ src, alt }) => {
-          if (src?.startsWith(EMOJI_CDN_PREFIX)) {
+          const isTwemoji = src?.startsWith('https://cdn.jsdelivr.net/gh/twitter/twemoji');
+          if (src?.startsWith(EMOJI_CDN_PREFIX) || isTwemoji) {
             return (
               <img
                 src={src}
                 alt={alt}
-                className="inline h-10 w-10 object-contain align-text-bottom"
+                className={`inline object-contain align-text-bottom ${
+                  isTwemoji ? 'h-6 w-6' : 'h-8 w-8'
+                }`}
+                loading="lazy"
               />
             );
           }
