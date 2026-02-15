@@ -30,7 +30,7 @@ const convertCustomEmojis = (text, emojis) => {
 
 const remarkMentions = () => {
   return (tree) => {
-    visit(tree, 'text', (node, index, parent) => {
+    visit(tree, ['text', 'html'], (node, index, parent) => {
       const value = node.value;
       const regex = /<(@|#)(\d+)>/g;
 
@@ -54,7 +54,7 @@ const remarkMentions = () => {
         children.push({
           type: 'link',
           url: href,
-          children: [{ type: 'text', value: match[0] }],
+          children: [{ type: 'text', value: match[0] }]
         });
 
         lastIndex = match.index + match[0].length;
