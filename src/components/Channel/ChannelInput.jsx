@@ -99,7 +99,6 @@ const getMentionQuery = (root) => {
   return query;
 };
 
-
 const getChannelQuery = (root) => {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return null;
@@ -199,7 +198,6 @@ const replaceAtQueryWithMention = (query, user, resolveUser) => {
   sel.addRange(range);
 };
 
-
 const replaceHashQueryWithChannel = (query, channel) => {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
@@ -217,7 +215,8 @@ const replaceHashQueryWithChannel = (query, channel) => {
   mention.dataset.id = channel.channel_id || channel.id; // Support both structures
 
   mention.textContent = `#${channel.name}`;
-  mention.className = 'inline-flex items-center rounded bg-[#2b2d31] px-1.5 py-0.5 mx-[1px] text-[#949cf7] hover:bg-[#2b2d31]/70 cursor-pointer select-none';
+  mention.className =
+    'inline-flex items-center rounded bg-[#2b2d31] px-1.5 py-0.5 mx-[1px] text-[#949cf7] hover:bg-[#2b2d31]/70 cursor-pointer select-none';
 
   range.insertNode(mention);
   mention.after(document.createTextNode(' '));
@@ -340,14 +339,12 @@ const ChannelInput = ({ channel }) => {
     if (channelQuery === null) return [];
 
     // Filterable channels
-    const available = channels.filter(c => c.type !== 4);
+    const available = channels.filter((c) => c.type !== 4);
 
     if (channelQuery === '') {
       // Random recommendations if query is empty
       // Using a simple shuffle copy
-      return [...available]
-        .sort(() => 0.5 - Math.random())
-        .slice(0, SUGGESTIONS_LIMIT);
+      return [...available].sort(() => 0.5 - Math.random()).slice(0, SUGGESTIONS_LIMIT);
     }
 
     return available
@@ -595,8 +592,9 @@ const ChannelInput = ({ channel }) => {
               onKeyUp={saveSelection}
               onClick={saveSelection}
               onPaste={handlePaste}
-              className={`max-h-[50vh] min-h-[44px] w-full overflow-y-auto px-3 py-3 text-sm outline-none ${!canSendMessages ? 'cursor-not-allowed opacity-50' : ''
-                }`}
+              className={`max-h-[50vh] min-h-[44px] w-full overflow-y-auto px-3 py-3 text-sm outline-none ${
+                !canSendMessages ? 'cursor-not-allowed opacity-50' : ''
+              }`}
               data-placeholder={
                 canSendMessages
                   ? channel?.type === ChannelType.DM
@@ -617,8 +615,9 @@ const ChannelInput = ({ channel }) => {
               {filteredMembers.map((m, i) => (
                 <button
                   key={m.user_id}
-                  className={`flex w-full items-center gap-2 rounded px-2 py-2 text-left ${i === mentionIndex ? 'bg-gray-700' : 'hover:bg-gray-700/60'
-                    }`}
+                  className={`flex w-full items-center gap-2 rounded px-2 py-2 text-left ${
+                    i === mentionIndex ? 'bg-gray-700' : 'hover:bg-gray-700/60'
+                  }`}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     replaceAtQueryWithMention(mentionQuery, m, resolveUser);
@@ -652,8 +651,9 @@ const ChannelInput = ({ channel }) => {
                 {filteredChannels.map((c, i) => (
                   <button
                     key={c.id || c.channel_id}
-                    className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-gray-200 ${i === channelIndex ? 'bg-[#404249]' : 'hover:bg-[#35373c]'
-                      }`}
+                    className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-gray-200 ${
+                      i === channelIndex ? 'bg-[#404249]' : 'hover:bg-[#35373c]'
+                    }`}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       replaceHashQueryWithChannel(channelQuery, c);
@@ -661,10 +661,16 @@ const ChannelInput = ({ channel }) => {
                       syncValue();
                     }}
                   >
-                    {c.type === 5 ? <Megaphone className="size-4 text-gray-400" /> : <Hash className="size-4 text-gray-400" />}
+                    {c.type === 5 ? (
+                      <Megaphone className="size-4 text-gray-400" />
+                    ) : (
+                      <Hash className="size-4 text-gray-400" />
+                    )}
                     <div className="flex-1 truncate font-medium">{c.name}</div>
                     {c.parent_id && (
-                      <div className="text-xs text-gray-500">{/* Category name could go here if available */}</div>
+                      <div className="text-xs text-gray-500">
+                        {/* Category name could go here if available */}
+                      </div>
                     )}
                   </button>
                 ))}
@@ -682,8 +688,9 @@ const ChannelInput = ({ channel }) => {
               {filteredEmojis.map((item, i) => (
                 <button
                   key={item.shortcode}
-                  className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors ${i === emojiIndex ? 'bg-gray-700' : 'hover:bg-gray-700/50'
-                    }`}
+                  className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors ${
+                    i === emojiIndex ? 'bg-gray-700' : 'hover:bg-gray-700/50'
+                  }`}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     replaceEmojiQueryWithEmoji(emojiQuery, item.shortcode);

@@ -54,7 +54,7 @@ const remarkMentions = () => {
         children.push({
           type: 'link',
           url: href,
-          children: [{ type: 'text', value: match[0] }]
+          children: [{ type: 'text', value: match[0] }],
         });
 
         lastIndex = match.index + match[0].length;
@@ -137,7 +137,11 @@ const ChannelMention = ({ channelId }) => {
   }, [guildsStore.guilds, guildId, channelId]);
 
   if (!channel) {
-    return <span className="rounded bg-gray-800/50 px-1 py-0.5 text-gray-500 cursor-not-allowed">#unknown-channel</span>;
+    return (
+      <span className="cursor-not-allowed rounded bg-gray-800/50 px-1 py-0.5 text-gray-500">
+        #unknown-channel
+      </span>
+    );
   }
 
   const handleClick = (e) => {
@@ -153,9 +157,13 @@ const ChannelMention = ({ channelId }) => {
     <button
       type="button"
       onClick={handleClick}
-      className="inline-flex items-center gap-0.5 cursor-pointer rounded bg-blue-500/10 px-1 py-0.5 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 align-baseline"
+      className="inline-flex cursor-pointer items-center gap-0.5 rounded bg-blue-500/10 px-1 py-0.5 align-baseline text-blue-400 hover:bg-blue-500/20 hover:text-blue-300"
     >
-      {channel.type === 5 ? <Megaphone weight="fill" className="size-3.5" /> : <Hash weight="bold" className="size-3.5" />}
+      {channel.type === 5 ? (
+        <Megaphone weight="fill" className="size-3.5" />
+      ) : (
+        <Hash weight="bold" className="size-3.5" />
+      )}
       <span className="font-medium hover:underline">{channel.name}</span>
     </button>
   );
