@@ -8,7 +8,7 @@ import {
 } from '../ui/emoji-picker';
 import { useChannelInputContext, useChannelContext } from '../../contexts/ChannelContext.jsx';
 import { useChannelsStore } from '../../store/channels.store';
-import { X } from '@phosphor-icons/react';
+import { X, Hash, Megaphone, ChatText } from '@phosphor-icons/react';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { ChannelType } from '../../enums/ChannelType';
@@ -42,6 +42,11 @@ const serializeFromDom = (root) => {
 
     if (node.dataset?.mention === 'user') {
       out += `<@${node.dataset.id}>`;
+      return;
+    }
+
+    if (node.dataset?.mention === 'channel') {
+      out += `<#${node.dataset.id}>`;
       return;
     }
 
@@ -84,6 +89,30 @@ const getMentionQuery = (root) => {
 
   const text = pre.toString();
   const idx = text.lastIndexOf('@');
+
+  if (idx === -1) return null;
+  if (idx > 0 && ![' ', '\n'].includes(text[idx - 1])) return null;
+
+  const query = text.slice(idx + 1);
+  if (query.includes(' ') || query.includes('\n')) return null;
+
+  return query;
+};
+
+
+const getChannelQuery = (root) => {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+
+  const range = sel.getRangeAt(0);
+  if (!root.contains(range.startContainer)) return null;
+
+  const pre = range.cloneRange();
+  pre.selectNodeContents(root);
+  pre.setEnd(range.startContainer, range.startOffset);
+
+  const text = pre.toString();
+  const idx = text.lastIndexOf('#');
 
   if (idx === -1) return null;
   if (idx > 0 && ![' ', '\n'].includes(text[idx - 1])) return null;
@@ -170,6 +199,35 @@ const replaceAtQueryWithMention = (query, user, resolveUser) => {
   sel.addRange(range);
 };
 
+
+const replaceHashQueryWithChannel = (query, channel) => {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+
+  const range = sel.getRangeAt(0);
+
+  // delete "#query"
+  const del = range.cloneRange();
+  del.setStart(range.startContainer, Math.max(0, range.startOffset - (query.length + 1)));
+  del.deleteContents();
+
+  const mention = document.createElement('span');
+  mention.contentEditable = 'false';
+  mention.dataset.mention = 'channel';
+  mention.dataset.id = channel.channel_id || channel.id; // Support both structures
+
+  mention.textContent = `#${channel.name}`;
+  mention.className = 'inline-flex items-center rounded bg-[#2b2d31] px-1.5 py-0.5 mx-[1px] text-[#949cf7] hover:bg-[#2b2d31]/70 cursor-pointer select-none';
+
+  range.insertNode(mention);
+  mention.after(document.createTextNode(' '));
+
+  range.setStartAfter(mention.nextSibling);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+};
+
 const convertSerializedMentions = (root, members, resolveUser) => {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let node;
@@ -204,6 +262,8 @@ const ChannelInput = ({ channel }) => {
   const customEmojis = guildEmojis[guildId] || [];
   const currentUser = useStore((s) => s.user);
   const members = guildsStore.guildMembers[guildId] || [];
+  const guild = guildsStore.guilds.find((g) => g.id === guildId);
+  const channels = guild?.channels || [];
   const channelMessages = useChannelsStore((s) => s.channelMessages);
 
   const typingUsers = useTypingStore((s) => s.typing[channel?.channel_id] || []);
@@ -259,7 +319,7 @@ const ChannelInput = ({ channel }) => {
   const [mentionIndex, setMentionIndex] = useState(0);
 
   const filteredMembers = useMemo(() => {
-    if (!mentionQuery) return [];
+    if (mentionQuery === null) return [];
     return members
       .filter(
         (m) =>
@@ -268,6 +328,47 @@ const ChannelInput = ({ channel }) => {
       )
       .slice(0, SUGGESTIONS_LIMIT);
   }, [members, mentionQuery]);
+
+  /* ---------------- channel mentions ---------------- */
+
+  /* ---------------- channel mentions ---------------- */
+
+  const [channelQuery, setChannelQuery] = useState(null);
+  const [channelIndex, setChannelIndex] = useState(0);
+
+  const filteredChannels = useMemo(() => {
+    if (channelQuery === null) return [];
+
+    // Filterable channels
+    const available = channels.filter(c => c.type !== 4);
+
+    if (channelQuery === '') {
+      // Random recommendations if query is empty
+      // Using a simple shuffle copy
+      return [...available]
+        .sort(() => 0.5 - Math.random())
+        .slice(0, SUGGESTIONS_LIMIT);
+    }
+
+    return available
+      .filter((c) => {
+        return c.name.toLowerCase().includes(channelQuery.toLowerCase());
+      })
+      .sort((a, b) => {
+        const q = channelQuery.toLowerCase();
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+
+        if (aName === q && bName !== q) return -1;
+        if (bName === q && aName !== q) return 1;
+
+        if (aName.startsWith(q) && !bName.startsWith(q)) return -1;
+        if (bName.startsWith(q) && !aName.startsWith(q)) return 1;
+
+        return 0;
+      })
+      .slice(0, SUGGESTIONS_LIMIT);
+  }, [channels, channelQuery]);
 
   /* ---------------- emojis ---------------- */
 
@@ -339,8 +440,10 @@ const ChannelInput = ({ channel }) => {
     saveSelection();
     syncValue();
     setMentionQuery(getMentionQuery(editorRef.current));
+    setChannelQuery(getChannelQuery(editorRef.current));
     setEmojiQuery(getEmojiQuery(editorRef.current));
     setMentionIndex(0);
+    setChannelIndex(0);
     setEmojiIndex(0);
 
     // Clean up empty editor to show placeholder
@@ -394,6 +497,28 @@ const ChannelInput = ({ channel }) => {
         e.preventDefault();
         replaceAtQueryWithMention(mentionQuery, filteredMembers[mentionIndex], resolveUser);
         setMentionQuery(null);
+        syncValue();
+        return;
+      }
+    }
+
+    if (channelQuery && filteredChannels.length) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setChannelIndex((i) => Math.min(i + 1, filteredChannels.length - 1));
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setChannelIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        replaceHashQueryWithChannel(channelQuery, filteredChannels[channelIndex]);
+        setChannelQuery(null);
         syncValue();
         return;
       }
@@ -470,9 +595,8 @@ const ChannelInput = ({ channel }) => {
               onKeyUp={saveSelection}
               onClick={saveSelection}
               onPaste={handlePaste}
-              className={`max-h-[50vh] min-h-[44px] w-full overflow-y-auto px-3 py-3 text-sm outline-none ${
-                !canSendMessages ? 'cursor-not-allowed opacity-50' : ''
-              }`}
+              className={`max-h-[50vh] min-h-[44px] w-full overflow-y-auto px-3 py-3 text-sm outline-none ${!canSendMessages ? 'cursor-not-allowed opacity-50' : ''
+                }`}
               data-placeholder={
                 canSendMessages
                   ? channel?.type === ChannelType.DM
@@ -493,9 +617,8 @@ const ChannelInput = ({ channel }) => {
               {filteredMembers.map((m, i) => (
                 <button
                   key={m.user_id}
-                  className={`flex w-full items-center gap-2 rounded px-2 py-2 text-left ${
-                    i === mentionIndex ? 'bg-gray-700' : 'hover:bg-gray-700/60'
-                  }`}
+                  className={`flex w-full items-center gap-2 rounded px-2 py-2 text-left ${i === mentionIndex ? 'bg-gray-700' : 'hover:bg-gray-700/60'
+                    }`}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     replaceAtQueryWithMention(mentionQuery, m, resolveUser);
@@ -511,6 +634,45 @@ const ChannelInput = ({ channel }) => {
           </Popover.Portal>
         </Popover.Root>
 
+        <Popover.Root open={channelQuery !== null && filteredChannels.length > 0} modal={false}>
+          {/* Anchor to the input group roughly, or just absolute full width */}
+          <Popover.Anchor className="absolute left-0 top-0 w-full" />
+          <Popover.Portal>
+            <Popover.Content
+              side="top"
+              align="start"
+              onOpenAutoFocus={(e) => e.preventDefault()}
+              className="z-50 rounded bg-[#2b2d31] p-0 shadow-lg"
+              style={{ width: editorRef.current?.parentElement?.offsetWidth ?? 300 }}
+            >
+              <div className="p-2">
+                <div className="mb-2 px-2 text-xs font-bold uppercase text-gray-400">
+                  Text Channels
+                </div>
+                {filteredChannels.map((c, i) => (
+                  <button
+                    key={c.id || c.channel_id}
+                    className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-gray-200 ${i === channelIndex ? 'bg-[#404249]' : 'hover:bg-[#35373c]'
+                      }`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      replaceHashQueryWithChannel(channelQuery, c);
+                      setChannelQuery(null);
+                      syncValue();
+                    }}
+                  >
+                    {c.type === 5 ? <Megaphone className="size-4 text-gray-400" /> : <Hash className="size-4 text-gray-400" />}
+                    <div className="flex-1 truncate font-medium">{c.name}</div>
+                    {c.parent_id && (
+                      <div className="text-xs text-gray-500">{/* Category name could go here if available */}</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
+
         {emojiQuery && filteredEmojis.length > 0 && (
           <div className="absolute bottom-full left-0 right-0 z-50 mb-2 flex max-h-[300px] w-full flex-col rounded border border-white/5 bg-[#2c2f33] shadow-lg">
             <div className="flex-shrink-0 border-b border-white/5 px-4 py-3 text-xs font-bold text-gray-400">
@@ -520,9 +682,8 @@ const ChannelInput = ({ channel }) => {
               {filteredEmojis.map((item, i) => (
                 <button
                   key={item.shortcode}
-                  className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors ${
-                    i === emojiIndex ? 'bg-gray-700' : 'hover:bg-gray-700/50'
-                  }`}
+                  className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors ${i === emojiIndex ? 'bg-gray-700' : 'hover:bg-gray-700/50'
+                    }`}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     replaceEmojiQueryWithEmoji(emojiQuery, item.shortcode);
