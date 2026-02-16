@@ -1,7 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import api from '@/api';
 import { GuildsService } from '@/services/guilds.service';
 import { PermissionsService } from '@/services/permissions.service';
 import { Permissions } from '@/enums/Permissions';
@@ -15,6 +13,16 @@ import {
   Bell,
   Lock,
 } from '@phosphor-icons/react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import InviteDialog from './InviteDialog';
@@ -30,7 +38,7 @@ const GuildSidebarHeader = ({
 
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [leaving, setLeaving] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
   const canOpenServerSettings = useMemo(() => {
     return PermissionsService.hasPermission(guild?.id, null, Permissions.MANAGE_GUILD);
@@ -41,27 +49,26 @@ const GuildSidebarHeader = ({
   }, [guild?.id]);
 
   const handleLeave = useCallback(
-    async (e) => {
-      e.stopPropagation();
-      if (!guild?.id || leaving) return;
-
-      setLeaving(true);
-
-      try {
-        await api.delete(`@me/guilds/${guild.id}/`);
-        toast.success('Left server.');
-        setPopoverOpen(false);
-        navigate('/channels/@me');
-        await GuildsService.loadGuilds();
-      } catch (err) {
-        const msg = err.response?.data?.message || err.message || 'Unknown error';
-        toast.error(msg);
-      } finally {
-        setLeaving(false);
-      }
+    (e) => {
+      e?.stopPropagation();
+      setShowLeaveDialog(true);
+      setPopoverOpen(false);
     },
-    [guild?.id, leaving, navigate]
+    []
   );
+
+  const confirmLeave = async () => {
+    if (!guild?.id) return;
+    
+    try {
+      await GuildsService.leaveGuild(guild.id);
+      navigate('/channels/@me');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setShowLeaveDialog(false);
+    }
+  };
 
   const handleInviteClick = () => {
     setPopoverOpen(false);
@@ -167,9 +174,9 @@ const GuildSidebarHeader = ({
               type="button"
               className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-red-300 hover:bg-white/5 disabled:opacity-60"
               onClick={handleLeave}
-              disabled={leaving}
+              disabled={showLeaveDialog}
             >
-              <span>{leaving ? 'Leaving…' : 'Leave Server'}</span>
+              <span>{showLeaveDialog ? 'Leaving…' : 'Leave Server'}</span>
               <SignOut className="ml-2 size-4" />
             </button>
           </PopoverContent>
@@ -190,6 +197,27 @@ const GuildSidebarHeader = ({
         onOpenChange={setInviteDialogOpen}
         guildId={guild?.id}
       />
+
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave &apos;{guildName}&apos;</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to leave <span className="font-bold text-white">{guildName}</span>? You won&apos;t be
+              able to rejoin this server unless you are re-invited.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmLeave}
+              className="bg-red-500 text-white hover:bg-red-600"
+            >
+              Leave Server
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

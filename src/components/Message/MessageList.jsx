@@ -1,4 +1,5 @@
 import { CircleNotch } from '@phosphor-icons/react';
+import { cn } from '@/lib/utils';
 import ChannelMessage from './ChannelMessage';
 
 const MessageList = ({
@@ -39,11 +40,15 @@ const MessageList = ({
 
       {messages?.map((message, index) => {
         const prevMessage = messages[index - 1] || null;
+        const isHighlighted = highlightId === message.id;
         return (
           <div
             key={message.id}
             id={`msg-${message.id}`}
-            className={highlightId === message.id ? 'rounded ring-2 ring-primary' : ''}
+            className={cn(
+              'relative',
+              isHighlighted && 'animate-message-highlight'
+            )}
           >
             <ChannelMessage
               message={message}
@@ -52,6 +57,7 @@ const MessageList = ({
               isEditing={editingId === message.id}
               setEditingId={setEditingId}
               guildId={guildId}
+              isHighlighted={isHighlighted}
             />
           </div>
         );
@@ -69,6 +75,7 @@ const MessageList = ({
             isEditing={false}
             setEditingId={setEditingId}
             guildId={guildId}
+            isHighlighted={false}
           />
         );
       })}

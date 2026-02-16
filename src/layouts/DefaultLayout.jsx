@@ -1,6 +1,16 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Fire, Plus } from '@phosphor-icons/react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 import {
   DndContext,
   DragOverlay,
@@ -12,8 +22,11 @@ import {
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { GuildsService } from '../services/guilds.service';
 import { useGuildsStore } from '../store/guilds.store';
 import GuildDialog from '../components/GuildDialog';
+import GuildContextMenu from '../components/Guild/GuildContextMenu';
+import { ContextMenu, ContextMenuTrigger } from '../components/ui/context-menu';
 
 import { useUnreadsStore } from '../store/unreads.store';
 import { useChannelsStore } from '../store/channels.store';
@@ -76,11 +89,12 @@ const SortableGuildIcon = ({
   isActive,
   isUnread,
   mentionCount,
-  isDragging: globalDragging,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: String(guild.id),
   });
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const navigate = useNavigate();
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -90,22 +104,53 @@ const SortableGuildIcon = ({
     zIndex: isDragging ? 0 : 'auto',
   };
 
+  const handleLeaveServer = async () => {
+    await GuildsService.leaveGuild(guild.id);
+    navigate('/channels/@me');
+  };
+
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <Link
-        to={`/channels/${guild.id}`}
-        draggable="false"
-        style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
-      >
-        <SidebarIcon
-          iconUrl={guild.icon || ''}
-          text={guild.name}
-          isServerIcon={true}
-          isActive={isActive}
-          isUnread={isUnread}
-          mentionCount={mentionCount}
-        />
-      </Link>
+      <ContextMenu>
+        <ContextMenuTrigger>
+          <Link
+            to={`/channels/${guild.id}`}
+            draggable="false"
+            style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
+          >
+            <SidebarIcon
+              iconUrl={guild.icon || ''}
+              text={guild.name}
+              isServerIcon={true}
+              isActive={isActive}
+              isUnread={isUnread}
+              mentionCount={mentionCount}
+            />
+          </Link>
+        </ContextMenuTrigger>
+        <GuildContextMenu guild={guild} onLeave={() => setShowLeaveDialog(true)} />
+      </ContextMenu>
+
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave &apos;{guild.name}&apos;</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to leave <span className="font-bold text-white">{guild.name}</span>? You won&apos;t be
+              able to rejoin this server unless you are re-invited.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleLeaveServer}
+              className="bg-red-500 text-white hover:bg-red-600"
+            >
+              Leave Server
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

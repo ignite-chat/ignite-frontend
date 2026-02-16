@@ -1,6 +1,3 @@
-import { useEffect } from 'react';
-import { GuildsService } from '../../services/guilds.service';
-import { useGuildsStore } from '../../store/guilds.store';
 import { useGuildContext } from '../../contexts/GuildContext';
 import ChannelBar from './ChannelBar.jsx';
 import ChannelInput from './ChannelInput';
@@ -9,7 +6,7 @@ import { ChannelType } from '../../enums/ChannelType';
 import MemberList from './MemberList';
 import VoiceChannelView from '../Voice/VoiceChannelView';
 
-const Channel = ({ channel }) => {
+const Channel = ({ channel, messageId }) => {
   const { guildId } = useGuildContext();
 
   if (channel?.type === ChannelType.GUILD_VOICE) {
@@ -27,8 +24,8 @@ const Channel = ({ channel }) => {
       <ChannelBar channel={channel} onJumpToMessage={() => {}} />
       <hr className="m-0 w-full border border-t-0 border-white/5 bg-gray-900 p-0" />
       <div className="flex min-h-0 flex-1">
-        <div className="relative flex h-full w-full flex-1 flex-col overflow-hidden">
-          <ChannelMessages channel={channel} />
+        <div className="relative flex size-full flex-1 flex-col overflow-hidden">
+          <ChannelMessages channel={channel} messageId={messageId} />
           <ChannelInput channel={channel} />
         </div>
 

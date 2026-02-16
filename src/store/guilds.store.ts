@@ -10,6 +10,7 @@ type GuildsStore = {
   addGuild: (guild: any) => void;
   editGuild: (guildId: string, updates: Partial<any>) => void;
   editGuildChannel: (guildId: string, channelId: string, updates: Partial<any>) => void;
+  removeGuild: (guildId: any) => void;
 };
 
 export const useGuildsStore = create<GuildsStore>((set) => ({
@@ -44,4 +45,5 @@ export const useGuildsStore = create<GuildsStore>((set) => ({
         return g;
       }),
     })),
+  removeGuild: (guildId) => set((state) => ({ guilds: state.guilds.filter((g) => g.id !== guildId) })),
 }));

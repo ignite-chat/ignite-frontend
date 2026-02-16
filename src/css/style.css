@@ -117,3 +117,27 @@ body {
   font-weight: 700;
   src: url('../assets/fonts/font-bold.woff') format('woff');
 }
+@layer utilities {
+  @keyframes message-highlight {
+    0% {
+      background-color: hsla(20, 80%, 15%, 0.4);
+      box-shadow: inset 3px 0 0 0 hsl(var(--primary));
+    }
+    10% {
+      background-color: hsla(20, 80%, 20%, 0.5);
+      box-shadow: inset 4px 0 0 0 hsl(var(--primary));
+    }
+    80% {
+      background-color: hsla(20, 80%, 15%, 0.3);
+      box-shadow: inset 4px 0 0 0 hsl(var(--primary));
+    }
+    100% {
+      background-color: transparent;
+      box-shadow: inset 0 0 0 0 hsl(var(--primary));
+    }
+  }
+
+  .animate-message-highlight {
+    animation: message-highlight 4s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+  }
+}
