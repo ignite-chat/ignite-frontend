@@ -2,6 +2,7 @@ import { Permissions } from '@/enums/Permissions';
 import useStore from '@/hooks/useStore';
 import { useGuildsStore } from '@/store/guilds.store';
 import { useRolesStore } from '@/store/roles.store';
+import { useUsersStore } from '@/store/users.store';
 
 export const PermissionsService = {
   /**
@@ -13,7 +14,7 @@ export const PermissionsService = {
    * @return True if the user has the permission, false otherwise.
    */
   hasPermission: (guildId: string, channelId: string | null, permission: bigint): boolean => {
-    const localUser = useStore.getState().user;
+    const localUser = useUsersStore.getState().getCurrentUser();
     const guild = useGuildsStore.getState().guilds.find((g) => g.id === guildId);
 
     if (!guild) return false;

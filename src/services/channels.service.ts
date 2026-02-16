@@ -8,6 +8,7 @@ import useStore from '../hooks/useStore';
 import { NotificationService } from './notification.service';
 import { UnreadsService } from './unreads.service';
 import { useNotificationStore } from '../store/notification.store';
+import { useUsersStore } from '@/store/users.store';
 
 export const ChannelsService = {
   /**
@@ -120,7 +121,7 @@ export const ChannelsService = {
   _lastTypingSent: {} as Record<string, number>,
 
   handleMemberTyping(event: any) {
-    const currentUser = useStore.getState().user;
+    const currentUser = useUsersStore.getState().getCurrentUser();
     if (!event.user || event.member.user.id === currentUser?.id) return;
     useTypingStore.getState().addTypingUser(event.channel.id, {
       user_id: event.member.user.id,
@@ -139,14 +140,15 @@ export const ChannelsService = {
     const { setChannelPendingMessages, channelPendingMessages } = useChannelsStore.getState();
 
     const generatedNonce = Date.now().toString() + Math.floor(Math.random() * 1000).toString();
+    const currentUser = useUsersStore.getState().getCurrentUser();;
 
     const pendingMessage = {
       nonce: generatedNonce,
       content: content,
       author: {
-        id: useStore.getState().user.id,
-        name: useStore.getState().user.name ?? useStore.getState().user.username,
-        username: useStore.getState().user.username,
+        id: currentUser.id,
+        name: currentUser.name ?? currentUser.username,
+        username: currentUser.username,
       },
       created_at: new Date().toISOString(),
       message_references: replyTo ? [{ message_id: replyTo, channel_id: channelId }] : [],
@@ -252,7 +254,7 @@ export const ChannelsService = {
     }
 
     // If we authored this message or are viewing this channel, mark as read immediately
-    const currentUser = useStore.getState().user;
+    const currentUser = useUsersStore.getState().getCurrentUser();
     const { activeChannelId } = useNotificationStore.getState();
     if (event.message.author.id === currentUser?.id || activeChannelId === channelId) {
       UnreadsService.setLastReadMessageId(channelId, event.message.id);
@@ -350,7 +352,7 @@ export const ChannelsService = {
    * @param emoji The emoji to react with
    */
   toggleMessageReaction(channelId: string, messageId: string, emoji: string) {
-    const { user } = useStore.getState();
+    const user = useUsersStore.getState().getCurrentUser();
     const { channelReactions, addReaction, removeReaction } = useChannelsStore.getState();
 
     const messageReactions = channelReactions[channelId]?.[messageId] || [];

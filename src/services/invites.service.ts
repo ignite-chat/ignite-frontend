@@ -5,6 +5,8 @@ import { GuildsService } from './guilds.service';
 import { ChannelsService } from './channels.service';
 import { FriendsService } from './friends.service';
 import { UnreadsService } from './unreads.service';
+import { useAuthStore } from '@/store/auth.store.js';
+import { useUsersStore } from '@/store/users.store.js';
 
 export const InvitesService = {
   async getInvitePreview(code) {
@@ -31,10 +33,13 @@ export const InvitesService = {
   async acceptInviteWithQuickAccount(code, username) {
     try {
       // Register with username only
-      const { data: authData } = await api.post('/register', { username });
+      const { data } = await api.post('/register', { username });
+
+      // Store user in users store
+      useUsersStore.getState().setUser(data.user.id, data.user);
 
       // Login with the new account
-      useStore.getState().login(authData.user, authData.token);
+      useAuthStore.getState().login(data.user.id, data.token);
 
       // Accept the invite
       await api.post(`/invites/${code}`);

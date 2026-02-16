@@ -52,7 +52,7 @@ export const useVoiceStore = create<VoiceState>((set) => ({
   guildName: null,
   channelName: null,
   participants: [],
-  isMuted: false,
+  isMuted: true,
   isDeafened: false,
   isCameraOn: false,
   isScreenSharing: false,
@@ -88,18 +88,18 @@ export const useVoiceStore = create<VoiceState>((set) => ({
     set({ audioOutputDeviceId });
   },
   reset: () =>
-    set({
+    set((state) => ({
       room: null,
       channelId: null,
       guildId: null,
       guildName: null,
       channelName: null,
       participants: [],
-      isMuted: false,
+      isMuted: state.isMuted,
       isDeafened: false,
       isCameraOn: false,
       isScreenSharing: false,
       isScreenSharePickerOpen: false,
       connectionState: 'disconnected',
-    }),
+    })),
 }));

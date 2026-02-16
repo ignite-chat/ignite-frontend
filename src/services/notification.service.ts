@@ -1,3 +1,4 @@
+import { useUsersStore } from '@/store/users.store';
 import useStore from '../hooks/useStore';
 import { useChannelsStore } from '../store/channels.store';
 import { useNotificationStore } from '../store/notification.store';
@@ -30,7 +31,7 @@ export const NotificationService = {
    * Runs guard checks, then plays sound and shows desktop notification.
    */
   notifyNewMessage(event: any) {
-    const { user } = useStore.getState();
+    const user = useUsersStore.getState().getCurrentUser();
     const { channels } = useChannelsStore.getState();
     const { activeChannelId, blockedUserIds, mutedChannelIds, mutedGuildIds } =
       useNotificationStore.getState();

@@ -6,11 +6,6 @@ import { useUsersStore } from '../store/users.store';
 import useStore from '../hooks/useStore';
 
 function resolveParticipantName(identity: string): string {
-  const currentUser = useStore.getState().user;
-  if (currentUser && String(currentUser.id) === identity) {
-    return currentUser.name || currentUser.username || identity;
-  }
-
   const user = useUsersStore.getState().getUser(identity);
   if (user) {
     return user.name || user.username || identity;
@@ -20,6 +15,8 @@ function resolveParticipantName(identity: string): string {
 }
 
 function buildParticipantsList(room: Room): VoiceParticipant[] {
+  const { isMuted } = useVoiceStore.getState();
+
   const participants: VoiceParticipant[] = [];
 
   const local = room.localParticipant;
@@ -27,8 +24,8 @@ function buildParticipantsList(room: Room): VoiceParticipant[] {
     participants.push({
       identity: local.identity,
       name: resolveParticipantName(local.identity),
-      isSpeaking: local.isSpeaking,
-      isMuted: !local.isMicrophoneEnabled,
+      isSpeaking: localSpeakingState,
+      isMuted: isMuted,
       isCameraOn: local.isCameraEnabled,
       isScreenSharing: local.isScreenShareEnabled,
     });
@@ -50,6 +47,52 @@ function buildParticipantsList(room: Room): VoiceParticipant[] {
 
 function refreshParticipants(room: Room) {
   useVoiceStore.getState().setParticipants(buildParticipantsList(room));
+}
+
+// Local speaking detection via Web Audio API (no server roundtrip)
+let localSpeakingState = false;
+let speakingMonitorCleanup: (() => void) | null = null;
+
+function startLocalSpeakingMonitor(room: Room) {
+  stopLocalSpeakingMonitor();
+
+  const publication = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+  const mediaStreamTrack = publication?.track?.mediaStreamTrack;
+  if (!mediaStreamTrack) return;
+
+  const audioContext = new AudioContext();
+  const source = audioContext.createMediaStreamSource(new MediaStream([mediaStreamTrack]));
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = 256;
+  source.connect(analyser);
+
+  const dataArray = new Uint8Array(analyser.frequencyBinCount);
+  const SPEAKING_THRESHOLD = 15;
+
+  const interval = setInterval(() => {
+    analyser.getByteFrequencyData(dataArray);
+    const average = dataArray.reduce((sum, val) => sum + val, 0) / dataArray.length;
+    const nowSpeaking = average > SPEAKING_THRESHOLD;
+
+    if (nowSpeaking !== localSpeakingState) {
+      localSpeakingState = nowSpeaking;
+      refreshParticipants(room);
+    }
+  }, 50);
+
+  speakingMonitorCleanup = () => {
+    clearInterval(interval);
+    source.disconnect();
+    audioContext.close();
+    localSpeakingState = false;
+  };
+}
+
+function stopLocalSpeakingMonitor() {
+  if (speakingMonitorCleanup) {
+    speakingMonitorCleanup();
+    speakingMonitorCleanup = null;
+  }
 }
 
 export const VoiceService = {
@@ -112,6 +155,7 @@ export const VoiceService = {
       });
 
       room.on(RoomEvent.Disconnected, () => {
+        stopLocalSpeakingMonitor();
         useVoiceStore.getState().reset();
       });
 
@@ -127,16 +171,21 @@ export const VoiceService = {
 
       store.setRoom(room);
       store.setConnectionState('connected');
-
-      // Try to enable microphone, but don't fail the call if denied
-      try {
-        await room.localParticipant.setMicrophoneEnabled(true);
-      } catch {
-        console.warn('Microphone access denied — joining muted.');
-        store.setMuted(true);
-      }
-
       store.setParticipants(buildParticipantsList(room));
+
+      // Respect the user's current mute state when joining
+      const shouldEnableMic = !useVoiceStore.getState().isMuted;
+      if (shouldEnableMic) {
+        try {
+          await room.localParticipant.setMicrophoneEnabled(true);
+          startLocalSpeakingMonitor(room);
+        } catch {
+          console.warn('Microphone access denied — joining muted.');
+          store.setMuted(true);
+        }
+      }
+      refreshParticipants(room);
+
     } catch (error) {
       console.error('Failed to join voice channel:', error);
       toast.error('Failed to join voice channel.');
@@ -147,6 +196,8 @@ export const VoiceService = {
   async leaveVoiceChannel() {
     const store = useVoiceStore.getState();
     const { room } = store;
+
+    stopLocalSpeakingMonitor();
 
     if (room) {
       room.disconnect();
@@ -164,6 +215,13 @@ export const VoiceService = {
     const newMuted = !isMuted;
     await room.localParticipant.setMicrophoneEnabled(!newMuted);
     store.setMuted(newMuted);
+
+    if (newMuted) {
+      stopLocalSpeakingMonitor();
+    } else {
+      startLocalSpeakingMonitor(room);
+    }
+
     refreshParticipants(room);
   },
 
@@ -190,6 +248,7 @@ export const VoiceService = {
     if (newDeafened && !store.isMuted) {
       await room.localParticipant.setMicrophoneEnabled(false);
       store.setMuted(true);
+      stopLocalSpeakingMonitor();
     }
 
     store.setDeafened(newDeafened);
