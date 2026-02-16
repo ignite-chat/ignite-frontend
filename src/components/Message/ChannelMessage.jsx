@@ -192,7 +192,7 @@ const ChannelMessage = memo(
                     />
                   ) : (
                     <div
-                      className={`whitespace-pre-wrap break-words text-gray-400 ${pending ? 'opacity-50' : ''}`}
+                     className={`whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-gray-400 ${pending ? 'opacity-50' : ''}`}
                     >
                       <MessageContent content={message.content} />
                       {message.updated_at && message.created_at !== message.updated_at && (
