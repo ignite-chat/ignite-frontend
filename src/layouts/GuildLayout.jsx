@@ -9,7 +9,7 @@ import GuildSidebar from '@/components/Guild/GuildSidebar';
 import CreateGuildChannelDialog from '@/components/Guild/CreateGuildChannelDialog';
 import CreateGuildCategoryDialog from '@/components/Guild/CreateGuildCategoryDialog';
 import { PermissionsService } from '@/services/permissions.service';
-import { Permissions } from '@/enums/Permissions';
+import { Permissions } from '@/constants/Permissions';
 
 const GuildLayout = ({ children, guild }) => {
   const store = useStore();

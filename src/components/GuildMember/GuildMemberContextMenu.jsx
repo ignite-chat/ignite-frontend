@@ -18,7 +18,7 @@ import { useRolesStore } from '../../store/roles.store';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { RolesService } from '../../services/roles.service';
 import { PermissionsService } from '@/services/permissions.service';
-import { Permissions } from '@/enums/Permissions';
+import { Permissions } from '@/constants/Permissions';
 
 const intToHex = (intColor) => {
   return `#${intColor.toString(16).padStart(6, '0')}`;

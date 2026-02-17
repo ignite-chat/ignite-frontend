@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import ServerInfo from './ServerInfo';
-import ServerRoleManager from './ServerRoleManager';
+import ServerRoleManager from './roles/ServerRoleManager';
 import ServerMemberManager from './ServerMemberManager';
 import ServerInviteManager from './ServerInviteManager';
 import ServerEmojiManager from './ServerEmojiManager';

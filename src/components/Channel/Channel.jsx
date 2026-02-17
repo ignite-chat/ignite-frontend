@@ -2,7 +2,7 @@ import { useGuildContext } from '../../contexts/GuildContext';
 import ChannelBar from './ChannelBar.jsx';
 import ChannelInput from './ChannelInput';
 import ChannelMessages from './ChannelMessages';
-import { ChannelType } from '../../enums/ChannelType';
+import { ChannelType } from '../../constants/ChannelType';
 import MemberList from './MemberList';
 import VoiceChannelView from '../Voice/VoiceChannelView';
 

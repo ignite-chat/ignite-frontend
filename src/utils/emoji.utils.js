@@ -71,10 +71,17 @@ export const convertUnicodeEmojis = (text) => {
   });
 };
 
+const twemojiUrlCache = new Map();
+
 export const getTwemojiUrl = (emoji) => {
+  const cached = twemojiUrlCache.get(emoji);
+  if (cached) return cached;
+
   const code = [...emoji]
     .map((char) => char.codePointAt(0).toString(16))
     .filter((hex) => hex !== 'fe0f') // Remove VS16
     .join('-');
-  return `https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/${code}.svg`;
+  const url = `https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/${code}.svg`;
+  twemojiUrlCache.set(emoji, url);
+  return url;
 };

@@ -20,7 +20,7 @@ import { useChannelsStore } from '../../store/channels.store';
 import { X, Hash, Megaphone, SpeakerHigh, Keyboard } from '@phosphor-icons/react';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useGuildContext } from '../../contexts/GuildContext';
-import { ChannelType } from '../../enums/ChannelType';
+import { ChannelType } from '../../constants/ChannelType';
 import useStore from '../../hooks/useStore';
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Button } from '../ui/button';
@@ -966,12 +966,14 @@ const ChannelInput = ({ channel }) => {
               <Smile className="size-5" />
             </Button>
           </Popover.Trigger>
+          <Popover.Portal forceMount>
           <Popover.Content
+            forceMount
             side="top"
             align="end"
             sideOffset={8}
             collisionPadding={16}
-            className="z-[1000] flex h-[430px] w-[452px] border-none bg-transparent p-0 shadow-none"
+            className="z-[1000] flex h-[430px] w-[452px] border-none bg-transparent p-0 shadow-none data-[state=closed]:pointer-events-none data-[state=closed]:invisible"
           >
             <EmojiPicker className="flex size-full flex-row">
               <EmojiPickerSidebar
@@ -1053,6 +1055,7 @@ const ChannelInput = ({ channel }) => {
               </div>
             </EmojiPicker>
           </Popover.Content>
+          </Popover.Portal>
         </Popover.Root>
         </div>
       </InputGroup>

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GuildsService } from '@/services/guilds.service';
 import { PermissionsService } from '@/services/permissions.service';
-import { Permissions } from '@/enums/Permissions';
+import { Permissions } from '@/constants/Permissions';
 import {
   CaretDown,
   Gear,

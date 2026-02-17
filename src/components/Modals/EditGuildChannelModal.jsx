@@ -5,7 +5,7 @@ import api from '../../api';
 import { useGuildsStore } from '../../store/guilds.store';
 import { Slash } from 'lucide-react';
 import { PermissionsService } from '@/services/permissions.service';
-import { Permissions } from '@/enums/Permissions';
+import { Permissions } from '@/constants/Permissions';
 import { toast } from 'sonner';
 
 const permissions = {

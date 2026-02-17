@@ -38,7 +38,7 @@ import { ChannelsService } from '@/services/channels.service';
 import { useChannelsStore } from '@/store/channels.store';
 import { useVoiceStore } from '@/store/voice.store';
 import { VoiceService } from '@/services/voice.service';
-import { ChannelType } from '@/enums/ChannelType';
+import { ChannelType } from '@/constants/ChannelType';
 import { useUsersStore } from '@/store/users.store';
 import useStore from '@/hooks/useStore';
 import VoiceControls from '@/components/Voice/VoiceControls';

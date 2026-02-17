@@ -18,7 +18,7 @@ import MessageActions from './MessageActions';
 import MessageContextMenu from './MessageContextMenu';
 import MessageReplyBar from './MessageReplyBar';
 import { PermissionsService } from '@/services/permissions.service';
-import { Permissions } from '@/enums/Permissions';
+import { Permissions } from '@/constants/Permissions';
 import { useChannelContext } from '../../contexts/ChannelContext.jsx';
 
 const ChannelMessage = memo(

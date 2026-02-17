@@ -1,4 +1,4 @@
-import { Permissions } from '@/enums/Permissions';
+import { Permissions } from '@/constants/Permissions';
 import useStore from '@/hooks/useStore';
 import { useGuildsStore } from '@/store/guilds.store';
 import { useRolesStore } from '@/store/roles.store';

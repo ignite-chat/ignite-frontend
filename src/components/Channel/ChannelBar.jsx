@@ -14,7 +14,7 @@ import SearchModal from '../Modals/SearchModal';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { useChannelContext } from '../../contexts/ChannelContext';
 import useStore from '@/hooks/useStore';
-import { ChannelType } from '@/enums/ChannelType';
+import { ChannelType } from '@/constants/ChannelType';
 import Avatar from '../Avatar';
 
 const Tooltip = ({ text = 'Hello' }) => {
