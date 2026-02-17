@@ -10,6 +10,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ExternalLink from './ExternalLink.jsx';
 import Emoji from './Emoji.jsx';
+import InviteEmbed from './InviteEmbed.jsx';
 import { convertEmojiShortcodes, convertUnicodeEmojis } from '../../utils/emoji.utils';
 import { useEmojisStore } from '../../store/emojis.store';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +19,7 @@ import { Hash, Megaphone, SpeakerHigh } from '@phosphor-icons/react';
 import { visit } from 'unist-util-visit';
 
 const EMOJI_CDN_PREFIX = `${import.meta.env.VITE_CDN_BASE_URL}/emojis/`;
+const INVITE_URL_REGEX = /https?:\/\/app\.ignite-chat\.com\/invite\/([a-zA-Z0-9]+)/g;
 
 const convertCustomEmojis = (text, allGuildEmojis, currentGuildId) => {
   // Handle global emoji format <id:name>
@@ -201,9 +203,15 @@ const ChannelMention = ({ channelId, isReply = false }) => {
 const MessageContent = ({ content, isReply = false }) => {
   const { guildId } = useGuildContext();
   const { guildEmojis } = useEmojisStore();
-  const emojis = guildEmojis[guildId] || [];
+
+  const inviteCodes = useMemo(() => {
+    if (isReply) return [];
+    const matches = [...content.matchAll(INVITE_URL_REGEX)];
+    return [...new Set(matches.map((m) => m[1]))];
+  }, [content, isReply]);
 
   return (
+    <>
     <Markdown
       remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMentions]}
       urlTransform={(url) => {
@@ -264,6 +272,10 @@ const MessageContent = ({ content, isReply = false }) => {
         convertEmojiShortcodes(convertCustomEmojis(content, guildEmojis, guildId))
       )}
     </Markdown>
+    {inviteCodes.map((code) => (
+      <InviteEmbed key={code} code={code} />
+    ))}
+    </>
   );
 };
 

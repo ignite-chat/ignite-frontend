@@ -193,9 +193,9 @@ const ServerInfo = ({ guild }) => {
       ) : (
         <>
           {/* ── Preview card (read-only) ── */}
-          <div className="overflow-hidden rounded-lg border border-border bg-card">
+          <div className="rounded-lg border border-border bg-card">
             {/* Banner */}
-            <div className="relative h-32 bg-muted">
+            <div className="relative h-32 overflow-hidden rounded-t-lg bg-muted">
               {displayBannerUrl && (
                 <img
                   src={displayBannerUrl}

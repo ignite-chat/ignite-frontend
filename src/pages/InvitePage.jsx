@@ -179,6 +179,10 @@ const InvitePage = () => {
     );
   }
 
+  const guildIconUrl = invite?.guild.icon_file_id
+    ? `${import.meta.env.VITE_CDN_BASE_URL}/icons/${invite.guild.icon_file_id}`
+    : null;
+
   // Success state - show invite preview
   return (
     <GuestLayout>
@@ -188,9 +192,9 @@ const InvitePage = () => {
             <div className="flex flex-col items-center gap-6">
               {/* Guild Icon */}
               <div className="relative">
-                {invite.guild.icon ? (
+                {guildIconUrl ? (
                   <img
-                    src={invite.guild.icon}
+                    src={guildIconUrl}
                     alt={invite.guild.name}
                     className="size-24 rounded-full object-cover"
                   />
