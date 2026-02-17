@@ -278,6 +278,21 @@ const ChannelInput = ({ channel }) => {
   const guildsStore = useGuildsStore();
   const { guildEmojis } = useEmojisStore();
   const customEmojis = guildEmojis[guildId] || [];
+
+  const guildEmojiGroups = useMemo(() => {
+    return guildsStore.guilds
+      .filter((g) => (guildEmojis[g.id] || []).length > 0)
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        icon: g.icon_file_id ? `${import.meta.env.VITE_CDN_BASE_URL}/icons/${g.icon_file_id}` : undefined,
+        emojis: (guildEmojis[g.id] || []).map((e) => ({
+          id: e.id,
+          name: e.name,
+          url: `${import.meta.env.VITE_CDN_BASE_URL}/emojis/${e.id}`,
+        })),
+      }));
+  }, [guildsStore.guilds, guildEmojis]);
   const currentUser = useUsersStore().getCurrentUser();
   const members = useMemo(
     () => guildsStore.guildMembers[guildId] || [],
@@ -407,7 +422,7 @@ const ChannelInput = ({ channel }) => {
   const { recentEmojis, addRecentEmoji } = useEmojisStore();
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState(
-    recentEmojis.length > 0 ? 'recent' : 'custom'
+    recentEmojis.length > 0 ? 'recent' : `guild-${guildId}`
   );
 
   const [hoveredEmoji, setHoveredEmoji] = useState(null);
@@ -903,18 +918,15 @@ const ChannelInput = ({ channel }) => {
                 }}
                 categories={[
                   { id: 'recent', label: 'Recent', icon: <Clock className="size-[20px]" /> },
-                  {
-                    id: 'custom',
-                    label: guild?.name || 'Server',
-                    icon: guild?.icon ? (
-                      <img
-                        src={`${import.meta.env.VITE_CDN_BASE_URL}/icons/${guild.id}`}
-                        className="size-5 rounded-full"
-                      />
+                  ...guildEmojiGroups.map((g) => ({
+                    id: `guild-${g.id}`,
+                    label: g.name,
+                    icon: g.icon ? (
+                      <img src={g.icon} className="size-5 rounded-full" />
                     ) : (
                       <Hash className="size-[20px]" />
                     ),
-                  },
+                  })),
                   { id: 'people', label: 'People', icon: <Smile className="size-[20px]" /> },
                   { id: 'nature', label: 'Nature', icon: <PawPrint className="size-[20px]" /> },
                   { id: 'food', label: 'Food', icon: <Pizza className="size-[20px]" /> },
@@ -935,16 +947,8 @@ const ChannelInput = ({ channel }) => {
                   standardEmojis={emojisData}
                   recentEmojis={recentEmojis}
                   onCategoryVisible={setActiveCategory}
-                  customEmojis={customEmojis.map((e) => ({
-                    id: e.id,
-                    name: e.name,
-                    url: `${import.meta.env.VITE_CDN_BASE_URL}/emojis/${e.id}`,
-                  }))}
-                  serverName={guild?.name}
+                  guildEmojis={guildEmojiGroups}
                   onHoverEmojiChange={setHoveredEmoji}
-                  serverIcon={
-                    guild?.icon ? `${import.meta.env.VITE_CDN_BASE_URL}/icons/${guild.id}` : null
-                  }
                   onEmojiSelect={({ id, label, emoji, url }) => {
                     // Record in recent emojis
                     addRecentEmoji({
@@ -961,8 +965,11 @@ const ChannelInput = ({ channel }) => {
                     // Restore focus and selection to the editor
                     restoreSelection();
 
-                    // Convert to shortcode or global ID format
-                    const shortcode = id ? `<${id}:${label}>` : `:${label}:`;
+                    console.log(id, customEmojis);
+
+                    // Use local shortcode if from current guild, global ID format otherwise
+                    const isCurrentGuildEmoji = !!id && customEmojis.some((e) => e.id === id);
+                    const shortcode = id && !isCurrentGuildEmoji ? `<${id}:${label}>` : `:${label}:`;
                     insertTextAtCaret(shortcode);
                     syncValue();
                   }}

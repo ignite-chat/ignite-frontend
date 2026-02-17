@@ -58,5 +58,15 @@ export const EmojisService = {
       throw error;
     }
   },
+
+  handleEmojiCreated(event: any) {
+    const { addGuildEmoji } = useEmojisStore.getState();
+    addGuildEmoji(event.emoji.guild_id, event.emoji);
+  },
+
+  handleEmojiDeleted(event: any) {
+    const { removeGuildEmoji } = useEmojisStore.getState();
+    removeGuildEmoji(event.emoji.guild_id, event.emoji.id);
+  },
 };
 

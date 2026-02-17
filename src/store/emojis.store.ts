@@ -39,12 +39,16 @@ export const useEmojisStore = create<EmojisStore>()(
         })),
 
       addGuildEmoji: (guildId, emoji) =>
-        set((state) => ({
-          guildEmojis: {
-            ...state.guildEmojis,
-            [guildId]: [...(state.guildEmojis[guildId] || []), emoji],
-          },
-        })),
+        set((state) => {
+          const existing = state.guildEmojis[guildId] || [];
+          if (existing.some((e) => e.id === emoji.id)) return state;
+          return {
+            guildEmojis: {
+              ...state.guildEmojis,
+              [guildId]: [...existing, emoji],
+            },
+          };
+        }),
 
       removeGuildEmoji: (guildId, emojiId) =>
         set((state) => ({

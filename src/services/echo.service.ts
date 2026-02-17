@@ -4,6 +4,7 @@ import { UnreadsService } from './unreads.service';
 import { ChannelsService } from './channels.service';
 import { GuildsService } from './guilds.service';
 import { RolesService } from './roles.service';
+import { EmojisService } from './emojis.service';
 import { useUsersStore } from '../store/users.store';
 import { useChannelsStore } from '../store/channels.store';
 
@@ -78,6 +79,8 @@ export const EchoService = {
       .listen('.role.created', RolesService.handleRoleCreated)
       .listen('.role.updated', RolesService.handleRoleUpdated)
       .listen('.role.deleted', RolesService.handleRoleDeleted)
+      .listen('.emoji.created', EmojisService.handleEmojiCreated)
+      .listen('.emoji.deleted', EmojisService.handleEmojiDeleted)
       .listen('.member.typing', ChannelsService.handleMemberTyping)
       .listen('.user.updated', (event: any) => {
         useUsersStore.getState().setUser(event.user.id, event.user);

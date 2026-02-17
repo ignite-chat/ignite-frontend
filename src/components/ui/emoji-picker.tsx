@@ -94,15 +94,20 @@ function EmojiPickerSearch({
   );
 }
 
+type GuildEmojiGroup = {
+  id: string;
+  name: string;
+  icon?: string;
+  emojis: { id: string; name: string; url: string }[];
+};
+
 // Custom props for the Content to include custom and standard emojis
 interface EmojiPickerContentProps
   extends React.ComponentProps<typeof EmojiPickerPrimitive.Viewport> {
-  customEmojis?: { id: string; name: string; url: string }[];
+  guildEmojis?: GuildEmojiGroup[];
   standardEmojis?: Record<string, { names: string[]; surrogates: string }[]>;
   onEmojiSelect?: (emoji: { id?: string; label: string; emoji: any; url?: string }) => void;
   searchValue?: string;
-  serverName?: string;
-  serverIcon?: string;
   onHoverEmojiChange?: (emoji: { label: string; url: string; isCustom: boolean } | null) => void;
   recentEmojis?: { id?: string; label: string; surrogates?: string; url?: string; isCustom: boolean }[];
   onCategoryVisible?: (categoryId: string) => void;
@@ -143,12 +148,10 @@ EmojiButton.displayName = 'EmojiButton';
 
 function EmojiPickerContent({
   className,
-  customEmojis = [],
+  guildEmojis = [],
   standardEmojis = {},
   onEmojiSelect,
   searchValue = '',
-  serverName,
-  serverIcon,
   onHoverEmojiChange,
   recentEmojis = [],
   onCategoryVisible,
@@ -172,7 +175,7 @@ function EmojiPickerContent({
       {
         root: document.querySelector('[data-slot="emoji-picker-viewport"]'),
         threshold: 0,
-        rootMargin: '-50% 0px -50% 0px', // Detect when cross the middle
+        rootMargin: '-50% 0px -50% 0px',
       }
     );
 
@@ -188,8 +191,13 @@ function EmojiPickerContent({
   }, [onHoverEmojiChange]);
 
   // Filter emojis with useMemo for performance
-  const { filteredCustomEmojis, filteredStandardEmojis } = React.useMemo(() => {
-    const fCustom = customEmojis.filter((e) => e.name.toLowerCase().includes(searchLower));
+  const { filteredGuildEmojis, filteredStandardEmojis } = React.useMemo(() => {
+    const fGuilds = guildEmojis
+      .map((guild) => ({
+        ...guild,
+        emojis: guild.emojis.filter((e) => e.name.toLowerCase().includes(searchLower)),
+      }))
+      .filter((guild) => guild.emojis.length > 0);
 
     const fStandard: typeof standardEmojis = {};
     Object.entries(standardEmojis).forEach(([category, emojis]) => {
@@ -201,10 +209,10 @@ function EmojiPickerContent({
       }
     });
 
-    return { filteredCustomEmojis: fCustom, filteredStandardEmojis: fStandard };
-  }, [customEmojis, standardEmojis, searchLower]);
+    return { filteredGuildEmojis: fGuilds, filteredStandardEmojis: fStandard };
+  }, [guildEmojis, standardEmojis, searchLower]);
 
-  const hasCustom = filteredCustomEmojis.length > 0;
+  const hasCustom = filteredGuildEmojis.length > 0;
   const hasStandard = Object.keys(filteredStandardEmojis).length > 0;
   const isEmpty = !hasCustom && !hasStandard;
 
@@ -292,20 +300,20 @@ function EmojiPickerContent({
           </div>
         )}
 
-        {/* Custom Emojis Section */}
-        {hasCustom && (
-          <div className="pb-2" id="category-custom">
+        {/* Guild Emoji Sections */}
+        {filteredGuildEmojis.map((guild) => (
+          <div key={guild.id} className="pb-2" id={`category-guild-${guild.id}`}>
             <div
               className={cn(
                 'sticky top-0 z-10 flex items-center gap-2 bg-[#2b2d31] px-2 pt-4 pb-2 text-[12px] font-semibold uppercase transition-colors',
-                activeCategory === 'custom' ? 'text-[#dbdee1]' : 'text-[#949ba4]'
+                activeCategory === `guild-${guild.id}` ? 'text-[#dbdee1]' : 'text-[#949ba4]'
               )}
             >
-              {serverIcon && <img src={serverIcon} className="size-4 rounded-full" />}
-              {serverName || 'Server Emojis'}
+              {guild.icon && <img src={guild.icon} className="size-4 rounded-full" />}
+              {guild.name}
             </div>
             <div className="grid grid-cols-9 gap-0.5 px-2">
-              {filteredCustomEmojis.map((emoji) => (
+              {guild.emojis.map((emoji) => (
                 <button
                   key={emoji.id}
                   className="flex size-9 items-center justify-center rounded-md transition-colors hover:bg-[#35373c]"
@@ -327,10 +335,9 @@ function EmojiPickerContent({
                       />
                     </ContextMenuTrigger>
                     <ContextMenuContent className="w-48">
-                      <ContextMenuItem 
+                      <ContextMenuItem
                         onClick={(e) => {
                           e.stopPropagation();
-                          /* backend needed */
                           navigator.clipboard.writeText(emoji.id);
                           toast.success('Emoji ID copied to clipboard');
                         }}
@@ -343,7 +350,7 @@ function EmojiPickerContent({
               ))}
             </div>
           </div>
-        )}
+        ))}
 
         {/* Standard Emojis Section */}
         {Object.entries(filteredStandardEmojis).map(([category, emojis]) => (

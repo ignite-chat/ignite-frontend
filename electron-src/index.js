@@ -118,6 +118,12 @@ oLink.Save
     }
 }
 
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+if (process.platform === 'win32') {
+	app.commandLine.appendSwitch('disable-background-timer-throttling');
+	app.commandLine.appendSwitch('disable-renderer-backgrounding');
+}
+
 // Single instance lock - prevent multiple instances
 const gotTheLock = app.requestSingleInstanceLock();
 

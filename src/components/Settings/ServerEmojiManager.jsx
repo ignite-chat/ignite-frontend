@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { EmojisService } from '../../services/emojis.service';
 import { useEmojisStore } from '../../store/emojis.store';
 import { Button } from '../ui/button';
@@ -6,14 +6,29 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
 import { toast } from 'sonner';
-import { Upload, Trash2, Plus } from 'lucide-react';
+import { Upload, Trash2 } from 'lucide-react';
+import ImageCropperDialog from './ImageCropperDialog';
+import api from '../../api';
+
+const EMOJI_SIZE = 128;
+
+const fileToDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 const ServerEmojiManager = ({ guild }) => {
-  const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [emojiName, setEmojiName] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
-  
+  const [croppedImage, setCroppedImage] = useState(null); // base64 data URL
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperSrc, setCropperSrc] = useState(null);
+
+  const fileInputRef = useRef(null);
+
   const guildEmojis = useEmojisStore((state) => state.guildEmojis[guild.id] || []);
 
   useEffect(() => {
@@ -22,30 +37,50 @@ const ServerEmojiManager = ({ guild }) => {
     }
   }, [guild?.id]);
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-      // Auto-fill name if empty
-      if (!emojiName) {
-        const name = file.name.split('.')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
-        setEmojiName(name);
-      }
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    // Auto-fill name from filename if empty
+    if (!emojiName) {
+      const name = file.name.split('.')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
+      setEmojiName(name);
     }
+
+    const dataUrl = await fileToDataUrl(file);
+    setCropperSrc(dataUrl);
+    setCropperOpen(true);
+  };
+
+  const handleCropConfirm = (croppedDataUrl) => {
+    setCroppedImage(croppedDataUrl);
+    setCropperOpen(false);
+    setCropperSrc(null);
+  };
+
+  const handleCropClose = () => {
+    setCropperOpen(false);
+    setCropperSrc(null);
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !emojiName) {
+    if (!croppedImage || !emojiName) {
       toast.error('Please select an image and enter a shortcode.');
       return;
     }
 
     setUploading(true);
     try {
-      await EmojisService.uploadEmoji(guild.id, emojiName, selectedFile);
+      const { addGuildEmoji } = useEmojisStore.getState();
+      const res = await api.post(`guilds/${guild.id}/emojis`, {
+        name: emojiName,
+        image: croppedImage,
+      });
+      addGuildEmoji(guild.id, res.data);
       toast.success('Emoji uploaded successfully!');
       setEmojiName('');
-      setSelectedFile(null);
+      setCroppedImage(null);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to upload emoji.');
     } finally {
@@ -74,47 +109,68 @@ const ServerEmojiManager = ({ guild }) => {
       <div className="rounded-lg border border-border bg-muted/30 p-4">
         <h3 className="mb-4 text-xs font-bold uppercase text-muted-foreground">Upload Emoji</h3>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          {/* Image picker */}
           <div className="flex-1 space-y-2">
-            <Label className="text-xs font-bold uppercase text-muted-foreground">File</Label>
+            <Label className="text-xs font-bold uppercase text-muted-foreground">Image</Label>
             <div className="flex items-center gap-4">
-              <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-md border-2 border-dashed border-border bg-background hover:border-primary/50 transition-colors cursor-pointer overflow-hidden">
-                {selectedFile ? (
-                  <img 
-                    src={URL.createObjectURL(selectedFile)} 
-                    className="h-full w-full object-contain" 
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="relative flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border-2 border-dashed border-border bg-background transition-colors hover:border-primary/50"
+              >
+                {croppedImage ? (
+                  <img
+                    src={croppedImage}
+                    className="h-full w-full object-contain"
                     alt="Preview"
                   />
                 ) : (
                   <Upload className="h-6 w-6 text-muted-foreground" />
                 )}
-                <input 
-                  type="file" 
-                  className="absolute inset-0 opacity-0 cursor-pointer" 
-                  accept="image/png, image/jpeg, image/gif"
-                  onChange={handleFileChange}
-                />
-              </div>
+              </button>
+
               <div className="flex-1 text-xs text-muted-foreground">
-                <p>Maximum file size: 256KB</p>
-                <p>Recommended dimensions: 128x128</p>
-                <p>Allowed types: PNG, JPEG, GIF</p>
+                <p>Recommended: 128×128</p>
+                <p>Allowed: PNG, JPEG, GIF</p>
+                {croppedImage && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="mt-1 text-primary hover:underline"
+                  >
+                    Change image
+                  </button>
+                )}
               </div>
             </div>
-          </div>
 
-          <div className="flex-1 space-y-2">
-            <Label className="text-xs font-bold uppercase text-muted-foreground">Emoji Name</Label>
-            <Input 
-              placeholder="emoji_name"
-              value={emojiName}
-              onChange={(e) => setEmojiName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-              className="bg-background h-10"
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png, image/jpeg, image/gif"
+              className="hidden"
+              onChange={handleFileChange}
             />
           </div>
 
-          <Button 
-            onClick={handleUpload} 
-            disabled={uploading || !selectedFile || !emojiName}
+          {/* Name */}
+          <div className="flex-1 space-y-2">
+            <Label className="text-xs font-bold uppercase text-muted-foreground">
+              Emoji Name
+            </Label>
+            <Input
+              placeholder="emoji_name"
+              value={emojiName}
+              onChange={(e) =>
+                setEmojiName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))
+              }
+              className="h-10 bg-background"
+            />
+          </div>
+
+          <Button
+            onClick={handleUpload}
+            disabled={uploading || !croppedImage || !emojiName}
             className="shrink-0"
           >
             {uploading ? 'Uploading...' : 'Upload'}
@@ -125,34 +181,32 @@ const ServerEmojiManager = ({ guild }) => {
       <Separator />
 
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase text-muted-foreground">
             {guildEmojis.length} Emojis
           </h3>
-          <p className="text-xs text-muted-foreground">
-            Slots remaining: {50 - guildEmojis.length}
-          </p>
+          <p className="text-xs text-muted-foreground">Slots remaining: {50 - guildEmojis.length}</p>
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5">
           {guildEmojis.map((emoji) => (
-            <div 
-              key={emoji.id} 
-              className="group relative flex flex-col items-center gap-2 rounded-md border border-border bg-muted/30 p-3 hover:bg-muted/50 transition-colors"
+            <div
+              key={emoji.id}
+              className="group relative flex flex-col items-center gap-2 rounded-md border border-border bg-muted/30 p-3 transition-colors hover:bg-muted/50"
             >
               <div className="h-8 w-8">
-                <img 
-                  src={`${import.meta.env.VITE_CDN_BASE_URL}/emojis/${emoji.id}`} 
+                <img
+                  src={`${import.meta.env.VITE_CDN_BASE_URL}/emojis/${emoji.id}`}
                   alt={emoji.name}
                   className="h-full w-full object-contain"
                 />
               </div>
-              <span className="text-xs font-medium text-foreground truncate w-full text-center">
+              <span className="w-full truncate text-center text-xs font-medium text-foreground">
                 :{emoji.name}:
               </span>
-              <button 
+              <button
                 onClick={() => handleDelete(emoji.id)}
-                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all"
+                className="absolute right-1 top-1 p-1 text-muted-foreground opacity-0 transition-all hover:text-destructive group-hover:opacity-100"
               >
                 <Trash2 className="h-3 w-3" />
               </button>
@@ -161,11 +215,25 @@ const ServerEmojiManager = ({ guild }) => {
 
           {guildEmojis.length === 0 && (
             <div className="col-span-full py-10 text-center">
-              <p className="text-sm text-muted-foreground italic">No custom emojis yet. Upload one above!</p>
+              <p className="text-sm italic text-muted-foreground">
+                No custom emojis yet. Upload one above!
+              </p>
             </div>
           )}
         </div>
       </div>
+
+      <ImageCropperDialog
+        open={cropperOpen}
+        onClose={handleCropClose}
+        imageSrc={cropperSrc}
+        title="Crop Emoji"
+        aspect={1}
+        cropShape="rect"
+        outputWidth={EMOJI_SIZE}
+        outputHeight={EMOJI_SIZE}
+        onConfirm={handleCropConfirm}
+      />
     </div>
   );
 };
