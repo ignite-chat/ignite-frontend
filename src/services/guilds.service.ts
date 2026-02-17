@@ -125,6 +125,16 @@ export const GuildsService = {
    * @param guildId The ID of the guild where the member exists.
    * @param memberId The ID of the member to be deleted.
    */
+  handleGuildUpdated(event: any) {
+    const { editGuild } = useGuildsStore.getState();
+    editGuild(event.guild.id, event.guild);
+  },
+
+  handleGuildDeleted(event: any) {
+    const { guilds, setGuilds } = useGuildsStore.getState();
+    setGuilds(guilds.filter((g) => g.id !== event.guild.id));
+  },
+
   async deleteGuildMemberFromStore(guildId: string, memberId: string) {
     const { guildMembers, setGuildMembers } = useGuildsStore.getState();
     const members = guildMembers[guildId] || [];

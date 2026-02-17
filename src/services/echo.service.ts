@@ -64,6 +64,8 @@ export const EchoService = {
     console.log(`Subscribing to guild: ${guildId}`);
 
     window.Echo.private(`guild.${guildId}`)
+      .listen('.guild.updated', GuildsService.handleGuildUpdated)
+      .listen('.guild.deleted', GuildsService.handleGuildDeleted)
       .listen('.member.joined', (event: any) => {
         GuildsService.addGuildMemberToStore(guildId, event.member);
       })
