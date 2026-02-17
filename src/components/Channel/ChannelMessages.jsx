@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { useChannelContext } from '../../contexts/ChannelContext.jsx';
 import { useChannelsStore } from '../../store/channels.store';
@@ -8,30 +8,35 @@ import { useUnreadsStore } from '../../store/unreads.store';
 import { isMessageRead } from '@/utils/unreads.utils';
 import MessageList from '../Message/MessageList';
 
-const ChannelMessages = ({ channel }) => {
+const ChannelMessages = ({ channel, messageId }) => {
   const { guildId } = useGuildContext();
-  const { editingId, setEditingId, replyingId, setReplyingId } = useChannelContext();
+  const { editingId, setEditingId, setReplyingId } = useChannelContext();
   const channelMessages = useChannelsStore((s) => s.channelMessages);
   const channelPendingMessages = useChannelsStore((s) => s.channelPendingMessages);
 
   const [atTop, setAtTop] = useState(false);
   const [forceScrollDown, setForceScrollDown] = useState(false);
   const [highlightId, setHighlightId] = useState(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const messagesRef = useRef();
-  const messages = channelMessages[channel?.channel_id] || [];
-  const pendingMessages = channelPendingMessages[channel?.channel_id] || [];
+  const messages = useMemo(
+    () => channelMessages[channel?.channel_id] || [],
+    [channelMessages, channel?.channel_id]
+  );
+  const pendingMessages = useMemo(
+    () => channelPendingMessages[channel?.channel_id] || [],
+    [channelPendingMessages, channel?.channel_id]
+  );
 
   const onLoadMore = useCallback(async () => {
     const oldestMessage = messages.sort(
       (a, b) => new Date(a.created_at) - new Date(b.created_at)
     )[0];
     console.log('Loading more messages before ID:', oldestMessage.id);
-    // ChannelsService.loadChannelMessages(channel?.channel_id, oldestMessage.id);
-  }, [channel, messages]);
+  }, [messages]);
 
   // Load initial messages
   useEffect(() => {
@@ -46,8 +51,49 @@ const ChannelMessages = ({ channel }) => {
     }
 
     if (!messagesRef.current) return;
-    messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-  }, [channel?.channel_id, channelMessages]);
+    if (!messageId) {
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+    }
+  }, [channel?.channel_id, channelMessages, messageId]);
+
+  const lastScrolledIdRef = useRef(null);
+
+  // Clear highlight when navigating away from a specific message
+  useEffect(() => {
+    if (!messageId) {
+      setHighlightId(null);
+      lastScrolledIdRef.current = null;
+    }
+  }, [messageId]);
+
+  // Handle message jumping
+  useEffect(() => {
+    if (!messageId || messages.length === 0 || lastScrolledIdRef.current === messageId) return;
+
+    const tryScroll = (retryCount = 0) => {
+      const targetMessage = messages.find((m) => m.id === messageId);
+      if (!targetMessage) return;
+
+      lastScrolledIdRef.current = messageId;
+      setHighlightId(messageId);
+      
+      const el = document.getElementById(`msg-${messageId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (retryCount < 5) {
+        // If element not found yet, retry after a bit (DOM might be rendering)
+        setTimeout(() => tryScroll(retryCount + 1), 100);
+      }
+    };
+
+    tryScroll();
+
+    // Clear highlight after 3 seconds
+    const timer = setTimeout(() => {
+      setHighlightId(null);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [messageId, messages]);
 
   // Handle message acknowledgment
   useEffect(() => {
@@ -85,7 +131,7 @@ const ChannelMessages = ({ channel }) => {
 
   // Auto-scroll on new messages
   useEffect(() => {
-    if (!messagesRef.current) return;
+    if (!messagesRef.current || messageId) return;
     const nearBottom =
       messagesRef.current.scrollHeight -
         messagesRef.current.scrollTop -
@@ -95,14 +141,13 @@ const ChannelMessages = ({ channel }) => {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
       if (forceScrollDown) setForceScrollDown(false);
     }
-  }, [messages, forceScrollDown]);
+  }, [messages, forceScrollDown, messageId]);
 
   // Always scroll to bottom when the current user sends a message (pending messages added)
-  // FIXME: This breaks with multiple pending messages, pass messagesRef to ChannelInput instead
   useEffect(() => {
-    if (!messagesRef.current || !pendingMessages.length) return;
+    if (!messagesRef.current || !pendingMessages.length || messageId) return;
     messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-  }, [pendingMessages]);
+  }, [pendingMessages, messageId]);
 
   // Handle escape key
   useEffect(() => {

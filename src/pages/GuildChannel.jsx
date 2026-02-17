@@ -16,7 +16,7 @@ const GuildChannelPage = () => {
   const { guilds } = useGuildsStore();
 
   // get the guild id from the URL
-  const { guildId, channelId } = useParams();
+  const { guildId, channelId, messageId } = useParams();
 
   // find guild from guilds
   const guild = useMemo(() => guilds.find((g) => g.id == guildId), [guilds, guildId]);
@@ -54,7 +54,7 @@ const GuildChannelPage = () => {
   return (
     <GuildLayout guild={guild}>
       <ChannelContextProvider>
-        <Channel channel={channel} />
+        <Channel channel={channel} messageId={messageId} />
       </ChannelContextProvider>
 
       <ChannelDialog

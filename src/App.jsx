@@ -207,7 +207,7 @@ function App() {
             }
           />
           <Route
-            path="/channels/@me/:channelId"
+            path="/channels/@me/:channelId/:messageId?"
             element={
               <>
                 <PageTitle title="Direct Messages" />
@@ -216,7 +216,7 @@ function App() {
             }
           />
           <Route
-            path="/channels/:guildId/:channelId?"
+            path="/channels/:guildId/:channelId?/:messageId?"
             element={
               <>
                 <PageTitle title="Guild Channel" />

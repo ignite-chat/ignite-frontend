@@ -22,12 +22,22 @@ import { Permissions } from '@/enums/Permissions';
 import { useChannelContext } from '../../contexts/ChannelContext.jsx';
 
 const ChannelMessage = memo(
-  ({ message, prevMessage, allMessages, pending, isEditing, setEditingId, guildId }) => {
+  ({
+    message,
+    prevMessage,
+    allMessages,
+    pending,
+    isEditing,
+    setEditingId,
+    guildId,
+  }) => {
     const store = useStore();
     const [profileModalOpen, setProfileModalOpen] = useState(false);
     const [popoverOpen, setPopoverOpen] = useState(false);
     const { setReplyingId, replyingId } = useChannelContext();
     const channelId = message.channel_id;
+
+
 
     const hasReply = message.message_references?.length > 0;
     const replyMessageId = hasReply ? message.message_references[0].message_id : null;
@@ -192,7 +202,10 @@ const ChannelMessage = memo(
                     />
                   ) : (
                     <div
-                     className={`whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-gray-400 ${pending ? 'opacity-50' : ''}`}
+                      className={cn(
+                        'whitespace-pre-wrap break-words text-gray-400 [overflow-wrap:anywhere]',
+                        pending && 'opacity-50'
+                      )}
                     >
                       <MessageContent content={message.content} stickers={message.stickers} />
                       {message.updated_at && message.created_at !== message.updated_at && (
@@ -225,6 +238,8 @@ const ChannelMessage = memo(
               onEdit={() => setEditingId(message.id)}
               onDelete={handleDelete}
               onReply={() => setReplyingId(message.id)}
+              guildId={guildId}
+              channelId={channelId}
             />
           </ContextMenu>
 

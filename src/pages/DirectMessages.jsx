@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DefaultLayout from '../layouts/DefaultLayout';
-import useStore from '../hooks/useStore';
 import { ChannelContextProvider } from '../contexts/ChannelContext';
 import Channel from '../components/Channel/Channel';
 import DMSidebar from '../components/dm/DMSidebar';
@@ -10,7 +9,7 @@ import { useChannelsStore } from '../store/channels.store';
 import { useNotificationStore } from '../store/notification.store';
 
 const DirectMessagesPage = () => {
-  const { channelId } = useParams();
+  const { channelId, messageId } = useParams();
   const navigate = useNavigate();
   const { channels } = useChannelsStore();
 
@@ -43,7 +42,7 @@ const DirectMessagesPage = () => {
             <ChannelContextProvider>
               {/* normalizeThread logic should ideally happen inside Channel or a hook, 
                      but passing activeChannel directly here works based on your existing code */}
-              <Channel channel={activeChannel} />
+              <Channel channel={activeChannel} messageId={messageId} />
             </ChannelContextProvider>
           )}
         </main>

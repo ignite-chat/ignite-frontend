@@ -120,4 +120,16 @@ export const GuildsService = {
     const updatedMembers = members.filter((member) => member.user_id !== memberId);
     setGuildMembers(guildId, updatedMembers);
   },
+
+  async leaveGuild(guildId: string) {
+    const { removeGuild } = useGuildsStore.getState();
+    try {
+      await api.delete(`/users/@me/guilds/${guildId}`);
+      removeGuild(guildId);
+      toast.success('Left server successfully.');
+    } catch (error) {
+      console.error(error);
+      toast.error('Unable to leave server.');
+    }
+  },
 };
