@@ -3,13 +3,13 @@ import { useUsersStore } from '../../store/users.store';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { cn } from '@/lib/utils';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '../ui/context-menu';
 import GuildMemberPopoverContent from '../GuildMember/GuildMemberPopoverContent';
 import GuildMemberContextMenu from '../GuildMember/GuildMemberContextMenu';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ExternalLink from './ExternalLink.jsx';
+import Emoji from './Emoji.jsx';
 import { convertEmojiShortcodes, convertUnicodeEmojis } from '../../utils/emoji.utils';
 import { useEmojisStore } from '../../store/emojis.store';
 import { useNavigate } from 'react-router-dom';
@@ -31,17 +31,9 @@ const convertCustomEmojis = (text, allGuildEmojis, currentGuildId) => {
   return text.replace(/:[\w_+-]+:/g, (match) => {
     const name = match.slice(1, -1);
     
-    // Try current guild first
     const currentEmojis = allGuildEmojis[currentGuildId] || [];
     const localEmoji = currentEmojis.find((e) => e.name === name);
     if (localEmoji) return `![${name}](${EMOJI_CDN_PREFIX}${localEmoji.id})`;
-
-    // Try other guilds
-    for (const gid in allGuildEmojis) {
-      if (gid === currentGuildId) continue;
-      const emoji = allGuildEmojis[gid].find((e) => e.name === name);
-      if (emoji) return `![${name}](${EMOJI_CDN_PREFIX}${emoji.id})`;
-    }
 
     return match;
   });
@@ -237,14 +229,11 @@ const MessageContent = ({ content, isReply = false }) => {
           const isTwemoji = src?.startsWith('https://cdn.jsdelivr.net/gh/twitter/twemoji');
           if (src?.startsWith(EMOJI_CDN_PREFIX) || isTwemoji) {
             return (
-              <img
+              <Emoji
                 src={src}
                 alt={alt}
-                className={cn(
-                  'inline object-contain align-text-bottom',
-                  isReply ? 'h-4 w-4' : isTwemoji ? 'h-6 w-6' : 'h-8 w-8'
-                )}
-                loading="lazy"
+                isReply={isReply}
+                isTwemoji={isTwemoji}
               />
             );
           }

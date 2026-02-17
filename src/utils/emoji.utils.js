@@ -3,6 +3,9 @@ import emojisData from '../assets/emojis/emojis.json';
 // Shared emoji shortcode ↔ unicode mapping
 export const emojiMap = new Map();
 
+// Reverse map: surrogate → canonical name (first listed name)
+export const surrogateToName = new Map();
+
 // Populate map synchronously from local JSON
 // Comprehensive list of all unicode surrogates for regex
 export const allUnicodeEmojis = [];
@@ -13,6 +16,9 @@ try {
       // Map each name to the surrogate
       if (emoji.names && emoji.surrogates) {
         allUnicodeEmojis.push(emoji.surrogates);
+        if (!surrogateToName.has(emoji.surrogates)) {
+          surrogateToName.set(emoji.surrogates, emoji.names[0]);
+        }
         emoji.names.forEach((name) => {
           const shortcode = `:${name}:`;
           if (!emojiMap.has(shortcode)) {
