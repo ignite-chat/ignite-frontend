@@ -52,7 +52,7 @@ const CreateGuildChannelDialog = ({ open, onOpenChange, guild, categoryId }) => 
         console.error('Failed to create channel', error);
       }
     },
-    [guild.id, categoryId, onOpenChange, reset]
+    [guild?.id, categoryId, onOpenChange, reset]
   );
 
   return (

@@ -51,10 +51,7 @@ export const EchoService = {
       .listen('.friendrequest.created', handleFriendRequestCreated)
       .listen('.friendrequest.deleted', handleFriendRequestDeleted)
       .listen('.friendrequest.accepted', handleFriendRequestAccepted)
-      .listen('.guild.joined', (data: any) => {
-        handleGuildJoined(data);
-        this.subscribeToGuild(data.guild.id);
-      })
+      .listen('.guild.joined', handleGuildJoined)
       .listen('.unread.updated', handleUnreadUpdated)
       .listen('.message.created', (data: any) => handleMessageCreated(data, context))
       .listen('.message.updated', (data: any) => handleMessageUpdated(data, context))
@@ -90,10 +87,7 @@ export const EchoService = {
       .listen('.channel_permission.updated', (data: any) => handleChannelPermissionUpdated(data, context))
       .listen('.emoji.created', (data: any) => handleEmojiCreated(data, context))
       .listen('.emoji.deleted', (data: any) => handleEmojiDeleted(data, context))
-      .listen('.guild.deleted', (data: any) => {
-        handleGuildDeleted(data, context);
-        this.unsubscribeFromGuild(data.guild.id);
-      })
+      .listen('.guild.deleted', (data: any) => handleGuildDeleted(data, context))
       .listen('.guild.updated', (data: any) => handleGuildUpdated(data, context))
       .listen('.member.joined', (data: any) => handleMemberJoined(data, context))
       .listen('.member.left', (data: any) => handleMemberLeft(data, context))

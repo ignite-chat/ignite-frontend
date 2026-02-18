@@ -141,7 +141,6 @@ export const GuildsService = {
     const { removeGuild } = useGuildsStore.getState();
     try {
       await api.delete(`/users/@me/guilds/${guildId}`);
-      removeGuild(guildId);
       toast.success('Left server successfully.');
     } catch (error) {
       console.error(error);

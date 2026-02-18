@@ -57,7 +57,7 @@ const CreateGuildCategoryDialog = ({ open, onOpenChange, guild }) => {
         console.error('Failed to create category', error);
       }
     },
-    [guild.id, reset]
+    [guild?.id, reset]
   );
 
   return (
