@@ -207,12 +207,14 @@ export const ChannelsService = {
 
       const mergedChannelMessages = [...(channelMessages[channelId] || []), ...data];
       const newChannelMessages = Array.from(
-        new Map(mergedChannelMessages.map((msg: any) => [msg.id ?? msg.nonce, msg])).values()
-      );
+        new Map(mergedChannelMessages.map((msg: any) => [msg.id, msg])).values()
+      ).sort((a: any, b: any) => a.id.localeCompare(b.id));
 
       setChannelMessages(channelId, newChannelMessages);
+      return data;
     } catch {
       toast.error('Unable to load channel messages.');
+      return [];
     }
   },
 

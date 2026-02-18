@@ -17,8 +17,8 @@ const ChannelMessages = ({ channel, messageId }) => {
   const [atTop, setAtTop] = useState(false);
   const [forceScrollDown, setForceScrollDown] = useState(false);
   const [highlightId, setHighlightId] = useState(null);
-  const [loadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
   const messagesRef = useRef();
@@ -32,19 +32,38 @@ const ChannelMessages = ({ channel, messageId }) => {
   );
 
   const onLoadMore = useCallback(async () => {
-    const oldestMessage = messages.sort(
-      (a, b) => new Date(a.created_at) - new Date(b.created_at)
-    )[0];
-    console.log('Loading more messages before ID:', oldestMessage.id);
-  }, [messages]);
+    if (loadingMore || !hasMore) return;
+
+    const sorted = [...messages].sort((a, b) => b.id.localeCompare(a.id));
+    const oldestMessage = sorted[sorted.length - 1];
+    if (!oldestMessage) return;
+
+    setLoadingMore(true);
+
+    const el = messagesRef.current;
+    const prevScrollHeight = el?.scrollHeight || 0;
+
+    const data = await ChannelsService.loadChannelMessages(channel?.channel_id, oldestMessage.id);
+    setHasMore(data.length >= 50);
+
+    // Preserve scroll position so the view doesn't jump
+    requestAnimationFrame(() => {
+      if (el) {
+        el.scrollTop = el.scrollHeight - prevScrollHeight;
+      }
+    });
+
+    setLoadingMore(false);
+  }, [messages, loadingMore, hasMore, channel?.channel_id]);
 
   // Load initial messages
   useEffect(() => {
     if (channel?.channel_id && channelMessages[channel?.channel_id] == null) {
       setIsLoading(true);
+      setHasMore(true);
       ChannelsService.loadChannelMessages(channel?.channel_id)
-        .then(() => {
-          setHasMore(channelMessages[channel?.channel_id]?.length === 50);
+        .then((data) => {
+          setHasMore(data.length >= 50);
           setTimeout(() => setForceScrollDown(true), 0);
         })
         .finally(() => setIsLoading(false));
@@ -162,12 +181,16 @@ const ChannelMessages = ({ channel, messageId }) => {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [setEditingId, setReplyingId]);
 
-  // Handle scroll position
+  // Handle scroll position and auto-load more
   const onScroll = useCallback(() => {
     const el = messagesRef.current;
     if (!el) return;
     setAtTop(el.scrollTop <= 10);
-  }, []);
+
+    if (el.scrollTop < 200 && hasMore && !loadingMore) {
+      onLoadMore();
+    }
+  }, [hasMore, loadingMore, onLoadMore]);
 
   useEffect(() => {
     const el = messagesRef.current;
@@ -186,9 +209,7 @@ const ChannelMessages = ({ channel, messageId }) => {
         guildId={guildId}
         isLoading={isLoading}
         hasMore={hasMore}
-        atTop={atTop}
         loadingMore={loadingMore}
-        onLoadMore={onLoadMore}
       />
     </div>
   );

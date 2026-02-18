@@ -11,9 +11,7 @@ const MessageList = ({
   guildId,
   isLoading,
   hasMore,
-  atTop,
   loadingMore,
-  onLoadMore,
 }) => {
   if (isLoading) {
     return <CircleNotch size={32} className="mx-auto animate-spin text-gray-500" />;
@@ -21,20 +19,13 @@ const MessageList = ({
 
   return (
     <>
-      {atTop && hasMore && (
-        <div className="sticky top-0 z-10 flex justify-center bg-gray-700/80 px-4 py-2 backdrop-blur">
-          <button
-            type="button"
-            onClick={onLoadMore}
-            disabled={loadingMore}
-            className="rounded bg-gray-800 px-3 py-1 text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-60"
-          >
-            {loadingMore ? 'Loading…' : 'Load history'}
-          </button>
+      {loadingMore && (
+        <div className="flex justify-center py-4">
+          <CircleNotch size={24} className="animate-spin text-gray-500" />
         </div>
       )}
 
-      {!hasMore && (
+      {!hasMore && !loadingMore && (
         <div className="px-4 py-2 text-center text-xs text-gray-500">Beginning of channel</div>
       )}
 
