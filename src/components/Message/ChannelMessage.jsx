@@ -17,6 +17,7 @@ import MessageReactions from './MessageReactions';
 import MessageActions from './MessageActions';
 import MessageContextMenu from './MessageContextMenu';
 import MessageReplyBar from './MessageReplyBar';
+import { Paperclip } from 'lucide-react';
 import { Permissions } from '@/constants/Permissions';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { useChannelContext } from '../../contexts/ChannelContext.jsx';
@@ -200,10 +201,38 @@ const ChannelMessage = memo(
                         pending && 'opacity-50'
                       )}
                     >
-                      <MessageContent content={message.content} stickers={message.stickers} />
+                      <MessageContent content={message.content} stickers={message.stickers} attachments={message.attachments} />
                       {message.updated_at && message.created_at !== message.updated_at && (
                         <span className="ml-1 text-[0.65rem] text-gray-500">(edited)</span>
                       )}
+                    </div>
+                  )}
+
+                  {pending && message.attachments?.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {message.attachments.map((att) => (
+                        <span
+                          key={att.id}
+                          className="inline-flex items-center gap-1 rounded bg-[#2b2d31] px-2 py-0.5 text-xs text-[#949ba4]"
+                        >
+                          <Paperclip className="size-3" />
+                          {att.filename}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {pending && message.uploadProgress !== undefined && (
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-[#1e1f22]">
+                        <div
+                          className="h-full rounded-full bg-[#5865f2] transition-[width] duration-200"
+                          style={{ width: `${message.uploadProgress}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] tabular-nums text-[#949ba4]">
+                        {message.uploadProgress}%
+                      </span>
                     </div>
                   )}
 

@@ -34,6 +34,8 @@ import {
   Lightbulb,
   Shapes,
   Flag as FlagIcon,
+  PlusCircle,
+  FileText,
 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { ChannelsService } from '../../services/channels.service';
@@ -49,6 +51,7 @@ import { Permissions } from '@/constants/Permissions';
 import { useHasPermission } from '@/hooks/useHasPermission';
 
 const MAX_MESSAGE_LENGTH = 2000;
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const SUGGESTIONS_LIMIT = 10;
 
 /* -------------------------------- utils -------------------------------- */
@@ -278,6 +281,11 @@ const ChannelInput = ({ channel }) => {
   const { replyingId, setReplyingId, setEditingId } = useChannelContext();
   const editorRef = useRef(null);
   const savedSelectionRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const dragCounterRef = useRef(0);
+
+  const [stagedFiles, setStagedFiles] = useState([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   const { guildId } = useGuildContext();
   const guildsStore = useGuildsStore();
@@ -365,6 +373,57 @@ const ChannelInput = ({ channel }) => {
     },
     [members]
   );
+
+  /* ---------------- file attachments ---------------- */
+
+  const addFiles = useCallback((files) => {
+    const incoming = Array.from(files).slice(0, 10 - stagedFiles.length);
+    const valid = [];
+    for (const file of incoming) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`${file.name} exceeds the 50 MB file size limit.`);
+      } else {
+        valid.push(file);
+      }
+    }
+    if (valid.length > 0) {
+      setStagedFiles((prev) => [...prev, ...valid]);
+    }
+  }, [stagedFiles.length]);
+
+  const removeFile = useCallback((index) => {
+    setStagedFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleDragEnter = useCallback((e) => {
+    e.preventDefault();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    if (e.dataTransfer.files?.length) {
+      addFiles(e.dataTransfer.files);
+    }
+  }, [addFiles]);
 
   /* ---------------- mentions ---------------- */
 
@@ -632,6 +691,13 @@ const ChannelInput = ({ channel }) => {
   };
 
   const handlePaste = (e) => {
+    const files = Array.from(e.clipboardData.files);
+    if (files.length > 0) {
+      e.preventDefault();
+      addFiles(files);
+      return;
+    }
+
     e.preventDefault();
     insertTextAtCaret(e.clipboardData.getData('text/plain'));
     convertSerializedMentions(editorRef.current, members, resolveUser);
@@ -643,17 +709,20 @@ const ChannelInput = ({ channel }) => {
       toast.error('You do not have permission to send messages in this channel.');
       return;
     }
-    if (!channel?.channel_id || !inputMessage.trim()) return;
+    if (!channel?.channel_id || (!inputMessage.trim() && stagedFiles.length === 0)) return;
     if (inputMessage.length > MAX_MESSAGE_LENGTH) return;
 
     ChannelsService.sendChannelMessage(
       channel.channel_id,
       inputMessage,
       replyingId || null,
-      shouldMention
+      shouldMention,
+      [],
+      stagedFiles
     );
     setInputMessage('');
     setReplyingId(null);
+    setStagedFiles([]);
     editorRef.current.innerHTML = '';
   };
 
@@ -683,7 +752,13 @@ const ChannelInput = ({ channel }) => {
   /* ---------------- render ---------------- */
 
   return (
-    <div className="bg-[#1a1a1e] p-2">
+    <div
+      className={cn('bg-[#1a1a1e] p-2', isDragging && 'ring-2 ring-inset ring-primary/50')}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div
         className={cn(
           'grid transition-all duration-200 ease-in-out',
@@ -720,12 +795,76 @@ const ChannelInput = ({ channel }) => {
           pointer-events: none;
         }
       `}</style>
+      {stagedFiles.length > 0 && (
+        <div className={cn(
+          'flex gap-2 overflow-x-auto bg-[#2b2d31] px-4 py-3 border-b border-white/5',
+          replyingMessage ? '' : 'rounded-t-md'
+        )}>
+          {stagedFiles.map((file, index) => (
+            <div
+              key={`${file.name}-${index}`}
+              className="group/attachment relative flex h-[52px] shrink-0 items-center gap-2 rounded-md bg-[#1e1f22] px-3 pr-8"
+            >
+              {file.type.startsWith('image/') ? (
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt={file.name}
+                  className="size-8 rounded object-cover"
+                />
+              ) : (
+                <div className="flex size-8 items-center justify-center rounded bg-[#5865f2]/20">
+                  <FileText className="size-4 text-[#5865f2]" />
+                </div>
+              )}
+              <div className="max-w-[120px]">
+                <div className="truncate text-xs text-[#dbdee1]">{file.name}</div>
+                <div className="text-[10px] text-[#949ba4]">
+                  {file.size < 1024 * 1024
+                    ? `${(file.size / 1024).toFixed(1)} KB`
+                    : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeFile(index)}
+                className="absolute -right-1 -top-1 rounded-full bg-[#1e1f22] p-0.5 text-[#b5bac1] opacity-0 transition-opacity group-hover/attachment:opacity-100 hover:text-[#dbdee1]"
+              >
+                <X weight="bold" size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.length) addFiles(e.target.files);
+          e.target.value = '';
+        }}
+      />
       <InputGroup
         className={cn(
           'relative flex h-auto items-center border border-white/5 bg-[#222327] transition-all duration-200',
-          replyingMessage ? 'rounded-t-none border-t-0' : 'rounded-t-md'
+          (replyingMessage || stagedFiles.length > 0) ? 'rounded-t-none border-t-0' : 'rounded-t-md'
         )}
       >
+        <div className="ml-2 mt-2 flex items-center self-start">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                className="size-8 text-[#b5bac1] hover:text-[#dbdee1]"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <PlusCircle className="size-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Attach files</TooltipContent>
+          </Tooltip>
+        </div>
         <Popover.Root
           open={mentionQuery !== null && filteredMembers.length > 0 && !isEmojiPickerOpen}
           modal={false}
@@ -740,6 +879,7 @@ const ChannelInput = ({ channel }) => {
               onKeyUp={saveSelection}
               onClick={saveSelection}
               onPaste={handlePaste}
+              onDragOver={handleDragOver}
               className={`max-h-[50vh] min-h-[44px] w-full overflow-y-auto p-3 text-sm outline-none ${
                 !canSendMessages ? 'cursor-not-allowed opacity-50' : ''
               }`}

@@ -136,13 +136,13 @@ export const ChannelsService = {
     await api.post(`channels/${channelId}/typing`).catch(() => { });
   },
 
-  async sendChannelMessage(channelId: string, content: string, replyTo: string | null = null, shouldMention: boolean = true, stickerIds: string[] = []) {
+  async sendChannelMessage(channelId: string, content: string, replyTo: string | null = null, shouldMention: boolean = true, stickerIds: string[] = [], attachments: File[] = []) {
     const { setChannelPendingMessages, channelPendingMessages } = useChannelsStore.getState();
 
     const generatedNonce = Date.now().toString() + Math.floor(Math.random() * 1000).toString();
-    const currentUser = useUsersStore.getState().getCurrentUser();;
+    const currentUser = useUsersStore.getState().getCurrentUser();
 
-    const pendingMessage = {
+    const pendingMessage: any = {
       nonce: generatedNonce,
       content: content,
       author: {
@@ -152,6 +152,12 @@ export const ChannelsService = {
       },
       created_at: new Date().toISOString(),
       message_references: replyTo ? [{ message_id: replyTo, channel_id: channelId }] : [],
+      attachments: attachments.map((f, i) => ({
+        id: String(i),
+        filename: f.name,
+        size: f.size,
+      })),
+      uploadProgress: attachments.length > 0 ? 0 : undefined,
     };
 
     setChannelPendingMessages(channelId, [
@@ -159,36 +165,62 @@ export const ChannelsService = {
       pendingMessage,
     ]);
 
-    // api.post(`/channels/${channelId}/messages`, {
-    //     content: content,
-    //     nonce: generatedNonce,
-    //     reply_to: replyingId
-    // }).then((response) => {
-    //     setPendingMessages((pendingMessages) => pendingMessages.filter((m) => m.nonce !== generatedNonce));
-    //     setMessages((messages) => {
-    //         if (messages.some((m) => m.nonce === generatedNonce)) {
-    //             return messages;
-    //         }
-    //         return [...messages, response.data];
-    //     });
-    // });
-
     try {
-      await api.post(`/channels/${channelId}/messages`, {
-        content: content,
-        nonce: generatedNonce,
-        ...(replyTo ? {
-          message_reference: { message_id: replyTo },
-          allowed_mentions: { replied_user: shouldMention }
-        } : {}),
-        ...(stickerIds.length > 0 ? { sticker_ids: stickerIds } : {}),
-      });
+      if (attachments.length > 0) {
+        const formData = new FormData();
+
+        const payloadJson = {
+          nonce: generatedNonce,
+          content: content,
+          attachments: attachments.map((f, i) => ({
+            id: String(i),
+            filename: f.name,
+            title: f.name,
+            flags: 0,
+          })),
+          flags: 0,
+          ...(replyTo ? {
+            message_reference: { message_id: replyTo },
+            allowed_mentions: { replied_user: shouldMention }
+          } : {}),
+          ...(stickerIds.length > 0 ? { sticker_ids: stickerIds } : {}),
+        };
+
+        formData.append('payload_json', JSON.stringify(payloadJson));
+        attachments.forEach((file, i) => {
+          formData.append(`files[${i}]`, file, file.name);
+        });
+
+        await api.post(`/channels/${channelId}/messages`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (progressEvent) => {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / (progressEvent.total || 1)
+            );
+            useChannelsStore.getState().updatePendingMessageProgress(
+              channelId,
+              generatedNonce,
+              percent
+            );
+          },
+        });
+      } else {
+        await api.post(`/channels/${channelId}/messages`, {
+          content: content,
+          nonce: generatedNonce,
+          ...(replyTo ? {
+            message_reference: { message_id: replyTo },
+            allowed_mentions: { replied_user: shouldMention }
+          } : {}),
+          ...(stickerIds.length > 0 ? { sticker_ids: stickerIds } : {}),
+        });
+      }
     } catch {
       // Remove from pending messages
       setChannelPendingMessages(
         channelId,
         (channelPendingMessages[channelId] || []).filter(
-          (msg) => msg.nonce !== pendingMessage.nonce
+          (msg: any) => msg.nonce !== pendingMessage.nonce
         )
       );
       toast.error('Unable to send message.');

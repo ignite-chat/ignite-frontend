@@ -21,6 +21,7 @@ type ChannelsStore = {
   addReaction: (channelId: string, messageId: string, emoji: string, userId: string) => void;
   removeReaction: (channelId: string, messageId: string, emoji: string, userId: string) => void;
   setMessageReactions: (channelId: string, messageId: string, reactions: Reaction[]) => void;
+  updatePendingMessageProgress: (channelId: string, nonce: string, progress: number) => void;
   togglePin: (channelId: string) => void;
   updateChannelVoiceState: (channelId: string, voiceState: any, upsert?: boolean) => void;
   removeUserVoiceState: (userId: string) => void;
@@ -68,6 +69,15 @@ export const useChannelsStore = create<ChannelsStore>((set) => ({
       channelPendingMessages: {
         ...state.channelPendingMessages,
         [channelId]: messages,
+      },
+    })),
+  updatePendingMessageProgress: (channelId, nonce, progress) =>
+    set((state) => ({
+      channelPendingMessages: {
+        ...state.channelPendingMessages,
+        [channelId]: (state.channelPendingMessages[channelId] || []).map((msg) =>
+          msg.nonce === nonce ? { ...msg, uploadProgress: progress } : msg
+        ),
       },
     })),
   addReaction: (channelId, messageId, emoji, userId) =>
