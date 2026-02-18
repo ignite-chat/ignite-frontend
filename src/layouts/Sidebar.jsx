@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Fire, Plus } from '@phosphor-icons/react';
+import { Fire, Plus, Compass } from '@phosphor-icons/react';
 import {
   DndContext,
   DragOverlay,
@@ -303,6 +303,9 @@ const Sidebar = () => {
         <button type="button" onClick={() => setIsGuildDialogOpen(true)}>
           <SidebarIcon icon={<Plus className="size-6" />} text="Add a Server" />
         </button>
+        <Link to="/guild-discovery">
+          <SidebarIcon icon={<Compass className="size-6" />} text="Discover Servers" />
+        </Link>
       </div>
 
       <GuildDialog open={isGuildDialogOpen} onOpenChange={setIsGuildDialogOpen} />

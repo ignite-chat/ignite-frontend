@@ -7,6 +7,7 @@ import RegisterPage from './pages/Register';
 import DirectMessagesPage from './pages/DirectMessages';
 import GuildChannelPage from './pages/GuildChannel';
 import InvitePage from './pages/InvitePage';
+import GuildDiscoveryPage from './pages/GuildDiscovery';
 import { InitializationService } from './services/initialization.service';
 import { EchoService } from './services/echo.service';
 import { useGuildsStore } from './store/guilds.store';
@@ -212,6 +213,15 @@ function App() {
               <>
                 <PageTitle title="Direct Messages" />
                 <DirectMessagesPage />
+              </>
+            }
+          />
+          <Route
+            path="/guild-discovery"
+            element={
+              <>
+                <PageTitle title="Discover Servers" />
+                <GuildDiscoveryPage />
               </>
             }
           />

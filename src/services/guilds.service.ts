@@ -121,6 +121,26 @@ export const GuildsService = {
     setGuildMembers(guildId, updatedMembers);
   },
 
+  async discoverGuilds(search?: string) {
+    const params = search ? { search } : {};
+    const { data } = await api.get('/guilds/discovery', { params });
+    return data;
+  },
+
+  async joinGuild(guildId: string) {
+    const { addGuild } = useGuildsStore.getState();
+    try {
+      const { data } = await api.post(`/guilds/${guildId}/join`);
+      addGuild(data);
+      await ChannelsService.loadChannels();
+      toast.success('Joined server successfully.');
+      return data;
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to join server.');
+      throw error;
+    }
+  },
+
   async leaveGuild(guildId: string) {
     const { removeGuild } = useGuildsStore.getState();
     try {
