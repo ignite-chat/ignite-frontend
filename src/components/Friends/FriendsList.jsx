@@ -47,9 +47,9 @@ const FriendsList = ({ friends, filter }) => {
             <Avatar user={friend} className="size-8 rounded-full" />
             <div>
               <div className="text-sm font-bold text-white">
-                {friend.username}
+                {friend.name}
                 <span className="ml-1 hidden text-xs text-gray-400 group-hover:inline">
-                  #{friend.discriminator || '0000'}
+                  {friend.username}
                 </span>
               </div>
               <div className="text-xs text-gray-400">{friend.status}</div>
