@@ -45,6 +45,8 @@ import { useTypingStore } from '../../store/typing.store';
 import { useUsersStore } from '@/store/users.store';
 import StickerPicker from './StickerPicker';
 import { Sticker } from 'lucide-react';
+import { PermissionsService } from '@/services/permissions.service';
+import { Permissions } from '@/constants/Permissions';
 
 const MAX_MESSAGE_LENGTH = 2000;
 const SUGGESTIONS_LIMIT = 10;
@@ -344,12 +346,11 @@ const ChannelInput = ({ channel }) => {
   }, [replyingId, channel?.channel_id, channelMessages]);
 
   // Check if user can send messages in this channel
-  // const canSendMessages = useMemo(() => {
-  //   // DM channels (no guildId) always allow sending
-  //   if (!guildId || !channel?.channel_id) return true;
-  //   return PermissionsService.hasPermission(guildId, channel.channel_id, Permissions.SEND_MESSAGES);
-  // }, [guildId, channel?.channel_id]);
-  const canSendMessages = true;
+  const canSendMessages = useMemo(() => {
+    // DM channels (no guildId) always allow sending
+    if (!guildId || !channel?.channel_id) return true;
+    return PermissionsService.hasPermission(guildId, channel.channel_id, Permissions.SEND_MESSAGES);
+  }, [guildId, channel?.channel_id]);
 
   const resolveUser = useCallback(
     (id) => {
@@ -966,7 +967,7 @@ const ChannelInput = ({ channel }) => {
               <Smile className="size-5" />
             </Button>
           </Popover.Trigger>
-          <Popover.Portal forceMount>
+          <Popover.Portal>
           <Popover.Content
             forceMount
             side="top"

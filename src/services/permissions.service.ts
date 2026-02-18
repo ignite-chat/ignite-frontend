@@ -17,7 +17,7 @@ export const PermissionsService = {
     const localUser = useUsersStore.getState().getCurrentUser();
     const guild = useGuildsStore.getState().guilds.find((g) => g.id === guildId);
 
-    if (!guild) return false;
+    if (!guild || !permission) return false;
 
     // Guild owner has all permissions
     if (guild.owner_id === localUser.id) {
@@ -39,7 +39,7 @@ export const PermissionsService = {
     const memberRoles = guildRoles.filter((role) => memberRoleIds.includes(role.id));
 
     // Calculate guild-level permissions
-    let permissions = 0n;
+    let permissions = BigInt(0n);
 
     // Start with @everyone role permissions from guild.default_permissions
     if (guild.default_permissions) {
@@ -56,6 +56,8 @@ export const PermissionsService = {
         return true;
       }
     }
+
+    console.log(permissions); 
 
     // If no channel specified, check guild-level permissions
     if (!channelId) {
@@ -89,6 +91,8 @@ export const PermissionsService = {
         permissions |= allowed;
       }
     }
+
+    console.log(typeof(permission), typeof(permissions));
 
     // Check if the user has the requested permission
     return (permissions & permission) === permission;

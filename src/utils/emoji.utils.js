@@ -1,5 +1,13 @@
 import emojisData from '../assets/emojis/emojis.json';
 
+// Import all local SVG files as URLs at build time
+const svgModules = import.meta.glob('../assets/emojis/svg/*.svg', { eager: true, query: '?url', import: 'default' });
+const localSvgLookup = new Map();
+for (const [path, url] of Object.entries(svgModules)) {
+  const filename = path.split('/').pop().replace('.svg', '');
+  localSvgLookup.set(filename, url);
+}
+
 // Shared emoji shortcode ↔ unicode mapping
 export const emojiMap = new Map();
 
@@ -81,7 +89,7 @@ export const getTwemojiUrl = (emoji) => {
     .map((char) => char.codePointAt(0).toString(16))
     .filter((hex) => hex !== 'fe0f') // Remove VS16
     .join('-');
-  const url = `https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/${code}.svg`;
+  const url = localSvgLookup.get(code) || `https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/${code}.svg`;
   twemojiUrlCache.set(emoji, url);
   return url;
 };

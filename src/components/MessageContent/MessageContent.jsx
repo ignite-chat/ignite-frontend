@@ -345,8 +345,12 @@ const MessageContent = ({ content, isReply = false, stickers = [] }) => {
         p: ({ children }) => <>{children}</>,
         // Render custom emojis as inline images, disable other images
         img: ({ src, alt }) => {
-          const isTwemoji = src?.startsWith('https://cdn.jsdelivr.net/gh/twitter/twemoji');
-          if (src?.startsWith(EMOJI_CDN_PREFIX) || isTwemoji) {
+          const isCustomEmoji = src?.startsWith(EMOJI_CDN_PREFIX);
+          // Local twemoji SVGs (from assets) are relative paths (start with /)
+          // CDN fallback twemojis start with the jsdelivr URL
+          const isTwemoji = src?.startsWith('https://cdn.jsdelivr.net/gh/twitter/twemoji') ||
+            (src && !src.startsWith('http') && !isCustomEmoji);
+          if (isCustomEmoji || isTwemoji) {
             return (
               <Emoji
                 src={src}
