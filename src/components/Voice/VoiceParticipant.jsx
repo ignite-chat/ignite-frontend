@@ -17,6 +17,11 @@ const VoiceParticipant = ({ participant }) => {
 
       {participant.isMuted && <MicrophoneSlash className="size-3.5 shrink-0 text-gray-500" />}
       {participant.isDeafened && <SpeakerSlash className="size-3.5 shrink-0 text-gray-500" />}
+      {participant.isScreenSharing && (
+        <span className="shrink-0 rounded-full bg-red-500 px-1 py-px text-[10px] font-bold uppercase leading-tight tracking-wide text-white">
+          LIVE
+        </span>
+      )}
     </div>
   );
 };
