@@ -6,6 +6,7 @@ import { useUsersStore } from '@/store/users.store';
 import useStore from '@/hooks/useStore';
 import { VoiceService } from '@/services/voice.service';
 import ParticipantTile from './ParticipantTile';
+import Avatar from '../Avatar';
 
 const ScreenShareView = ({ participantIdentity }) => {
   const videoRef = useRef(null);
@@ -39,7 +40,7 @@ const ScreenShareView = ({ participantIdentity }) => {
 };
 
 const VoiceChannelView = ({ channel }) => {
-  const { participants, connectionState, room } = useVoiceStore();
+  const { participants, connectionState } = useVoiceStore();
   const currentUser = useStore((s) => s.user);
   const usersStore = useUsersStore();
 
@@ -84,12 +85,17 @@ const VoiceChannelView = ({ channel }) => {
                   key={u.userId}
                   className="flex items-center gap-1.5 rounded-full bg-gray-600 px-3 py-1.5"
                 >
-                  <div className="flex size-5 items-center justify-center rounded-full bg-gray-500 text-[10px] font-semibold text-gray-200">
-                    {(u.name || '?').charAt(0).toUpperCase()}
+                  <div className="flex size-5 items-center justify-center rounded-full">
+                    <Avatar
+                      user={{ avatar_url: u.avatar_url, name: u.name }}
+                      className="size-5 bg-gray-500 text-[10px] font-semibold text-gray-200"
+                    />
                   </div>
                   <span className="text-xs text-gray-300">{u.name}</span>
                   {u.selfDeaf && <SpeakerSlash className="size-3 text-gray-400" />}
-                  {u.selfMute && !u.selfDeaf && <MicrophoneSlash className="size-3 text-gray-400" />}
+                  {u.selfMute && !u.selfDeaf && (
+                    <MicrophoneSlash className="size-3 text-gray-400" />
+                  )}
                 </div>
               ))}
             </div>
@@ -123,14 +129,12 @@ const VoiceChannelView = ({ channel }) => {
 
   // Connected — show participants
   return (
-    <div className="flex flex-1 flex-col overflow-hidden bg-gray-700 p-4">
+    <div className="flex flex-1 flex-col overflow-hidden bg-black px-4 py-20">
       {screenSharer && isWatchingScreen ? (
         // Screenshare layout: main screenshare + participant strip
         <div className="flex flex-1 flex-col gap-3 overflow-hidden">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-300">
-              {screenSharer.name} is sharing their screen
-            </p>
+            <p className="text-sm text-gray-300">{screenSharer.name} is sharing their screen</p>
             <button
               type="button"
               onClick={() => setIsWatchingScreen(false)}
@@ -155,9 +159,7 @@ const VoiceChannelView = ({ channel }) => {
         <div className="flex flex-1 flex-col gap-3 overflow-hidden">
           {screenSharer && (
             <div className="flex items-center justify-between rounded-md bg-gray-600 px-3 py-2">
-              <p className="text-sm text-gray-300">
-                {screenSharer.name} is sharing their screen
-              </p>
+              <p className="text-sm text-gray-300">{screenSharer.name} is sharing their screen</p>
               <button
                 type="button"
                 onClick={() => setIsWatchingScreen(true)}
