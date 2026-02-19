@@ -99,7 +99,13 @@ const ScreenShareTile = ({ participant, onWatch }) => {
       className="group/tile relative flex cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-[#1e1f22]"
     >
       {isLocal && (
-        <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 size-full object-cover" />
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="absolute inset-0 size-full object-cover"
+        />
       )}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#101113] to-transparent" />
 
@@ -113,11 +119,11 @@ const ScreenShareTile = ({ participant, onWatch }) => {
       {/* Top-right badges */}
       <div className="absolute right-3 top-3 flex items-center gap-1.5">
         {resLabel && (
-          <span className="rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+          <span className="rounded-full bg-gray-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
             {resLabel}
           </span>
         )}
-        <span className="rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+        <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
           LIVE
         </span>
       </div>
@@ -222,7 +228,7 @@ const VoiceChannelView = ({ channel }) => {
 
   // Connected — show participants
   return (
-    <div className="group relative flex flex-1 flex-col overflow-hidden bg-black px-4 pt-14 pb-24">
+    <div className="group relative flex flex-1 flex-col overflow-hidden bg-black px-4 pb-24 pt-14">
       {screenSharer && isWatchingScreen ? (
         // Screenshare layout: main screenshare + participant strip
         <div className="flex flex-1 gap-3 overflow-hidden">
@@ -239,23 +245,21 @@ const VoiceChannelView = ({ channel }) => {
         // Grid layout
         <div
           className={`grid flex-1 gap-3 ${
-            totalTiles === 1
-              ? 'grid-cols-1'
-              : totalTiles <= 4
-                ? 'grid-cols-2'
-                : 'grid-cols-3'
+            totalTiles === 1 ? 'grid-cols-1' : totalTiles <= 4 ? 'grid-cols-2' : 'grid-cols-3'
           }`}
           style={{
             gridAutoRows: totalTiles <= 2 ? '1fr' : 'minmax(0, 1fr)',
           }}
         >
-          {participants.filter((p) => p.isScreenSharing).map((p) => (
-            <ScreenShareTile
-              key={`${p.identity}-screen`}
-              participant={p}
-              onWatch={() => setIsWatchingScreen(true)}
-            />
-          ))}
+          {participants
+            .filter((p) => p.isScreenSharing)
+            .map((p) => (
+              <ScreenShareTile
+                key={`${p.identity}-screen`}
+                participant={p}
+                onWatch={() => setIsWatchingScreen(true)}
+              />
+            ))}
           {participants.map((p) => (
             <ParticipantTile key={p.identity} participant={p} />
           ))}
