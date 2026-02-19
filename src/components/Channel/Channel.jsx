@@ -12,8 +12,12 @@ const Channel = ({ channel, messageId }) => {
   if (channel?.type === ChannelType.GUILD_VOICE) {
     return (
       <div className="relative flex min-h-0 w-full flex-1 flex-col bg-[#1a1a1e]">
-        <ChannelBar channel={channel} />
-        <hr className="m-0 w-full border border-t-0 border-white/5 bg-gray-900 p-0" />
+        {channel?.type !== ChannelType.GUILD_VOICE && (
+          <>
+            <ChannelBar channel={channel} />
+            <hr className="m-0 w-full border border-t-0 border-white/5 bg-gray-900 p-0" />
+          </>
+        )}
         <VoiceChannelView channel={channel} />
       </div>
     );

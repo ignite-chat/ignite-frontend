@@ -3,6 +3,7 @@ import { Track } from 'livekit-client';
 import {
   MicrophoneSlash,
   SpeakerSlash,
+  SpeakerHigh,
   Microphone,
   VideoCamera,
   VideoCameraSlash,
@@ -139,7 +140,7 @@ const VoiceChannelView = ({ channel }) => {
 
   // Connected — show participants
   return (
-    <div className="group relative flex flex-1 flex-col overflow-hidden bg-black pb-24 pt-4 px-4">
+    <div className="group relative flex flex-1 flex-col overflow-hidden bg-black px-4 pt-14 pb-24">
       {screenSharer && isWatchingScreen ? (
         // Screenshare layout: main screenshare + participant strip
         <div className="flex flex-1 flex-col gap-3 overflow-hidden">
@@ -197,6 +198,14 @@ const VoiceChannelView = ({ channel }) => {
           </div>
         </div>
       )}
+
+      {/* Floating Channel Info - Top */}
+      <div className="pointer-events-none absolute inset-x-0 top-4 flex -translate-y-2 px-4 opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
+        <div className="flex items-center gap-2 px-1">
+          <SpeakerHigh className="size-4 shrink-0 text-gray-400" weight="fill" />
+          <span className="text-sm font-medium text-gray-200">{channel?.name}</span>
+        </div>
+      </div>
 
       {/* Floating Voice Controls */}
       <div className="pointer-events-none absolute inset-x-0 bottom-4 flex translate-y-2 justify-center gap-4 opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
