@@ -232,7 +232,17 @@ const VoiceChannelView = ({ channel }) => {
       {screenSharer && isWatchingScreen ? (
         // Screenshare layout: main screenshare + participant strip
         <div className="flex flex-1 gap-3 overflow-hidden">
-          <ScreenShareView participantIdentity={screenSharer.identity} />
+          <div
+            className="group/stream relative flex flex-1 cursor-pointer"
+            onClick={() => setIsWatchingScreen(false)}
+          >
+            <ScreenShareView participantIdentity={screenSharer.identity} />
+            <div className="pointer-events-none absolute inset-0 flex items-end justify-center rounded-xl pb-4 opacity-0 transition-opacity duration-150 group-hover/stream:opacity-100">
+              <span className="rounded-lg bg-black/60 px-3 py-1.5 text-sm text-white backdrop-blur-sm">
+                Click to go back
+              </span>
+            </div>
+          </div>
           <div className="flex w-60 shrink-0 flex-col gap-2 overflow-y-auto">
             {participants.map((p) => (
               <div key={p.identity} className="aspect-video">
