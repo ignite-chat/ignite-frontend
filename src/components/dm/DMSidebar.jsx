@@ -7,7 +7,6 @@ import useStore from '@/hooks/useStore';
 import { useUnreadsStore } from '@/store/unreads.store';
 import { useFriendsStore } from '@/store/friends.store';
 import DMChannelItem from './DMChannelItem';
-import UserBar from '../UserBar';
 
 const sortByLastMessage = (a, b) => {
   if (!a.last_message_id) return 1;
@@ -117,7 +116,6 @@ const DMSidebar = ({ activeChannelId, onNavigate }) => {
 
         />
       </div>
-      <UserBar />
     </aside>
   );
 };

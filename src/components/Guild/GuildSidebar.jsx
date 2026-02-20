@@ -41,7 +41,6 @@ import { VoiceService } from '@/services/voice.service';
 import { ChannelType } from '@/constants/ChannelType';
 import VoiceControls from '@/components/Voice/VoiceControls';
 import VoiceParticipant from '@/components/Voice/VoiceParticipant';
-import UserBar from '@/components/UserBar';
 import GuildSidebarHeader from './GuildSidebarHeader';
 
 // Presentational channel row, used both in SortableChannel and DragOverlay
@@ -642,7 +641,6 @@ const GuildSidebar = ({
                 />
               ))}
             </div>
-            <UserBar />
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-52">

@@ -89,21 +89,21 @@ const UserBar = () => {
       )}
 
       {/* User Info Bar */}
-      <div className="flex items-center px-2 py-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="flex items-center px-2.5 py-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <div className="relative shrink-0">
-            <Avatar user={user} className="size-8" />
+            <Avatar user={user} className="size-9" />
             {user?.status !== 'offline' && (
-              <div className="absolute -bottom-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-[#202024]">
-                <div className="size-2.5 rounded-full bg-green-600"></div>
+              <div className="absolute -bottom-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-[#202024]">
+                <div className="size-3 rounded-full bg-green-600"></div>
               </div>
             )}
           </div>
           <div className="flex min-w-0 flex-col">
-            <span className="truncate text-sm font-semibold text-gray-100">
+            <span className="truncate text-base font-semibold leading-tight text-gray-100">
               {user?.name}
             </span>
-            <span className="truncate text-[11px] text-gray-500">
+            <span className="truncate text-xs text-gray-500">
               {user?.status || 'Online'}
             </span>
           </div>
@@ -113,7 +113,7 @@ const UserBar = () => {
           <button
             type="button"
             onClick={() => VoiceService.toggleMute()}
-            className={`flex size-8 items-center justify-center rounded transition-colors ${
+            className={`flex size-9 items-center justify-center rounded transition-colors ${
               isMuted
                 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                 : 'hover:bg-white/5'
@@ -121,16 +121,16 @@ const UserBar = () => {
             title={isMuted ? 'Unmute' : 'Mute'}
           >
             {isMuted ? (
-              <MicrophoneSlash className="size-4 text-red-400" weight="fill" />
+              <MicrophoneSlash className="size-5 text-red-400" weight="fill" />
             ) : (
-              <Microphone className="size-4 text-gray-400 hover:text-gray-200" weight="fill" />
+              <Microphone className="size-5 text-gray-400 hover:text-gray-200" weight="fill" />
             )}
           </button>
 
           <button
             type="button"
             onClick={() => VoiceService.toggleDeafen()}
-            className={`flex size-8 items-center justify-center rounded transition-colors ${
+            className={`flex size-9 items-center justify-center rounded transition-colors ${
               isDeafened
                 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                 : 'hover:bg-white/5'
@@ -138,29 +138,20 @@ const UserBar = () => {
             title={isDeafened ? 'Undeafen' : 'Deafen'}
           >
             {isDeafened ? (
-              <SpeakerSlash className="size-4 text-red-400" weight="fill" />
+              <SpeakerSlash className="size-5 text-red-400" weight="fill" />
             ) : (
-              <SpeakerHigh className="size-4 text-gray-400 hover:text-gray-200" weight="fill" />
+              <SpeakerHigh className="size-5 text-gray-400 hover:text-gray-200" weight="fill" />
             )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => logout()}
-            className="flex size-8 items-center justify-center rounded hover:bg-white/5"
-            title="Logout"
-          >
-            <LogOut className="size-4 text-gray-400 hover:text-gray-200" />
           </button>
 
           <Dialog>
             <DialogTrigger asChild>
               <button
                 type="button"
-                className="flex size-8 items-center justify-center rounded hover:bg-white/5"
+                className="flex size-9 items-center justify-center rounded hover:bg-white/5"
                 title="User Settings"
               >
-                <Gear className="size-4 text-gray-400 hover:text-gray-200" weight="fill" />
+                <Gear className="size-5 text-gray-400 hover:text-gray-200" weight="fill" />
               </button>
             </DialogTrigger>
             <UserSettingsDialogContent />

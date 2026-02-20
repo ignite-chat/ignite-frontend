@@ -26,27 +26,23 @@ const DirectMessagesPage = () => {
   }, [channelId]);
 
   return (
-    <DefaultLayout>
-      <div className="flex h-full w-full overflow-hidden bg-gray-700 text-gray-100">
-        {/* Sidebar Component */}
+    <DefaultLayout
+      sidebar={
         <DMSidebar
           activeChannelId={channelId || 'friends'}
           onNavigate={(id) => navigate(`/channels/@me/${id}`)}
         />
-
-        {/* Main Content Area */}
-        <main className="relative flex flex-1 flex-col overflow-hidden">
-          {isFriendsView ? (
-            <FriendsDashboard />
-          ) : (
-            <ChannelContextProvider>
-              {/* normalizeThread logic should ideally happen inside Channel or a hook, 
-                     but passing activeChannel directly here works based on your existing code */}
-              <Channel channel={activeChannel} messageId={messageId} />
-            </ChannelContextProvider>
-          )}
-        </main>
-      </div>
+      }
+    >
+      <main className="relative flex h-full flex-1 flex-col overflow-hidden bg-gray-700 text-gray-100">
+        {isFriendsView ? (
+          <FriendsDashboard />
+        ) : (
+          <ChannelContextProvider>
+            <Channel channel={activeChannel} messageId={messageId} />
+          </ChannelContextProvider>
+        )}
+      </main>
     </DefaultLayout>
   );
 };
