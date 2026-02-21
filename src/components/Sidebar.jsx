@@ -39,6 +39,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
+import { Button } from '../components/ui/button';
 import { useDiscordStore } from '../discord/store/discord.store';
 import { useDiscordGuildsStore } from '../discord/store/discord-guilds.store';
 import { DiscordService } from '../discord/services/discord.service';
@@ -162,6 +172,8 @@ const Sidebar = () => {
   const [activeId, setActiveId] = useState(null);
   const [leaveGuild, setLeaveGuild] = useState(null);
   const [inviteGuildId, setInviteGuildId] = useState(null);
+  const [isDiscordDialogOpen, setIsDiscordDialogOpen] = useState(false);
+  const [discordTokenInput, setDiscordTokenInput] = useState('');
 
   // Discord state
   const { token: discordToken, isConnected: discordConnected } = useDiscordStore();
@@ -404,12 +416,7 @@ const Sidebar = () => {
             <hr className="mx-auto mb-2 mt-1 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
             <button
               type="button"
-              onClick={() => {
-                const token = prompt('Enter your Discord token:');
-                if (token) {
-                  useDiscordStore.getState().setToken(token);
-                }
-              }}
+              onClick={() => setIsDiscordDialogOpen(true)}
             >
               <SidebarIcon
                 icon={<DiscordLogo className="size-6" />}
@@ -419,6 +426,49 @@ const Sidebar = () => {
           </>
         )}
       </div>
+
+      <Dialog
+        open={isDiscordDialogOpen}
+        onOpenChange={(open) => {
+          setIsDiscordDialogOpen(open);
+          if (!open) setDiscordTokenInput('');
+        }}
+      >
+        <DialogContent className="!max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Connect Discord</DialogTitle>
+            <DialogDescription>Enter your Discord token to connect your account.</DialogDescription>
+          </DialogHeader>
+          <Input
+            type="password"
+            placeholder="Discord token"
+            value={discordTokenInput}
+            onChange={(e) => setDiscordTokenInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && discordTokenInput.trim()) {
+                useDiscordStore.getState().setToken(discordTokenInput.trim());
+                setDiscordTokenInput('');
+                setIsDiscordDialogOpen(false);
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDiscordDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!discordTokenInput.trim()}
+              onClick={() => {
+                useDiscordStore.getState().setToken(discordTokenInput.trim());
+                setDiscordTokenInput('');
+                setIsDiscordDialogOpen(false);
+              }}
+            >
+              Connect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <GuildDialog open={isGuildDialogOpen} onOpenChange={setIsGuildDialogOpen} />
 
