@@ -15,6 +15,7 @@ import { User, UserCircle, Mic, Bot, LogOut, X, Menu, KeyRound, Camera, Trash2, 
 import { Switch } from './ui/switch';
 import { useSoundStore, SOUND_EVENTS, SOUND_EVENT_LABELS } from '../store/sound.store';
 import { SoundService } from '../services/sound.service';
+import { VoiceService } from '../services/voice.service';
 import ImageCropperDialog from './Settings/ImageCropperDialog';
 import {
   AlertDialog,
@@ -30,6 +31,7 @@ import { useVoiceStore } from '../store/voice.store';
 import { useAuthStore } from '../store/auth.store';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Separator } from './ui/separator';
+import MicTestBars from './Voice/MicTestBars';
 import { cn } from '@/lib/utils';
 
 // ─── My Account Tab ───────────────────────────────────────────────────────────
@@ -809,7 +811,9 @@ const TabVoiceAudio = () => {
   const [outputDevices, setOutputDevices] = useState([]);
   const audioInputDeviceId = useVoiceStore((s) => s.audioInputDeviceId);
   const audioOutputDeviceId = useVoiceStore((s) => s.audioOutputDeviceId);
+  const noiseSuppression = useVoiceStore((s) => s.noiseSuppression);
   const room = useVoiceStore((s) => s.room);
+  const [isTesting, setIsTesting] = useState(false);
 
   const loadDevices = useCallback(async () => {
     try {
@@ -825,6 +829,9 @@ const TabVoiceAudio = () => {
   useEffect(() => {
     loadDevices();
   }, [loadDevices]);
+
+  // Stop mic test on unmount
+  useEffect(() => () => setIsTesting(false), []);
 
   const handleInputChange = useCallback(
     async (deviceId) => {
@@ -855,6 +862,14 @@ const TabVoiceAudio = () => {
     },
     [room]
   );
+
+  const handleNoiseToggle = useCallback(async () => {
+    if (room) {
+      await VoiceService.toggleNoiseSuppression();
+    } else {
+      useVoiceStore.getState().setNoiseSuppression(!noiseSuppression);
+    }
+  }, [room, noiseSuppression]);
 
   return (
     <div className="max-w-[740px] space-y-6">
@@ -899,6 +914,54 @@ const TabVoiceAudio = () => {
             </Select>
           </Field>
         </FieldGroup>
+      </div>
+
+      {/* Noise Suppression */}
+      {/* TODO: Krisp requires LiveKit Cloud — noise suppression won't work on self-hosted LiveKit servers */}
+      <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Mic className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-semibold">Noise Suppression</p>
+              <p className="text-xs text-muted-foreground">
+                Powered by Krisp — make some noise while speaking and your friends will only hear your voice.
+              </p>
+            </div>
+          </div>
+          <Switch checked={noiseSuppression} onCheckedChange={handleNoiseToggle} />
+        </div>
+
+        {/* Mic Test */}
+        <Separator />
+        <div>
+          <p className="mb-2 text-sm font-semibold">Mic Test</p>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsTesting((prev) => !prev)}
+            >
+              {isTesting ? 'Stop' : 'Test'}
+            </Button>
+            {isTesting && <MicTestBars deviceId={audioInputDeviceId} outputDeviceId={audioOutputDeviceId} />}
+          </div>
+        </div>
+
+        {/* Krisp branding */}
+        <Separator />
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Powered by</span>
+          <span className="text-sm font-bold">krisp</span>
+          <a
+            href="https://krisp.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary hover:underline"
+          >
+            Learn More
+          </a>
+        </div>
       </div>
     </div>
   );

@@ -405,23 +405,25 @@ export const ChannelsService = {
     const existingReaction = messageReactions.find((r) => r.emoji === emoji);
 
     if (existingReaction?.users.includes(user.id)) {
+      // Optimistic update — immediately reflect in UI
       removeReaction(channelId, messageId, emoji, user.id);
-      // TODO: BACKEND INTEGRATION NEEDED
-      // When ready, make API call to remove reaction from server:
-      // await api.delete(`/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`);
-      // This will:
-      // - Remove the current user from the reaction's users list on the server
-      // - Trigger a 'message.reaction.removed' WebSocket event (see handleReactionRemoved)
-      // - Delete the entire reaction if no other users have reacted with this emoji
+      // TODO: BACKEND — Uncomment when the reaction API endpoints are implemented:
+      // api.delete(`/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`)
+      //   .catch(() => {
+      //     // Rollback on failure
+      //     addReaction(channelId, messageId, emoji, user.id);
+      //     toast.error('Failed to remove reaction');
+      //   });
     } else {
+      // Optimistic update — immediately reflect in UI
       addReaction(channelId, messageId, emoji, user.id);
-      // TODO: BACKEND INTEGRATION NEEDED
-      // When ready, make API call to add reaction to server:
-      // await api.put(`/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`);
-      // This will:
-      // - Add the current user to the reaction's users list on the server
-      // - Trigger a 'message.reaction.added' WebSocket event (see handleReactionAdded)
-      // - Create the reaction if no one has reacted with this emoji yet
+      // TODO: BACKEND — Uncomment when the reaction API endpoints are implemented:
+      // api.put(`/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`)
+      //   .catch(() => {
+      //     // Rollback on failure
+      //     removeReaction(channelId, messageId, emoji, user.id);
+      //     toast.error('Failed to add reaction');
+      //   });
     }
   },
 

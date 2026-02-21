@@ -21,6 +21,9 @@ import {
   handleMessageCreated,
   handleMessageDeleted,
   handleMessageUpdated,
+  handleReactionAdded,
+  handleReactionRemoved,
+  handleReactionsSet,
   handleRoleCreated,
   handleRoleDeleted,
   handleRoleUpdated,
@@ -56,6 +59,10 @@ export const EchoService = {
       .listen('.message.created', (data: any) => handleMessageCreated(data, context))
       .listen('.message.updated', (data: any) => handleMessageUpdated(data, context))
       .listen('.message.deleted', (data: any) => handleMessageDeleted(data, context))
+      // TODO: BACKEND — These reaction listeners are ready; enable server-side broadcasting to activate
+      .listen('.message.reaction.added', (data: any) => handleReactionAdded(data, context))
+      .listen('.message.reaction.removed', (data: any) => handleReactionRemoved(data, context))
+      .listen('.message.reactions.set', (data: any) => handleReactionsSet(data, context))
       .listen('.channel.created', (data: any) => handleChannelCreated(data, context))
       .listen('.member.typing', (data: any) => handleMemberTyping(data, context))
       .listen('.user.updated', (data: any) => handleUserUpdated(data, context))
@@ -96,6 +103,10 @@ export const EchoService = {
       .listen('.message.created', (data: any) => handleMessageCreated(data, context))
       .listen('.message.deleted', (data: any) => handleMessageDeleted(data, context))
       .listen('.message.updated', (data: any) => handleMessageUpdated(data, context))
+      // TODO: BACKEND — These reaction listeners are ready; enable server-side broadcasting to activate
+      .listen('.message.reaction.added', (data: any) => handleReactionAdded(data, context))
+      .listen('.message.reaction.removed', (data: any) => handleReactionRemoved(data, context))
+      .listen('.message.reactions.set', (data: any) => handleReactionsSet(data, context))
       .listen('.role.created', (data: any) => handleRoleCreated(data, context))
       .listen('.role.deleted', (data: any) => handleRoleDeleted(data, context))
       .listen('.role.updated', (data: any) => handleRoleUpdated(data, context))
