@@ -43,7 +43,7 @@ import { toast } from 'sonner';
 import { emojiMap, registerEmoji, getTwemojiUrl } from '../../utils/emoji.utils';
 import { useEmojisStore } from '../../store/emojis.store';
 import emojisData from '../../assets/emojis/emojis.json';
-import { useTypingStore } from '../../store/typing.store';
+import { useTypingText } from '@/hooks/useTypingText';
 import { useUsersStore } from '@/store/users.store';
 import StickerPicker from './StickerPicker';
 import { Sticker } from 'lucide-react';
@@ -318,13 +318,7 @@ const ChannelInput = ({ channel }) => {
   const channels = useMemo(() => guild?.channels || [], [guild?.channels]);
   const channelMessages = useChannelsStore((s) => s.channelMessages);
 
-  const typingUsers = useTypingStore((s) => s.typing[channel?.channel_id] || []);
-  const clearExpired = useTypingStore((s) => s.clearExpired);
-
-  useEffect(() => {
-    const interval = setInterval(clearExpired, 1000);
-    return () => clearInterval(interval);
-  }, [clearExpired]);
+  const { typingText } = useTypingText(channel?.channel_id);
 
   // Auto-focus the editor when switching channels or replying
   useEffect(() => {
@@ -339,14 +333,6 @@ const ChannelInput = ({ channel }) => {
       sel.addRange(range);
     }
   }, [channel?.channel_id, replyingId]);
-
-  const typingText = useMemo(() => {
-    if (typingUsers.length === 0) return null;
-    const names = typingUsers.map((t) => t.username);
-    if (names.length === 1) return `${names[0]} is typing...`;
-    if (names.length === 2) return `${names[0]} and ${names[1]} are typing...`;
-    return `${names[0]}, ${names[1]}, and others are typing...`;
-  }, [typingUsers]);
 
   const replyingMessage = useMemo(() => {
     if (!replyingId || !channel?.channel_id) return null;

@@ -13,7 +13,7 @@ type TypingStore = {
   clearExpired: () => void;
 };
 
-const TYPING_DURATION = 3000;
+const TYPING_DURATION = 8000;
 
 export const useTypingStore = create<TypingStore>((set) => ({
   typing: {},

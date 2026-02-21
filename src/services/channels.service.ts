@@ -127,7 +127,7 @@ export const ChannelsService = {
 
   handleMemberTyping(event: any) {
     const currentUser = useUsersStore.getState().getCurrentUser();
-    if (!event.user || event.member.user.id === currentUser?.id) return;
+    if (!event.member?.user || event.member.user.id === currentUser?.id) return;
     useTypingStore.getState().addTypingUser(event.channel.id, {
       user_id: event.member.user.id,
       username: event.member.user.username,
