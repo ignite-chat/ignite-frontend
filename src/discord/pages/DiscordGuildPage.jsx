@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordStore } from '../store/discord.store';
-import { DiscordService } from '../services/discord.service';
 import DiscordGuildLayout from '../layouts/DiscordGuildLayout';
 import DiscordChannel from '../components/DiscordChannel';
 
@@ -19,13 +18,6 @@ const DiscordGuildPage = () => {
   const guildChannels = useMemo(() => {
     return channels.filter((c) => c.guild_id === guildId);
   }, [channels, guildId]);
-
-  // Load channels for this guild via REST if gateway hasn't provided them yet
-  useEffect(() => {
-    if (isConnected && guildId && guildChannels.length === 0) {
-      DiscordService.loadGuildChannels(guildId);
-    }
-  }, [isConnected, guildId, guildChannels.length]);
 
   // Redirect if not connected
   useEffect(() => {

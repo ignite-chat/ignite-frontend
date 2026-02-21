@@ -3,10 +3,13 @@ import { Link, useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordStore } from '../store/discord.store';
+import { useDiscordUsersStore } from '../store/discord-users.store';
+import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { DiscordService } from '../services/discord.service';
 
-const getDMDisplayInfo = (channel, currentUserId) => {
-  const recipients = channel.recipients || [];
+const getDMDisplayInfo = (channel, currentUserId, usersMap) => {
+  const recipientIds = channel.recipient_ids || [];
+  const recipients = recipientIds.map((id) => usersMap[id]).filter(Boolean);
 
   if (channel.type === 3) {
     // Group DM
@@ -14,26 +17,34 @@ const getDMDisplayInfo = (channel, currentUserId) => {
     const icon = channel.icon
       ? `https://cdn.discordapp.com/channel-icons/${channel.id}/${channel.icon}.png?size=64`
       : null;
-    return { name, icon, isGroup: true, recipients };
+    return { name, icon, isGroup: true, recipientCount: recipientIds.length };
   }
 
   // 1-on-1 DM — find the other user
   const other = recipients.find((r) => r.id !== currentUserId) || recipients[0];
-  if (!other) return { name: 'Unknown User', icon: null, isGroup: false, recipients };
+  if (!other) return { name: 'Unknown User', icon: null, isGroup: false };
 
   return {
     name: other.global_name || other.username,
     icon: DiscordService.getUserAvatarUrl(other.id, other.avatar, 64),
     isGroup: false,
-    recipients,
     user: other,
   };
 };
 
-const DMChannelItem = ({ channel, isActive, currentUserId }) => {
+const DMChannelItem = ({ channel, isActive, currentUserId, usersMap }) => {
+  const readStates = useDiscordReadStatesStore((s) => s.readStates);
+  const entry = readStates[channel.id];
+
+  const isUnread =
+    !isActive &&
+    !!channel.last_message_id &&
+    (!entry?.last_message_id || channel.last_message_id > entry.last_message_id);
+  const mentionCount = entry?.mention_count ?? 0;
+
   const info = useMemo(
-    () => getDMDisplayInfo(channel, currentUserId),
-    [channel, currentUserId]
+    () => getDMDisplayInfo(channel, currentUserId, usersMap),
+    [channel, currentUserId, usersMap]
   );
 
   return (
@@ -43,7 +54,9 @@ const DMChannelItem = ({ channel, isActive, currentUserId }) => {
         'flex items-center gap-3 rounded-md px-2 py-2 transition-colors',
         isActive
           ? 'bg-white/10 text-white'
-          : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+          : isUnread
+            ? 'bg-white/5 text-white'
+            : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
       )}
     >
       {info.icon ? (
@@ -54,18 +67,26 @@ const DMChannelItem = ({ channel, isActive, currentUserId }) => {
         />
       ) : (
         <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#5865f2] text-sm font-medium text-white">
-          {info.isGroup ? info.recipients.length : info.name.charAt(0).toUpperCase()}
+          {info.isGroup ? info.recipientCount : info.name.charAt(0).toUpperCase()}
         </div>
       )}
 
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{info.name}</div>
+        <div className={cn('truncate text-sm', isUnread ? 'font-semibold' : 'font-medium')}>
+          {info.name}
+        </div>
         {info.isGroup && (
           <div className="truncate text-xs text-gray-500">
-            {info.recipients.length} members
+            {info.recipientCount} members
           </div>
         )}
       </div>
+
+      {mentionCount > 0 && (
+        <div className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-bold text-white">
+          {mentionCount > 99 ? '99+' : mentionCount}
+        </div>
+      )}
     </Link>
   );
 };
@@ -74,6 +95,7 @@ const DiscordDMSidebar = () => {
   const { channelId } = useParams();
   const currentUser = useDiscordStore((s) => s.user);
   const channels = useDiscordChannelsStore((s) => s.channels);
+  const usersMap = useDiscordUsersStore((s) => s.users);
 
   const dmChannels = useMemo(() => {
     return channels
@@ -105,6 +127,7 @@ const DiscordDMSidebar = () => {
               channel={channel}
               isActive={channelId === channel.id}
               currentUserId={currentUser?.id}
+              usersMap={usersMap}
             />
           ))}
         </div>

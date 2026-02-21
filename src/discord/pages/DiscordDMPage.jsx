@@ -2,7 +2,6 @@ import { useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordStore } from '../store/discord.store';
-import { DiscordService } from '../services/discord.service';
 import DiscordDMLayout from '../layouts/DiscordDMLayout';
 import DiscordChannel from '../components/DiscordChannel';
 
@@ -11,18 +10,6 @@ const DiscordDMPage = () => {
   const { channelId } = useParams();
   const { isConnected } = useDiscordStore();
   const channels = useDiscordChannelsStore((s) => s.channels);
-
-  const dmChannels = useMemo(
-    () => channels.filter((c) => c.type === 1 || c.type === 3),
-    [channels]
-  );
-
-  // Load DM channels via REST if gateway hasn't provided them yet
-  useEffect(() => {
-    if (isConnected && dmChannels.length === 0) {
-      DiscordService.loadDMChannels();
-    }
-  }, [isConnected, dmChannels.length]);
 
   // Redirect if not connected and no token
   useEffect(() => {

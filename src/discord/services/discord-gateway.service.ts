@@ -1,6 +1,8 @@
 import { useDiscordStore } from '../store/discord.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
+import { useDiscordUsersStore } from '../store/discord-users.store';
+import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 
 // Discord Gateway Opcodes
 const GatewayOp = {
@@ -199,7 +201,7 @@ export const DiscordGatewayService = {
    * Handle DISPATCH events by routing to the appropriate handler.
    */
   _handleDispatch(eventName: string, data: any) {
-    console.log(`[Discord Gateway] DISPATCH: ${eventName}`);
+    console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
 
     switch (eventName) {
       case 'READY':
@@ -235,6 +237,9 @@ export const DiscordGatewayService = {
       case 'MESSAGE_DELETE':
         this._handleMessageDelete(data);
         break;
+      case 'MESSAGE_ACK':
+        this._handleMessageAck(data);
+        break;
       default:
         // Forward unhandled events to the external handler if set
         break;
@@ -249,10 +254,10 @@ export const DiscordGatewayService = {
   // ─── Dispatch Event Handlers ──────────────────────────────────────
 
   _handleReady(data: any) {
-    const { user, guilds, session_id, resume_gateway_url, private_channels } = data;
+    const { user, guilds, session_id, resume_gateway_url, private_channels, users, read_state } = data;
 
     console.log(`[Discord Gateway] READY as ${user.username}#${user.discriminator} (${user.id})`);
-    console.log(`[Discord Gateway] ${guilds.length} guilds, ${private_channels?.length || 0} DMs`);
+    console.log(`[Discord Gateway] ${guilds.length} guilds, ${private_channels?.length || 0} DMs, ${users?.length || 0} users`);
 
     useDiscordStore.getState().setUser(user);
     useDiscordStore.getState().setSessionId(session_id);
@@ -262,15 +267,47 @@ export const DiscordGatewayService = {
       this.resumeGatewayUrl = resume_gateway_url;
     }
 
-    // Guilds in READY are "unavailable" stubs — full data comes via GUILD_CREATE
-    // Store them as placeholders
-    const guildStubs = guilds.map((g: any) => ({
-      id: g.id,
-      name: g.properties?.name || '',
-      icon: g.properties?.icon || null,
-      unavailable: g.unavailable ?? false,
-    }));
-    useDiscordGuildsStore.getState().setGuilds(guildStubs);
+    useDiscordGuildsStore.getState().setGuilds(guilds);
+
+    // Extract channels and member data from READY guilds
+    const allGuildChannels: any[] = [];
+    const currentUserId = user.id;
+    for (const guild of guilds) {
+      if (guild.channels?.length > 0) {
+        for (const ch of guild.channels) {
+          allGuildChannels.push({ ...ch, guild_id: guild.id });
+        }
+      }
+      // Extract current user's member data for permissions
+      const mergedMembers = guild.merged_members || [];
+      const members = guild.members || [];
+      let currentMember = members.find((m: any) => m.user?.id === currentUserId || m.user_id === currentUserId);
+      if (!currentMember) {
+        for (const group of mergedMembers) {
+          const found = group?.find?.((m: any) => m.user?.id === currentUserId || m.user_id === currentUserId);
+          if (found) {
+            currentMember = found;
+            break;
+          }
+        }
+      }
+      if (currentMember) {
+        useDiscordGuildsStore.getState().setGuildMembers(guild.id, [currentMember]);
+      }
+    }
+    if (allGuildChannels.length > 0) {
+      useDiscordChannelsStore.getState().setChannels(allGuildChannels);
+    }
+
+    // Store users from READY payload
+    if (users && users.length > 0) {
+      useDiscordUsersStore.getState().setUsers(users);
+    }
+
+    // Store read states
+    if (read_state?.entries?.length > 0) {
+      useDiscordReadStatesStore.getState().setReadStates(read_state.entries);
+    }
 
     // Store private channels (DMs and group DMs)
     if (private_channels && private_channels.length > 0) {
@@ -282,17 +319,28 @@ export const DiscordGatewayService = {
   },
 
   _handleGuildCreate(data: any) {
-    const guild = {
-      id: data.id,
-      name: data.properties?.name || data.name,
-      icon: data.properties?.icon || data.icon,
-      owner_id: data.properties?.owner_id || data.owner_id,
-      member_count: data.member_count,
-      channels: data.channels || [],
-      roles: data.roles || [],
-    };
+    useDiscordGuildsStore.getState().addGuild(data);
 
-    useDiscordGuildsStore.getState().addGuild(guild);
+    // Store current user's member data for permission resolution
+    const currentUserId = useDiscordStore.getState().user?.id;
+    if (currentUserId) {
+      // merged_members is an array of arrays; find the current user's entry
+      const mergedMembers = data.merged_members || [];
+      const members = data.members || [];
+      let currentMember = members.find((m: any) => m.user?.id === currentUserId || m.user_id === currentUserId);
+      if (!currentMember) {
+        for (const group of mergedMembers) {
+          const found = group?.find?.((m: any) => m.user?.id === currentUserId || m.user_id === currentUserId);
+          if (found) {
+            currentMember = found;
+            break;
+          }
+        }
+      }
+      if (currentMember) {
+        useDiscordGuildsStore.getState().setGuildMembers(data.id, [currentMember]);
+      }
+    }
 
     // Store the guild's channels
     if (data.channels && data.channels.length > 0) {
@@ -350,6 +398,12 @@ export const DiscordGatewayService = {
   _handleMessageDelete(data: any) {
     if (data.id && data.channel_id) {
       useDiscordChannelsStore.getState().removeMessage(data.channel_id, data.id);
+    }
+  },
+
+  _handleMessageAck(data: any) {
+    if (data.channel_id && data.message_id) {
+      useDiscordReadStatesStore.getState().ackChannel(data.channel_id, data.message_id);
     }
   },
 

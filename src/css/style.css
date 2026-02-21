@@ -84,6 +84,13 @@
   scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 html,
 body {
   touch-action: pan-x pan-y;

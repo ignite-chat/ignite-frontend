@@ -1,18 +1,21 @@
 import { useMemo } from 'react';
 import { At, Hash } from '@phosphor-icons/react';
 import { useDiscordStore } from '../store/discord.store';
+import { useDiscordUsersStore } from '../store/discord-users.store';
 import { DiscordService } from '../services/discord.service';
 import DiscordChannelMessages from './DiscordChannelMessages';
 import DiscordChannelInput from './DiscordChannelInput';
 
 const DiscordChannel = ({ channel }) => {
   const currentUser = useDiscordStore((s) => s.user);
+  const usersMap = useDiscordUsersStore((s) => s.users);
 
   const isDM = channel?.type === 1 || channel?.type === 3;
 
   const dmInfo = useMemo(() => {
     if (!isDM || !channel) return null;
-    const recipients = channel.recipients || [];
+    const recipientIds = channel.recipient_ids || [];
+    const recipients = recipientIds.map((id) => usersMap[id]).filter(Boolean);
 
     if (channel.type === 3) {
       // Group DM
@@ -28,7 +31,7 @@ const DiscordChannel = ({ channel }) => {
       name: other.global_name || other.username,
       icon: DiscordService.getUserAvatarUrl(other.id, other.avatar, 32),
     };
-  }, [channel, currentUser?.id, isDM]);
+  }, [channel, currentUser?.id, isDM, usersMap]);
 
   if (!channel) return null;
 
@@ -41,10 +44,10 @@ const DiscordChannel = ({ channel }) => {
       <div className="flex h-12 shrink-0 items-center border-b border-white/5 px-4 shadow-sm">
         {isDM ? (
           <>
-            {dmInfo?.icon ? (
+            {dmInfo?.properties?.icon ? (
               <img
-                src={dmInfo.icon}
-                alt={dmInfo.name}
+                src={dmInfo.properties?.icon}
+                alt={dmInfo.properties?.name}
                 className="mr-2 size-6 rounded-full object-cover"
               />
             ) : (
@@ -67,7 +70,7 @@ const DiscordChannel = ({ channel }) => {
       <DiscordChannelMessages channelId={channel.id} />
 
       {/* Input */}
-      <DiscordChannelInput channelId={channel.id} channelName={placeholderName} />
+      <DiscordChannelInput channel={channel} channelName={placeholderName} />
     </div>
   );
 };

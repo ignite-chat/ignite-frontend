@@ -2,7 +2,15 @@ import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Hash, SpeakerHigh, CaretDown, CaretRight, Megaphone } from '@phosphor-icons/react';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
+import { useDiscordGuildsStore } from '../store/discord-guilds.store';
+import { useDiscordStore } from '../store/discord.store';
+import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { DiscordService } from '../services/discord.service';
+import { computeChannelPermissions } from '../utils/permissions';
+import { VIEW_CHANNEL } from '../constants/permissions';
+
+const DISCORD_EPOCH = 1420070400000;
+const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
 
 // Discord channel types
 const DiscordChannelType = {
@@ -28,10 +36,22 @@ const ChannelIcon = ({ type, className }) => {
   }
 };
 
-const DiscordChannelRow = ({ channel, isActive }) => {
-  const isVoice =
-    channel.type === DiscordChannelType.GUILD_VOICE ||
-    channel.type === DiscordChannelType.GUILD_STAGE_VOICE;
+const DiscordChannelRow = ({ channel, isActive, joinedAtMs }) => {
+  const readStates = useDiscordReadStatesStore((s) => s.readStates);
+  const entry = readStates[channel.id];
+
+  const isUnread =
+    !isActive &&
+    !!channel.last_message_id &&
+    (() => {
+      if (entry?.last_message_id) {
+        return BigInt(channel.last_message_id) > BigInt(entry.last_message_id);
+      }
+      // No read state — only unread if the last message came after user joined
+      if (!joinedAtMs) return false;
+      return snowflakeToTimestamp(channel.last_message_id) > joinedAtMs;
+    })();
+  const mentionCount = entry?.mention_count ?? 0;
 
   return (
     <Link
@@ -39,26 +59,37 @@ const DiscordChannelRow = ({ channel, isActive }) => {
       className={`group relative mx-2 my-0.5 flex items-center rounded-sm px-2 py-1 transition-colors ${
         isActive
           ? 'bg-white/[0.11] text-gray-100'
-          : 'text-gray-500 hover:bg-white/5 hover:text-gray-100'
+          : isUnread
+            ? 'text-white hover:bg-white/5'
+            : 'text-gray-500 hover:bg-white/5 hover:text-gray-100'
       }`}
       draggable="false"
     >
+      {/* Unread pill on the left edge */}
+      {isUnread && (
+        <div className="absolute -left-1 top-1/2 h-2 w-1 -translate-y-1/2 rounded-r-full bg-white" />
+      )}
       <ChannelIcon
         type={channel.type}
-        className={`size-5 shrink-0 ${isActive ? 'text-gray-200' : 'text-gray-500'}`}
+        className={`size-5 shrink-0 ${isActive ? 'text-gray-200' : isUnread ? 'text-white' : 'text-gray-500'}`}
       />
       <p
         className={`ml-1 flex-1 select-none truncate text-base ${
-          isActive ? 'font-semibold text-white' : 'font-medium'
+          isActive ? 'font-semibold text-white' : isUnread ? 'font-semibold' : 'font-medium'
         }`}
       >
         {channel.name}
       </p>
+      {mentionCount > 0 && (
+        <div className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-bold text-white">
+          {mentionCount > 99 ? '99+' : mentionCount}
+        </div>
+      )}
     </Link>
   );
 };
 
-const DiscordCategory = ({ category, channels, activeChannelId }) => {
+const DiscordCategory = ({ category, channels, activeChannelId, joinedAtMs }) => {
   const [expanded, setExpanded] = useState(true);
 
   const sortedChannels = useMemo(() => {
@@ -100,6 +131,7 @@ const DiscordCategory = ({ category, channels, activeChannelId }) => {
           <DiscordChannelRow
             channel={channel}
             isActive={channel.id === activeChannelId}
+            joinedAtMs={joinedAtMs}
           />
         </div>
       ))}
@@ -110,10 +142,36 @@ const DiscordCategory = ({ category, channels, activeChannelId }) => {
 const DiscordGuildSidebar = ({ guild }) => {
   const { channelId } = useParams();
   const { channels } = useDiscordChannelsStore();
+  const guildMembers = useDiscordGuildsStore((s) => s.guildMembers);
+  const currentUser = useDiscordStore((s) => s.user);
+
+  const guildId = guild?.id;
+  const guildRoles = guild?.roles || [];
+  const guildOwnerId = guild?.owner_id || guild?.properties?.owner_id;
+  const userId = currentUser?.id;
+
+  const myMember = useMemo(() => {
+    const members = guildMembers[guildId] || [];
+    return members.find((m) => m.user?.id === userId || m.user_id === userId);
+  }, [guildMembers, guildId, userId]);
+
+  const memberRoleIds = myMember?.roles || [];
+  const joinedAtMs = useMemo(() => {
+    // guild.joined_at comes directly from the READY / GUILD_CREATE payload
+    const raw = guild?.joined_at || myMember?.joined_at;
+    return raw ? new Date(raw).getTime() : null;
+  }, [guild?.joined_at, myMember?.joined_at]);
 
   const guildChannels = useMemo(() => {
-    return channels.filter((c) => c.guild_id === guild?.id);
-  }, [channels, guild?.id]);
+    const allGuildChannels = channels.filter((c) => c.guild_id === guildId);
+    if (!userId || guildRoles.length === 0) return allGuildChannels;
+
+    return allGuildChannels.filter((c) => {
+      if (c.type === DiscordChannelType.GUILD_CATEGORY) return true;
+      const perms = computeChannelPermissions(c, memberRoleIds, guildRoles, guildId, guildOwnerId, userId);
+      return (perms & VIEW_CHANNEL) === VIEW_CHANNEL;
+    });
+  }, [channels, guildId, userId, memberRoleIds, guildRoles, guildOwnerId]);
 
   const categories = useMemo(() => {
     return guildChannels
@@ -130,7 +188,7 @@ const DiscordGuildSidebar = ({ guild }) => {
     );
   }, [guildChannels]);
 
-  const iconUrl = DiscordService.getGuildIconUrl(guild?.id, guild?.icon, 64);
+  const iconUrl = DiscordService.getGuildIconUrl(guild?.id, guild?.properties?.icon, 64);
 
   return (
     <div className="relative top-0 flex h-full min-w-[240px] flex-col bg-[#121214] text-gray-100">
@@ -146,7 +204,7 @@ const DiscordGuildSidebar = ({ guild }) => {
               />
             )}
             <div className="flex-1 truncate text-base font-semibold">
-              {guild?.name || 'Discord Server'}
+              {guild?.properties?.name || 'Discord Server'}
             </div>
           </div>
         </div>
@@ -163,6 +221,7 @@ const DiscordGuildSidebar = ({ guild }) => {
                   key={channel.id}
                   channel={channel}
                   isActive={channel.id === channelId}
+                  joinedAtMs={joinedAtMs}
                 />
               ))}
           </div>
@@ -175,6 +234,7 @@ const DiscordGuildSidebar = ({ guild }) => {
             category={category}
             channels={guildChannels}
             activeChannelId={channelId}
+            joinedAtMs={joinedAtMs}
           />
         ))}
       </div>

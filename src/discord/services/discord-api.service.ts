@@ -31,14 +31,6 @@ export const DiscordApiService = {
   },
 
   /**
-   * Get all channels in a guild.
-   */
-  async getGuildChannels(guildId: string) {
-    const { data } = await discordApi.get(`/guilds/${guildId}/channels`);
-    return data;
-  },
-
-  /**
    * Get messages in a channel.
    */
   async getChannelMessages(channelId: string, before?: string, limit: number = 50) {
@@ -83,10 +75,13 @@ export const DiscordApiService = {
   },
 
   /**
-   * Get all private channels (DMs and group DMs) for the current user.
+   * Acknowledge (mark as read) up to a specific message in a channel.
    */
-  async getDMChannels() {
-    const { data } = await discordApi.get('/users/@me/channels');
+  async ackMessage(channelId: string, messageId: string) {
+    const { data } = await discordApi.post(
+      `/channels/${channelId}/messages/${messageId}/ack`,
+      { token: null }
+    );
     return data;
   },
 };

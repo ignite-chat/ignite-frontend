@@ -1,10 +1,13 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
+import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { DiscordService } from '../services/discord.service';
+import { DiscordApiService } from '../services/discord-api.service';
 import DiscordMessage from './DiscordMessage';
 
 const DiscordChannelMessages = ({ channelId }) => {
   const channelMessages = useDiscordChannelsStore((s) => s.channelMessages);
+  const channels = useDiscordChannelsStore((s) => s.channels);
 
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -12,10 +15,39 @@ const DiscordChannelMessages = ({ channelId }) => {
   const [forceScrollDown, setForceScrollDown] = useState(false);
 
   const messagesRef = useRef();
+  const ackTimerRef = useRef(null);
+  const lastAckedRef = useRef(null);
+
   const messages = useMemo(
     () => channelMessages[channelId] || [],
     [channelMessages, channelId]
   );
+
+  const lastMessageId = useMemo(
+    () => channels.find((c) => c.id === channelId)?.last_message_id,
+    [channels, channelId]
+  );
+
+  // Ack the channel's last_message_id if scrolled to the bottom
+  const ackIfAtBottom = useCallback(() => {
+    if (!lastMessageId || lastAckedRef.current === lastMessageId) return;
+
+    // Debounce: clear any pending ack and schedule a new one
+    if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
+    ackTimerRef.current = setTimeout(() => {
+      lastAckedRef.current = lastMessageId;
+      useDiscordReadStatesStore.getState().ackChannel(channelId, lastMessageId);
+      DiscordApiService.ackMessage(channelId, lastMessageId).catch(() => {});
+    }, 500);
+  }, [channelId, lastMessageId]);
+
+  // Reset last-acked ref when switching channels
+  useEffect(() => {
+    lastAckedRef.current = null;
+    return () => {
+      if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
+    };
+  }, [channelId]);
 
   // Load initial messages
   useEffect(() => {
@@ -71,8 +103,9 @@ const DiscordChannelMessages = ({ channelId }) => {
     if (forceScrollDown || nearBottom) {
       el.scrollTop = el.scrollHeight;
       if (forceScrollDown) setForceScrollDown(false);
+      ackIfAtBottom();
     }
-  }, [messages, forceScrollDown]);
+  }, [messages, forceScrollDown, ackIfAtBottom]);
 
   // Handle scroll position and auto-load more
   const onScroll = useCallback(() => {
@@ -82,7 +115,13 @@ const DiscordChannelMessages = ({ channelId }) => {
     if (el.scrollTop < 200 && hasMore && !loadingMore) {
       onLoadMore();
     }
-  }, [hasMore, loadingMore, onLoadMore]);
+
+    // Ack when scrolled to the bottom
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    if (atBottom) {
+      ackIfAtBottom();
+    }
+  }, [hasMore, loadingMore, onLoadMore, ackIfAtBottom]);
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" ref={messagesRef} onScroll={onScroll}>

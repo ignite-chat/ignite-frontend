@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Fire, Plus, Compass, DiscordLogo, ChatCircle } from '@phosphor-icons/react';
+import { Fire, Plus, Compass, DiscordLogo, ChatCircle, SignOut } from '@phosphor-icons/react';
 import {
   DndContext,
   DragOverlay,
@@ -51,6 +51,8 @@ import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { useDiscordStore } from '../discord/store/discord.store';
 import { useDiscordGuildsStore } from '../discord/store/discord-guilds.store';
+import { useDiscordChannelsStore } from '../discord/store/discord-channels.store';
+import { useDiscordReadStatesStore } from '../discord/store/discord-readstates.store';
 import { DiscordService } from '../discord/services/discord.service';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
@@ -144,16 +146,79 @@ const SortableGuildIcon = ({ guild, isActive, isUnread, mentionCount, isDragging
   );
 };
 
+const DISCORD_EPOCH = 1420070400000;
+const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
+
 const DiscordGuildIcon = ({ guild, isActive }) => {
-  const iconUrl = DiscordService.getGuildIconUrl(guild.id, guild.icon, 128);
+  const iconUrl = DiscordService.getGuildIconUrl(guild.id, guild.properties.icon, 128);
+  const channels = useDiscordChannelsStore((s) => s.channels);
+  const readStates = useDiscordReadStatesStore((s) => s.readStates);
+
+  const joinedAtMs = useMemo(() => {
+    return guild.joined_at ? new Date(guild.joined_at).getTime() : null;
+  }, [guild.joined_at]);
+
+  const { unread, mentions } = useMemo(() => {
+    const guildChannels = channels.filter((c) => c.guild_id === guild.id);
+    let hasUnread = false;
+    let totalMentions = 0;
+    for (const ch of guildChannels) {
+      if (ch.last_message_id) {
+        const entry = readStates[ch.id];
+        if (entry?.last_message_id) {
+          if (BigInt(ch.last_message_id) > BigInt(entry.last_message_id)) hasUnread = true;
+        } else if (joinedAtMs && snowflakeToTimestamp(ch.last_message_id) > joinedAtMs) {
+          hasUnread = true;
+        }
+      }
+      totalMentions += readStates[ch.id]?.mention_count ?? 0;
+    }
+    return { unread: hasUnread, mentions: totalMentions };
+  }, [channels, guild.id, readStates, joinedAtMs]);
 
   return (
     <Link to={`/discord/${guild.id}`} draggable="false">
       <SidebarIcon
         iconUrl={iconUrl || ''}
-        text={guild.name || guild.id}
+        text={guild.properties.name || guild.id}
         isServerIcon={true}
         isActive={isActive}
+        isUnread={unread}
+        mentionCount={mentions}
+      />
+    </Link>
+  );
+};
+
+const DiscordDMsIcon = ({ isActive }) => {
+  const channels = useDiscordChannelsStore((s) => s.channels);
+  const readStates = useDiscordReadStatesStore((s) => s.readStates);
+
+  const { unread, mentions } = useMemo(() => {
+    const dmChannels = channels.filter((c) => c.type === 1 || c.type === 3);
+    let hasUnread = false;
+    let totalMentions = 0;
+    for (const ch of dmChannels) {
+      if (ch.last_message_id) {
+        const entry = readStates[ch.id];
+        if (!entry?.last_message_id || ch.last_message_id > entry.last_message_id) {
+          hasUnread = true;
+        }
+      }
+      totalMentions += readStates[ch.id]?.mention_count ?? 0;
+    }
+    return { unread: hasUnread, mentions: totalMentions };
+  }, [channels, readStates]);
+
+  return (
+    <Link to="/discord/@me">
+      <SidebarIcon
+        icon={<ChatCircle className="size-6" />}
+        text="Discord DMs"
+        isServerIcon={true}
+        isActive={isActive}
+        isUnread={unread}
+        mentionCount={mentions}
       />
     </Link>
   );
@@ -390,24 +455,39 @@ const Sidebar = () => {
         </Link>
 
         {/* Discord */}
-        {discordConnected && (
+        {discordToken && (
           <>
             <hr className="mx-auto mb-2 mt-1 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
-            <Link to="/discord/@me">
+            {discordConnected ? (
+              <>
+                <DiscordDMsIcon isActive={location.pathname.startsWith('/discord/@me')} />
+                {discordGuilds.map((guild) => (
+                  <DiscordGuildIcon
+                    key={`discord-${guild.id}`}
+                    guild={guild}
+                    isActive={location.pathname.startsWith(`/discord/${guild.id}`)}
+                  />
+                ))}
+              </>
+            ) : (
+              <div className="group relative mb-2 flex min-w-min items-center justify-center px-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1d1d1e]">
+                  <div className="size-5 animate-spin rounded-full border-2 border-solid border-[#5865f2] border-t-transparent" />
+                </div>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                DiscordService.logout();
+                navigate('/channels/@me');
+              }}
+            >
               <SidebarIcon
-                icon={<ChatCircle className="size-6" />}
-                text="Discord DMs"
-                isServerIcon={true}
-                isActive={location.pathname.startsWith('/discord/@me')}
+                icon={<SignOut className="size-5" />}
+                text="Disconnect Discord"
               />
-            </Link>
-            {discordGuilds.map((guild) => (
-              <DiscordGuildIcon
-                key={`discord-${guild.id}`}
-                guild={guild}
-                isActive={location.pathname.startsWith(`/discord/${guild.id}`)}
-              />
-            ))}
+            </button>
           </>
         )}
 

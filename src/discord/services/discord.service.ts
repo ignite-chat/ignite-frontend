@@ -2,6 +2,8 @@ import { toast } from 'sonner';
 import { useDiscordStore } from '../store/discord.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
+import { useDiscordUsersStore } from '../store/discord-users.store';
+import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { DiscordGatewayService } from './discord-gateway.service';
 import { DiscordApiService } from './discord-api.service';
 
@@ -44,6 +46,8 @@ export const DiscordService = {
     useDiscordStore.getState().setSessionId(null);
     useDiscordGuildsStore.getState().clear();
     useDiscordChannelsStore.getState().clear();
+    useDiscordUsersStore.getState().clear();
+    useDiscordReadStatesStore.getState().clear();
     console.log('[Discord] Disconnected and stores cleared');
   },
 
@@ -54,22 +58,6 @@ export const DiscordService = {
     this.disconnect();
     useDiscordStore.getState().disconnect();
     toast.success('Disconnected from Discord.');
-  },
-
-  /**
-   * Load channels for a specific guild via REST API.
-   * Use this when you need full channel data beyond what the gateway provides.
-   */
-  async loadGuildChannels(guildId: string) {
-    try {
-      const channels = await DiscordApiService.getGuildChannels(guildId);
-      useDiscordChannelsStore.getState().setGuildChannels(guildId, channels);
-      return channels;
-    } catch (error) {
-      console.error(`[Discord] Failed to load channels for guild ${guildId}:`, error);
-      toast.error('Failed to load Discord channels.');
-      return [];
-    }
   },
 
   /**
@@ -115,23 +103,6 @@ export const DiscordService = {
     }
   },
 
-  /**
-   * Load all DM channels via REST API.
-   */
-  async loadDMChannels() {
-    try {
-      const channels = await DiscordApiService.getDMChannels();
-      const channelsStore = useDiscordChannelsStore.getState();
-      for (const channel of channels) {
-        channelsStore.addChannel(channel);
-      }
-      return channels;
-    } catch (error) {
-      console.error('[Discord] Failed to load DM channels:', error);
-      toast.error('Failed to load Discord DMs.');
-      return [];
-    }
-  },
 
   /**
    * Load guild members via REST API.
