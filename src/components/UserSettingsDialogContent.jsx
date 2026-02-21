@@ -11,7 +11,11 @@ import { Textarea } from './ui/textarea';
 import { Field, FieldError, FieldGroup, FieldLabel } from './ui/field';
 import { toast } from 'sonner';
 import { SheetDescription } from './ui/sheet';
-import { User, UserCircle, Mic, Bot, LogOut, X, Menu, KeyRound, Camera, Trash2 } from 'lucide-react';
+import { User, UserCircle, Mic, Bot, LogOut, X, Menu, KeyRound, Camera, Trash2, Bell, Volume2, Upload } from 'lucide-react';
+import { Switch } from './ui/switch';
+import { useSoundStore, SOUND_EVENTS, SOUND_EVENT_LABELS } from '../store/sound.store';
+import { SoundService } from '../services/sound.service';
+import { VoiceService } from '../services/voice.service';
 import ImageCropperDialog from './Settings/ImageCropperDialog';
 import {
   AlertDialog,
@@ -27,6 +31,7 @@ import { useVoiceStore } from '../store/voice.store';
 import { useAuthStore } from '../store/auth.store';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Separator } from './ui/separator';
+import MicTestBars from './Voice/MicTestBars';
 import { cn } from '@/lib/utils';
 
 // ─── My Account Tab ───────────────────────────────────────────────────────────
@@ -806,7 +811,9 @@ const TabVoiceAudio = () => {
   const [outputDevices, setOutputDevices] = useState([]);
   const audioInputDeviceId = useVoiceStore((s) => s.audioInputDeviceId);
   const audioOutputDeviceId = useVoiceStore((s) => s.audioOutputDeviceId);
+  const noiseSuppression = useVoiceStore((s) => s.noiseSuppression);
   const room = useVoiceStore((s) => s.room);
+  const [isTesting, setIsTesting] = useState(false);
 
   const loadDevices = useCallback(async () => {
     try {
@@ -822,6 +829,9 @@ const TabVoiceAudio = () => {
   useEffect(() => {
     loadDevices();
   }, [loadDevices]);
+
+  // Stop mic test on unmount
+  useEffect(() => () => setIsTesting(false), []);
 
   const handleInputChange = useCallback(
     async (deviceId) => {
@@ -852,6 +862,14 @@ const TabVoiceAudio = () => {
     },
     [room]
   );
+
+  const handleNoiseToggle = useCallback(async () => {
+    if (room) {
+      await VoiceService.toggleNoiseSuppression();
+    } else {
+      useVoiceStore.getState().setNoiseSuppression(!noiseSuppression);
+    }
+  }, [room, noiseSuppression]);
 
   return (
     <div className="max-w-[740px] space-y-6">
@@ -897,6 +915,54 @@ const TabVoiceAudio = () => {
           </Field>
         </FieldGroup>
       </div>
+
+      {/* Noise Suppression */}
+      {/* TODO: Krisp requires LiveKit Cloud — noise suppression won't work on self-hosted LiveKit servers */}
+      <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Mic className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-semibold">Noise Suppression</p>
+              <p className="text-xs text-muted-foreground">
+                Powered by Krisp — make some noise while speaking and your friends will only hear your voice.
+              </p>
+            </div>
+          </div>
+          <Switch checked={noiseSuppression} onCheckedChange={handleNoiseToggle} />
+        </div>
+
+        {/* Mic Test */}
+        <Separator />
+        <div>
+          <p className="mb-2 text-sm font-semibold">Mic Test</p>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsTesting((prev) => !prev)}
+            >
+              {isTesting ? 'Stop' : 'Test'}
+            </Button>
+            {isTesting && <MicTestBars deviceId={audioInputDeviceId} outputDeviceId={audioOutputDeviceId} />}
+          </div>
+        </div>
+
+        {/* Krisp branding */}
+        <Separator />
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Powered by</span>
+          <span className="text-sm font-bold">krisp</span>
+          <a
+            href="https://krisp.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary hover:underline"
+          >
+            Learn More
+          </a>
+        </div>
+      </div>
     </div>
   );
 };
@@ -908,6 +974,123 @@ const TabBots = () => {
     <div className="max-w-[740px]">
       <h3 className="text-base font-semibold">Bots</h3>
       <p className="mt-1 text-sm text-muted-foreground">Manage your bots and integrations</p>
+    </div>
+  );
+};
+
+// ─── Notification Sounds Tab ──────────────────────────────────────────────────
+
+const TabNotificationSounds = () => {
+  const disableAll = useSoundStore((s) => s.disableAll);
+  const events = useSoundStore((s) => s.events);
+  const { setDisableAll, setEventEnabled, setCustomSound, removeCustomSound } = useSoundStore();
+  const fileInputRef = useRef(null);
+  const [uploadTarget, setUploadTarget] = useState(null);
+
+  const handleUploadClick = (eventType) => {
+    setUploadTarget(eventType);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !uploadTarget) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Sound file must be under 2MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCustomSound(uploadTarget, reader.result);
+      SoundService.invalidateCache(uploadTarget);
+      setUploadTarget(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="max-w-[740px] space-y-6">
+      <div>
+        <h3 className="text-base font-semibold">Notification Sounds</h3>
+        <p className="text-sm text-muted-foreground">
+          Toggle and customize sounds for different events
+        </p>
+      </div>
+
+      {/* Master toggle */}
+      <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
+        <div>
+          <p className="text-sm font-medium">Disable All Notification Sounds</p>
+          <p className="text-xs text-muted-foreground">Mute every sound effect at once</p>
+        </div>
+        <Switch checked={disableAll} onCheckedChange={setDisableAll} />
+      </div>
+
+      {/* Per-event rows */}
+      <div className="space-y-1 rounded-lg border border-border bg-card p-4">
+        {SOUND_EVENTS.map((eventType) => {
+          const config = events[eventType];
+          return (
+            <div
+              key={eventType}
+              className="flex items-center justify-between rounded-md px-2 py-2.5 hover:bg-muted/50"
+            >
+              <span className="text-sm font-medium">{SOUND_EVENT_LABELS[eventType]}</span>
+              <div className="flex items-center gap-2">
+                {/* Preview */}
+                <button
+                  onClick={() => SoundService.previewSound(eventType)}
+                  className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title="Preview sound"
+                >
+                  <Volume2 className="h-4 w-4" />
+                </button>
+
+                {/* Upload custom */}
+                <button
+                  onClick={() => handleUploadClick(eventType)}
+                  className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title="Upload custom sound"
+                >
+                  <Upload className="h-4 w-4" />
+                </button>
+
+                {/* Remove custom */}
+                {config?.customSound && (
+                  <button
+                    onClick={() => {
+                      removeCustomSound(eventType);
+                      SoundService.invalidateCache(eventType);
+                    }}
+                    className="rounded-md p-1.5 text-destructive transition-colors hover:bg-destructive/10"
+                    title="Remove custom sound"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+
+                {/* Toggle */}
+                <Switch
+                  checked={config?.enabled ?? true}
+                  onCheckedChange={(checked) => setEventEnabled(eventType, checked)}
+                  disabled={disableAll}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".mp3,.wav,.ogg,.m4a,.aac,.flac,.opus,.webm"
+        className="hidden"
+        onChange={handleFileChange}
+      />
     </div>
   );
 };
@@ -924,7 +1107,10 @@ const navigationSections = [
   },
   {
     label: 'APP SETTINGS',
-    items: [{ id: 'voice', title: 'Voice & Audio', icon: Mic }],
+    items: [
+      { id: 'voice', title: 'Voice & Audio', icon: Mic },
+      { id: 'notifications', title: 'Notification Sounds', icon: Bell },
+    ],
   },
   {
     label: 'BOTS & INTEGRATIONS',
@@ -957,6 +1143,8 @@ const UserSettingsDialogContent = () => {
         return <TabProfiles />;
       case 'voice':
         return <TabVoiceAudio />;
+      case 'notifications':
+        return <TabNotificationSounds />;
       case 'bots':
         return <TabBots />;
       default:

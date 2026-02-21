@@ -2,6 +2,69 @@ import { Room, RoomEvent, Track, ConnectionState } from 'livekit-client';
 import { toast } from 'sonner';
 import api from '../api.js';
 import { useVoiceStore, type VoiceState } from '../store/voice.store';
+import { SoundService } from './sound.service';
+
+// Krisp noise suppression — lazy-loaded to avoid WASM init at import time.
+// TODO: Krisp requires LiveKit Cloud (*.livekit.cloud) for authentication.
+// Noise suppression will not work on self-hosted LiveKit servers until migrated to Cloud.
+let krispModule: typeof import('@livekit/krisp-noise-filter') | null = null;
+let krispProcessor: any = null;
+
+async function getKrispModule() {
+  if (!krispModule) {
+    krispModule = await import('@livekit/krisp-noise-filter');
+  }
+  return krispModule;
+}
+
+/**
+ * Apply Krisp noise suppression to the local mic track.
+ * TODO: Krisp requires LiveKit Cloud — will fail silently on self-hosted servers.
+ */
+async function applyNoiseSuppression(room: Room) {
+  const { noiseSuppression } = useVoiceStore.getState();
+  const publication = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+  const track = publication?.track;
+  if (!track) return;
+
+  try {
+    const krisp = await getKrispModule();
+    if (!krisp.isKrispNoiseFilterSupported()) {
+      console.warn('[noise] Krisp is not supported in this browser.');
+      return;
+    }
+    if (!krispProcessor) {
+      krispProcessor = krisp.KrispNoiseFilter();
+    }
+    await track.setProcessor(krispProcessor);
+    krispProcessor.setEnabled(noiseSuppression);
+  } catch (err) {
+    // TODO: This will fail on self-hosted LiveKit servers (non-Cloud).
+    // Krisp authentication requires *.livekit.cloud — migrate to LiveKit Cloud to enable.
+    console.warn('[noise] Krisp failed (requires LiveKit Cloud):', err);
+  }
+}
+
+/**
+ * Toggle Krisp noise suppression on an active mic track.
+ * TODO: Krisp requires LiveKit Cloud — toggling will have no effect on self-hosted servers.
+ */
+async function toggleNoiseSuppressionOnTrack(room: Room, enabled: boolean) {
+  const publication = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+  const track = publication?.track;
+  if (!track) return;
+
+  if (krispProcessor) {
+    try {
+      krispProcessor.setEnabled(enabled);
+    } catch (err) {
+      console.warn('[noise] Krisp toggle failed:', err);
+    }
+  } else {
+    // Processor not yet set up — full apply
+    await applyNoiseSuppression(room);
+  }
+}
 
 function buildVoiceStates(room: Room): VoiceState[] {
   const { isMuted, isDeafened, isCameraOn, isScreenSharing, channelId, guildId, voiceStates } = useVoiceStore.getState();
@@ -141,8 +204,14 @@ export const VoiceService = {
       });
 
       // Participant events
-      room.on(RoomEvent.ParticipantConnected, () => refreshVoiceStates(room));
-      room.on(RoomEvent.ParticipantDisconnected, () => refreshVoiceStates(room));
+      room.on(RoomEvent.ParticipantConnected, () => {
+        refreshVoiceStates(room);
+        SoundService.playSound('user_join_channel');
+      });
+      room.on(RoomEvent.ParticipantDisconnected, () => {
+        refreshVoiceStates(room);
+        SoundService.playSound('user_leave_channel');
+      });
       room.on(RoomEvent.ActiveSpeakersChanged, () => refreshVoiceStates(room));
       room.on(RoomEvent.TrackMuted, () => refreshVoiceStates(room));
       room.on(RoomEvent.TrackUnmuted, () => refreshVoiceStates(room));
@@ -167,6 +236,8 @@ export const VoiceService = {
 
       room.on(RoomEvent.Disconnected, () => {
         stopLocalSpeakingMonitor();
+        krispProcessor = null;
+        SoundService.playSound('voice_disconnected');
         useVoiceStore.getState().reset();
       });
 
@@ -189,6 +260,7 @@ export const VoiceService = {
       if (shouldEnableMic) {
         try {
           await room.localParticipant.setMicrophoneEnabled(true);
+          await applyNoiseSuppression(room);
           startLocalSpeakingMonitor(room);
         } catch {
           console.warn('Microphone access denied — joining muted.');
@@ -209,6 +281,7 @@ export const VoiceService = {
     const { room } = store;
 
     stopLocalSpeakingMonitor();
+    krispProcessor = null;
 
     if (room) {
       room.localParticipant.setScreenShareEnabled(false);
@@ -227,10 +300,12 @@ export const VoiceService = {
     const newMuted = !isMuted;
     await room.localParticipant.setMicrophoneEnabled(!newMuted);
     store.setMuted(newMuted);
+    SoundService.playSound(newMuted ? 'voice_mute' : 'voice_unmute');
 
     if (newMuted) {
       stopLocalSpeakingMonitor();
     } else {
+      await applyNoiseSuppression(room);
       startLocalSpeakingMonitor(room);
     }
 
@@ -270,6 +345,7 @@ export const VoiceService = {
     }
 
     store.setDeafened(newDeafened);
+    SoundService.playSound(newDeafened ? 'voice_deafen' : 'voice_undeafen');
     refreshVoiceStates(room);
 
     if (channelId) {
@@ -289,11 +365,23 @@ export const VoiceService = {
     try {
       await room.localParticipant.setCameraEnabled(!isCameraOn);
       store.setCameraOn(!isCameraOn);
+      SoundService.playSound(!isCameraOn ? 'camera_on' : 'camera_off');
       refreshVoiceStates(room);
     } catch {
       console.warn('Camera access denied.');
       toast.error('Could not access camera.');
     }
+  },
+
+  async toggleNoiseSuppression() {
+    const store = useVoiceStore.getState();
+    const newEnabled = !store.noiseSuppression;
+    store.setNoiseSuppression(newEnabled);
+
+    const { room } = store;
+    if (!room) return;
+
+    await toggleNoiseSuppressionOnTrack(room, newEnabled);
   },
 
   async toggleScreenShare() {

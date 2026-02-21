@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Microphone,
   MicrophoneSlash,
@@ -8,14 +9,17 @@ import {
   VideoCamera,
   VideoCameraSlash,
   Monitor,
+  GearSix,
 } from '@phosphor-icons/react';
 import { useVoiceStore } from '@/store/voice.store';
 import { VoiceService } from '@/services/voice.service';
 import ScreenSharePicker from './ScreenSharePicker';
+import VoiceSettingsDialog from './VoiceSettingsDialog';
 
 const VoiceControls = () => {
   const { channelName, connectionState, isMuted, isDeafened, isCameraOn, isScreenSharing } =
     useVoiceStore();
+  const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
 
   if (connectionState === 'disconnected') return null;
 
@@ -92,6 +96,15 @@ const VoiceControls = () => {
 
         <button
           type="button"
+          onClick={() => setVoiceSettingsOpen(true)}
+          className="flex size-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200"
+          title="Voice Settings"
+        >
+          <GearSix className="size-5" />
+        </button>
+
+        <button
+          type="button"
           onClick={() => VoiceService.leaveVoiceChannel()}
           className="flex size-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-red-500/20 hover:text-red-400"
           title="Disconnect"
@@ -101,6 +114,7 @@ const VoiceControls = () => {
       </div>
 
       <ScreenSharePicker />
+      <VoiceSettingsDialog open={voiceSettingsOpen} onOpenChange={setVoiceSettingsOpen} />
     </div>
   );
 };

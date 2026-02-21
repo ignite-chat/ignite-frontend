@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Gear,
   Microphone,
@@ -13,6 +13,7 @@ import {
   VideoCamera,
   VideoCameraSlash,
   Monitor,
+  Waveform,
 } from '@phosphor-icons/react';
 import { useAuthStore } from '@/store/auth.store';
 import { Dialog, DialogTrigger } from './ui/dialog';
@@ -23,6 +24,7 @@ import Avatar from './Avatar';
 import { useVoiceStore } from '@/store/voice.store';
 import { useUsersStore } from '@/store/users.store';
 import { VoiceService } from '@/services/voice.service';
+import VoiceSettingsDialog from './Voice/VoiceSettingsDialog';
 
 function getPingInfo(ping) {
   if (ping === null || ping == 0) return { Icon: WifiHigh, color: 'text-gray-400', label: 'Measuring...' };
@@ -37,6 +39,7 @@ const UserBar = () => {
   const { channelName, connectionState, isMuted, isDeafened, isCameraOn, isScreenSharing, room, ping } =
     useVoiceStore();
   const user = useUsersStore((state) => state.getCurrentUser());
+  const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
 
   const isConnected = connectionState !== 'disconnected';
 
@@ -117,6 +120,15 @@ const UserBar = () => {
 
             <button
               type="button"
+              onClick={() => setVoiceSettingsOpen(true)}
+              className="flex size-9 shrink-0 items-center justify-center rounded bg-[#2a2a2d] text-gray-300 transition-colors hover:bg-[#35353a] hover:text-gray-100"
+              title="Voice Settings"
+            >
+              <Waveform className="size-5" weight="bold" />
+            </button>
+
+            <button
+              type="button"
               onClick={() => VoiceService.leaveVoiceChannel()}
               className="flex size-9 shrink-0 items-center justify-center rounded bg-[#2a2a2d] text-gray-300 transition-colors hover:bg-red-500/20 hover:text-red-400"
               title="Disconnect"
@@ -124,6 +136,8 @@ const UserBar = () => {
               <PhoneDisconnect className="size-5" weight="fill" />
             </button>
           </div>
+
+          <VoiceSettingsDialog open={voiceSettingsOpen} onOpenChange={setVoiceSettingsOpen} />
         </div>
       )}
 

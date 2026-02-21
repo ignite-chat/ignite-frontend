@@ -36,6 +36,8 @@ import { UnreadsService } from '@/services/unreads.service';
 import { isChannelUnread as checkChannelUnread, getChannelMentionCount as getChannelMentions } from '@/utils/unreads.utils';
 import { ChannelsService } from '@/services/channels.service';
 import { useChannelsStore } from '@/store/channels.store';
+import { useTypingStore } from '@/store/typing.store';
+import { useUsersStore } from '@/store/users.store';
 import { useVoiceStore } from '@/store/voice.store';
 import { VoiceService } from '@/services/voice.service';
 import { ChannelType } from '@/constants/ChannelType';
@@ -47,6 +49,11 @@ import GuildSidebarHeader from './GuildSidebarHeader';
 const ChannelRow = ({ channel, isActive, isUnread, mentionsCount, isDragOverlay }) => {
   const isVoice = channel.type === ChannelType.GUILD_VOICE;
   const Icon = isVoice ? SpeakerHigh : Hash;
+  const typingUsers = useTypingStore((s) => s.typing[channel.channel_id] || []);
+  const firstTypingUser = useUsersStore((s) =>
+    typingUsers[0] ? s.users[typingUsers[0].user_id] : null
+  );
+  const showTyping = !isDragOverlay && !isVoice && typingUsers.length > 0 && !mentionsCount;
 
   return (
     <div
@@ -66,7 +73,7 @@ const ChannelRow = ({ channel, isActive, isUnread, mentionsCount, isDragOverlay 
         }`}
       />
       <p
-        className={`ml-1 flex-1 select-none truncate text-base ${
+        className={`ml-1 select-none truncate text-base ${showTyping ? '' : 'flex-1'} ${
           isDragOverlay
             ? 'font-medium text-gray-100'
             : isActive || isUnread
@@ -76,6 +83,28 @@ const ChannelRow = ({ channel, isActive, isUnread, mentionsCount, isDragOverlay 
       >
         {channel.name}
       </p>
+      {showTyping && (
+        <span className="ml-auto flex items-center gap-1">
+          {firstTypingUser ? (
+            firstTypingUser.avatar_url ? (
+              <img src={firstTypingUser.avatar_url} className="size-4 rounded-full" alt="" />
+            ) : (
+              <span className="flex size-4 items-center justify-center rounded-full bg-[#2b2d31] text-[8px] font-semibold text-gray-300">
+                {firstTypingUser.username?.slice(0, 1).toUpperCase()}
+              </span>
+            )
+          ) : (
+            <span className="flex size-4 items-center justify-center rounded-full bg-[#2b2d31] text-[8px] font-semibold text-gray-300">
+              {typingUsers[0]?.username?.slice(0, 1).toUpperCase()}
+            </span>
+          )}
+          <span className="flex items-center gap-[2px]">
+            <span className="size-[5px] animate-bounce rounded-full bg-white [animation-delay:0ms]" />
+            <span className="size-[5px] animate-bounce rounded-full bg-white [animation-delay:150ms]" />
+            <span className="size-[5px] animate-bounce rounded-full bg-white [animation-delay:300ms]" />
+          </span>
+        </span>
+      )}
       {mentionsCount > 0 && (
         <div className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white shadow-sm">
           {mentionsCount}
