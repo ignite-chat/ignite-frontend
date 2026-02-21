@@ -26,6 +26,7 @@ interface VoiceStoreState {
   isScreenSharePickerOpen: boolean;
   watchingScreens: string[];
   connectionState: 'disconnected' | 'connecting' | 'connected';
+  ping: number | null;
   audioInputDeviceId: string | null;
   audioOutputDeviceId: string | null;
   noiseSuppression: boolean;
@@ -49,6 +50,7 @@ interface VoiceStoreState {
   setScreenSharePickerOpen: (open: boolean) => void;
   addWatchingScreen: (identity: string) => void;
   removeWatchingScreen: (identity: string) => void;
+  setPing: (ping: number | null) => void;
   setAudioInputDeviceId: (id: string | null) => void;
   setAudioOutputDeviceId: (id: string | null) => void;
   setNoiseSuppression: (enabled: boolean) => void;
@@ -69,6 +71,7 @@ export const useVoiceStore = create<VoiceStoreState>((set) => ({
   isScreenSharePickerOpen: false,
   watchingScreens: [],
   connectionState: 'disconnected',
+  ping: null,
   audioInputDeviceId: localStorage.getItem('audioInputDeviceId') || null,
   audioOutputDeviceId: localStorage.getItem('audioOutputDeviceId') || null,
   noiseSuppression: localStorage.getItem('noiseSuppression') === 'true',
@@ -102,6 +105,7 @@ export const useVoiceStore = create<VoiceStoreState>((set) => ({
         ...voiceStates,
       ],
     })),
+  setPing: (ping) => set({ ping }),
   setConnectionState: (connectionState) => set({ connectionState }),
   setMuted: (isMuted) => set({ isMuted }),
   setDeafened: (isDeafened) => set({ isDeafened }),
@@ -152,5 +156,6 @@ export const useVoiceStore = create<VoiceStoreState>((set) => ({
       isScreenSharePickerOpen: false,
       watchingScreens: [],
       connectionState: 'disconnected',
+      ping: null,
     })),
 }));
