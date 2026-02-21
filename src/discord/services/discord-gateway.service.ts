@@ -254,7 +254,7 @@ export const DiscordGatewayService = {
   // ─── Dispatch Event Handlers ──────────────────────────────────────
 
   _handleReady(data: any) {
-    const { user, guilds, session_id, resume_gateway_url, private_channels, users, read_state } = data;
+    const { user, guilds, session_id, resume_gateway_url, private_channels, users, read_state, merged_members } = data;
 
     console.log(`[Discord Gateway] READY as ${user.username}#${user.discriminator} (${user.id})`);
     console.log(`[Discord Gateway] ${guilds.length} guilds, ${private_channels?.length || 0} DMs, ${users?.length || 0} users`);
@@ -270,29 +270,20 @@ export const DiscordGatewayService = {
     useDiscordGuildsStore.getState().setGuilds(guilds);
 
     // Extract channels and member data from READY guilds
+    // merged_members is a top-level array ordered the same as guilds —
+    // merged_members[i] contains an array of member objects for guilds[i]
     const allGuildChannels: any[] = [];
-    const currentUserId = user.id;
-    for (const guild of guilds) {
+    for (let i = 0; i < guilds.length; i++) {
+      const guild = guilds[i];
       if (guild.channels?.length > 0) {
         for (const ch of guild.channels) {
           allGuildChannels.push({ ...ch, guild_id: guild.id });
         }
       }
       // Extract current user's member data for permissions
-      const mergedMembers = guild.merged_members || [];
-      const members = guild.members || [];
-      let currentMember = members.find((m: any) => m.user?.id === currentUserId || m.user_id === currentUserId);
-      if (!currentMember) {
-        for (const group of mergedMembers) {
-          const found = group?.find?.((m: any) => m.user?.id === currentUserId || m.user_id === currentUserId);
-          if (found) {
-            currentMember = found;
-            break;
-          }
-        }
-      }
-      if (currentMember) {
-        useDiscordGuildsStore.getState().setGuildMembers(guild.id, [currentMember]);
+      const memberGroup = merged_members?.[i];
+      if (memberGroup?.length > 0) {
+        useDiscordGuildsStore.getState().setGuildMembers(guild.id, memberGroup);
       }
     }
     if (allGuildChannels.length > 0) {
