@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Fire, Plus, Compass } from '@phosphor-icons/react';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Fire, Plus, Compass, DiscordLogo, ChatCircle } from '@phosphor-icons/react';
 import {
   DndContext,
   DragOverlay,
@@ -39,6 +39,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import { useDiscordStore } from '../discord/store/discord.store';
+import { useDiscordGuildsStore } from '../discord/store/discord-guilds.store';
+import { DiscordService } from '../discord/services/discord.service';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
@@ -131,9 +134,25 @@ const SortableGuildIcon = ({ guild, isActive, isUnread, mentionCount, isDragging
   );
 };
 
+const DiscordGuildIcon = ({ guild, isActive }) => {
+  const iconUrl = DiscordService.getGuildIconUrl(guild.id, guild.icon, 128);
+
+  return (
+    <Link to={`/discord/${guild.id}`} draggable="false">
+      <SidebarIcon
+        iconUrl={iconUrl || ''}
+        text={guild.name || guild.id}
+        isServerIcon={true}
+        isActive={isActive}
+      />
+    </Link>
+  );
+};
+
 const Sidebar = () => {
   const { guildId, channelId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useStore();
   const { guilds } = useGuildsStore();
   const { channelUnreads, channelUnreadsLoaded } = useUnreadsStore();
@@ -143,6 +162,17 @@ const Sidebar = () => {
   const [activeId, setActiveId] = useState(null);
   const [leaveGuild, setLeaveGuild] = useState(null);
   const [inviteGuildId, setInviteGuildId] = useState(null);
+
+  // Discord state
+  const { token: discordToken, isConnected: discordConnected } = useDiscordStore();
+  const { guilds: discordGuilds } = useDiscordGuildsStore();
+
+  // Auto-connect to Discord if token exists
+  useEffect(() => {
+    if (discordToken && !discordConnected) {
+      DiscordService.connect();
+    }
+  }, [discordToken, discordConnected]);
 
   const { orderedGuilds, reorder } = useGuildOrder(guilds);
 
@@ -346,6 +376,48 @@ const Sidebar = () => {
         <Link to="/guild-discovery">
           <SidebarIcon icon={<Compass className="size-6" />} text="Discover Servers" />
         </Link>
+
+        {/* Discord */}
+        {discordConnected && (
+          <>
+            <hr className="mx-auto mb-2 mt-1 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
+            <Link to="/discord/@me">
+              <SidebarIcon
+                icon={<ChatCircle className="size-6" />}
+                text="Discord DMs"
+                isServerIcon={true}
+                isActive={location.pathname.startsWith('/discord/@me')}
+              />
+            </Link>
+            {discordGuilds.map((guild) => (
+              <DiscordGuildIcon
+                key={`discord-${guild.id}`}
+                guild={guild}
+                isActive={location.pathname.startsWith(`/discord/${guild.id}`)}
+              />
+            ))}
+          </>
+        )}
+
+        {!discordToken && (
+          <>
+            <hr className="mx-auto mb-2 mt-1 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
+            <button
+              type="button"
+              onClick={() => {
+                const token = prompt('Enter your Discord token:');
+                if (token) {
+                  useDiscordStore.getState().setToken(token);
+                }
+              }}
+            >
+              <SidebarIcon
+                icon={<DiscordLogo className="size-6" />}
+                text="Connect Discord"
+              />
+            </button>
+          </>
+        )}
       </div>
 
       <GuildDialog open={isGuildDialogOpen} onOpenChange={setIsGuildDialogOpen} />

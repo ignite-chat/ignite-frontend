@@ -8,6 +8,8 @@ import DirectMessagesPage from './pages/DirectMessages';
 import GuildChannelPage from './pages/GuildChannel';
 import InvitePage from './pages/InvitePage';
 import GuildDiscoveryPage from './pages/GuildDiscovery';
+import DiscordGuildPage from './discord/pages/DiscordGuildPage';
+import DiscordDMPage from './discord/pages/DiscordDMPage';
 import { InitializationService } from './services/initialization.service';
 import { EchoService } from './services/echo.service';
 import { useGuildsStore } from './store/guilds.store';
@@ -231,6 +233,24 @@ function App() {
               <>
                 <PageTitle title="Guild Channel" />
                 <GuildChannelPage />
+              </>
+            }
+          />
+          <Route
+            path="/discord/@me/:channelId?"
+            element={
+              <>
+                <PageTitle title="Discord DMs" />
+                <DiscordDMPage />
+              </>
+            }
+          />
+          <Route
+            path="/discord/:guildId/:channelId?"
+            element={
+              <>
+                <PageTitle title="Discord" />
+                <DiscordGuildPage />
               </>
             }
           />
