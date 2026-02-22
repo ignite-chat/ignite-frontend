@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Hash, Plus, CaretDown, CaretRight, SpeakerHigh } from '@phosphor-icons/react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Plus, CaretDown, CaretRight } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import {
   DndContext,
@@ -14,16 +14,12 @@ import {
 } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  useSortable,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 import api from '@/api';
-import { GuildsService } from '@/services/guilds.service';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -36,250 +32,12 @@ import { UnreadsService } from '@/services/unreads.service';
 import { isChannelUnread as checkChannelUnread, getChannelMentionCount as getChannelMentions } from '@/utils/unreads.utils';
 import { ChannelsService } from '@/services/channels.service';
 import { useChannelsStore } from '@/store/channels.store';
-import { useTypingStore } from '@/store/typing.store';
-import { useUsersStore } from '@/store/users.store';
 import { useVoiceStore } from '@/store/voice.store';
-import { VoiceService } from '@/services/voice.service';
 import { ChannelType } from '@/constants/ChannelType';
-import VoiceControls from '@/components/Voice/VoiceControls';
-import VoiceParticipant from '@/components/Voice/VoiceParticipant';
 import { scrollPositions } from '@/store/last-channel.store';
+import ChannelItem from '@/components/Channel/ChannelItem';
+import ChannelRow from '@/components/Channel/ChannelRow';
 import GuildSidebarHeader from './GuildSidebarHeader';
-
-// Presentational channel row, used both in SortableChannel and DragOverlay
-const ChannelRow = ({ channel, isActive, isUnread, mentionsCount, isDragOverlay }) => {
-  const isVoice = channel.type === ChannelType.GUILD_VOICE;
-  const Icon = isVoice ? SpeakerHigh : Hash;
-  const typingUsers = useTypingStore((s) => s.typing[channel.channel_id] || []);
-  const firstTypingUser = useUsersStore((s) =>
-    typingUsers[0] ? s.users[typingUsers[0].user_id] : null
-  );
-  const showTyping = !isDragOverlay && !isVoice && typingUsers.length > 0 && !mentionsCount;
-
-  return (
-    <div
-      className={`relative mx-2 my-0.5 flex items-center rounded-sm px-2 py-1 transition-colors ${
-        isDragOverlay
-          ? 'bg-white/[0.11] text-gray-100 shadow-md shadow-black/40 ring-1 ring-gray-500/40'
-          : isActive
-            ? 'bg-white/[0.11] text-gray-100'
-            : isUnread
-              ? 'text-gray-100 hover:bg-white/5'
-              : 'text-gray-500 hover:bg-white/5 hover:text-gray-100'
-      }`}
-    >
-      <Icon
-        className={`size-5 shrink-0 ${
-          isDragOverlay ? 'text-gray-300' : isActive || isUnread ? 'text-gray-200' : 'text-gray-500'
-        }`}
-      />
-      <p
-        className={`ml-1 select-none truncate text-base ${showTyping ? '' : 'flex-1'} ${
-          isDragOverlay
-            ? 'font-medium text-gray-100'
-            : isActive || isUnread
-              ? 'font-semibold text-white'
-              : 'font-medium'
-        }`}
-      >
-        {channel.name}
-      </p>
-      {showTyping && (
-        <span className="ml-auto flex items-center gap-1">
-          {firstTypingUser ? (
-            firstTypingUser.avatar_url ? (
-              <img src={firstTypingUser.avatar_url} className="size-4 rounded-full" alt="" />
-            ) : (
-              <span className="flex size-4 items-center justify-center rounded-full bg-[#2b2d31] text-[8px] font-semibold text-gray-300">
-                {firstTypingUser.username?.slice(0, 1).toUpperCase()}
-              </span>
-            )
-          ) : (
-            <span className="flex size-4 items-center justify-center rounded-full bg-[#2b2d31] text-[8px] font-semibold text-gray-300">
-              {typingUsers[0]?.username?.slice(0, 1).toUpperCase()}
-            </span>
-          )}
-          <span className="flex items-center gap-[2px]">
-            <span className="size-[5px] animate-bounce rounded-full bg-white [animation-delay:0ms]" />
-            <span className="size-[5px] animate-bounce rounded-full bg-white [animation-delay:150ms]" />
-            <span className="size-[5px] animate-bounce rounded-full bg-white [animation-delay:300ms]" />
-          </span>
-        </span>
-      )}
-      {mentionsCount > 0 && (
-        <div className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white shadow-sm">
-          {mentionsCount}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const SortableChannel = ({
-  channel,
-  isActive,
-  isUnread,
-  mentionsCount,
-  expanded,
-  canManageChannels,
-  onEditChannel,
-  handleDeleteChannel,
-  navigate,
-  globalIsDragging,
-  guild,
-  voiceParticipants,
-}) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: channel.channel_id,
-    disabled: !canManageChannels,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.3 : 1,
-    touchAction: 'none',
-    position: 'relative',
-  };
-
-  const handleMarkAsRead = async () => {
-    await UnreadsService.setLastReadMessageId(channel.channel_id, channel.last_message_id || null);
-    await ChannelsService.acknowledgeChannelMessage(
-      channel.channel_id,
-      channel.last_message_id || null
-    );
-    toast.success('Channel marked as read.');
-  };
-
-  const handleCopyLink = async () => {
-    const channelLink = `${window.location.origin}/channels/${channel.guild_id}/${channel.channel_id}`;
-    try {
-      await navigator.clipboard.writeText(channelLink);
-      toast.success('Channel link copied to clipboard.');
-    } catch {
-      toast.error('Could not copy channel link to clipboard.');
-    }
-  };
-
-  const handleCopyId = async () => {
-    try {
-      await navigator.clipboard.writeText(String(channel.channel_id));
-      toast.success('Channel ID copied to clipboard.');
-    } catch {
-      toast.error('Could not copy channel ID to clipboard.');
-    }
-  };
-
-  const isVoice = channel.type === ChannelType.GUILD_VOICE;
-
-  const handleVoiceClick = (e) => {
-    if (isDragging) return;
-    VoiceService.joinVoiceChannel(
-      channel.channel_id,
-      channel.guild_id,
-      guild?.name || '',
-      channel.name
-    );
-  };
-
-  const channelContent = (
-    <>
-      {/* Unread indicator bar */}
-      {isUnread && !isActive && (
-        <div className="absolute left-0 top-1/2 h-2 w-1 -translate-y-1/2 rounded-r-full bg-white" />
-      )}
-
-      <ChannelRow
-        channel={channel}
-        isActive={isActive}
-        isUnread={isUnread}
-        mentionsCount={mentionsCount}
-      />
-    </>
-  );
-
-  return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <ContextMenu>
-        <ContextMenuTrigger>
-          {isVoice ? (
-            <div>
-              <Link
-                to={`/channels/${channel.guild_id}/${channel.channel_id}`}
-                onClick={handleVoiceClick}
-                className={`${!expanded && !isActive ? 'hidden' : ''} group relative block`}
-                draggable="false"
-                style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
-              >
-                {channelContent}
-              </Link>
-              {/* Voice participants */}
-              {voiceParticipants?.length > 0 && (
-                <div className="pb-1">
-                  {voiceParticipants.map((vs) => (
-                    <VoiceParticipant key={vs.user_id} voiceState={vs} />
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <Link
-              to={`/channels/${channel.guild_id}/${channel.channel_id}`}
-              className={`${!expanded && !isActive ? 'hidden' : ''} group relative block`}
-              draggable="false"
-              style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
-            >
-              {channelContent}
-            </Link>
-          )}
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-52">
-          {!isVoice && (
-            <ContextMenuItem disabled={!isUnread} onSelect={handleMarkAsRead}>
-              Mark as Read
-            </ContextMenuItem>
-          )}
-          {!isVoice && <ContextMenuSeparator />}
-          {isVoice ? (
-            <ContextMenuItem
-              onSelect={() => {
-                handleVoiceClick();
-                navigate(`/channels/${channel.guild_id}/${channel.channel_id}`);
-              }}
-            >
-              Join Voice Channel
-            </ContextMenuItem>
-          ) : (
-            <ContextMenuItem
-              onSelect={() => navigate(`/channels/${channel.guild_id}/${channel.channel_id}`)}
-            >
-              Go to Channel
-            </ContextMenuItem>
-          )}
-          <ContextMenuItem onSelect={handleCopyLink}>Copy Link</ContextMenuItem>
-
-          {canManageChannels && (
-            <>
-              <ContextMenuSeparator />
-              <ContextMenuItem onSelect={() => onEditChannel?.(channel)}>
-                Edit Channel
-              </ContextMenuItem>
-              <ContextMenuItem
-                onSelect={() => handleDeleteChannel(channel)}
-                className="text-red-500 hover:bg-red-600/20"
-              >
-                Delete Channel
-              </ContextMenuItem>
-            </>
-          )}
-
-          <ContextMenuSeparator />
-          <ContextMenuItem onSelect={handleCopyId}>Copy Channel ID</ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
-    </div>
-  );
-};
 
 const GuildSidebarCategory = ({
   category,
@@ -291,6 +49,9 @@ const GuildSidebarCategory = ({
   canManageChannels,
   isDropTarget,
   globalIsDragging,
+  overId,
+  activeId,
+  dropPosition,
 }) => {
   const [expanded, setExpanded] = useState(true);
   const navigate = useNavigate();
@@ -431,11 +192,16 @@ const GuildSidebarCategory = ({
         </ContextMenu>
       )}
 
+      {/* Drop indicator when dropping directly on category header */}
+      {overId === category?.channel_id && activeId && category && (
+        <div className="mx-2 my-1 h-0.5 rounded-full bg-primary" />
+      )}
+
       <SortableContext
         items={sortedChannels.map((c) => c.channel_id)}
         strategy={verticalListSortingStrategy}
       >
-        {sortedChannels.map((channel) => {
+        {sortedChannels.map((channel, index) => {
           const isUnread =
             channel.type === ChannelType.GUILD_VOICE ? false : isChannelUnread(channel);
           const isActive =
@@ -446,8 +212,10 @@ const GuildSidebarCategory = ({
           const mentionsCount =
             channel.type === ChannelType.GUILD_VOICE ? 0 : getMentionsCount(channel);
 
+          const dropIndicator = (channel.channel_id === overId && activeId) ? dropPosition : null;
+
           return (
-            <SortableChannel
+            <ChannelItem
               key={channel.channel_id}
               channel={channel}
               isActive={isActive}
@@ -460,6 +228,7 @@ const GuildSidebarCategory = ({
               navigate={navigate}
               globalIsDragging={globalIsDragging}
               guild={guild}
+              dropIndicator={dropIndicator}
               voiceParticipants={
                 channel.type === ChannelType.GUILD_VOICE
                   ? voiceStates.filter((vs) => String(vs.channel_id) === String(channel.channel_id))
@@ -473,7 +242,7 @@ const GuildSidebarCategory = ({
   );
 };
 
-const GuildSidebar = ({
+const GuildChannelsSidebar = ({
   guild,
   onOpenServerSettings,
   onEditChannel,
@@ -486,6 +255,8 @@ const GuildSidebar = ({
   const { channels, setChannels } = useChannelsStore();
   const [activeId, setActiveId] = useState(null);
   const [overId, setOverId] = useState(null);
+  const [dropPosition, setDropPosition] = useState(null);
+  const dropPositionRef = useRef(null);
   const sidebarRef = useRef();
 
   const guildChannels = useMemo(() => {
@@ -493,12 +264,6 @@ const GuildSidebar = ({
   }, [channels, guild?.id]);
 
   const categories = (guildChannels || []).filter((c) => c.type === 3);
-
-  // Find the active channel data for the drag overlay
-  const activeChannel = useMemo(() => {
-    if (!activeId) return null;
-    return channels.find((c) => c.channel_id === activeId);
-  }, [activeId, channels]);
 
   // Determine which category is being hovered over
   const dropTargetCategoryId = useMemo(() => {
@@ -547,17 +312,39 @@ const GuildSidebar = ({
   };
 
   const handleDragOver = (event) => {
-    setOverId(event.over?.id || null);
+    const { over, active } = event;
+    setOverId(over?.id || null);
+
+    if (over && active) {
+      const activeRect = active.rect.current.translated;
+      const overRect = over.rect;
+      if (activeRect && overRect) {
+        const activeCenter = activeRect.top + activeRect.height / 2;
+        const overCenter = overRect.top + overRect.height / 2;
+        const pos = activeCenter > overCenter ? 'below' : 'above';
+        setDropPosition(pos);
+        dropPositionRef.current = pos;
+      }
+    } else {
+      setDropPosition(null);
+      dropPositionRef.current = null;
+    }
   };
 
   const handleDragCancel = () => {
     setActiveId(null);
     setOverId(null);
+    setDropPosition(null);
+    dropPositionRef.current = null;
   };
 
   const handleDragEnd = async (event) => {
+    const currentDropPosition = dropPositionRef.current;
     setActiveId(null);
     setOverId(null);
+    setDropPosition(null);
+    dropPositionRef.current = null;
+
     const { active, over } = event;
 
     if (!over || active.id === over.id || !canManageChannels) {
@@ -569,70 +356,85 @@ const GuildSidebar = ({
 
     if (!activeChannel || !overChannel) return;
 
-    let newChannels = [...channels];
-    const oldIndex = newChannels.findIndex((c) => c.channel_id === active.id);
+    // Determine target category
+    const targetParentId = overChannel.type === 3
+      ? overChannel.channel_id
+      : overChannel.parent_id;
+    const oldParentId = activeChannel.parent_id;
 
-    let newParentId;
-
-    // Case 1: Drop on a Category Header (Type 3)
-    if (overChannel.type === 3) {
-      newParentId = overChannel.channel_id;
-
-      // Update parent_id of the active channel
-      newChannels[oldIndex] = {
-        ...newChannels[oldIndex],
-        parent_id: newParentId,
-        // We don't set position here, will rely on API/sibling finding or append
-      };
-
-      // Move the channel to the end of the new list in UI (simplest optimistic update)
-      // Or filter out and push.
-      // But simplest way for optimistic UI is just update parent_id.
-      // The sort logic in GuildSidebarCategory handles visual placement (based on position).
-      // Since we didn't update position, it might look odd.
-      // Let's rely on setting a high position?
-      newChannels[oldIndex].position = 9999;
-    }
-    // Case 2: Drop on another Channel (Sortable)
-    else {
-      newParentId = overChannel.parent_id;
-
-      // Update active channel parent
-      newChannels[oldIndex] = { ...newChannels[oldIndex], parent_id: newParentId };
-
-      // Find target index in global list
-      const newIndex = newChannels.findIndex((c) => c.channel_id === over.id);
-
-      // Reorder
-      newChannels = arrayMove(newChannels, oldIndex, newIndex);
-    }
-
-    // Recalculate positions for all sibling channels in the target parent group
-    // Filter to only text channels (type 0) in the same parent, preserving array order
-    const siblingsInOrder = newChannels.filter(
-      (c) => c.parent_id === newParentId && (c.type === 0 || c.type === 2)
-    );
-
-    // Update position fields on the channel objects so the UI sorts correctly
-    siblingsInOrder.forEach((sibling, index) => {
-      const channelIndex = newChannels.findIndex((c) => c.channel_id === sibling.channel_id);
-      if (channelIndex !== -1) {
-        newChannels[channelIndex] = { ...newChannels[channelIndex], position: index };
+    // Helper: sort channels by position then name
+    const sortByPosition = (a, b) => {
+      const aPos = Number(a.position ?? 0);
+      const bPos = Number(b.position ?? 0);
+      if (aPos === bPos) {
+        return String(a.name || a.channel_name || '').localeCompare(
+          String(b.name || b.channel_name || '')
+        );
       }
-    });
+      return aPos - bPos;
+    };
 
-    // Update local state immediately (now with correct position values)
-    setChannels([...newChannels]);
+    // Get sorted channels of the target category, excluding the dragged channel
+    const targetChannels = channels
+      .filter(
+        (c) =>
+          c.channel_id !== active.id &&
+          // eslint-disable-next-line eqeqeq
+          c.parent_id == targetParentId &&
+          (c.type === ChannelType.GUILD_TEXT || c.type === ChannelType.GUILD_VOICE)
+      )
+      .sort(sortByPosition);
+
+    // Determine insertion index
+    let insertIndex;
+    if (overChannel.type === 3) {
+      // Dropped on category header → insert at top of category
+      insertIndex = 0;
+    } else {
+      const overIndex = targetChannels.findIndex((c) => c.channel_id === over.id);
+      if (overIndex === -1) {
+        insertIndex = targetChannels.length;
+      } else {
+        insertIndex = currentDropPosition === 'below' ? overIndex + 1 : overIndex;
+      }
+    }
+
+    // Build the new ordered list for the target category
+    const newOrderedTarget = [...targetChannels];
+    newOrderedTarget.splice(insertIndex, 0, { ...activeChannel, parent_id: targetParentId });
+
+    // eslint-disable-next-line eqeqeq
+    const isCrossCategory = oldParentId != targetParentId;
 
     // Prepare API payload
-    const siblings = siblingsInOrder.map((c, index) => ({
+    const payload = newOrderedTarget.map((c, idx) => ({
       id: c.channel_id,
-      position: index,
-      parent_id: newParentId,
+      position: idx,
+      parent_id: targetParentId,
     }));
 
+    if (isCrossCategory) {
+      const oldCategorySiblings = channels
+        .filter(
+          (c) =>
+            c.channel_id !== active.id &&
+            // eslint-disable-next-line eqeqeq
+            c.parent_id == oldParentId &&
+            (c.type === ChannelType.GUILD_TEXT || c.type === ChannelType.GUILD_VOICE)
+        )
+        .sort(sortByPosition);
+
+      oldCategorySiblings.forEach((c, idx) => {
+        payload.push({
+          id: c.channel_id,
+          position: idx,
+          parent_id: oldParentId,
+        });
+      });
+    }
+
     try {
-      await api.patch(`/guilds/${guild.id}/channels`, siblings);
+      await api.patch(`/guilds/${guild.id}/channels`, payload);
       toast.success('Channel moved.');
     } catch (err) {
       console.error('Failed to move channel', err);
@@ -675,6 +477,9 @@ const GuildSidebar = ({
                 canManageChannels={canManageChannels}
                 isDropTarget={dropTargetCategoryId === null && !!activeId}
                 globalIsDragging={!!activeId}
+                overId={overId}
+                activeId={activeId}
+                dropPosition={dropPosition}
               />
 
               {categories.map((category) => (
@@ -689,6 +494,9 @@ const GuildSidebar = ({
                   canManageChannels={canManageChannels}
                   isDropTarget={dropTargetCategoryId === category.channel_id}
                   globalIsDragging={!!activeId}
+                  overId={overId}
+                  activeId={activeId}
+                  dropPosition={dropPosition}
                 />
               ))}
             </div>
@@ -704,27 +512,18 @@ const GuildSidebar = ({
         </ContextMenuContent>
       </ContextMenu>
 
-      {/* Drag overlay - floating ghost preview */}
-      <DragOverlay
-        dropAnimation={{
-          duration: 150,
-          easing: 'ease',
-        }}
-      >
-        {activeChannel ? (
-          <div className="w-[240px]" style={{ pointerEvents: 'none' }}>
-            <ChannelRow
-              channel={activeChannel}
-              isActive={false}
-              isUnread={false}
-              mentionsCount={0}
-              isDragOverlay={true}
-            />
-          </div>
-        ) : null}
+      <DragOverlay dropAnimation={null}>
+        {activeId ? (() => {
+          const ch = guildChannels.find((c) => c.channel_id === activeId);
+          return ch ? (
+            <div className="w-[240px] rounded bg-[#1e1f22] shadow-lg">
+              <ChannelRow channel={ch} isActive={false} isUnread={false} mentionsCount={0} />
+            </div>
+          ) : null;
+        })() : null}
       </DragOverlay>
     </DndContext>
   );
 };
 
-export default GuildSidebar;
+export default GuildChannelsSidebar;

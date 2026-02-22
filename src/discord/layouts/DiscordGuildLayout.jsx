@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import DefaultLayout from '../../layouts/DefaultLayout';
-import DiscordGuildSidebar from '../components/DiscordGuildSidebar';
+import DiscordGuildChannelsSidebar from '../components/DiscordGuildChannelsSidebar';
 
 const DiscordGuildLayout = ({ children, guild }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -24,7 +24,7 @@ const DiscordGuildLayout = ({ children, guild }) => {
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <DiscordGuildSidebar guild={guild} />
+        <DiscordGuildChannelsSidebar guild={guild} />
       </div>
       {!isSidebarOpen && (
         <button

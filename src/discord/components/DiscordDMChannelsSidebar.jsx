@@ -91,7 +91,7 @@ const DMChannelItem = ({ channel, isActive, currentUserId, usersMap }) => {
   );
 };
 
-const DiscordDMSidebar = () => {
+const DiscordDMChannelsSidebar = () => {
   const { channelId } = useParams();
   const currentUser = useDiscordStore((s) => s.user);
   const channels = useDiscordChannelsStore((s) => s.channels);
@@ -142,4 +142,4 @@ const DiscordDMSidebar = () => {
   );
 };
 
-export default DiscordDMSidebar;
+export default DiscordDMChannelsSidebar;

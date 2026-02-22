@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import DefaultLayout from '../layouts/DefaultLayout';
 import { ChannelContextProvider } from '../contexts/ChannelContext';
 import Channel from '../components/Channel/Channel';
-import DMSidebar from '../components/dm/DMSidebar';
+import DMChannelsSidebar from '../components/dm/DMChannelsSidebar';
 import FriendsDashboard from '../components/Friends/FriendsDashboard';
 import { useChannelsStore } from '../store/channels.store';
 import { useNotificationStore } from '../store/notification.store';
@@ -28,7 +28,7 @@ const DirectMessagesPage = () => {
   return (
     <DefaultLayout
       sidebar={
-        <DMSidebar
+        <DMChannelsSidebar
           activeChannelId={channelId || 'friends'}
           onNavigate={(id) => navigate(`/channels/@me/${id}`)}
         />

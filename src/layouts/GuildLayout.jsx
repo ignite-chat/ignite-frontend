@@ -5,7 +5,7 @@ import ServerSettings from '../components/Settings/ServerSettings';
 import useStore from '../hooks/useStore';
 import EditGuildChannelModal from '../components/Modals/EditGuildChannelModal';
 import { useChannelsStore } from '../store/channels.store';
-import GuildSidebar from '@/components/Guild/GuildSidebar';
+import GuildChannelsSidebar from '@/components/Guild/GuildChannelsSidebar';
 import CreateGuildChannelDialog from '@/components/Guild/CreateGuildChannelDialog';
 import CreateGuildCategoryDialog from '@/components/Guild/CreateGuildCategoryDialog';
 import { Permissions } from '@/constants/Permissions';
@@ -71,7 +71,7 @@ const GuildLayout = ({ children, guild }) => {
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <GuildSidebar
+        <GuildChannelsSidebar
           guild={guild}
           onOpenServerSettings={() => openServerSettings({ tab: 'info', channelId: null })}
           onEditChannel={(channel) => {

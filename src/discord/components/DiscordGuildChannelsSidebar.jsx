@@ -140,7 +140,7 @@ const DiscordCategory = ({ category, channels, activeChannelId, joinedAtMs }) =>
   );
 };
 
-const DiscordGuildSidebar = ({ guild }) => {
+const DiscordGuildChannelsSidebar = ({ guild }) => {
   const { channelId } = useParams();
   const { channels } = useDiscordChannelsStore();
   const guildMembers = useDiscordGuildsStore((s) => s.guildMembers);
@@ -264,4 +264,4 @@ const DiscordGuildSidebar = ({ guild }) => {
   );
 };
 
-export default DiscordGuildSidebar;
+export default DiscordGuildChannelsSidebar;

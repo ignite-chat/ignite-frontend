@@ -45,7 +45,7 @@ const ChannelSection = ({
   );
 };
 
-const DMSidebar = ({ activeChannelId, onNavigate }) => {
+const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
   const store = useStore();
   const currentUser = store.user || { id: 'me' };
   const { channels, pinnedChannelIds } = useChannelsStore();
@@ -120,4 +120,4 @@ const DMSidebar = ({ activeChannelId, onNavigate }) => {
   );
 };
 
-export default DMSidebar;
+export default DMChannelsSidebar;

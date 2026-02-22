@@ -1,5 +1,5 @@
 import { GuildContextProvider } from '@/contexts/GuildContext';
-import Sidebar from '../components/Sidebar';
+import GuildsSidebar from '../components/GuildsSidebar';
 import UserBar from '../components/UserBar';
 
 const DefaultLayout = ({ children, sidebar }) => {
@@ -9,7 +9,7 @@ const DefaultLayout = ({ children, sidebar }) => {
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="flex shrink-0 flex-col">
             <div className="flex min-h-0 flex-1 overflow-hidden">
-              <Sidebar />
+              <GuildsSidebar />
               {sidebar}
             </div>
             <UserBar />

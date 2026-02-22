@@ -227,7 +227,7 @@ const DiscordDMsIcon = ({ isActive }) => {
   );
 };
 
-const Sidebar = () => {
+const GuildsSidebar = () => {
   const { guildId, channelId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -585,4 +585,4 @@ const Sidebar = () => {
   );
 };
 
-export default Sidebar;
+export default GuildsSidebar;

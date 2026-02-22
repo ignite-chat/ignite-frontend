@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import DefaultLayout from '../../layouts/DefaultLayout';
-import DiscordDMSidebar from '../components/DiscordDMSidebar';
+import DiscordDMChannelsSidebar from '../components/DiscordDMChannelsSidebar';
 
 const DiscordDMLayout = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -20,7 +20,7 @@ const DiscordDMLayout = ({ children }) => {
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <DiscordDMSidebar />
+        <DiscordDMChannelsSidebar />
       </div>
       {!isSidebarOpen && (
         <button
