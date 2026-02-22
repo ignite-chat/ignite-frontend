@@ -150,11 +150,7 @@ export const ChannelsService = {
     const pendingMessage: any = {
       nonce: generatedNonce,
       content: content,
-      author: {
-        id: currentUser.id,
-        name: currentUser.name ?? currentUser.username,
-        username: currentUser.username,
-      },
+      author: currentUser,
       created_at: new Date().toISOString(),
       message_references: replyTo ? [{ message_id: replyTo, channel_id: channelId }] : [],
       attachments: attachments.map((f, i) => ({

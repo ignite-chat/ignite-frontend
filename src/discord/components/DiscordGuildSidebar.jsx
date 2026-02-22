@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Hash, SpeakerHigh, CaretDown, CaretRight, Megaphone } from '@phosphor-icons/react';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
@@ -8,6 +8,7 @@ import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { DiscordService } from '../services/discord.service';
 import { computeChannelPermissions } from '../utils/permissions';
 import { VIEW_CHANNEL } from '../constants/permissions';
+import { scrollPositions } from '@/store/last-channel.store';
 
 const DISCORD_EPOCH = 1420070400000;
 const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
@@ -144,6 +145,7 @@ const DiscordGuildSidebar = ({ guild }) => {
   const { channels } = useDiscordChannelsStore();
   const guildMembers = useDiscordGuildsStore((s) => s.guildMembers);
   const currentUser = useDiscordStore((s) => s.user);
+  const sidebarRef = useRef();
 
   const guildId = guild?.id;
   const guildRoles = guild?.roles || [];
@@ -188,11 +190,31 @@ const DiscordGuildSidebar = ({ guild }) => {
     );
   }, [guildChannels]);
 
+  // Save sidebar scroll position on every scroll
+  const onSidebarScroll = useCallback(() => {
+    if (guildId && sidebarRef.current) {
+      scrollPositions.saveSidebar(guildId, sidebarRef.current.scrollTop);
+    }
+  }, [guildId]);
+
+  // Restore sidebar scroll position when guild changes
+  useEffect(() => {
+    if (!guildId) return;
+    const saved = scrollPositions.getSidebar(guildId);
+    if (saved != null) {
+      requestAnimationFrame(() => {
+        if (sidebarRef.current) {
+          sidebarRef.current.scrollTop = saved;
+        }
+      });
+    }
+  }, [guildId]);
+
   const iconUrl = DiscordService.getGuildIconUrl(guild?.id, guild?.properties?.icon, 64);
 
   return (
     <div className="relative top-0 flex h-full min-w-[240px] flex-col bg-[#121214] text-gray-100">
-      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto" ref={sidebarRef} onScroll={onSidebarScroll}>
         {/* Guild Header */}
         <div className="w-full p-2">
           <div className="flex w-full items-center gap-2 rounded-md px-2 py-1">

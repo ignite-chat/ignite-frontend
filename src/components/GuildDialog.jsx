@@ -48,7 +48,11 @@ const GuildDialog = ({ open, onOpenChange }) => {
   const onJoin = useCallback(
     async (data) => {
       try {
-        await InvitesService.acceptInvite(data.invite);
+        let code = data.invite.trim();
+        // Extract invite code from full URL if pasted
+        const urlMatch = code.match(/\/invite\/([^/?#]+)/);
+        if (urlMatch) code = urlMatch[1];
+        await InvitesService.acceptInvite(code);
         closeAll();
       } catch (error) {
         console.error(error);
@@ -176,7 +180,7 @@ const GuildDialog = ({ open, onOpenChange }) => {
                   <FormInput
                     type="text"
                     name="invite"
-                    placeholder="Enter invite code"
+                    placeholder="Enter invite code or link"
                     validation={{
                       required: 'Invite is required.',
                       minLength: { value: 4, message: 'Invite code looks too short.' },

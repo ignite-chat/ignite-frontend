@@ -75,6 +75,42 @@ export const DiscordApiService = {
   },
 
   /**
+   * Get a user's profile (banner, bio, etc.)
+   */
+  async getUserProfile(userId: string, guildId?: string) {
+    const params: any = {
+      with_mutual_guilds: false,
+      with_mutual_friends_count: false,
+    };
+    if (guildId) params.guild_id = guildId;
+    const { data } = await discordApi.get(`/users/${userId}/profile`, { params });
+    return data;
+  },
+
+  /**
+   * Delete a message in a channel.
+   */
+  async deleteMessage(channelId: string, messageId: string) {
+    await discordApi.delete(`/channels/${channelId}/messages/${messageId}`);
+  },
+
+  /**
+   * Kick a member from a guild.
+   */
+  async kickMember(guildId: string, userId: string) {
+    await discordApi.delete(`/guilds/${guildId}/members/${userId}`);
+  },
+
+  /**
+   * Ban a member from a guild.
+   */
+  async banMember(guildId: string, userId: string, deleteMessageSeconds: number = 0) {
+    await discordApi.put(`/guilds/${guildId}/bans/${userId}`, {
+      delete_message_seconds: deleteMessageSeconds,
+    });
+  },
+
+  /**
    * Acknowledge (mark as read) up to a specific message in a channel.
    */
   async ackMessage(channelId: string, messageId: string) {

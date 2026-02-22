@@ -1,11 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useUsersStore } from '../../../store/users.store';
 import { useGuildsStore } from '../../../store/guilds.store';
 import { useGuildContext } from '../../../contexts/GuildContext';
 import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '../../ui/context-menu';
 import GuildMemberPopoverContent from '../../GuildMember/GuildMemberPopoverContent';
-import GuildMemberContextMenu from '../../GuildMember/GuildMemberContextMenu';
+import GuildMemberContextMenu, { KickBanDialog } from '../../GuildMember/GuildMemberContextMenu';
 
 const MentionText = ({ userId, isReply = false }) => {
   const { getUser } = useUsersStore();
@@ -39,28 +39,33 @@ const MentionText = ({ userId, isReply = false }) => {
     );
   }
 
+  const [confirmAction, setConfirmAction] = useState(null);
+
   return (
-    <ContextMenu>
-      <Popover>
-        <ContextMenuTrigger asChild>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className={`inline cursor-pointer rounded px-1 font-medium transition-colors ${roleColor ? 'hover:brightness-110' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 hover:text-blue-300'}`}
-              style={mentionStyle}
-            >
-              @{user.name}
-            </button>
-          </PopoverTrigger>
-        </ContextMenuTrigger>
-        <PopoverContent className="w-auto p-2" align="start" alignOffset={0}>
-          <GuildMemberPopoverContent userId={user.id} guild={null} />
-        </PopoverContent>
-      </Popover>
-      <ContextMenuContent>
-        <GuildMemberContextMenu user={user} />
-      </ContextMenuContent>
-    </ContextMenu>
+    <>
+      <ContextMenu>
+        <Popover>
+          <ContextMenuTrigger asChild>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={`inline cursor-pointer rounded px-1 font-medium transition-colors ${roleColor ? 'hover:brightness-110' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 hover:text-blue-300'}`}
+                style={mentionStyle}
+              >
+                @{user.name}
+              </button>
+            </PopoverTrigger>
+          </ContextMenuTrigger>
+          <PopoverContent className="w-auto p-2" align="start" alignOffset={0}>
+            <GuildMemberPopoverContent userId={user.id} guild={null} />
+          </PopoverContent>
+        </Popover>
+        <ContextMenuContent>
+          <GuildMemberContextMenu user={user} onConfirmAction={setConfirmAction} />
+        </ContextMenuContent>
+      </ContextMenu>
+      <KickBanDialog user={user} confirmAction={confirmAction} setConfirmAction={setConfirmAction} />
+    </>
   );
 };
 

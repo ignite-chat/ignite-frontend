@@ -4,6 +4,7 @@ import { GuildsService } from '../services/guilds.service';
 import { EmojisService } from '../services/emojis.service';
 import { useGuildsStore } from '../store/guilds.store';
 import { useNotificationStore } from '../store/notification.store';
+import { useLastChannelStore } from '../store/last-channel.store';
 import GuildLayout from '../layouts/GuildLayout';
 import Channel from '../components/Channel/Channel';
 import { ChannelContextProvider } from '../contexts/ChannelContext';
@@ -34,9 +35,22 @@ const GuildChannelPage = () => {
     return () => useNotificationStore.getState().setActiveChannelId(null);
   }, [channelId]);
 
-  // if no channel id in url redirect to first channel
+  // Save last visited channel
+  useEffect(() => {
+    if (guildId && channelId) {
+      useLastChannelStore.getState().setLastChannel(guildId, channelId);
+    }
+  }, [guildId, channelId]);
+
+  // If no channel id in url, restore last channel or redirect to first channel
   useEffect(() => {
     if (guild?.channels && !channelId) {
+      const lastChannelId = useLastChannelStore.getState().getLastChannel(guild.id);
+      const lastChannel = lastChannelId && guild.channels.find((c) => c.channel_id == lastChannelId);
+      if (lastChannel) {
+        navigate(`/channels/${guild.id}/${lastChannelId}`, { replace: true });
+        return;
+      }
       const firstTextChannel = guild.channels.find((c) => c.type === 0);
       if (firstTextChannel) {
         navigate(`/channels/${guild.id}/${BigInt(firstTextChannel.channel_id)}`, { replace: true });

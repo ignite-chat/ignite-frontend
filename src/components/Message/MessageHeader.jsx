@@ -1,14 +1,15 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { PopoverTrigger } from '../ui/popover';
 import { Badge } from '../ui/badge';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '../ui/context-menu';
-import GuildMemberContextMenu from '../GuildMember/GuildMemberContextMenu';
+import GuildMemberContextMenu, { KickBanDialog } from '../GuildMember/GuildMemberContextMenu';
 
 const MessageHeader = ({ message, onViewProfile }) => {
   const { guildId } = useGuildContext();
   const guildsStore = useGuildsStore();
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const authorColor = useMemo(() => {
     const members = guildsStore.guildMembers[guildId] || [];
@@ -53,9 +54,10 @@ const MessageHeader = ({ message, onViewProfile }) => {
           </PopoverTrigger>
         </ContextMenuTrigger>
         <ContextMenuContent>
-          <GuildMemberContextMenu user={message.author} onViewProfile={onViewProfile} />
+          <GuildMemberContextMenu user={message.author} onViewProfile={onViewProfile} onConfirmAction={setConfirmAction} />
         </ContextMenuContent>
       </ContextMenu>
+      <KickBanDialog user={message.author} confirmAction={confirmAction} setConfirmAction={setConfirmAction} />
       <p className="ml-2 self-end text-xs font-medium leading-tight text-gray-500">
         {formattedDateTime}
       </p>

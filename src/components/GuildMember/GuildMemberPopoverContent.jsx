@@ -7,17 +7,21 @@ import { FriendsService } from '../../services/friends.service';
 import { ChannelsService } from '../../services/channels.service';
 import { useFriendsStore } from '../../store/friends.store';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { DotsThree, Prohibit, UserCircle } from '@phosphor-icons/react';
+import { DotsThree, Prohibit, UserCircle, UserCircleMinus, Gavel } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import UserProfileModal from '../UserProfileModal';
+import { KickBanDialog } from './GuildMemberContextMenu';
 import { useUsersStore } from '@/store/users.store';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { useGuildsStore } from '../../store/guilds.store';
+import { Permissions } from '@/constants/Permissions';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
   const store = useStore();
   const navigate = useNavigate();
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null); // 'kick' | 'ban' | null
 
   const { friends, requests } = useFriendsStore();
   const { getUser } = useUsersStore();
@@ -119,6 +123,14 @@ const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
     navigator.clipboard.writeText(user.id);
     toast.success('Copied User ID');
   };
+
+  const hasKickPermission = useHasPermission(guildId, null, Permissions.KICK_MEMBERS);
+  const hasBanPermission = useHasPermission(guildId, null, Permissions.BAN_MEMBERS);
+  const canKick = user?.id !== store.user?.id && hasKickPermission;
+  const canBan = user?.id !== store.user?.id && hasBanPermission;
+
+  const handleKick = () => setConfirmAction('kick');
+  const handleBan = () => setConfirmAction('ban');
 
   const handleBlock = () => {
     toast.info('Block feature coming soon!');
@@ -243,6 +255,24 @@ const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
                     Block
                     <Prohibit size={14} />
                   </button>
+                  {canKick && (
+                    <button
+                      onClick={handleKick}
+                      className="flex w-full items-center justify-between rounded px-2 py-1.5 text-xs font-medium text-red-500 transition-colors hover:bg-red-500/10"
+                    >
+                      Kick
+                      <UserCircleMinus size={14} />
+                    </button>
+                  )}
+                  {canBan && (
+                    <button
+                      onClick={handleBan}
+                      className="flex w-full items-center justify-between rounded px-2 py-1.5 text-xs font-medium text-red-500 transition-colors hover:bg-red-500/10"
+                    >
+                      Ban
+                      <Gavel size={14} />
+                    </button>
+                  )}
                   <div className="my-0.5 h-px bg-white/5" />
                   <button
                     onClick={handleCopyId}
@@ -325,8 +355,10 @@ const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
       </div>
 
       {!onOpenProfile && (
-        <UserProfileModal user={user} open={profileModalOpen} onOpenChange={setProfileModalOpen} />
+        <UserProfileModal userId={userId} open={profileModalOpen} onOpenChange={setProfileModalOpen} />
       )}
+
+      <KickBanDialog user={user} confirmAction={confirmAction} setConfirmAction={setConfirmAction} />
     </>
   );
 };

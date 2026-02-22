@@ -147,4 +147,44 @@ export const GuildsService = {
       toast.error('Unable to leave server.');
     }
   },
+
+  async kickMember(guildId: string, memberId: string) {
+    try {
+      await api.delete(`/guilds/${guildId}/members/${memberId}`);
+      await GuildsService.deleteGuildMemberFromStore(guildId, memberId);
+      toast.success('Member kicked successfully.');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to kick member.');
+      throw error;
+    }
+  },
+
+  async banMember(guildId: string, memberId: string, reason?: string, deleteMessageSeconds?: number) {
+    try {
+      await api.put(`/guilds/${guildId}/bans/${memberId}`, {
+        reason,
+        delete_message_seconds: deleteMessageSeconds,
+      });
+      await GuildsService.deleteGuildMemberFromStore(guildId, memberId);
+      toast.success('Member banned successfully.');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to ban member.');
+      throw error;
+    }
+  },
+
+  async unbanMember(guildId: string, memberId: string) {
+    try {
+      await api.delete(`/guilds/${guildId}/bans/${memberId}`);
+      toast.success('Member unbanned successfully.');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to unban member.');
+      throw error;
+    }
+  },
+
+  async getGuildBans(guildId: string) {
+    const { data } = await api.get(`/guilds/${guildId}/bans`);
+    return data;
+  },
 };

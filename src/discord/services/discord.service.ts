@@ -133,12 +133,34 @@ export const DiscordService = {
   },
 
   /**
+   * Get the banner URL for a Discord user.
+   */
+  getUserBannerUrl(userId: string, bannerHash: string | null, size: number = 600) {
+    if (!bannerHash) return null;
+    const ext = bannerHash.startsWith('a_') ? 'gif' : 'png';
+    return `https://cdn.discordapp.com/banners/${userId}/${bannerHash}.${ext}?size=${size}`;
+  },
+
+  /**
    * Get the icon URL for a Discord guild.
    */
   getGuildIconUrl(guildId: string, iconHash: string | null, size: number = 128) {
     if (!iconHash) return null;
     const ext = iconHash.startsWith('a_') ? 'gif' : 'png';
     return `https://cdn.discordapp.com/icons/${guildId}/${iconHash}.${ext}?size=${size}`;
+  },
+
+  /**
+   * Get the URL for a Discord sticker.
+   * format_type: 1=PNG, 2=APNG, 3=Lottie, 4=GIF
+   */
+  getStickerUrl(stickerId: string, formatType: number, size: number = 160) {
+    if (formatType === 3) {
+      // Lottie stickers are JSON — can't render as an image
+      return null;
+    }
+    const ext = formatType === 4 ? 'gif' : 'png';
+    return `https://media.discordapp.net/stickers/${stickerId}.${ext}?size=${size}`;
   },
 
   /**

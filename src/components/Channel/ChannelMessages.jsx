@@ -6,6 +6,7 @@ import { ChannelsService } from '@/services/channels.service';
 import { UnreadsService } from '@/services/unreads.service';
 import { useUnreadsStore } from '../../store/unreads.store';
 import { isMessageRead } from '@/utils/unreads.utils';
+import { scrollPositions } from '@/store/last-channel.store';
 import MessageList from '../Message/MessageList';
 
 const ChannelMessages = ({ channel, messageId }) => {
@@ -22,6 +23,8 @@ const ChannelMessages = ({ channel, messageId }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const messagesRef = useRef();
+  const contentRef = useRef();
+  const wasNearBottomRef = useRef(true);
   const messages = useMemo(
     () => channelMessages[channel?.channel_id] || [],
     [channelMessages, channel?.channel_id]
@@ -56,7 +59,9 @@ const ChannelMessages = ({ channel, messageId }) => {
     setLoadingMore(false);
   }, [messages, loadingMore, hasMore, channel?.channel_id]);
 
-  // Load initial messages
+  // (Scroll position is saved continuously via onScroll handler below)
+
+  // Load initial messages or restore scroll position
   useEffect(() => {
     if (channel?.channel_id && channelMessages[channel?.channel_id] == null) {
       setIsLoading(true);
@@ -71,7 +76,12 @@ const ChannelMessages = ({ channel, messageId }) => {
 
     if (!messagesRef.current) return;
     if (!messageId) {
-      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+      const saved = scrollPositions.getMessage(channel?.channel_id);
+      if (saved != null) {
+        messagesRef.current.scrollTop = saved;
+      } else {
+        messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+      }
     }
   }, [channel?.channel_id, channelMessages, messageId]);
 
@@ -127,7 +137,7 @@ const ChannelMessages = ({ channel, messageId }) => {
       const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
       const now = Date.now();
       if (nearBottom && messages.length > 0) {
-        const lastMessageId = messages[messages.length - 1]?.id;
+        const lastMessageId = channel.last_message_id;
 
         const alreadyRead = isMessageRead(
           channel.channel_id,
@@ -187,10 +197,33 @@ const ChannelMessages = ({ channel, messageId }) => {
     if (!el) return;
     setAtTop(el.scrollTop <= 10);
 
+    // Save scroll position on every scroll
+    if (channel?.channel_id) {
+      scrollPositions.saveMessage(channel.channel_id, el.scrollTop);
+    }
+
+    wasNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+
     if (el.scrollTop < 200 && hasMore && !loadingMore) {
       onLoadMore();
     }
-  }, [hasMore, loadingMore, onLoadMore]);
+  }, [channel?.channel_id, hasMore, loadingMore, onLoadMore]);
+
+  // Auto-scroll when content resizes (embed/image loads) and user was near bottom
+  useEffect(() => {
+    const content = contentRef.current;
+    const scrollEl = messagesRef.current;
+    if (!content || !scrollEl) return;
+
+    const observer = new ResizeObserver(() => {
+      if (wasNearBottomRef.current) {
+        scrollEl.scrollTop = scrollEl.scrollHeight;
+      }
+    });
+
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const el = messagesRef.current;
@@ -200,17 +233,19 @@ const ChannelMessages = ({ channel, messageId }) => {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" ref={messagesRef} onScroll={onScroll}>
-      <MessageList
-        messages={messages}
-        pendingMessages={pendingMessages}
-        editingId={editingId}
-        setEditingId={setEditingId}
-        highlightId={highlightId}
-        guildId={guildId}
-        isLoading={isLoading}
-        hasMore={hasMore}
-        loadingMore={loadingMore}
-      />
+      <div ref={contentRef}>
+        <MessageList
+          messages={messages}
+          pendingMessages={pendingMessages}
+          editingId={editingId}
+          setEditingId={setEditingId}
+          highlightId={highlightId}
+          guildId={guildId}
+          isLoading={isLoading}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+        />
+      </div>
     </div>
   );
 };

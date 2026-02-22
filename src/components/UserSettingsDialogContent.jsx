@@ -50,16 +50,24 @@ const ChangeEmailDialog = ({ open, onOpenChange }) => {
   const onSubmit = useCallback(
     async (data) => {
       try {
-        console.log('User Email Data:', data);
-        // await api.patch('/users/@me/email', data);
+        await api.patch('users/@me/email', {
+          email: data.email,
+          password: data.currentPassword,
+        });
+        store.setUser({ ...store.user, email: data.email });
         onOpenChange(false);
         form.reset();
         toast.success('Email updated successfully');
       } catch (error) {
-        console.error('Failed to update email:', error);
+        const msg = error.response?.data?.message || error.response?.data?.error;
+        if (error.response?.status === 429) {
+          toast.error(msg || 'You can only change your email once every 24 hours.');
+        } else {
+          toast.error(msg || 'Failed to update email');
+        }
       }
     },
-    [form, onOpenChange]
+    [form, onOpenChange, store]
   );
 
   return (
@@ -275,16 +283,24 @@ const ChangeUsernameDialog = ({ open, onOpenChange }) => {
   const onSubmit = useCallback(
     async (data) => {
       try {
-        console.log('Username Data:', data);
-        // await api.patch('/users/@me/username', data);
+        await api.patch('users/@me/username', {
+          username: data.username,
+          password: data.currentPassword,
+        });
+        store.setUser({ ...store.user, username: data.username });
         onOpenChange(false);
         form.reset();
         toast.success('Username updated successfully');
       } catch (error) {
-        console.error('Failed to update username:', error);
+        const msg = error.response?.data?.message || error.response?.data?.error;
+        if (error.response?.status === 429) {
+          toast.error(msg || 'You can only change your username once every 24 hours.');
+        } else {
+          toast.error(msg || 'Failed to update username');
+        }
       }
     },
-    [form, onOpenChange]
+    [form, onOpenChange, store]
   );
 
   return (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Hash, Plus, CaretDown, CaretRight, SpeakerHigh } from '@phosphor-icons/react';
 import { toast } from 'sonner';
@@ -43,6 +43,7 @@ import { VoiceService } from '@/services/voice.service';
 import { ChannelType } from '@/constants/ChannelType';
 import VoiceControls from '@/components/Voice/VoiceControls';
 import VoiceParticipant from '@/components/Voice/VoiceParticipant';
+import { scrollPositions } from '@/store/last-channel.store';
 import GuildSidebarHeader from './GuildSidebarHeader';
 
 // Presentational channel row, used both in SortableChannel and DragOverlay
@@ -485,6 +486,7 @@ const GuildSidebar = ({
   const { channels, setChannels } = useChannelsStore();
   const [activeId, setActiveId] = useState(null);
   const [overId, setOverId] = useState(null);
+  const sidebarRef = useRef();
 
   const guildChannels = useMemo(() => {
     return (channels || []).filter((c) => String(c.guild_id) === String(guild?.id));
@@ -508,6 +510,26 @@ const GuildSidebar = ({
     // If hovering over a channel, highlight its parent category
     return overItem.parent_id;
   }, [overId, activeId, channels]);
+
+  // Save sidebar scroll position on every scroll
+  const onSidebarScroll = useCallback(() => {
+    if (guild?.id && sidebarRef.current) {
+      scrollPositions.saveSidebar(guild.id, sidebarRef.current.scrollTop);
+    }
+  }, [guild?.id]);
+
+  // Restore sidebar scroll position when guild changes
+  useEffect(() => {
+    if (!guild?.id) return;
+    const saved = scrollPositions.getSidebar(guild.id);
+    if (saved != null) {
+      requestAnimationFrame(() => {
+        if (sidebarRef.current) {
+          sidebarRef.current.scrollTop = saved;
+        }
+      });
+    }
+  }, [guild?.id]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -631,7 +653,7 @@ const GuildSidebar = ({
       <ContextMenu>
         <ContextMenuTrigger>
           <div className="relative top-0 flex h-full min-w-[240px] flex-col bg-[#121214] text-gray-100">
-            <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto">
+            <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto" ref={sidebarRef} onScroll={onSidebarScroll}>
               <GuildSidebarHeader
                 guildName={guild?.name}
                 guild={guild}

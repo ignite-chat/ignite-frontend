@@ -67,7 +67,7 @@ const DiscordChannel = ({ channel }) => {
       </div>
 
       {/* Messages */}
-      <DiscordChannelMessages channelId={channel.id} />
+      <DiscordChannelMessages channel={channel} />
 
       {/* Input */}
       <DiscordChannelInput channel={channel} channelName={placeholderName} />

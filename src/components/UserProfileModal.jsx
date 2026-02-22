@@ -19,6 +19,7 @@ import {
 import { cn } from '../lib/utils';
 import useStore from '../hooks/useStore';
 import { useFriendsStore } from '../store/friends.store';
+import { useUsersStore } from '../store/users.store';
 import { FriendsService } from '../services/friends.service';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
@@ -27,8 +28,9 @@ import { useGuildsStore } from '../store/guilds.store';
 import { ChannelsService } from '../services/channels.service';
 import { useNavigate } from 'react-router-dom';
 
-const UserProfileModal = ({ user, open, onOpenChange }) => {
+const UserProfileModal = ({ userId, open, onOpenChange }) => {
   const store = useStore();
+  const user = useUsersStore((state) => state.users[userId]);
   const navigate = useNavigate();
   const { friends, requests } = useFriendsStore();
   const guildContext = useContext(GuildContext);

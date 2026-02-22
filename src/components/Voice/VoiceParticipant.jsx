@@ -56,7 +56,7 @@ const VoiceParticipant = ({ voiceState }) => {
         </PopoverContent>
       </Popover>
       <UserProfileModal
-        user={user || { id: voiceState.user_id, name }}
+        userId={String(voiceState.user_id)}
         open={profileModalOpen}
         onOpenChange={setProfileModalOpen}
       />

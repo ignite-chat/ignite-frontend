@@ -7,7 +7,7 @@ import { useChannelsStore } from '../../store/channels.store';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '../ui/context-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import Avatar from '../Avatar.jsx';
-import GuildMemberContextMenu from '../GuildMember/GuildMemberContextMenu';
+import GuildMemberContextMenu, { KickBanDialog } from '../GuildMember/GuildMemberContextMenu';
 import GuildMemberPopoverContent from '../GuildMember/GuildMemberPopoverContent';
 import UserProfileModal from '../UserProfileModal';
 import MessageContent from './MessageContent.jsx';
@@ -35,6 +35,7 @@ const ChannelMessage = memo(
     const store = useStore();
     const [profileModalOpen, setProfileModalOpen] = useState(false);
     const [popoverOpen, setPopoverOpen] = useState(false);
+    const [confirmAction, setConfirmAction] = useState(null);
     const { setReplyingId, replyingId } = useChannelContext();
     const channelId = message.channel_id;
 
@@ -154,6 +155,7 @@ const ChannelMessage = memo(
                             setPopoverOpen(false);
                             setProfileModalOpen(true);
                           }}
+                          onConfirmAction={setConfirmAction}
                         />
                       </ContextMenuContent>
                     </PopoverTrigger>
@@ -171,6 +173,7 @@ const ChannelMessage = memo(
                             setPopoverOpen(false);
                             setProfileModalOpen(true);
                           }}
+                          onConfirmAction={setConfirmAction}
                         />
                       </ContextMenuContent>
                     </PopoverTrigger>
@@ -281,10 +284,11 @@ const ChannelMessage = memo(
           </PopoverContent>
         </Popover>
         <UserProfileModal
-          user={message.author}
+          userId={message.author.id}
           open={profileModalOpen}
           onOpenChange={setProfileModalOpen}
         />
+        <KickBanDialog user={message.author} confirmAction={confirmAction} setConfirmAction={setConfirmAction} />
       </>
     );
   }

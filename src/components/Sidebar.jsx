@@ -54,6 +54,7 @@ import { useDiscordGuildsStore } from '../discord/store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../discord/store/discord-channels.store';
 import { useDiscordReadStatesStore } from '../discord/store/discord-readstates.store';
 import { DiscordService } from '../discord/services/discord.service';
+import { useLastChannelStore } from '../store/last-channel.store';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
@@ -106,6 +107,7 @@ const SortableGuildIcon = ({ guild, isActive, isUnread, mentionCount, isDragging
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: String(guild.id),
   });
+  const lastChannelId = useLastChannelStore((s) => s.lastChannels[guild.id]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -122,7 +124,7 @@ const SortableGuildIcon = ({ guild, isActive, isUnread, mentionCount, isDragging
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <Link
-            to={`/channels/${guild.id}`}
+            to={`/channels/${guild.id}${lastChannelId ? `/${lastChannelId}` : ''}`}
             draggable="false"
             style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
           >
@@ -153,6 +155,7 @@ const DiscordGuildIcon = ({ guild, isActive }) => {
   const iconUrl = DiscordService.getGuildIconUrl(guild.id, guild.properties.icon, 128);
   const channels = useDiscordChannelsStore((s) => s.channels);
   const readStates = useDiscordReadStatesStore((s) => s.readStates);
+  const lastChannelId = useLastChannelStore((s) => s.lastChannels[guild.id]);
 
   const joinedAtMs = useMemo(() => {
     return guild.joined_at ? new Date(guild.joined_at).getTime() : null;
@@ -177,7 +180,7 @@ const DiscordGuildIcon = ({ guild, isActive }) => {
   }, [channels, guild.id, readStates, joinedAtMs]);
 
   return (
-    <Link to={`/discord/${guild.id}`} draggable="false">
+    <Link to={`/discord/${guild.id}${lastChannelId ? `/${lastChannelId}` : ''}`} draggable="false">
       <SidebarIcon
         iconUrl={iconUrl || ''}
         text={guild.properties.name || guild.id}

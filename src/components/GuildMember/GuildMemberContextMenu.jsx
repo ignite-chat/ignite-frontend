@@ -1,9 +1,10 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import useStore from '../../hooks/useStore';
 import api from '../../api';
 import { FriendsService } from '../../services/friends.service';
+import { GuildsService } from '../../services/guilds.service';
 import { useFriendsStore } from '../../store/friends.store';
 import {
   ContextMenuItem,
@@ -13,10 +14,21 @@ import {
   ContextMenuSubContent,
   ContextMenuCheckboxItem, // Using CheckboxItem is standard for toggling roles
 } from '../ui/context-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useRolesStore } from '../../store/roles.store';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { RolesService } from '../../services/roles.service';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Permissions } from '@/constants/Permissions';
 import { useHasPermission } from '@/hooks/useHasPermission';
 
@@ -24,7 +36,102 @@ const intToHex = (intColor) => {
   return `#${intColor.toString(16).padStart(6, '0')}`;
 };
 
-const GuildMemberContextMenu = ({ user, onViewProfile }) => {
+const DELETE_MESSAGE_OPTIONS = [
+  { value: '0', label: "Don't delete any" },
+  { value: '3600', label: 'Last hour' },
+  { value: '21600', label: 'Last 6 hours' },
+  { value: '43200', label: 'Last 12 hours' },
+  { value: '86400', label: 'Last 24 hours' },
+  { value: '259200', label: 'Last 3 days' },
+  { value: '604800', label: 'Last 7 days' },
+];
+
+/**
+ * Confirmation dialog for kick/ban actions.
+ * Must be rendered OUTSIDE ContextMenuContent so it persists after the menu closes.
+ */
+export const KickBanDialog = ({ user, confirmAction, setConfirmAction }) => {
+  const { guildId } = useGuildContext();
+  const [reason, setReason] = useState('');
+  const [deleteSeconds, setDeleteSeconds] = useState('0');
+  const isBan = confirmAction === 'ban';
+
+  if (!user) return null;
+
+  const handleClose = (open) => {
+    if (!open) {
+      setConfirmAction(null);
+      setReason('');
+      setDeleteSeconds('0');
+    }
+  };
+
+  return (
+    <AlertDialog open={confirmAction !== null} onOpenChange={handleClose}>
+      <AlertDialogContent className={isBan ? '!max-w-md' : undefined}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {isBan ? `Ban ${user.username}` : `Kick ${user.username}`}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {isBan
+              ? `Are you sure you want to ban ${user.username}? They will not be able to rejoin unless unbanned.`
+              : `Are you sure you want to kick ${user.username} from the server? They can rejoin with a new invite.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        {isBan && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Reason</label>
+              <input
+                type="text"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Optional reason for the ban"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                maxLength={512}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Delete message history</label>
+              <Select value={deleteSeconds} onValueChange={setDeleteSeconds}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DELETE_MESSAGE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={() => {
+              if (isBan) {
+                GuildsService.banMember(guildId, user.id, reason || undefined, parseInt(deleteSeconds) || undefined);
+              } else {
+                GuildsService.kickMember(guildId, user.id);
+              }
+            }}
+          >
+            {isBan ? 'Ban' : 'Kick'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
+const GuildMemberContextMenu = ({ user, onViewProfile, onConfirmAction }) => {
   const store = useStore();
   const navigate = useNavigate();
   const { friends, requests } = useFriendsStore();
@@ -57,7 +164,9 @@ const GuildMemberContextMenu = ({ user, onViewProfile }) => {
   };
 
   const hasKickPermission = useHasPermission(guildId, null, Permissions.KICK_MEMBERS);
+  const hasBanPermission = useHasPermission(guildId, null, Permissions.BAN_MEMBERS);
   const canKickMember = user.id !== store.user.id && hasKickPermission;
+  const canBanMember = user.id !== store.user.id && hasBanPermission;
 
   const isFriend = useMemo(() => friends.some((f) => f.id === user.id), [friends, user.id]);
   const hasSentRequest = useMemo(
@@ -181,9 +290,18 @@ const GuildMemberContextMenu = ({ user, onViewProfile }) => {
       {canKickMember && (
         <ContextMenuItem
           className="text-red-500"
-          onSelect={() => toast.info('Block feature coming soon.')}
+          onSelect={() => onConfirmAction?.('kick')}
         >
           Kick {user.username}
+        </ContextMenuItem>
+      )}
+
+      {canBanMember && (
+        <ContextMenuItem
+          className="text-red-500"
+          onSelect={() => onConfirmAction?.('ban')}
+        >
+          Ban {user.username}
         </ContextMenuItem>
       )}
 

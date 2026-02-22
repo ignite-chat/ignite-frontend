@@ -1,8 +1,14 @@
-import { useMemo, memo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { DiscordService } from '../services/discord.service';
 import { parseMarkdown } from '@/components/Message/markdown/parser';
-import MarkdownRenderer from '@/components/Message/markdown/MarkdownRenderer';
+import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
+import DiscordUserPopoverContent from './DiscordUserPopoverContent';
+import DiscordUserProfileModal from './DiscordUserProfileModal';
+import DiscordMessageContextMenu from './DiscordMessageContextMenu';
+import DiscordUserContextMenu from './DiscordUserContextMenu';
 
 const DiscordAvatar = ({ author, className = 'size-10' }) => {
   const url = DiscordService.getUserAvatarUrl(author.id, author.avatar, 80);
@@ -17,9 +23,9 @@ const DiscordAvatar = ({ author, className = 'size-10' }) => {
   );
 };
 
-const DiscordMessageHeader = ({ message }) => {
+const DiscordMessageHeader = ({ message, onClickName }) => {
   const displayName =
-    message.author.global_name || message.author.username;
+    message.member?.nick || message.author.global_name || message.author.username;
 
   const formattedDateTime = useMemo(() => {
     const date = new Date(message.timestamp);
@@ -49,23 +55,27 @@ const DiscordMessageHeader = ({ message }) => {
 
   return (
     <div className="relative mb-1 flex items-baseline gap-2 leading-none">
-      <span className="font-semibold leading-none text-white">
+      <button
+        type="button"
+        className="font-semibold text-white hover:underline"
+        onClick={onClickName}
+      >
         {displayName}
         {message.author.bot && (
-          <span className="ml-1.5 inline-flex items-center rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium uppercase text-white">
+          <span className="ml-1.5 inline-flex items-center rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium uppercase text-white no-underline">
             Bot
           </span>
         )}
-      </span>
+      </button>
       <span className="text-xs font-medium text-gray-500">{formattedDateTime}</span>
     </div>
   );
 };
 
-const DiscordMessageContent = ({ content }) => {
-  const ast = useMemo(() => parseMarkdown(content || '', {}), [content]);
-
-  return <MarkdownRenderer nodes={ast} isReply={false} />;
+const DiscordMessageContent = ({ content, guildId }) => {
+  const ast = useMemo(() => parseMarkdown(content), [content]);
+  if (!content) return null;
+  return <DiscordMarkdownRenderer nodes={ast} guildId={guildId} />;
 };
 
 const DiscordAttachments = ({ attachments }) => {
@@ -201,6 +211,42 @@ const DiscordEmbeds = ({ embeds }) => {
   );
 };
 
+const DiscordStickers = ({ stickerItems }) => {
+  if (!stickerItems || stickerItems.length === 0) return null;
+
+  return (
+    <div className="mt-1.5 flex gap-2">
+      {stickerItems.map((sticker) => {
+        const url = DiscordService.getStickerUrl(sticker.id, sticker.format_type, 160);
+
+        if (!url) {
+          // Lottie stickers — show name as fallback
+          return (
+            <div
+              key={sticker.id}
+              className="flex size-[160px] items-center justify-center rounded-lg bg-[#2b2d31] text-sm text-gray-400"
+            >
+              {sticker.name}
+            </div>
+          );
+        }
+
+        return (
+          <img
+            key={sticker.id}
+            src={url}
+            alt={sticker.name}
+            title={sticker.name}
+            className="size-[160px] object-contain"
+            loading="lazy"
+            draggable="false"
+          />
+        );
+      })}
+    </div>
+  );
+};
+
 const DiscordReplyBar = ({ referencedMessage }) => {
   if (!referencedMessage) return null;
 
@@ -237,7 +283,10 @@ const DiscordReplyBar = ({ referencedMessage }) => {
   );
 };
 
-const DiscordMessage = memo(({ message, prevMessage }) => {
+const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, hasManageMessages, hasKickMembers, hasBanMembers }) => {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+
   const hasReply = !!message.referenced_message || !!message.message_reference;
 
   const shouldStack = useMemo(() => {
@@ -249,41 +298,100 @@ const DiscordMessage = memo(({ message, prevMessage }) => {
     return sameAuthor && timeDiff < 60;
   }, [prevMessage, message, hasReply]);
 
+  const isOwnMessage = currentUserId === message.author.id;
+  const canDelete = isOwnMessage || hasManageMessages;
+  const canKick = !!guildId && !isOwnMessage && hasKickMembers;
+  const canBan = !!guildId && !isOwnMessage && hasBanMembers;
+
+  const openProfile = () => {
+    setPopoverOpen(false);
+    setProfileModalOpen(true);
+  };
+
   const messageClasses = cn(
     'group relative block py-1 transition-all duration-200 hover:bg-gray-800/40',
     shouldStack ? '' : 'mt-3.5'
   );
 
   return (
-    <div className={messageClasses}>
-      {hasReply && (
-        <div className="px-4">
-          <DiscordReplyBar referencedMessage={message.referenced_message} />
-        </div>
-      )}
-
-      <div className="flex items-start gap-4 px-4">
-        {shouldStack ? (
-          <div className="w-10" />
-        ) : (
-          <DiscordAvatar author={message.author} className="size-10 shrink-0" />
-        )}
-
-        <div className="flex flex-1 flex-col items-start justify-start overflow-hidden">
-          {!shouldStack && <DiscordMessageHeader message={message} />}
-
-          <div className="whitespace-pre-wrap break-words text-gray-400 [overflow-wrap:anywhere]">
-            <DiscordMessageContent content={message.content} />
-            {message.edited_timestamp && (
-              <span className="ml-1 text-[0.65rem] text-gray-500">(edited)</span>
+    <>
+      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <ContextMenu>
+          <ContextMenuTrigger className={messageClasses}>
+            {hasReply && (
+              <div className="px-4">
+                <DiscordReplyBar referencedMessage={message.referenced_message} />
+              </div>
             )}
-          </div>
 
-          <DiscordAttachments attachments={message.attachments} />
-          <DiscordEmbeds embeds={message.embeds} />
-        </div>
-      </div>
-    </div>
+            <div className="flex items-start gap-4 px-4">
+              {shouldStack ? (
+                <div className="w-10" />
+              ) : (
+                <ContextMenu>
+                  <PopoverTrigger asChild>
+                    <ContextMenuTrigger asChild>
+                      <button type="button" className="shrink-0 cursor-pointer">
+                        <DiscordAvatar author={message.author} className="size-10" />
+                      </button>
+                    </ContextMenuTrigger>
+                  </PopoverTrigger>
+                  <ContextMenuContent className="w-48">
+                    <DiscordUserContextMenu
+                      author={message.author}
+                      guildId={guildId}
+                      canKick={canKick}
+                      canBan={canBan}
+                      onViewProfile={openProfile}
+                    />
+                  </ContextMenuContent>
+                </ContextMenu>
+              )}
+
+              <div className="flex flex-1 flex-col items-start justify-start overflow-hidden">
+                {!shouldStack && (
+                  <DiscordMessageHeader message={message} onClickName={openProfile} />
+                )}
+
+                <div className="whitespace-pre-wrap break-words text-gray-400 [overflow-wrap:anywhere]">
+                  <DiscordMessageContent content={message.content} guildId={guildId} />
+                  {message.edited_timestamp && (
+                    <span className="ml-1 text-[0.65rem] text-gray-500">(edited)</span>
+                  )}
+                </div>
+
+                <DiscordAttachments attachments={message.attachments} />
+                <DiscordEmbeds embeds={message.embeds} />
+                <DiscordStickers stickerItems={message.sticker_items} />
+              </div>
+            </div>
+          </ContextMenuTrigger>
+
+          <DiscordMessageContextMenu message={message} canDelete={canDelete} />
+        </ContextMenu>
+
+        <PopoverContent
+          className="w-auto border-none bg-transparent p-0 shadow-none"
+          align="start"
+          alignOffset={0}
+        >
+          <DiscordUserPopoverContent
+            author={message.author}
+            member={message.member}
+            guildId={guildId}
+            onOpenProfile={openProfile}
+          />
+        </PopoverContent>
+      </Popover>
+
+      <DiscordUserProfileModal
+        author={message.author}
+        member={message.member}
+        guildId={guildId}
+        open={profileModalOpen}
+        onOpenChange={setProfileModalOpen}
+      />
+    </>
   );
 });
 

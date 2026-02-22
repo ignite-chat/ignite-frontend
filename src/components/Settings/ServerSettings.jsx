@@ -5,8 +5,9 @@ import ServerMemberManager from './ServerMemberManager';
 import ServerInviteManager from './ServerInviteManager';
 import ServerEmojiManager from './ServerEmojiManager';
 import ServerStickerManager from './ServerStickerManager';
+import ServerBanManager from './ServerBanManager';
 import { Button } from '../ui/button';
-import { Info, Shield, Users, Mail, X, Smile, StickyNote } from 'lucide-react';
+import { Info, Shield, Users, Mail, X, Smile, StickyNote, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const ServerSettings = ({ isOpen, onClose, guild, initialTab = 'info' }) => {
@@ -26,6 +27,7 @@ const ServerSettings = ({ isOpen, onClose, guild, initialTab = 'info' }) => {
         label: 'USER MANAGEMENT',
         items: [
           { id: 'members', label: 'Members', icon: Users, component: <ServerMemberManager guild={guild} /> },
+          { id: 'bans', label: 'Bans', icon: Ban, component: <ServerBanManager guild={guild} /> },
           { id: 'invites', label: 'Invites', icon: Mail, component: <ServerInviteManager guild={guild} /> },
           { id: 'roles', label: 'Roles', icon: Shield, component: <ServerRoleManager guild={guild} /> },
         ],

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordStore } from '../store/discord.store';
+import { useLastChannelStore } from '@/store/last-channel.store';
 import DiscordGuildLayout from '../layouts/DiscordGuildLayout';
 import DiscordChannel from '../components/DiscordChannel';
 
@@ -26,9 +27,22 @@ const DiscordGuildPage = () => {
     }
   }, [isConnected, navigate]);
 
-  // Auto-redirect to first text channel if no channelId
+  // Save last visited channel
+  useEffect(() => {
+    if (guildId && channelId) {
+      useLastChannelStore.getState().setLastChannel(guildId, channelId);
+    }
+  }, [guildId, channelId]);
+
+  // Restore last channel or redirect to first text channel if no channelId
   useEffect(() => {
     if (guildChannels.length > 0 && !channelId) {
+      const lastChannelId = useLastChannelStore.getState().getLastChannel(guildId);
+      const lastChannel = lastChannelId && guildChannels.find((c) => c.id === lastChannelId);
+      if (lastChannel) {
+        navigate(`/discord/${guildId}/${lastChannelId}`, { replace: true });
+        return;
+      }
       const textChannels = guildChannels
         .filter((c) => c.type === 0)
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));

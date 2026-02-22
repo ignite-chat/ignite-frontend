@@ -210,6 +210,28 @@ export function parseInline(text, emojiContext) {
       }
     }
 
+    // Masked links [text](url)
+    if (text[i] === '[') {
+      const closeBracket = text.indexOf(']', i + 1);
+      if (closeBracket > i + 1 && text[closeBracket + 1] === '(') {
+        const closeParen = text.indexOf(')', closeBracket + 2);
+        if (closeParen > closeBracket + 2) {
+          const linkText = text.slice(i + 1, closeBracket);
+          const href = text.slice(closeBracket + 2, closeParen);
+          if (/^https?:\/\//.test(href)) {
+            flush();
+            nodes.push({
+              type: 'Link',
+              href,
+              children: parseInline(linkText, emojiContext),
+            });
+            i = closeParen + 1;
+            continue;
+          }
+        }
+      }
+    }
+
     // Angle-bracket tokens: timestamps and mentions
     if (text[i] === '<') {
       const rest = text.slice(i);
@@ -258,12 +280,21 @@ export function parseInline(text, emojiContext) {
       const animEmojiMatch = rest.match(/^<a:([\w_+-]+):(\d+)>/);
       if (animEmojiMatch) {
         flush();
-        nodes.push({ type: 'Emoji', kind: { kind: 'Custom', name: animEmojiMatch[1], id: animEmojiMatch[2] } });
+        nodes.push({ type: 'Emoji', kind: { kind: 'Custom', name: animEmojiMatch[1], id: animEmojiMatch[2], animated: true } });
         i += animEmojiMatch[0].length;
         continue;
       }
 
-      // Custom emoji — web format <id:name>
+      // Custom emoji — static format <:name:id> (Discord)
+      const staticEmojiMatch = rest.match(/^<:([\w_+-]+):(\d+)>/);
+      if (staticEmojiMatch) {
+        flush();
+        nodes.push({ type: 'Emoji', kind: { kind: 'Custom', name: staticEmojiMatch[1], id: staticEmojiMatch[2], animated: false } });
+        i += staticEmojiMatch[0].length;
+        continue;
+      }
+
+      // Custom emoji — web format <id:name> (Ignite)
       const webEmojiMatch = rest.match(/^<(\d+):([\w_+-]+)>/);
       if (webEmojiMatch) {
         flush();
