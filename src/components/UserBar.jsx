@@ -58,10 +58,10 @@ const UserBar = () => {
   }, [room, connectionState]);
 
   return (
-    <div className="bg-[#121214] p-2">
+    <div className="pointer-events-auto flex flex-col gap-2 bg-gradient-to-t from-[#121214] from-70% to-transparent p-2 pt-6">
       {/* Voice Channel Panel - Only show when connected */}
       {isConnected && (
-        <div className="mb-2 rounded-lg bg-[#1a1a1d] px-3 py-2.5">
+        <div className="rounded-lg bg-[#1a1a1d] px-3 py-2.5">
           <div className="mb-2 flex items-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>

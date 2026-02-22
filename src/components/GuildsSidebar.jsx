@@ -78,7 +78,7 @@ const SidebarIcon = ({
 
     <div className="relative mx-auto h-12 w-12">
       <div
-        className={`absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden rounded-2xl transition-all duration-300 ease-out hover:bg-primary hover:text-white ${isActive ? 'bg-primary text-white' : 'bg-[#1d1d1e] text-gray-100'} ${!isServerIcon ? 'text-green-500 hover:bg-green-500 hover:text-white' : ''}`}
+        className={`absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden transition-all duration-300 ease-out ${isActive ? 'rounded-xl' : 'rounded-2xl hover:rounded-xl'} ${isServerIcon ? (iconUrl ? 'bg-[#1d1d1e] text-gray-100' : isActive ? 'bg-primary text-white' : 'bg-[#1d1d1e] text-gray-100 hover:bg-primary hover:text-white') : 'text-green-500 hover:bg-green-500 hover:text-white'}`}
       >
         {icon ? (
           icon
