@@ -80,8 +80,8 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
 
   return (
     <>
-    <aside className="flex w-80 cursor-default select-none flex-col bg-[#121214]">
-      <div className="flex-1 overflow-y-auto p-2">
+    <aside className="flex min-h-0 w-80 cursor-default select-none flex-col overflow-hidden bg-[#121214]">
+      <div className="flex-1 overflow-y-auto p-2 pb-36">
         <Button
           variant={activeChannelId === 'friends' ? 'secondary' : 'ghost'}
           className="mb-1 w-full justify-start gap-3"
