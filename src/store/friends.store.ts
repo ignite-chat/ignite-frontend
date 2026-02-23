@@ -1,14 +1,13 @@
 import { create } from 'zustand';
 import type { User } from './users.store';
 
-export type Friend = {
-  id: string;
-  user: User;
-  created_at?: string;
+export type Friend = User & {
+  status?: string;
 };
 
 export type FriendRequest = {
   id: string;
+  sender_id?: string;
   sender?: User;
   receiver?: User;
   user?: User;

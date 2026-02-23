@@ -14,15 +14,21 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import UserProfileModal from '@/components/UserProfileModal';
+import type { Friend } from '@/store/friends.store';
 
-const FriendsList = ({ friends, filter }) => {
+type FriendsListProps = {
+  friends: Friend[];
+  filter: string;
+};
+
+const FriendsList = ({ friends, filter }: FriendsListProps) => {
   const navigate = useNavigate();
   const { channels } = useChannelsStore();
-  const [profileUserId, setProfileUserId] = useState(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
-  const messageUser = (userId) => {
+  const messageUser = (userId: string) => {
     const existingChannel = channels.find(
-      (c) => c.type === 1 && c.recipients.some((r) => r.id === userId)
+      (c) => c.type === 1 && c.recipients?.some((r) => r.id === userId)
     );
     if (existingChannel) {
       navigate(`/channels/@me/${existingChannel.channel_id}`);
@@ -33,13 +39,13 @@ const FriendsList = ({ friends, filter }) => {
     }
   };
 
-  const deleteFriend = (id) => {
-    FriendsService.removeFriend(id)
+  const deleteFriend = (id: string) => {
+    FriendsService.deleteFriend(id)
       .then(() => toast.success('Friend removed'))
       .catch(() => toast.error('Failed to remove friend'));
   };
 
-  const handleCopyUserId = (id) => {
+  const handleCopyUserId = (id: string) => {
     navigator.clipboard.writeText(id);
     toast.success('User ID copied to clipboard.');
   };

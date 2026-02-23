@@ -10,13 +10,15 @@ import AddFriendForm from './AddFriendForm';
 import FriendsList from './FriendsList';
 import PendingRequests from './PendingRequests';
 
+type Tab = 'online' | 'all' | 'pending' | 'add_friend';
+
 const FriendsDashboard = () => {
-  const [activeTab, setActiveTab] = useState('online');
+  const [activeTab, setActiveTab] = useState<Tab>('online');
   const [searchQuery, setSearchQuery] = useState('');
   const { friends, requests } = useFriendsStore();
   const currentUser = useUsersStore((s) => s.getCurrentUser());
 
-  const pendingCount = requests.filter((req) => req.sender_id != currentUser.id).length;
+  const pendingCount = requests.filter((req) => req.sender_id != currentUser?.id).length;
 
   const filteredFriends = useMemo(() => {
     if (!searchQuery.trim()) return friends;
@@ -28,7 +30,7 @@ const FriendsDashboard = () => {
   }, [friends, searchQuery]);
 
   return (
-    <div className="flex h-full flex-col bg-[#1a1a1e]">
+    <div className="flex h-full flex-col bg-[#1a1a1e] select-none">
       {/* Header */}
       <header className="flex h-12 items-center justify-between border-b border-white/5 px-4 shadow-sm">
         <div className="flex items-center gap-4">
@@ -103,7 +105,7 @@ const FriendsDashboard = () => {
           </>
         )}
 
-        {activeTab === 'pending' && (
+        {activeTab === 'pending' && currentUser && (
           <PendingRequests requests={requests} currentUser={currentUser} />
         )}
       </div>
@@ -111,7 +113,15 @@ const FriendsDashboard = () => {
   );
 };
 
-const TabButton = ({ id, label, active, onClick, count }) => (
+type TabButtonProps = {
+  id: Tab;
+  label: string;
+  active: Tab;
+  onClick: (id: Tab) => void;
+  count?: number;
+};
+
+const TabButton = ({ id, label, active, onClick, count }: TabButtonProps) => (
   <Button
     variant={active === id ? 'secondary' : 'ghost'}
     size="sm"
@@ -119,7 +129,7 @@ const TabButton = ({ id, label, active, onClick, count }) => (
     onClick={() => onClick(id)}
   >
     {label}
-    {count > 0 && (
+    {count != null && count > 0 && (
       <Badge className="ml-2 h-4 min-w-4 bg-[#f23f42] p-1 text-[11px] font-bold hover:bg-[#f23f42]">
         {count}
       </Badge>

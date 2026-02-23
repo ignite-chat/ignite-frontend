@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -8,14 +9,14 @@ const AddFriendForm = () => {
   const [friendUsername, setFriendUsername] = useState('');
 
   const sendFriendRequest = useCallback(
-    (e) => {
+    (e: React.FormEvent) => {
       e.preventDefault();
       FriendsService.sendRequest(friendUsername)
         .then(() => {
           toast.success(`Friend request sent to ${friendUsername}`);
           setFriendUsername('');
         })
-        .catch((error) => {
+        .catch((error: AxiosError) => {
           if (error?.response?.status === 404) {
             toast.error('User not found');
           } else {
