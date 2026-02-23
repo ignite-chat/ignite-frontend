@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Avatar from '@/components/Avatar';
 import { useChannelsStore } from '@/store/channels.store';
 import {
@@ -7,6 +8,13 @@ import {
   ContextMenuTrigger,
   ContextMenuSeparator,
 } from '../ui/context-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '../ui/dialog';
 import { PushPin } from '@phosphor-icons/react';
 import { isChannelUnread } from '@/utils/unreads.utils';
 
@@ -18,10 +26,31 @@ const DMChannelItem = ({
   channelUnreadsLoaded,
 }) => {
   const { togglePin } = useChannelsStore();
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
 
   const unreadState = isChannelUnread(channel, channelUnreads, channelUnreadsLoaded);
 
+  const highlightJson = (obj) => {
+    const raw = JSON.stringify(obj, null, 2);
+    const escaped = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return escaped.replace(
+      /("(\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
+      (match) => {
+        let cls = 'text-emerald-400'; // number
+        if (/^"/.test(match)) {
+          cls = /:$/.test(match) ? 'text-blue-400' : 'text-amber-300';
+        } else if (/true|false/.test(match)) {
+          cls = 'text-purple-400';
+        } else if (/null/.test(match)) {
+          cls = 'text-red-400';
+        }
+        return `<span class="${cls}">${match}</span>`;
+      }
+    );
+  };
+
   return (
+    <>
     <ContextMenu>
       <ContextMenuTrigger>
         <button
@@ -66,8 +95,26 @@ const DMChannelItem = ({
           Copy User ID
           <span className="ml-auto flex h-[18px] items-center rounded-[3px] bg-[#b5bac1] px-1 text-[10px] font-bold leading-none text-[#111214]">ID</span>
         </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => setShowDebugInfo(true)}>
+          Debug Info
+        </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
+
+    <Dialog open={showDebugInfo} onOpenChange={setShowDebugInfo}>
+      <DialogContent className="flex max-h-[80vh] flex-col sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Channel Debug Info</DialogTitle>
+          <DialogDescription>{channel.user?.name || channel.name}</DialogDescription>
+        </DialogHeader>
+        <pre
+          className="min-h-0 flex-1 overflow-auto rounded-md bg-black/40 p-4 text-xs leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: highlightJson(channel) }}
+        />
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 

@@ -136,7 +136,7 @@ const ChannelMessages = ({ channel, messageId }) => {
     function checkAndAckAtBottom() {
       const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
       const now = Date.now();
-      if (nearBottom && messages.length > 0) {
+      if (nearBottom && channel.last_message_id) {
         const lastMessageId = channel.last_message_id;
 
         const alreadyRead = isMessageRead(
