@@ -1,0 +1,6 @@
+node_modules
+out
+package-lock.json
+*.asar
+
+*.crswap # crostini tmp files

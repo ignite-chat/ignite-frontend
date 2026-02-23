@@ -1,0 +1,128 @@
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+@layer base {
+  :root {
+    /* Base surfaces */
+    --background: 220 7% 8%;
+    /* #202225 */
+    --foreground: 210 11% 96%;
+    /* near-white */
+
+    --card: 220 7% 12%;
+    /* #2f3136 */
+    --card-foreground: 210 11% 96%;
+
+    --popover: 220 7% 12%;
+    --popover-foreground: 210 11% 96%;
+
+    /* Primary (Discord blurple-inspired neutral) */
+    --primary: 11 87% 60%;
+    /* Discord blurple */
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary surfaces */
+    --secondary: 220 6% 18%;
+    /* #36393f */
+    --secondary-foreground: 210 11% 96%;
+
+    /* Muted */
+    --muted: 220 6% 18%;
+    --muted-foreground: 215 8% 65%;
+
+    /* Accent (hover / focus surfaces) */
+    --accent: 220 6% 22%;
+    --accent-foreground: 210 11% 96%;
+
+    /* Destructive */
+    --destructive: 359 82% 59%;
+    /* Discord red */
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders & inputs */
+    --border: 220 6% 20%;
+    --input: 220 6% 20%;
+    --ring: 11 87% 60%;
+
+    /* Charts (Discord-friendly colors) */
+    --chart-1: 235 85% 65%;
+    /* blurple */
+    --chart-2: 150 60% 50%;
+    /* green */
+    --chart-3: 35 90% 55%;
+    /* orange */
+    --chart-4: 280 65% 65%;
+    /* purple */
+    --chart-5: 355 75% 60%;
+    /* red */
+
+    --radius: 0.75rem;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+html,
+body {
+  touch-action: pan-x pan-y;
+  font-family: 'Inter';
+}
+@layer utilities {
+  @keyframes message-highlight {
+    0% {
+      background-color: hsla(20, 80%, 15%, 0.4);
+      box-shadow: inset 3px 0 0 0 hsl(var(--primary));
+    }
+    10% {
+      background-color: hsla(20, 80%, 20%, 0.5);
+      box-shadow: inset 4px 0 0 0 hsl(var(--primary));
+    }
+    80% {
+      background-color: hsla(20, 80%, 15%, 0.3);
+      box-shadow: inset 4px 0 0 0 hsl(var(--primary));
+    }
+    100% {
+      background-color: transparent;
+      box-shadow: inset 0 0 0 0 hsl(var(--primary));
+    }
+  }
+
+  .animate-message-highlight {
+    animation: message-highlight 4s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+  }
+}
