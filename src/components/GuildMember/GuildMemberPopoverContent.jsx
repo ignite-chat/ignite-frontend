@@ -12,6 +12,7 @@ import { DotsThree, Prohibit, UserCircle, UserCircleMinus, Gavel } from '@phosph
 import { toast } from 'sonner';
 import UserProfileModal from '../UserProfileModal';
 import { KickBanDialog } from './GuildMemberContextMenu';
+import { MarkdownText } from '../MarkdownText';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useRolesStore } from '@/store/roles.store';
@@ -326,9 +327,16 @@ const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
               <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                 About Me
               </h3>
-              <p className="text-[13px] leading-relaxed text-gray-300">
-                {user.bio || 'No description provided.'}
-              </p>
+              {user.bio ? (
+                <MarkdownText
+                  text={user.bio}
+                  className="break-words text-[13px] leading-relaxed text-gray-300"
+                />
+              ) : (
+                <p className="text-[13px] leading-relaxed text-gray-300">
+                  No description provided.
+                </p>
+              )}
             </div>
 
             <div className="mt-3">

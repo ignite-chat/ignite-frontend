@@ -29,6 +29,7 @@ import { GuildContext } from '../contexts/GuildContext';
 import { useGuildsStore } from '../store/guilds.store';
 import { ChannelsService } from '../services/channels.service';
 import { useNavigate } from 'react-router-dom';
+import { MarkdownText } from './MarkdownText';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
@@ -312,9 +313,16 @@ const UserProfileModal = ({ userId, open, onOpenChange }) => {
                     <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
                       About Me
                     </h3>
-                    <p className="text-[15px] leading-normal text-gray-200">
-                      {user.bio || 'No description provided.'}
-                    </p>
+                    {user.bio ? (
+                      <MarkdownText
+                        text={user.bio}
+                        className="break-words text-[15px] leading-normal text-gray-200"
+                      />
+                    ) : (
+                      <p className="text-[15px] leading-normal text-gray-200">
+                        No description provided.
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">

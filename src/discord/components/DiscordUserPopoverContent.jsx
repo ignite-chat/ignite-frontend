@@ -6,6 +6,7 @@ import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
+import { MarkdownText } from '../../components/MarkdownText';
 
 const DISCORD_EPOCH = 1420070400000;
 
@@ -119,9 +120,10 @@ const DiscordUserPopoverContent = ({ author, member, guildId, onOpenProfile }) =
               <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                 About Me
               </h3>
-              <p className="text-[13px] leading-relaxed text-gray-300">
-                {profile.user.bio}
-              </p>
+              <MarkdownText
+                text={profile.user.bio}
+                className="break-words text-[13px] leading-relaxed text-gray-300"
+              />
             </div>
           )}
 
