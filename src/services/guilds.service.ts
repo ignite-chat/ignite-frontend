@@ -95,13 +95,23 @@ export const GuildsService = {
    */
   async updateGuildMemberInStore(guildId: string, memberId: string, updates: Partial<GuildMember>) {
     const { guildMembers, setGuildMembers } = useGuildsStore.getState();
+    const { setUser } = useUsersStore.getState();
     const members = guildMembers[guildId] || [];
     if (members.length === 0) return;
 
-    const updatedMembers = members.map((member) =>
-      member.user_id === memberId ? { ...member, ...updates } : member
-    );
-    setGuildMembers(guildId, updatedMembers);
+    const exists = members.some((member) => member.user_id === memberId);
+    if (exists) {
+      const updatedMembers = members.map((member) =>
+        member.user_id === memberId ? { ...member, ...updates } : member
+      );
+      setGuildMembers(guildId, updatedMembers);
+    } else {
+      setGuildMembers(guildId, [...members, { user_id: memberId, ...updates } as GuildMember]);
+    }
+
+    if (updates.user) {
+      setUser(updates.user.id, updates.user);
+    }
   },
 
   handleGuildUpdated(event: GuildEvent) {
