@@ -17,7 +17,7 @@ import {
 } from '@phosphor-icons/react';
 import { useAuthStore } from '@/store/auth.store';
 import { Dialog, DialogTrigger } from './ui/dialog';
-import UserSettingsDialogContent from './UserSettingsDialogContent';
+import UserSettingsContent from './UserSettings';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 import { LogOut } from 'lucide-react';
 import Avatar from './Avatar';
@@ -207,7 +207,7 @@ const UserBar = () => {
                 <Gear className="size-5 text-gray-400 hover:text-gray-200" weight="fill" />
               </button>
             </DialogTrigger>
-            <UserSettingsDialogContent />
+            <UserSettingsContent />
           </Dialog>
         </div>
       </div>
