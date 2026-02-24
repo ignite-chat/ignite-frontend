@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { UserCircle } from '@phosphor-icons/react';
 import { toast } from 'sonner';
-import { DiscordService } from '../services/discord.service';
-import { DiscordApiService } from '../services/discord-api.service';
-import { useDiscordGuildsStore } from '../store/discord-guilds.store';
-import { useDiscordUsersStore } from '../store/discord-users.store';
+import { DiscordService } from '../../discord/services/discord.service';
+import { DiscordApiService } from '../../discord/services/discord-api.service';
+import { useDiscordGuildsStore } from '../../discord/store/discord-guilds.store';
+import { useDiscordUsersStore } from '../../discord/store/discord-users.store';
 
 const DISCORD_EPOCH = 1420070400000;
 

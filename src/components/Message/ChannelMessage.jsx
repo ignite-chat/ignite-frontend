@@ -8,7 +8,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '../ui/conte
 import { Popover, PopoverContent } from '../ui/popover';
 import Avatar from '../Avatar.jsx';
 import GuildMemberContextMenu from '../GuildMember/GuildMemberContextMenu';
-import GuildMemberPopoverContent from '../GuildMember/GuildMemberPopoverContent';
+import GuildMemberPopoverContent from '../popovers/GuildMemberPopoverContent';
 import UserProfileModal from '@/components/modals/UserProfileModal';
 import { useModalStore } from '../../store/modal.store';
 import MessageContent from './MessageContent.jsx';

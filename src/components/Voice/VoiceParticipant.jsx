@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MicrophoneSlash, SpeakerSlash } from '@phosphor-icons/react';
 import Avatar from '../Avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import GuildMemberPopoverContent from '../GuildMember/GuildMemberPopoverContent';
+import GuildMemberPopoverContent from '../popovers/GuildMemberPopoverContent';
 import UserProfileModal from '@/components/modals/UserProfileModal';
 import { useModalStore } from '../../store/modal.store';
 import { useUsersStore } from '@/store/users.store';

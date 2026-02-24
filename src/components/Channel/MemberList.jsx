@@ -3,7 +3,7 @@ import { useChannelContext } from '../../contexts/ChannelContext.jsx';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '../ui/context-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import GuildMemberContextMenu from '../GuildMember/GuildMemberContextMenu.jsx';
-import GuildMemberPopoverContent from '../GuildMember/GuildMemberPopoverContent.jsx';
+import GuildMemberPopoverContent from '../popovers/GuildMemberPopoverContent.jsx';
 import UserProfileModal from '@/components/modals/UserProfileModal.jsx';
 import { useModalStore } from '../../store/modal.store';
 import Avatar from '../Avatar.jsx';

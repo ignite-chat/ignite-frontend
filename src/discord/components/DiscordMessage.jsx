@@ -5,7 +5,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/component
 import { DiscordService } from '../services/discord.service';
 import { parseMarkdown } from '@/components/Message/markdown/parser';
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
-import DiscordUserPopoverContent from './DiscordUserPopoverContent';
+import DiscordUserPopoverContent from '@/components/popovers/DiscordUserPopoverContent';
 import DiscordUserProfileModal from './DiscordUserProfileModal';
 import DiscordMessageContextMenu from './DiscordMessageContextMenu';
 import DiscordUserContextMenu from './DiscordUserContextMenu';
