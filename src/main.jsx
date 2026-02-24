@@ -8,6 +8,21 @@ import { Minus, Square, X } from '@phosphor-icons/react';
 import App from './App';
 import api from './api';
 import './css/style.css';
+import { useAuthStore } from './store/auth.store';
+import { useUsersStore } from './store/users.store';
+import { useGuildsStore } from './store/guilds.store';
+import { useChannelsStore } from './store/channels.store';
+import { useFriendsStore } from './store/friends.store';
+import { useRolesStore } from './store/roles.store';
+import { useEmojisStore } from './store/emojis.store';
+import { useStickersStore } from './store/stickers.store';
+import { useUnreadsStore } from './store/unreads.store';
+import { useNotificationStore } from './store/notification.store';
+import { useVoiceStore } from './store/voice.store';
+import { useTypingStore } from './store/typing.store';
+import { useLastChannelStore } from './store/last-channel.store';
+import { useSoundStore } from './store/sound.store';
+import { useInvitesStore } from './store/invites.store';
 import { Toaster } from './components/ui/sonner';
 import { ModalRoot } from './store/modal.store';
 
@@ -116,6 +131,24 @@ window.Echo = new Echo({
       },
     };
   },
+});
+
+window.__IGNITE_STORES__ = () => ({
+  auth: useAuthStore.getState(),
+  users: useUsersStore.getState(),
+  guilds: useGuildsStore.getState(),
+  channels: useChannelsStore.getState(),
+  friends: useFriendsStore.getState(),
+  roles: useRolesStore.getState(),
+  emojis: useEmojisStore.getState(),
+  stickers: useStickersStore.getState(),
+  unreads: useUnreadsStore.getState(),
+  notification: useNotificationStore.getState(),
+  voice: useVoiceStore.getState(),
+  typing: useTypingStore.getState(),
+  lastChannel: useLastChannelStore.getState(),
+  sound: useSoundStore.getState(),
+  invites: useInvitesStore.getState(),
 });
 
 ReactDOM.createRoot(document.getElementById('root')).render(
