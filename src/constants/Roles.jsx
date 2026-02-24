@@ -87,16 +87,6 @@ const _textPermissions = {
   ],
 };
 
-const _threadPermissions = {
-  name: 'Thread Permissions',
-  permissions: [
-    1n << 35n, // Create Public Threads
-    1n << 36n, // Create Private Threads
-    1n << 38n, // Send Messages In Threads
-    1n << 34n, // Manage Threads
-  ],
-};
-
 const _voicePermissions = {
   name: 'Voice Channel Permissions',
   permissions: [
@@ -140,14 +130,12 @@ export const PERMISSION_GROUPS = {
       ],
     },
     _textPermissions,
-    _threadPermissions,
     _voicePermissions,
   ],
 
   text: [
     _generalChannelPermissions,
     _textPermissions,
-    _threadPermissions,
   ],
 
   voice: [
@@ -158,7 +146,6 @@ export const PERMISSION_GROUPS = {
   category: [
     _generalChannelPermissions,
     _textPermissions,
-    _threadPermissions,
     _voicePermissions,
   ],
 };
