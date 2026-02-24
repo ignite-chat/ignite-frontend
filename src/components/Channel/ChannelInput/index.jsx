@@ -404,7 +404,7 @@ const ChannelInput = ({ channel }) => {
           (replyingMessage || stagedFiles.length > 0) ? 'rounded-t-none border-t-0' : 'rounded-t-md'
         )}
       >
-        <div className="ml-2 mt-2 flex items-center self-start">
+        <div className="ml-2 mt-2.5 flex items-center self-start">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -424,13 +424,13 @@ const ChannelInput = ({ channel }) => {
             <PlainTextPlugin
               contentEditable={
                 <ContentEditable
-                  className={`max-h-[50vh] min-h-[44px] w-full overflow-y-auto p-3 text-sm outline-none [&_.channel-input-paragraph]:m-0 ${
+                  className={`max-h-[50vh] min-h-[50px] w-full overflow-y-auto px-3 py-4 text-sm outline-none [&_.channel-input-paragraph]:m-0 ${
                     !canSendMessages ? 'cursor-not-allowed opacity-50' : ''
                   }`}
                 />
               }
               placeholder={
-                <div className="pointer-events-none absolute left-0 top-0 p-3 text-sm text-gray-400">
+                <div className="pointer-events-none absolute left-0 top-0 px-3 py-4 text-sm font-normal text-gray-500">
                   {placeholder}
                 </div>
               }
@@ -452,7 +452,7 @@ const ChannelInput = ({ channel }) => {
           </div>
         </LexicalComposer>
 
-        <div className="mr-2 mt-2 flex items-center gap-0.5 self-start">
+        <div className="mr-2 mt-2.5 flex items-center gap-0.5 self-start">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
