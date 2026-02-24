@@ -77,8 +77,8 @@ const ChannelMessages = ({ channel, messageId }) => {
     if (!messagesRef.current) return;
     if (!messageId) {
       const saved = scrollPositions.getMessage(channel?.channel_id);
-      if (saved != null) {
-        messagesRef.current.scrollTop = saved;
+      if (saved != null && !saved.nearBottom) {
+        messagesRef.current.scrollTop = saved.scrollTop;
       } else {
         messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
       }
@@ -197,12 +197,12 @@ const ChannelMessages = ({ channel, messageId }) => {
     if (!el) return;
     setAtTop(el.scrollTop <= 10);
 
+    wasNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+
     // Save scroll position on every scroll
     if (channel?.channel_id) {
-      scrollPositions.saveMessage(channel.channel_id, el.scrollTop);
+      scrollPositions.saveMessage(channel.channel_id, el.scrollTop, wasNearBottomRef.current);
     }
-
-    wasNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
 
     if (el.scrollTop < 200 && hasMore && !loadingMore) {
       onLoadMore();
@@ -223,6 +223,17 @@ const ChannelMessages = ({ channel, messageId }) => {
 
     observer.observe(content);
     return () => observer.disconnect();
+  }, []);
+
+  // Scroll to bottom when returning to tab if user was near bottom
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && wasNearBottomRef.current && messagesRef.current) {
+        messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
   useEffect(() => {

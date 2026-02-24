@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import api from '../../../api';
 import { useUsersStore } from '@/store/users.store';
+import MessageContent from '../../Message/MessageContent';
 import { useModalStore } from '../../../store/modal.store';
 import Avatar from '../../Avatar';
 import { Button } from '../../ui/button';
@@ -331,7 +332,7 @@ const TabProfiles = () => {
                 <>
                   <Separator className="my-2" />
                   <p className="text-xs font-bold uppercase text-muted-foreground">About Me</p>
-                  <p className="mt-1 text-xs">{watchedBio}</p>
+                  <div className="mt-1 text-xs"><MessageContent content={watchedBio} /></div>
                 </>
               )}
             </div>

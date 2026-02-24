@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import Avatar from '../Avatar.jsx';
+import MessageContent from './MessageContent.jsx';
 
 const MessageReplyBar = ({ referenceMessageId, messages }) => {
   const referencedMessage = useMemo(() => {
@@ -39,7 +40,11 @@ const MessageReplyBar = ({ referenceMessageId, messages }) => {
             {referencedMessage.author.name || referencedMessage.author.username}
           </span>
           <span className="max-w-[300px] truncate text-gray-400">
-            {referencedMessage.content || 'Click to see original message'}
+            {referencedMessage.content ? (
+              <MessageContent content={referencedMessage.content} isReply />
+            ) : (
+              'Click to see original message'
+            )}
           </span>
         </>
       ) : (

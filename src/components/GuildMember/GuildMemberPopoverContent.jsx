@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import MessageContent from '../Message/MessageContent';
 import { useNavigate } from 'react-router-dom';
 import { useUsersStore } from '@/store/users.store';
 import { MessageSquare, Plus, UserCheck, UserMinus, UserPlus, UserX, X } from 'lucide-react';
@@ -325,9 +326,9 @@ const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
               <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                 About Me
               </h3>
-              <p className="text-[13px] leading-relaxed text-gray-300">
-                {user.bio || 'No description provided.'}
-              </p>
+              <div className="text-[13px] leading-relaxed text-gray-300">
+                {user.bio ? <MessageContent content={user.bio} /> : 'No description provided.'}
+              </div>
             </div>
 
             <div className="mt-3">

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import MessageContent from './Message/MessageContent';
 import {
   Dialog,
   DialogContent,
@@ -312,9 +313,9 @@ const UserProfileModal = ({ modalId, userId, guildId }) => {
                     <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
                       About Me
                     </h3>
-                    <p className="text-[15px] leading-normal text-gray-200">
-                      {user.bio || 'No description provided.'}
-                    </p>
+                    <div className="text-[15px] leading-normal text-gray-200">
+                      {user.bio ? <MessageContent content={user.bio} /> : 'No description provided.'}
+                    </div>
                   </div>
 
                   <div className="space-y-2">

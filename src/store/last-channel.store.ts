@@ -4,7 +4,7 @@ import { create } from 'zustand';
  * Module-level maps for scroll positions.
  * These don't need to be reactive — just saved/restored imperatively.
  */
-const messageScrollPositions = new Map<string, number>();
+const messageScrollPositions = new Map<string, { scrollTop: number; nearBottom: boolean }>();
 const sidebarScrollPositions = new Map<string, number>();
 
 type LastChannelStore = {
@@ -27,8 +27,8 @@ export const useLastChannelStore = create<LastChannelStore>((set, get) => ({
 
 /** Save/restore scroll position for message containers, keyed by channelId */
 export const scrollPositions = {
-  saveMessage: (channelId: string, scrollTop: number) => {
-    messageScrollPositions.set(channelId, scrollTop);
+  saveMessage: (channelId: string, scrollTop: number, nearBottom: boolean) => {
+    messageScrollPositions.set(channelId, { scrollTop, nearBottom });
   },
   getMessage: (channelId: string) => messageScrollPositions.get(channelId),
 
