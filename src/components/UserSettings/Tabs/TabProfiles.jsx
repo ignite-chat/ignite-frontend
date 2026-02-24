@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Camera, Trash2 } from 'lucide-react';
 import { Separator } from '../../ui/separator';
 import ImageCropperDialog from '../../Settings/ImageCropperDialog';
+import { MarkdownText } from '../../MarkdownText';
 
 const AVATAR_OUTPUT_W = 512;
 const AVATAR_OUTPUT_H = 512;
@@ -338,7 +339,7 @@ const TabProfiles = () => {
                 <>
                   <Separator className="my-2" />
                   <p className="text-xs font-bold uppercase text-muted-foreground">About Me</p>
-                  <p className="mt-1 text-xs">{watchedBio}</p>
+                  <MarkdownText text={watchedBio} className="mt-1 break-words text-xs" />
                 </>
               )}
             </div>
