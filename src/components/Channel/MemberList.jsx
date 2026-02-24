@@ -20,8 +20,7 @@ const StatusBadge = ({ status, className = '' }) => {
   );
 };
 
-const MemberListItem = ({ member, guildId }) => {
-  const [popoverOpen, setPopoverOpen] = useState(false);
+const MemberListItem = ({ member, guildId, popoverOpen, setPopoverOpen }) => {
   const userFromStore = useUsersStore((state) => state.users[member.user.id]);
   const status = userFromStore?.status ?? member.user.status;
 
@@ -96,6 +95,7 @@ const MemberList = ({ guildId }) => {
   const [offlineMembers, setOfflineMembers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [collapsedRoles, setCollapsedRoles] = useState({});
+  const [openPopoverUserId, setOpenPopoverUserId] = useState(null);
 
   const activeGuild = guilds.find((g) => g.id === guildId);
   const activeGuildMembers = guildMembers[guildId];
@@ -109,6 +109,10 @@ const MemberList = ({ guildId }) => {
   }, [guildId]);
 
   const roles = useMemo(() => useRolesStore.getState().guildRoles[guildId] || [], [guildId]);
+
+  const makePopoverHandler = useCallback((userId) => (open) => {
+    setOpenPopoverUserId(open ? userId : null);
+  }, []);
 
   const toggleRole = useCallback((roleId) => {
     setCollapsedRoles((prev) => ({
@@ -189,7 +193,7 @@ const MemberList = ({ guildId }) => {
                       </div>
                       {!collapsedRoles[role.id] &&
                         membersByRole[role.id].map((member) => (
-                          <MemberListItem key={member.user.id} member={member} guildId={guildId} />
+                          <MemberListItem key={member.user.id} member={member} guildId={guildId} popoverOpen={openPopoverUserId === member.user.id} setPopoverOpen={makePopoverHandler(member.user.id)} />
                         ))}
                     </div>
                   ) : null
@@ -209,7 +213,7 @@ const MemberList = ({ guildId }) => {
                     </div>
                     {!collapsedRoles['no-role'] &&
                       membersWithoutRoles.map((member) => (
-                        <MemberListItem key={member.user.id} member={member} guildId={guildId} />
+                        <MemberListItem key={member.user.id} member={member} guildId={guildId} popoverOpen={openPopoverUserId === member.user.id} setPopoverOpen={makePopoverHandler(member.user.id)} />
                       ))}
                   </div>
                 )}
@@ -228,7 +232,7 @@ const MemberList = ({ guildId }) => {
                     </div>
                     {!collapsedRoles['offline'] &&
                       offlineMembers.map((member) => (
-                        <MemberListItem key={member.user.id} member={member} guildId={guildId} />
+                        <MemberListItem key={member.user.id} member={member} guildId={guildId} popoverOpen={openPopoverUserId === member.user.id} setPopoverOpen={makePopoverHandler(member.user.id)} />
                       ))}
                   </div>
                 )}
