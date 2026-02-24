@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type Sticker = {
+export type Sticker = {
   id: string;
   guild_id: string;
   name: string;

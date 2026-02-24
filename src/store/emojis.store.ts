@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-type Emoji = {
+export type Emoji = {
   id: string;
   guild_id: string;
   name: string;

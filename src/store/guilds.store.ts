@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { User } from './users.store';
 import type { Channel } from './channels.store';
 import type { Role } from './roles.store';
+import type { Emoji } from './emojis.store';
+import type { Sticker } from './stickers.store';
 
 export type Guild = {
   id: string;
@@ -14,6 +16,10 @@ export type Guild = {
   is_discoverable: boolean;
   channels: Channel[];
   roles: Role[];
+  emojis?: Emoji[];
+  stickers?: Sticker[];
+  member_count?: number;
+  member?: GuildMember;
   created_at?: string;
   updated_at?: string;
 };
