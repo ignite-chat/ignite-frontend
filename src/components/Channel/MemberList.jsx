@@ -45,7 +45,7 @@ const MemberListItem = ({ member, guildId }) => {
       <ContextMenu>
         <PopoverTrigger className="w-full text-left">
           <ContextMenuTrigger>
-            <div className="flex items-center gap-3 rounded-md p-2 transition hover:bg-gray-700/50">
+            <div className={`flex items-center gap-3 rounded-md p-2 transition hover:bg-gray-700/50 ${status === 'offline' ? 'opacity-40' : ''}`}>
               <div className="relative shrink-0">
                 <Avatar user={member.user} className="size-8" />
                 <StatusBadge status={status} />
