@@ -9,13 +9,13 @@ import {
   Tray,
   Users,
 } from '@phosphor-icons/react';
-import { useState } from 'react';
 import SearchModal from '../Modals/SearchModal';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { useChannelContext } from '../../contexts/ChannelContext';
 import { ChannelType } from '@/constants/ChannelType';
 import Avatar from '../Avatar';
 import { useUsersStore } from '@/store/users.store';
+import { useModalStore } from '../../store/modal.store';
 
 const Tooltip = ({ text = 'Hello' }) => {
   return (
@@ -83,8 +83,6 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
       ? (channel.recipients || []).find((r) => r.id !== currentUser?.id)
       : {};
 
-  const [searchOpen, setSearchOpen] = useState(false);
-
   return (
     <>
       <div className="relative">
@@ -123,18 +121,12 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
               />
             )}
             {channel?.type !== ChannelType.GUILD_VOICE && (
-              <IconButton icon="search" tooltipText="Search" onClick={() => setSearchOpen(true)} />
+              <IconButton icon="search" tooltipText="Search" onClick={() => useModalStore.getState().push(SearchModal, { channel, onPick: onJumpToMessage })} />
             )}
           </div>
         </div>
       </div>
 
-      <SearchModal
-        open={searchOpen}
-        onOpenChange={setSearchOpen}
-        channel={channel}
-        onPick={onJumpToMessage}
-      />
     </>
   );
 };

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { EmojisService } from '../../services/emojis.service';
 import { useEmojisStore } from '../../store/emojis.store';
+import { useModalStore } from '../../store/modal.store';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -24,8 +25,6 @@ const ServerEmojiManager = ({ guild }) => {
   const [uploading, setUploading] = useState(false);
   const [emojiName, setEmojiName] = useState('');
   const [croppedImage, setCroppedImage] = useState(null); // base64 data URL
-  const [cropperOpen, setCropperOpen] = useState(false);
-  const [cropperSrc, setCropperSrc] = useState(null);
 
   const fileInputRef = useRef(null);
 
@@ -43,19 +42,15 @@ const ServerEmojiManager = ({ guild }) => {
     }
 
     const dataUrl = await fileToDataUrl(file);
-    setCropperSrc(dataUrl);
-    setCropperOpen(true);
-  };
-
-  const handleCropConfirm = (croppedDataUrl) => {
-    setCroppedImage(croppedDataUrl);
-    setCropperOpen(false);
-    setCropperSrc(null);
-  };
-
-  const handleCropClose = () => {
-    setCropperOpen(false);
-    setCropperSrc(null);
+    useModalStore.getState().push(ImageCropperDialog, {
+      imageSrc: dataUrl,
+      title: 'Crop Emoji',
+      aspect: 1,
+      cropShape: 'rect',
+      outputWidth: EMOJI_SIZE,
+      outputHeight: EMOJI_SIZE,
+      onConfirm: (croppedDataUrl) => setCroppedImage(croppedDataUrl),
+    });
   };
 
   const handleUpload = async () => {
@@ -217,17 +212,6 @@ const ServerEmojiManager = ({ guild }) => {
         </div>
       </div>
 
-      <ImageCropperDialog
-        open={cropperOpen}
-        onClose={handleCropClose}
-        imageSrc={cropperSrc}
-        title="Crop Emoji"
-        aspect={1}
-        cropShape="rect"
-        outputWidth={EMOJI_SIZE}
-        outputHeight={EMOJI_SIZE}
-        onConfirm={handleCropConfirm}
-      />
     </div>
   );
 };

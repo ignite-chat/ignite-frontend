@@ -3,23 +3,19 @@ import { toast } from 'sonner';
 import DefaultLayout from './DefaultLayout';
 import ServerSettings from '../components/Settings/ServerSettings';
 import EditGuildChannelModal from '../components/Modals/EditGuildChannelModal';
-import { useChannelsStore } from '../store/channels.store';
+import { useChannelsStore } from '@/store/channels.store';
 import GuildChannelsSidebar from '@/components/Guild/GuildChannelsSidebar';
 import CreateGuildChannelDialog from '@/components/Guild/CreateGuildChannelDialog';
 import CreateGuildCategoryDialog from '@/components/Guild/CreateGuildCategoryDialog';
 import { Permissions } from '@/constants/Permissions';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { useModalStore } from '@/store/modal.store';
 
 const GuildLayout = ({ children, guild }) => {
   const [isServerSettingsOpen, setIsServerSettingsOpen] = useState(false);
-  const [isEditChannelModalOpen, setIsEditChannelModalOpen] = useState(false);
-  const [isCreateChannelDialogOpen, setIsCreateChannelDialogOpen] = useState(false);
-  const [isCreateCategoryDialogOpen, setIsCreateCategoryDialogOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('info');
   const [editChannelId, setEditChannelId] = useState(null);
-  const [createChannelCategoryId, setCreateChannelCategoryId] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { channels } = useChannelsStore();
 
   const canManageGuild = useHasPermission(guild?.id, null, Permissions.MANAGE_GUILD);
   const canManageChannels = useHasPermission(guild?.id, null, Permissions.MANAGE_CHANNELS);
@@ -43,10 +39,11 @@ const GuildLayout = ({ children, guild }) => {
         toast.error('You do not have permission to edit channels.');
         return;
       }
-      setEditChannelId(channelId);
-      setIsEditChannelModalOpen(true);
+      const { channels } = useChannelsStore.getState();
+      const channel = channels.find((c) => String(c.channel_id) === String(channelId));
+      useModalStore.getState().push(EditGuildChannelModal, { guild, channel });
     },
-    [canManageChannels]
+    [canManageChannels, guild]
   );
 
   // Open sidebar when a new guild is selected
@@ -76,10 +73,11 @@ const GuildLayout = ({ children, guild }) => {
             openEditChannelModal({ channelId: channel.channel_id || channel.id });
           }}
           onCreateChannel={(categoryId) => {
-            setCreateChannelCategoryId(categoryId);
-            setIsCreateChannelDialogOpen(true);
+            useModalStore.getState().push(CreateGuildChannelDialog, { guild, categoryId });
           }}
-          onCreateCategory={() => setIsCreateCategoryDialogOpen(true)}
+          onCreateCategory={() => {
+            useModalStore.getState().push(CreateGuildCategoryDialog, { guild });
+          }}
           canOpenServerSettings={canManageGuild}
           canManageChannels={canManageChannels}
         />
@@ -105,24 +103,6 @@ const GuildLayout = ({ children, guild }) => {
         initialTab={settingsTab}
         editChannelId={editChannelId}
         onEditChannelChange={setEditChannelId}
-      />
-      <EditGuildChannelModal
-        isOpen={isEditChannelModalOpen}
-        setIsOpen={setIsEditChannelModalOpen}
-        guild={guild}
-        onClose={() => setIsEditChannelModalOpen(false)}
-        channel={channels.find((c) => String(c.channel_id) === String(editChannelId))}
-      />
-      <CreateGuildChannelDialog
-        open={isCreateChannelDialogOpen}
-        onOpenChange={setIsCreateChannelDialogOpen}
-        guild={guild}
-        categoryId={createChannelCategoryId}
-      />
-      <CreateGuildCategoryDialog
-        open={isCreateCategoryDialogOpen}
-        onOpenChange={setIsCreateCategoryDialogOpen}
-        guild={guild}
       />
     </DefaultLayout>
   );

@@ -1,4 +1,4 @@
-import { useState, useContext, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -25,19 +25,18 @@ import { FriendsService } from '../services/friends.service';
 import { UsersService } from '../services/users.service';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
-import { GuildContext } from '../contexts/GuildContext';
 import { useGuildsStore } from '../store/guilds.store';
+import { useModalStore } from '../store/modal.store';
 import { ChannelsService } from '../services/channels.service';
 import { useNavigate } from 'react-router-dom';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
-const UserProfileModal = ({ userId, open, onOpenChange }) => {
+const UserProfileModal = ({ modalId, userId, guildId }) => {
   const currentUser = useUsersStore((s) => s.getCurrentUser());
   const user = useUsersStore((state) => state.users[userId]);
   const navigate = useNavigate();
   const { friends, requests } = useFriendsStore();
-  const guildContext = useContext(GuildContext);
   const guildsStore = useGuildsStore();
   const [note, setNote] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -45,27 +44,28 @@ const UserProfileModal = ({ userId, open, onOpenChange }) => {
   const [mutualGuilds, setMutualGuilds] = useState([]);
   const [mutualFriends, setMutualFriends] = useState([]);
 
+  const closeModal = () => useModalStore.getState().close(modalId);
+
   const member = useMemo(() => {
-    const guildId = guildContext?.guildId;
     if (!guildId) return null;
     return (guildsStore.guildMembers[guildId] || []).find((m) => m.user_id === userId);
-  }, [guildContext?.guildId, guildsStore.guildMembers, userId]);
+  }, [guildId, guildsStore.guildMembers, userId]);
 
   const isOwner = currentUser?.id === user?.id;
 
   useEffect(() => {
-    if (!open || !userId || isOwner) return;
+    if (!userId || isOwner) return;
     setActiveTab('about');
     setMutualGuilds([]);
     setMutualFriends([]);
 
-    UsersService.getUserProfile(userId, guildContext?.guildId)
+    UsersService.getUserProfile(userId, guildId)
       .then((profile) => {
         setMutualGuilds(profile.mutual_guilds || []);
         setMutualFriends(profile.mutual_friends || []);
       })
       .catch(() => {});
-  }, [open, userId]);
+  }, [userId]);
 
   const isFriend = useMemo(() => friends.some((f) => f.id === user?.id), [friends, user?.id]);
 
@@ -136,7 +136,7 @@ const UserProfileModal = ({ userId, open, onOpenChange }) => {
     try {
       const channel = await ChannelsService.createPrivateChannel([user.id]);
       if (channel) {
-        onOpenChange(false);
+        closeModal();
         navigate(`/channels/@me/${channel.channel_id}`);
       }
     } catch (error) {
@@ -147,7 +147,7 @@ const UserProfileModal = ({ userId, open, onOpenChange }) => {
 
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open onOpenChange={closeModal}>
       <DialogContent aria-describedby={undefined} className="max-w-xl border-none bg-transparent p-0 shadow-2xl [&>button]:hidden">
         <VisuallyHidden>
           <DialogTitle>User Profile</DialogTitle>
@@ -368,7 +368,7 @@ const UserProfileModal = ({ userId, open, onOpenChange }) => {
                         <button
                           key={mutual.id}
                           onClick={() => {
-                            onOpenChange(false);
+                            closeModal();
                             navigate(`/channels/${mutual.id}`);
                           }}
                           className="flex w-full items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-white/5"

@@ -10,6 +10,7 @@ import Avatar from '../Avatar.jsx';
 import GuildMemberContextMenu from '../GuildMember/GuildMemberContextMenu';
 import GuildMemberPopoverContent from '../GuildMember/GuildMemberPopoverContent';
 import UserProfileModal from '../UserProfileModal';
+import { useModalStore } from '../../store/modal.store';
 import MessageContent from './MessageContent.jsx';
 import MessageHeader from './MessageHeader';
 import MessageEditor from './MessageEditor';
@@ -33,7 +34,6 @@ const ChannelMessage = memo(
     guildId,
   }) => {
     const currentUser = useUsersStore((s) => s.getCurrentUser());
-    const [profileModalOpen, setProfileModalOpen] = useState(false);
     const [popoverOpen, setPopoverOpen] = useState(false);
     const avatarClickedRef = useRef(false);
     const [contextImageUrl, setContextImageUrl] = useState(null);
@@ -170,7 +170,7 @@ const ChannelMessage = memo(
                         user={message.author}
                         onViewProfile={() => {
                           setPopoverOpen(false);
-                          setProfileModalOpen(true);
+                          useModalStore.getState().push(UserProfileModal, { userId: message.author.id, guildId });
                         }}
                       />
                     </ContextMenuContent>
@@ -183,7 +183,7 @@ const ChannelMessage = memo(
                       message={message}
                       onViewProfile={() => {
                         setPopoverOpen(false);
-                        setProfileModalOpen(true);
+                        useModalStore.getState().push(UserProfileModal, { userId: message.author.id, guildId });
                       }}
                     />
                   )}
@@ -276,16 +276,11 @@ const ChannelMessage = memo(
               guild={null}
               onOpenProfile={() => {
                 setPopoverOpen(false);
-                setProfileModalOpen(true);
+                useModalStore.getState().push(UserProfileModal, { userId: message.author.id, guildId });
               }}
             />
           </PopoverContent>
         </Popover>
-        <UserProfileModal
-          userId={message.author.id}
-          open={profileModalOpen}
-          onOpenChange={setProfileModalOpen}
-        />
       </>
     );
   }

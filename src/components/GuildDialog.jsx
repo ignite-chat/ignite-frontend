@@ -12,8 +12,9 @@ import {
 import FormInput from './Form/FormInput';
 import FormError from './Form/FormError';
 import FormSubmit from './Form/FormSubmit';
+import { useModalStore } from '../store/modal.store';
 
-const GuildDialog = ({ open, onOpenChange }) => {
+const GuildDialog = ({ modalId }) => {
   const [view, setView] = useState('menu');
   const createForm = useForm({ mode: 'onChange', defaultValues: { name: '' } });
   const joinForm = useForm({ mode: 'onChange', defaultValues: { invite: '' } });
@@ -25,11 +26,11 @@ const GuildDialog = ({ open, onOpenChange }) => {
   }, [view]);
 
   const closeAll = useCallback(() => {
-    onOpenChange(false);
+    useModalStore.getState().close(modalId);
     setView('menu');
     createForm.reset();
     joinForm.reset();
-  }, [onOpenChange, createForm, joinForm]);
+  }, [modalId, createForm, joinForm]);
 
   const goBack = useCallback(() => {
     setView('menu');
@@ -66,7 +67,7 @@ const GuildDialog = ({ open, onOpenChange }) => {
   const isJoinSubmitting = joinForm.formState.isSubmitting;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open onOpenChange={() => useModalStore.getState().close(modalId)}>
       <DialogContent className="max-w-[520px]">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

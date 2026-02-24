@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { Copy, Link } from '@phosphor-icons/react';
 import api from '@/api';
+import { useModalStore } from '@/store/modal.store';
 
 import {
   Dialog,
@@ -41,7 +42,7 @@ const MAX_USES_OPTIONS = [
   { label: '100 uses', value: '100' },
 ];
 
-const InviteDialog = ({ open, onOpenChange, guildId }) => {
+const InviteDialog = ({ modalId, guildId }) => {
   const [maxAge, setMaxAge] = useState('86400');
   const [maxUses, setMaxUses] = useState('0');
   const [loading, setLoading] = useState(false);
@@ -75,17 +76,12 @@ const InviteDialog = ({ open, onOpenChange, guildId }) => {
     }
   }, [inviteCode]);
 
-  const handleClose = (value) => {
-    onOpenChange(value);
-    if (!value) {
-      setInviteCode(null);
-      setMaxAge('86400');
-      setMaxUses('0');
-    }
+  const handleClose = () => {
+    useModalStore.getState().close(modalId);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open onOpenChange={() => useModalStore.getState().close(modalId)}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Invite to Server</DialogTitle>
@@ -129,7 +125,7 @@ const InviteDialog = ({ open, onOpenChange, guildId }) => {
             </div>
 
             <DialogFooter>
-              <Button variant="ghost" onClick={() => handleClose(false)}>
+              <Button variant="ghost" onClick={handleClose}>
                 Cancel
               </Button>
               <Button onClick={handleCreate} disabled={loading} className="text-white">
@@ -159,7 +155,7 @@ const InviteDialog = ({ open, onOpenChange, guildId }) => {
               <Button variant="ghost" onClick={() => setInviteCode(null)}>
                 Create Another
               </Button>
-              <Button onClick={() => handleClose(false)} className="text-white">
+              <Button onClick={handleClose} className="text-white">
                 Done
               </Button>
             </DialogFooter>

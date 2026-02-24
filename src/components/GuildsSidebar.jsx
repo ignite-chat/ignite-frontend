@@ -29,6 +29,7 @@ import {
 import { ContextMenu, ContextMenuTrigger } from '../components/ui/context-menu';
 import GuildContextMenu from '../components/Guild/GuildContextMenu';
 import InviteDialog from '../components/Guild/InviteDialog';
+import { useModalStore } from '../store/modal.store';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -236,10 +237,8 @@ const GuildsSidebar = () => {
   const { channelUnreads, channelUnreadsLoaded } = useUnreadsStore();
   const { channels, channelMessages } = useChannelsStore();
   const { requests } = useFriendsStore();
-  const [isGuildDialogOpen, setIsGuildDialogOpen] = useState(false);
   const [activeId, setActiveId] = useState(null);
   const [leaveGuild, setLeaveGuild] = useState(null);
-  const [inviteGuildId, setInviteGuildId] = useState(null);
   const [isDiscordDialogOpen, setIsDiscordDialogOpen] = useState(false);
   const [discordTokenInput, setDiscordTokenInput] = useState('');
   const [isDiscordLogoutOpen, setIsDiscordLogoutOpen] = useState(false);
@@ -431,7 +430,7 @@ const GuildsSidebar = () => {
                 mentionCount={getGuildMentionCount(guild)}
                 isDragging={!!activeId}
                 onLeave={setLeaveGuild}
-                onInvite={(g) => setInviteGuildId(g.id)}
+                onInvite={(g) => useModalStore.getState().push(InviteDialog, { guildId: g.id })}
               />
             ))}
           </SortableContext>
@@ -451,7 +450,7 @@ const GuildsSidebar = () => {
           </DragOverlay>
         </DndContext>
 
-        <button type="button" onClick={() => setIsGuildDialogOpen(true)}>
+        <button type="button" onClick={() => useModalStore.getState().push(GuildDialog)}>
           <SidebarIcon icon={<Plus className="size-6" />} text="Add a Server" />
         </button>
         <Link to="/guild-discovery">
@@ -552,14 +551,6 @@ const GuildsSidebar = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <GuildDialog open={isGuildDialogOpen} onOpenChange={setIsGuildDialogOpen} />
-
-      <InviteDialog
-        open={!!inviteGuildId}
-        onOpenChange={(open) => !open && setInviteGuildId(null)}
-        guildId={inviteGuildId}
-      />
 
       <AlertDialog open={isDiscordLogoutOpen} onOpenChange={setIsDiscordLogoutOpen}>
         <AlertDialogContent>

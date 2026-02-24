@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { GuildsService } from '../services/guilds.service';
 import { EmojisService } from '../services/emojis.service';
@@ -9,7 +9,6 @@ import { useLastChannelStore } from '../store/last-channel.store';
 import GuildLayout from '../layouts/GuildLayout';
 import Channel from '../components/Channel/Channel';
 import { ChannelContextProvider } from '../contexts/ChannelContext';
-import ChannelDialog from '../components/Channel/ChannelDialog';
 import { StickersService } from '@/services/stickers.service';
 
 const GuildChannelPage = () => {
@@ -71,19 +70,11 @@ const GuildChannelPage = () => {
     [channels, channelId]
   );
 
-  const [isChannelDialogOpen, setIsChannelDialogOpen] = useState(false);
-
   return (
     <GuildLayout guild={guild}>
       <ChannelContextProvider>
         <Channel channel={channel} messageId={messageId} />
       </ChannelContextProvider>
-
-      <ChannelDialog
-        open={isChannelDialogOpen}
-        onOpenChange={setIsChannelDialogOpen}
-        guild={guild}
-      />
     </GuildLayout>
   );
 };

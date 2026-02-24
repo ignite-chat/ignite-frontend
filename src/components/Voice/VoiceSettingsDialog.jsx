@@ -3,6 +3,7 @@ import { Mic } from 'lucide-react';
 import { Room } from 'livekit-client';
 import { useVoiceStore } from '@/store/voice.store';
 import { VoiceService } from '@/services/voice.service';
+import { useModalStore } from '@/store/modal.store';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MicTestBars from './MicTestBars';
@@ -14,7 +15,7 @@ function filterDefaultDevice(devices) {
   return devices.filter((d) => d.deviceId !== 'default');
 }
 
-const VoiceSettingsDialog = ({ open, onOpenChange }) => {
+const VoiceSettingsDialog = ({ modalId }) => {
   const [inputDevices, setInputDevices] = useState([]);
   const [outputDevices, setOutputDevices] = useState([]);
   const audioInputDeviceId = useVoiceStore((s) => s.audioInputDeviceId);
@@ -25,13 +26,6 @@ const VoiceSettingsDialog = ({ open, onOpenChange }) => {
   const micCleanupRef = useRef(null);
 
   useEffect(() => {
-    if (!open) {
-      // Immediately stop the mic stream when the dialog closes
-      micCleanupRef.current?.();
-      micCleanupRef.current = null;
-      setIsTesting(false);
-      return;
-    }
     const loadDevices = async () => {
       try {
         const inputs = await Room.getLocalDevices('audioinput', true);
@@ -43,7 +37,13 @@ const VoiceSettingsDialog = ({ open, onOpenChange }) => {
       }
     };
     loadDevices();
-  }, [open]);
+
+    return () => {
+      // Immediately stop the mic stream when the dialog unmounts
+      micCleanupRef.current?.();
+      micCleanupRef.current = null;
+    };
+  }, []);
 
   const handleInputChange = useCallback(
     async (deviceId) => {
@@ -84,7 +84,7 @@ const VoiceSettingsDialog = ({ open, onOpenChange }) => {
   }, [room, noiseSuppression]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open onOpenChange={() => useModalStore.getState().close(modalId)}>
       <DialogContent
         showCloseButton={false}
         className="!max-w-[480px] !gap-0 !rounded-2xl !border-[#1e1f22] !bg-[#313338] !p-0 overflow-hidden !shadow-2xl"
@@ -95,7 +95,7 @@ const VoiceSettingsDialog = ({ open, onOpenChange }) => {
         <div className="flex items-center justify-between border-b border-[#1e1f22]/60 px-5 py-3.5">
           <h2 className="text-[15px] font-semibold text-[#f2f3f5]">Voice Settings</h2>
           <button
-            onClick={() => onOpenChange(false)}
+            onClick={() => useModalStore.getState().close(modalId)}
             className="flex h-8 w-8 items-center justify-center rounded-full text-[#b5bac1] transition-colors hover:bg-[#3b3d44] hover:text-[#dbdee1]"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

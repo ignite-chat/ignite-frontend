@@ -14,8 +14,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../../ui/alert-dialog';
+import { useModalStore } from '@/store/modal.store';
 
-const ChangePasswordDialog = ({ open, onOpenChange }) => {
+const ChangePasswordDialog = ({ modalId }) => {
   const form = useForm({
     defaultValues: {
       currentPassword: '',
@@ -31,18 +32,18 @@ const ChangePasswordDialog = ({ open, onOpenChange }) => {
       try {
         console.log('User Password Data:', data);
         // await api.patch('/users/@me/password', data);
-        onOpenChange(false);
+        useModalStore.getState().close(modalId);
         form.reset();
         toast.success('Password updated successfully');
       } catch (error) {
         console.error('Failed to update password:', error);
       }
     },
-    [form, onOpenChange]
+    [form, modalId]
   );
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open onOpenChange={(v) => { if (!v) useModalStore.getState().close(modalId); }}>
       <AlertDialogContent className="!max-w-md sm:!max-w-md">
         <AlertDialogHeader>
           <AlertDialogTitle>Change your password</AlertDialogTitle>

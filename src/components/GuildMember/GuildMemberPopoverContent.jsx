@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUsersStore } from '@/store/users.store';
 import { MessageSquare, Plus, UserCheck, UserMinus, UserPlus, UserX, X } from 'lucide-react';
@@ -22,7 +22,6 @@ import { useHasPermission } from '@/hooks/useHasPermission';
 const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
   const currentUser = useUsersStore((s) => s.getCurrentUser());
   const navigate = useNavigate();
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   const { friends, requests } = useFriendsStore();
   const { getUser } = useUsersStore();
@@ -183,7 +182,7 @@ const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
           <div className="absolute -bottom-12 left-4">
             <button
               type="button"
-              onClick={() => (onOpenProfile ? onOpenProfile() : setProfileModalOpen(true))}
+              onClick={() => (onOpenProfile ? onOpenProfile() : useModalStore.getState().push(UserProfileModal, { userId, guildId }))}
               className="group relative rounded-full ring-[6px] ring-[#111214]"
             >
               <Avatar user={user} className="size-20 !cursor-pointer text-3xl" />
@@ -428,9 +427,6 @@ const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
         </div>
       </div>
 
-      {!onOpenProfile && (
-        <UserProfileModal userId={userId} open={profileModalOpen} onOpenChange={setProfileModalOpen} />
-      )}
     </>
   );
 };

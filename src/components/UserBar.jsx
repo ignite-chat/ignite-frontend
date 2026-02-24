@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   Gear,
   Microphone,
@@ -24,6 +24,7 @@ import Avatar from './Avatar';
 import { useVoiceStore } from '@/store/voice.store';
 import { useUsersStore } from '@/store/users.store';
 import { VoiceService } from '@/services/voice.service';
+import { useModalStore } from '@/store/modal.store';
 import VoiceSettingsDialog from './Voice/VoiceSettingsDialog';
 
 function getPingInfo(ping) {
@@ -39,7 +40,6 @@ const UserBar = () => {
   const { channelName, connectionState, isMuted, isDeafened, isCameraOn, isScreenSharing, room, ping } =
     useVoiceStore();
   const user = useUsersStore((state) => state.getCurrentUser());
-  const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
 
   const isConnected = connectionState !== 'disconnected';
 
@@ -120,7 +120,7 @@ const UserBar = () => {
 
             <button
               type="button"
-              onClick={() => setVoiceSettingsOpen(true)}
+              onClick={() => useModalStore.getState().push(VoiceSettingsDialog)}
               className="flex size-9 shrink-0 items-center justify-center rounded bg-[#2a2a2d] text-gray-300 transition-colors hover:bg-[#35353a] hover:text-gray-100"
               title="Voice Settings"
             >
@@ -137,7 +137,6 @@ const UserBar = () => {
             </button>
           </div>
 
-          <VoiceSettingsDialog open={voiceSettingsOpen} onOpenChange={setVoiceSettingsOpen} />
         </div>
       )}
 

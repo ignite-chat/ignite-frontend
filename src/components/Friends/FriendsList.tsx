@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageSquare, UserMinus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -14,6 +13,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import UserProfileModal from '@/components/UserProfileModal';
+import { useModalStore } from '@/store/modal.store';
 import { useUsersStore } from '@/store/users.store';
 import type { Friend } from '@/store/friends.store';
 
@@ -26,7 +26,6 @@ const FriendsList = ({ friends, filter }: FriendsListProps) => {
   const navigate = useNavigate();
   const { channels } = useChannelsStore();
   const getUser = useUsersStore((s) => s.getUser);
-  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   const messageUser = (userId: string) => {
     const existingChannel = channels.find(
@@ -99,7 +98,7 @@ const FriendsList = ({ friends, filter }: FriendsListProps) => {
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent className="w-52">
-              <ContextMenuItem onSelect={() => setProfileUserId(friend.id)}>
+              <ContextMenuItem onSelect={() => useModalStore.getState().push(UserProfileModal, { userId: friend.id })}>
                 View Profile
               </ContextMenuItem>
               <ContextMenuItem onSelect={() => messageUser(friend.id)}>
@@ -122,11 +121,6 @@ const FriendsList = ({ friends, filter }: FriendsListProps) => {
           );
         })}
       </div>
-      <UserProfileModal
-        userId={profileUserId}
-        open={!!profileUserId}
-        onOpenChange={(open) => { if (!open) setProfileUserId(null); }}
-      />
     </>
   );
 };

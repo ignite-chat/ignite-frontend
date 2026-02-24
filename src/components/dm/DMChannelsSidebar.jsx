@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback } from 'react';
 import { UserStarIcon, SquarePen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '../ui/badge';
@@ -8,6 +8,7 @@ import { useUnreadsStore } from '@/store/unreads.store';
 import { useFriendsStore } from '@/store/friends.store';
 import DMChannelItem from './DMChannelItem';
 import NewDMModal from './NewDMModal';
+import { useModalStore } from '@/store/modal.store';
 
 const sortByLastMessage = (a, b) => {
   if (!a.last_message_id) return 1;
@@ -48,7 +49,6 @@ const ChannelSection = ({
 
 const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
   const currentUser = useUsersStore((s) => s.getCurrentUser()) || { id: 'me' };
-  const [newDMOpen, setNewDMOpen] = useState(false);
   const { channels, pinnedChannelIds } = useChannelsStore();
   const { channelUnreads, channelUnreadsLoaded } = useUnreadsStore();
   const { requests } = useFriendsStore();
@@ -99,7 +99,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
         <Button
           variant="ghost"
           className="mb-1 w-full justify-start gap-3"
-          onClick={() => setNewDMOpen(true)}
+          onClick={() => useModalStore.getState().push(NewDMModal)}
         >
           <SquarePen className="h-5 w-5" />
           <span className="font-medium">New Message</span>
@@ -126,7 +126,6 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
         />
       </div>
     </aside>
-    <NewDMModal open={newDMOpen} onOpenChange={setNewDMOpen} />
     </>
   );
 };

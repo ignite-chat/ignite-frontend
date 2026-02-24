@@ -9,29 +9,17 @@ import {
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import api from '../../api';
+import { useModalStore } from '../../store/modal.store';
 
-const SearchModal = ({ open, onOpenChange, channel, onPick }) => {
+const SearchModal = ({ modalId, channel, onPick }) => {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (!open) return;
-    setQuery('');
-    setResults([]);
-    setLoading(false);
     requestAnimationFrame(() => inputRef.current?.focus());
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') onOpenChange(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onOpenChange]);
+  }, []);
 
   const normalizeResults = (data) => {
     if (Array.isArray(data)) return data;
@@ -58,13 +46,13 @@ const SearchModal = ({ open, onOpenChange, channel, onPick }) => {
 
   const handlePick = (id) => {
     onPick(id);
-    onOpenChange(false);
+    useModalStore.getState().close(modalId);
   };
 
   const grouped = useMemo(() => results, [results]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open onOpenChange={() => useModalStore.getState().close(modalId)}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Search Messages</DialogTitle>

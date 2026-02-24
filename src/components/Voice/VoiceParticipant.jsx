@@ -4,12 +4,12 @@ import Avatar from '../Avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import GuildMemberPopoverContent from '../GuildMember/GuildMemberPopoverContent';
 import UserProfileModal from '../UserProfileModal';
+import { useModalStore } from '../../store/modal.store';
 import { useUsersStore } from '@/store/users.store';
 import { useVoiceStore } from '@/store/voice.store';
 
 const VoiceParticipant = ({ voiceState }) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const currentUser = useUsersStore().getCurrentUser();
   const connectionState = useVoiceStore((s) => s.connectionState);
   const user = useUsersStore.getState().getUser(String(voiceState.user_id))
@@ -50,16 +50,11 @@ const VoiceParticipant = ({ voiceState }) => {
             userId={String(voiceState.user_id)}
             onOpenProfile={() => {
               setPopoverOpen(false);
-              setProfileModalOpen(true);
+              useModalStore.getState().push(UserProfileModal, { userId: String(voiceState.user_id) });
             }}
           />
         </PopoverContent>
       </Popover>
-      <UserProfileModal
-        userId={String(voiceState.user_id)}
-        open={profileModalOpen}
-        onOpenChange={setProfileModalOpen}
-      />
     </>
   );
 };

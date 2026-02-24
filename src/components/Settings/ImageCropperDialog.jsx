@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import { Button } from '../ui/button';
+import { useModalStore } from '../../store/modal.store';
 
 const createImage = (url) =>
   new Promise((resolve, reject) => {
@@ -41,8 +42,7 @@ const getCroppedImg = async (src, pixelCrop, outputWidth, outputHeight) => {
 
 /**
  * @param {object} props
- * @param {boolean}  props.open
- * @param {()=>void} props.onClose
+ * @param {number}  props.modalId
  * @param {string}   props.imageSrc   — data URL or object URL of the raw file
  * @param {number}   props.aspect     — width/height ratio for the crop area
  * @param {number}   props.outputWidth
@@ -52,8 +52,7 @@ const getCroppedImg = async (src, pixelCrop, outputWidth, outputHeight) => {
  * @param {(dataUrl: string) => void} props.onConfirm
  */
 const ImageCropperDialog = ({
-  open,
-  onClose,
+  modalId,
   imageSrc,
   aspect,
   outputWidth,
@@ -70,19 +69,21 @@ const ImageCropperDialog = ({
     setCroppedAreaPixels(pixels);
   }, []);
 
+  const closeModal = () => useModalStore.getState().close(modalId);
+
   const handleConfirm = async () => {
     if (!croppedAreaPixels || !imageSrc) return;
     const dataUrl = await getCroppedImg(imageSrc, croppedAreaPixels, outputWidth, outputHeight);
     onConfirm(dataUrl);
-    onClose();
+    closeModal();
   };
 
   const handleOpenChange = (isOpen) => {
-    if (!isOpen) onClose();
+    if (!isOpen) closeModal();
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open onOpenChange={handleOpenChange}>
       <DialogContent showCloseButton={false} className="max-w-lg gap-0 overflow-hidden p-0">
         <DialogHeader className="px-6 pb-4 pt-5">
           <DialogTitle>{title}</DialogTitle>
@@ -123,7 +124,7 @@ const ImageCropperDialog = ({
         </div>
 
         <DialogFooter className="px-6 pb-5 pt-2">
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <Button type="button" variant="ghost" onClick={closeModal}>
             Cancel
           </Button>
           <Button type="button" onClick={handleConfirm}>

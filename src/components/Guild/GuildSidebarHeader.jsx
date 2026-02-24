@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { GuildsService } from '@/services/guilds.service';
 import { Permissions } from '@/constants/Permissions';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { useModalStore } from '@/store/modal.store';
 import {
   CaretDown,
   Gear,
@@ -37,7 +38,6 @@ const GuildSidebarHeader = ({
 
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [popoverView, setPopoverView] = useState('main');
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
   const canOpenServerSettings = useHasPermission(guild?.id, null, Permissions.MANAGE_GUILD);
@@ -67,7 +67,7 @@ const GuildSidebarHeader = ({
 
   const handleInviteClick = () => {
     setPopoverOpen(false);
-    setInviteDialogOpen(true);
+    useModalStore.getState().push(InviteDialog, { guildId: guild?.id });
   };
 
   return (
@@ -152,12 +152,6 @@ const GuildSidebarHeader = ({
           </PopoverContent>
         </Popover>
       </div>
-
-      <InviteDialog
-        open={inviteDialogOpen}
-        onOpenChange={setInviteDialogOpen}
-        guildId={guild?.id}
-      />
 
       <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
         <AlertDialogContent>

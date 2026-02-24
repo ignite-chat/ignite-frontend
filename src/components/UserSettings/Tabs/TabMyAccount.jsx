@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useUsersStore } from '@/store/users.store';
 import Avatar from '../../Avatar';
 import { Button } from '../../ui/button';
@@ -7,12 +6,10 @@ import { Separator } from '../../ui/separator';
 import ChangeUsernameDialog from '../Dialogs/ChangeUsernameDialog';
 import ChangeEmailDialog from '../Dialogs/ChangeEmailDialog';
 import ChangePasswordDialog from '../Dialogs/ChangePasswordDialog';
+import { useModalStore } from '@/store/modal.store';
 
 const TabMyAccount = ({ onNavigateToProfiles }) => {
   const user = useUsersStore((s) => s.getCurrentUser());
-  const [isUsernameDialogOpen, setIsUsernameDialogOpen] = useState(false);
-  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
-  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
   return (
     <div className="max-w-[740px] space-y-8">
@@ -59,7 +56,7 @@ const TabMyAccount = ({ onNavigateToProfiles }) => {
                 <p className="text-xs font-bold uppercase text-muted-foreground">Username</p>
                 <p className="mt-0.5 text-sm">{user?.username}</p>
               </div>
-              <Button variant="secondary" size="sm" onClick={() => setIsUsernameDialogOpen(true)}>
+              <Button variant="secondary" size="sm" onClick={() => useModalStore.getState().push(ChangeUsernameDialog)}>
                 Edit
               </Button>
             </div>
@@ -69,7 +66,7 @@ const TabMyAccount = ({ onNavigateToProfiles }) => {
                 <p className="text-xs font-bold uppercase text-muted-foreground">Email</p>
                 <p className="mt-0.5 text-sm">{user?.email || 'Not set'}</p>
               </div>
-              <Button variant="secondary" size="sm" onClick={() => setIsEmailDialogOpen(true)}>
+              <Button variant="secondary" size="sm" onClick={() => useModalStore.getState().push(ChangeEmailDialog)}>
                 Edit
               </Button>
             </div>
@@ -80,16 +77,12 @@ const TabMyAccount = ({ onNavigateToProfiles }) => {
       {/* Password & Authentication */}
       <div className="space-y-4">
         <h3 className="text-base font-semibold">Password and Authentication</h3>
-        <Button variant="secondary" onClick={() => setIsPasswordDialogOpen(true)}>
+        <Button variant="secondary" onClick={() => useModalStore.getState().push(ChangePasswordDialog)}>
           <KeyRound className="mr-2 h-4 w-4" />
           Change Password
         </Button>
       </div>
 
-      {/* Dialogs */}
-      <ChangeUsernameDialog open={isUsernameDialogOpen} onOpenChange={setIsUsernameDialogOpen} />
-      <ChangeEmailDialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen} />
-      <ChangePasswordDialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen} />
     </div>
   );
 };

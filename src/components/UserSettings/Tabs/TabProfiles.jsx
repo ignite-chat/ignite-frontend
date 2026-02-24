@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import api from '../../../api';
 import { useUsersStore } from '@/store/users.store';
+import { useModalStore } from '../../../store/modal.store';
 import Avatar from '../../Avatar';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
@@ -35,10 +36,6 @@ const TabProfiles = () => {
   const [pendingAvatar, setPendingAvatar] = useState(null);
   const [pendingBanner, setPendingBanner] = useState(null);
 
-  const [cropperOpen, setCropperOpen] = useState(false);
-  const [cropperSrc, setCropperSrc] = useState(null);
-  const [cropperMode, setCropperMode] = useState(null); // 'avatar' | 'banner'
-
   const avatarInputRef = useRef(null);
   const bannerInputRef = useRef(null);
 
@@ -54,27 +51,23 @@ const TabProfiles = () => {
     e.target.value = '';
     if (!file) return;
     const dataUrl = await fileToDataUrl(file);
-    setCropperSrc(dataUrl);
-    setCropperMode(mode);
-    setCropperOpen(true);
+    const isAvatar = mode === 'avatar';
+    useModalStore.getState().push(ImageCropperDialog, {
+      imageSrc: dataUrl,
+      title: isAvatar ? 'Crop Avatar' : 'Crop Banner',
+      aspect: isAvatar ? 1 : BANNER_OUTPUT_W / BANNER_OUTPUT_H,
+      cropShape: isAvatar ? 'round' : 'rect',
+      outputWidth: isAvatar ? AVATAR_OUTPUT_W : BANNER_OUTPUT_W,
+      outputHeight: isAvatar ? AVATAR_OUTPUT_H : BANNER_OUTPUT_H,
+      onConfirm: (croppedDataUrl) => {
+        if (isAvatar) setPendingAvatar(croppedDataUrl);
+        else setPendingBanner(croppedDataUrl);
+      },
+    });
   };
 
   const handleAvatarChange = (e) => openCropper(e, 'avatar');
   const handleBannerChange = (e) => openCropper(e, 'banner');
-
-  const handleCropConfirm = (croppedDataUrl) => {
-    if (cropperMode === 'avatar') setPendingAvatar(croppedDataUrl);
-    else setPendingBanner(croppedDataUrl);
-    setCropperOpen(false);
-    setCropperSrc(null);
-    setCropperMode(null);
-  };
-
-  const handleCropClose = () => {
-    setCropperOpen(false);
-    setCropperSrc(null);
-    setCropperMode(null);
-  };
 
   const displayAvatarUrl =
     pendingAvatar === null ? user?.avatar_url : pendingAvatar === REMOVE ? null : pendingAvatar;
@@ -346,17 +339,6 @@ const TabProfiles = () => {
         </div>
       </div>
 
-      <ImageCropperDialog
-        open={cropperOpen}
-        onClose={handleCropClose}
-        imageSrc={cropperSrc}
-        title={cropperMode === 'avatar' ? 'Crop Avatar' : 'Crop Banner'}
-        aspect={cropperMode === 'avatar' ? 1 : BANNER_OUTPUT_W / BANNER_OUTPUT_H}
-        cropShape={cropperMode === 'avatar' ? 'round' : 'rect'}
-        outputWidth={cropperMode === 'avatar' ? AVATAR_OUTPUT_W : BANNER_OUTPUT_W}
-        outputHeight={cropperMode === 'avatar' ? AVATAR_OUTPUT_H : BANNER_OUTPUT_H}
-        onConfirm={handleCropConfirm}
-      />
     </div>
   );
 };

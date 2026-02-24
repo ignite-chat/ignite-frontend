@@ -17,8 +17,9 @@ import {
 
 import { GuildsService } from '../../services/guilds.service';
 import { ChannelsService } from '../../services/channels.service';
+import { useModalStore } from '@/store/modal.store';
 
-const CreateGuildCategoryDialog = ({ open, onOpenChange, guild }) => {
+const CreateGuildCategoryDialog = ({ modalId, guild }) => {
   const {
     register,
     handleSubmit,
@@ -51,17 +52,17 @@ const CreateGuildCategoryDialog = ({ open, onOpenChange, guild }) => {
           type: 3,
         });
 
-        onOpenChange(false);
+        useModalStore.getState().close(modalId);
         reset();
       } catch (error) {
         console.error('Failed to create category', error);
       }
     },
-    [guild?.id, reset]
+    [guild?.id, modalId, reset]
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open onOpenChange={() => useModalStore.getState().close(modalId)}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create Category</DialogTitle>
@@ -100,7 +101,7 @@ const CreateGuildCategoryDialog = ({ open, onOpenChange, guild }) => {
               type="button"
               variant="ghost"
               onClick={() => {
-                onOpenChange(false);
+                useModalStore.getState().close(modalId);
                 reset();
               }}
             >

@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import GuildMemberContextMenu from '../GuildMember/GuildMemberContextMenu.jsx';
 import GuildMemberPopoverContent from '../GuildMember/GuildMemberPopoverContent.jsx';
 import UserProfileModal from '../UserProfileModal.jsx';
+import { useModalStore } from '../../store/modal.store';
 import Avatar from '../Avatar.jsx';
 import { useRolesStore } from '../../store/roles.store.ts';
 import { useGuildsStore } from '@/store/guilds.store.ts';
@@ -19,8 +20,7 @@ const StatusBadge = ({ status, className = '' }) => {
   );
 };
 
-const MemberListItem = ({ member }) => {
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
+const MemberListItem = ({ member, guildId }) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const userFromStore = useUsersStore((state) => state.users[member.user.id]);
   const status = userFromStore?.status ?? member.user.status;
@@ -64,7 +64,7 @@ const MemberListItem = ({ member }) => {
             user={member.user}
             onViewProfile={() => {
               setPopoverOpen(false);
-              setProfileModalOpen(true);
+              useModalStore.getState().push(UserProfileModal, { userId: member.user.id, guildId });
             }}
           />
         </ContextMenuContent>
@@ -79,15 +79,10 @@ const MemberListItem = ({ member }) => {
           guild={null}
           onOpenProfile={() => {
             setPopoverOpen(false);
-            setProfileModalOpen(true);
+            useModalStore.getState().push(UserProfileModal, { userId: member.user.id, guildId });
           }}
         />
       </PopoverContent>
-      <UserProfileModal
-        userId={member.user.id}
-        open={profileModalOpen}
-        onOpenChange={setProfileModalOpen}
-      />
     </Popover>
   );
 };
@@ -194,7 +189,7 @@ const MemberList = ({ guildId }) => {
                       </div>
                       {!collapsedRoles[role.id] &&
                         membersByRole[role.id].map((member) => (
-                          <MemberListItem key={member.user.id} member={member} />
+                          <MemberListItem key={member.user.id} member={member} guildId={guildId} />
                         ))}
                     </div>
                   ) : null
@@ -214,7 +209,7 @@ const MemberList = ({ guildId }) => {
                     </div>
                     {!collapsedRoles['no-role'] &&
                       membersWithoutRoles.map((member) => (
-                        <MemberListItem key={member.user.id} member={member} />
+                        <MemberListItem key={member.user.id} member={member} guildId={guildId} />
                       ))}
                   </div>
                 )}
@@ -233,7 +228,7 @@ const MemberList = ({ guildId }) => {
                     </div>
                     {!collapsedRoles['offline'] &&
                       offlineMembers.map((member) => (
-                        <MemberListItem key={member.user.id} member={member} />
+                        <MemberListItem key={member.user.id} member={member} guildId={guildId} />
                       ))}
                   </div>
                 )}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import api from '../../api';
+import { useModalStore } from '../../store/modal.store';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -41,10 +42,6 @@ const ServerInfo = ({ guild }) => {
   // null = no change, '' = remove, '<data:...>' = new image
   const [pendingIcon, setPendingIcon] = useState(null);
   const [pendingBanner, setPendingBanner] = useState(null);
-
-  const [cropperOpen, setCropperOpen] = useState(false);
-  const [cropperSrc, setCropperSrc] = useState(null);
-  const [cropperMode, setCropperMode] = useState(null); // 'icon' | 'banner'
 
   const iconInputRef = useRef(null);
   const bannerInputRef = useRef(null);
@@ -138,27 +135,23 @@ const ServerInfo = ({ guild }) => {
     e.target.value = '';
     if (!file) return;
     const dataUrl = await fileToDataUrl(file);
-    setCropperSrc(dataUrl);
-    setCropperMode(mode);
-    setCropperOpen(true);
+    const isIcon = mode === 'icon';
+    useModalStore.getState().push(ImageCropperDialog, {
+      imageSrc: dataUrl,
+      title: isIcon ? 'Crop Server Icon' : 'Crop Server Banner',
+      aspect: isIcon ? 1 : BANNER_OUTPUT_W / BANNER_OUTPUT_H,
+      cropShape: isIcon ? 'round' : 'rect',
+      outputWidth: isIcon ? ICON_OUTPUT_W : BANNER_OUTPUT_W,
+      outputHeight: isIcon ? ICON_OUTPUT_H : BANNER_OUTPUT_H,
+      onConfirm: (croppedDataUrl) => {
+        if (isIcon) setPendingIcon(croppedDataUrl);
+        else setPendingBanner(croppedDataUrl);
+      },
+    });
   };
 
   const handleIconChange = (e) => openCropper(e, 'icon');
   const handleBannerChange = (e) => openCropper(e, 'banner');
-
-  const handleCropConfirm = (croppedDataUrl) => {
-    if (cropperMode === 'icon') setPendingIcon(croppedDataUrl);
-    else setPendingBanner(croppedDataUrl);
-    setCropperOpen(false);
-    setCropperSrc(null);
-    setCropperMode(null);
-  };
-
-  const handleCropClose = () => {
-    setCropperOpen(false);
-    setCropperSrc(null);
-    setCropperMode(null);
-  };
 
   const handleSaveImages = async () => {
     const body = {};
@@ -622,17 +615,6 @@ const ServerInfo = ({ guild }) => {
         </>
       )}
 
-      <ImageCropperDialog
-        open={cropperOpen}
-        onClose={handleCropClose}
-        imageSrc={cropperSrc}
-        title={cropperMode === 'icon' ? 'Crop Server Icon' : 'Crop Server Banner'}
-        aspect={cropperMode === 'icon' ? 1 : BANNER_OUTPUT_W / BANNER_OUTPUT_H}
-        cropShape={cropperMode === 'icon' ? 'round' : 'rect'}
-        outputWidth={cropperMode === 'icon' ? ICON_OUTPUT_W : BANNER_OUTPUT_W}
-        outputHeight={cropperMode === 'icon' ? ICON_OUTPUT_H : BANNER_OUTPUT_H}
-        onConfirm={handleCropConfirm}
-      />
     </div>
   );
 };

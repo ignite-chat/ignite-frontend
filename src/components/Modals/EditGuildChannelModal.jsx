@@ -7,6 +7,7 @@ import { Slash } from 'lucide-react';
 import { Permissions } from '@/constants/Permissions';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { toast } from 'sonner';
+import { useModalStore } from '@/store/modal.store';
 
 const permissions = {
   2: 'Manage Guild', // 2
@@ -407,8 +408,10 @@ const PermissionsTab = ({ guild, channel }) => {
   );
 };
 
-const EditGuildChannelModal = ({ isOpen, onClose, guild, initialTab = 'info', channel }) => {
-  const [activeTab, setActiveTab] = useState('info');
+const EditGuildChannelModal = ({ modalId, guild, initialTab = 'info', channel }) => {
+  const [activeTab, setActiveTab] = useState(initialTab || 'info');
+
+  const closeModal = () => useModalStore.getState().close(modalId);
 
   const tabs = useMemo(
     () => [
@@ -429,9 +432,8 @@ const EditGuildChannelModal = ({ isOpen, onClose, guild, initialTab = 'info', ch
   );
 
   useEffect(() => {
-    if (!isOpen) return;
     const onKeyDown = (e) => {
-      if (e.key === 'Escape') onClose?.();
+      if (e.key === 'Escape') closeModal();
     };
     document.addEventListener('keydown', onKeyDown);
     const previousOverflow = document.body.style.overflow;
@@ -440,13 +442,9 @@ const EditGuildChannelModal = ({ isOpen, onClose, guild, initialTab = 'info', ch
       document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [isOpen, onClose]);
+  }, [modalId]);
 
-  useEffect(() => {
-    if (isOpen) setActiveTab(initialTab || 'info');
-  }, [initialTab, isOpen]);
-
-  if (!isOpen || !channel) return null;
+  if (!channel) return null;
 
   const activeContent = tabs.find((tab) => tab.id === activeTab)?.component;
 
@@ -460,7 +458,7 @@ const EditGuildChannelModal = ({ isOpen, onClose, guild, initialTab = 'info', ch
           <button
             type="button"
             className="self-start rounded p-2 text-gray-200 hover:bg-gray-800 sm:self-auto"
-            onClick={onClose}
+            onClick={closeModal}
             aria-label="Close"
           >
             <X size={20} />

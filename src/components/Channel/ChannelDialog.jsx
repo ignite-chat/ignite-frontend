@@ -8,6 +8,7 @@ import {
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import api from '../../api';
+import { useModalStore } from '../../store/modal.store';
 
 // Sample roles and permissions data structure
 const rolesList = [
@@ -68,7 +69,7 @@ const PermissionsList = ({ permissions, onPermissionChange }) => {
   );
 };
 
-const ChannelDialog = ({ open, onOpenChange }) => {
+const ChannelDialog = ({ modalId }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedRole, setSelectedRole] = useState(rolesList[0].id);
   const [permissions, setPermissions] = useState({});
@@ -117,7 +118,7 @@ const ChannelDialog = ({ open, onOpenChange }) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open onOpenChange={() => useModalStore.getState().close(modalId)}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Channel Settings</DialogTitle>

@@ -16,8 +16,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../../ui/alert-dialog';
+import { useModalStore } from '@/store/modal.store';
 
-const ChangeEmailDialog = ({ open, onOpenChange }) => {
+const ChangeEmailDialog = ({ modalId }) => {
   const user = useUsersStore((s) => s.getCurrentUser());
   const setUser = useUsersStore((s) => s.setUser);
 
@@ -36,7 +37,7 @@ const ChangeEmailDialog = ({ open, onOpenChange }) => {
           password: data.currentPassword,
         });
         setUser(user.id, { ...user, email: data.email });
-        onOpenChange(false);
+        useModalStore.getState().close(modalId);
         form.reset();
         toast.success('Email updated successfully');
       } catch (error) {
@@ -48,11 +49,11 @@ const ChangeEmailDialog = ({ open, onOpenChange }) => {
         }
       }
     },
-    [form, onOpenChange, user, setUser]
+    [form, modalId, user, setUser]
   );
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open onOpenChange={(v) => { if (!v) useModalStore.getState().close(modalId); }}>
       <AlertDialogContent className="!max-w-md sm:!max-w-md">
         <AlertDialogHeader>
           <AlertDialogTitle>Change your email</AlertDialogTitle>

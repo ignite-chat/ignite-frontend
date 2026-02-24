@@ -16,8 +16,9 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { ChannelsService } from '@/services/channels.service';
+import { useModalStore } from '@/store/modal.store';
 
-const CreateGuildChannelDialog = ({ open, onOpenChange, guild, categoryId }) => {
+const CreateGuildChannelDialog = ({ modalId, guild, categoryId }) => {
   const {
     register,
     handleSubmit,
@@ -46,17 +47,17 @@ const CreateGuildChannelDialog = ({ open, onOpenChange, guild, categoryId }) => 
           parent_id: categoryId,
         });
 
-        onOpenChange(false);
+        useModalStore.getState().close(modalId);
         reset();
       } catch (error) {
         console.error('Failed to create channel', error);
       }
     },
-    [guild?.id, categoryId, onOpenChange, reset]
+    [guild?.id, categoryId, modalId, reset]
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open onOpenChange={() => useModalStore.getState().close(modalId)}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create Channel</DialogTitle>
@@ -154,7 +155,7 @@ const CreateGuildChannelDialog = ({ open, onOpenChange, guild, categoryId }) => 
               type="button"
               variant="ghost"
               onClick={() => {
-                onOpenChange(false);
+                useModalStore.getState().close(modalId);
                 reset();
               }}
             >

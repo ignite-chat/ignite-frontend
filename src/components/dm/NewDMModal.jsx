@@ -14,6 +14,7 @@ import { useChannelsStore } from '@/store/channels.store';
 import { useGuildsStore } from '@/store/guilds.store';
 import { ChannelsService } from '@/services/channels.service';
 import { ChannelType } from '@/constants/ChannelType';
+import { useModalStore } from '@/store/modal.store';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
@@ -24,7 +25,7 @@ const PREFIXES = {
   '*': 'servers',
 };
 
-const NewDMModal = ({ open, onOpenChange }) => {
+const NewDMModal = ({ modalId }) => {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -223,7 +224,7 @@ const NewDMModal = ({ open, onOpenChange }) => {
   };
 
   const close = () => {
-    onOpenChange(false);
+    useModalStore.getState().close(modalId);
     setQuery('');
     setSelectedIndex(0);
   };
@@ -235,10 +236,9 @@ const NewDMModal = ({ open, onOpenChange }) => {
 
   return (
     <Dialog
-      open={open}
+      open
       onOpenChange={(v) => {
         if (!v) close();
-        else onOpenChange(v);
       }}
     >
       <DialogContent

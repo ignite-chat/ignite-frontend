@@ -1,9 +1,9 @@
-import { useState } from 'react';
 import { Check, Minus, UserCheck, UserMinus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import Avatar from '@/components/Avatar';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import UserProfileModal from '@/components/UserProfileModal';
+import { useModalStore } from '@/store/modal.store';
 import { FriendsService } from '@/services/friends.service';
 import { useUsersStore } from '@/store/users.store';
 import type { FriendRequest } from '@/store/friends.store';
@@ -87,7 +87,9 @@ type PendingRequestsProps = {
 };
 
 const PendingRequests = ({ requests, currentUser }: PendingRequestsProps) => {
-  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const openProfile = (userId: string) => {
+    useModalStore.getState().push(UserProfileModal, { userId });
+  };
 
   return (
     <>
@@ -106,15 +108,10 @@ const PendingRequests = ({ requests, currentUser }: PendingRequestsProps) => {
             key={req.id}
             request={req}
             currentUser={currentUser}
-            onClickUser={setProfileUserId}
+            onClickUser={openProfile}
           />
         ))}
       </div>
-      <UserProfileModal
-        userId={profileUserId}
-        open={!!profileUserId}
-        onOpenChange={(open: boolean) => { if (!open) setProfileUserId(null); }}
-      />
     </>
   );
 };
