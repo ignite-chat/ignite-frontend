@@ -83,8 +83,6 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
       ? (channel.recipients || []).find((r) => r.id !== currentUser?.id)
       : {};
 
-      console.log(otherRecipient, currentUser?.id);
-
   const [searchOpen, setSearchOpen] = useState(false);
 
   return (
