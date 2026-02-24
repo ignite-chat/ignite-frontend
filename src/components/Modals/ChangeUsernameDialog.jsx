@@ -1,11 +1,11 @@
 import { useCallback } from 'react';
-import api from '../../../api';
+import api from '@/api';
 import { useUsersStore } from '@/store/users.store';
-import { Button } from '../../ui/button';
-import { Input } from '../../ui/input';
-import { Label } from '../../ui/label';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Controller, useForm } from 'react-hook-form';
-import { FieldError } from '../../ui/field';
+import { FieldError } from '@/components/ui/field';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -15,7 +15,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../../ui/alert-dialog';
+} from '@/components/ui/alert-dialog';
 import { useModalStore } from '@/store/modal.store';
 
 const ChangeUsernameDialog = ({ modalId }) => {

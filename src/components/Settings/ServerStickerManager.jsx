@@ -7,7 +7,7 @@ import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
 import { toast } from 'sonner';
 import { Upload, Trash2 } from 'lucide-react';
-import ImageCropperDialog from './ImageCropperDialog';
+import ImageCropperDialog from '@/components/modals/ImageCropperDialog';
 import api from '../../api';
 
 const STICKER_SIZE = 320;

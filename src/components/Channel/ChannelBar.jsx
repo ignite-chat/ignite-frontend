@@ -9,7 +9,7 @@ import {
   Tray,
   Users,
 } from '@phosphor-icons/react';
-import SearchModal from '../Modals/SearchModal';
+import SearchModal from '../modals/SearchModal';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { useChannelContext } from '../../contexts/ChannelContext';
 import { ChannelType } from '@/constants/ChannelType';

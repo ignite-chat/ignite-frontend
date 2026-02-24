@@ -3,9 +3,9 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
-} from './ui/dialog';
+} from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import Avatar from './Avatar';
+import Avatar from '@/components/Avatar';
 import {
   UserCircle,
   UserPlus,
@@ -18,16 +18,16 @@ import {
   UserCheck,
   X,
 } from '@phosphor-icons/react';
-import { cn } from '../lib/utils';
-import { useFriendsStore } from '../store/friends.store';
-import { useUsersStore } from '../store/users.store';
-import { FriendsService } from '../services/friends.service';
-import { UsersService } from '../services/users.service';
+import { cn } from '@/lib/utils';
+import { useFriendsStore } from '@/store/friends.store';
+import { useUsersStore } from '@/store/users.store';
+import { FriendsService } from '@/services/friends.service';
+import { UsersService } from '@/services/users.service';
 import { toast } from 'sonner';
-import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
-import { useGuildsStore } from '../store/guilds.store';
-import { useModalStore } from '../store/modal.store';
-import { ChannelsService } from '../services/channels.service';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { useGuildsStore } from '@/store/guilds.store';
+import { useModalStore } from '@/store/modal.store';
+import { ChannelsService } from '@/services/channels.service';
 import { useNavigate } from 'react-router-dom';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;

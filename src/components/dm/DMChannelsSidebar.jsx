@@ -7,7 +7,7 @@ import { useUsersStore } from '@/store/users.store';
 import { useUnreadsStore } from '@/store/unreads.store';
 import { useFriendsStore } from '@/store/friends.store';
 import DMChannelItem from './DMChannelItem';
-import NewDMModal from './NewDMModal';
+import NewDMModal from '@/components/modals/NewDMModal';
 import { useModalStore } from '@/store/modal.store';
 
 const sortByLastMessage = (a, b) => {

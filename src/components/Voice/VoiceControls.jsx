@@ -14,7 +14,7 @@ import { useVoiceStore } from '@/store/voice.store';
 import { VoiceService } from '@/services/voice.service';
 import { useModalStore } from '@/store/modal.store';
 import ScreenSharePicker from './ScreenSharePicker';
-import VoiceSettingsDialog from './VoiceSettingsDialog';
+import VoiceSettingsDialog from '@/components/modals/VoiceSettingsDialog';
 
 const VoiceControls = () => {
   const { channelName, connectionState, isMuted, isDeafened, isCameraOn, isScreenSharing } =

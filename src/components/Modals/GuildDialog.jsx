@@ -1,18 +1,18 @@
 import { useCallback, useMemo, useState } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 import { ArrowLeft, ArrowRight } from '@phosphor-icons/react';
-import { GuildsService } from '../services/guilds.service';
-import { InvitesService } from '../services/invites.service';
+import { GuildsService } from '@/services/guilds.service';
+import { InvitesService } from '@/services/invites.service';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from './ui/dialog';
-import FormInput from './Form/FormInput';
-import FormError from './Form/FormError';
-import FormSubmit from './Form/FormSubmit';
-import { useModalStore } from '../store/modal.store';
+} from '@/components/ui/dialog';
+import FormInput from '@/components/Form/FormInput';
+import FormError from '@/components/Form/FormError';
+import FormSubmit from '@/components/Form/FormSubmit';
+import { useModalStore } from '@/store/modal.store';
 
 const GuildDialog = ({ modalId }) => {
   const [view, setView] = useState('menu');

@@ -12,7 +12,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
-import UserProfileModal from '@/components/UserProfileModal';
+import UserProfileModal from '@/components/modals/UserProfileModal';
 import { useModalStore } from '@/store/modal.store';
 import { useUsersStore } from '@/store/users.store';
 import type { Friend } from '@/store/friends.store';

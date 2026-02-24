@@ -2,7 +2,7 @@ import { Check, Minus, UserCheck, UserMinus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import Avatar from '@/components/Avatar';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import UserProfileModal from '@/components/UserProfileModal';
+import UserProfileModal from '@/components/modals/UserProfileModal';
 import { useModalStore } from '@/store/modal.store';
 import { FriendsService } from '@/services/friends.service';
 import { useUsersStore } from '@/store/users.store';

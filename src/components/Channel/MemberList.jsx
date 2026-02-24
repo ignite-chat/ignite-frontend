@@ -4,7 +4,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '../ui/conte
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import GuildMemberContextMenu from '../GuildMember/GuildMemberContextMenu.jsx';
 import GuildMemberPopoverContent from '../GuildMember/GuildMemberPopoverContent.jsx';
-import UserProfileModal from '../UserProfileModal.jsx';
+import UserProfileModal from '@/components/modals/UserProfileModal.jsx';
 import { useModalStore } from '../../store/modal.store';
 import Avatar from '../Avatar.jsx';
 import { useRolesStore } from '../../store/roles.store.ts';

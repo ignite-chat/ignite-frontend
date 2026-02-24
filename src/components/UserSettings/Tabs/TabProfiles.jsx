@@ -12,7 +12,7 @@ import { FieldError } from '../../ui/field';
 import { toast } from 'sonner';
 import { Camera, Trash2 } from 'lucide-react';
 import { Separator } from '../../ui/separator';
-import ImageCropperDialog from '../../Settings/ImageCropperDialog';
+import ImageCropperDialog from '@/components/modals/ImageCropperDialog';
 
 const AVATAR_OUTPUT_W = 512;
 const AVATAR_OUTPUT_H = 512;

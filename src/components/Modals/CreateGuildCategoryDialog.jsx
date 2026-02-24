@@ -3,20 +3,20 @@ import { useForm, Controller } from 'react-hook-form';
 import { ArrowRight, Hash, SpeakerHigh } from '@phosphor-icons/react';
 
 // Shadcn UI Components
-import { Label } from '../ui/label';
-import { Input } from '../ui/input';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Button } from '../ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '../ui/dialog';
+} from '@/components/ui/dialog';
 
-import { GuildsService } from '../../services/guilds.service';
-import { ChannelsService } from '../../services/channels.service';
+import { GuildsService } from '@/services/guilds.service';
+import { ChannelsService } from '@/services/channels.service';
 import { useModalStore } from '@/store/modal.store';
 
 const CreateGuildCategoryDialog = ({ modalId, guild }) => {

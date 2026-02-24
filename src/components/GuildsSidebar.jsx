@@ -13,7 +13,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { useGuildsStore } from '../store/guilds.store';
-import GuildDialog from '../components/GuildDialog';
+import GuildDialog from '@/components/modals/GuildDialog';
 import { useUnreadsStore } from '../store/unreads.store';
 import { useChannelsStore } from '../store/channels.store';
 import { useUsersStore } from '../store/users.store';
@@ -28,7 +28,7 @@ import {
 } from '../utils/unreads.utils';
 import { ContextMenu, ContextMenuTrigger } from '../components/ui/context-menu';
 import GuildContextMenu from '../components/Guild/GuildContextMenu';
-import InviteDialog from '../components/Guild/InviteDialog';
+import InviteDialog from '@/components/modals/InviteDialog';
 import { useModalStore } from '../store/modal.store';
 import {
   AlertDialog,

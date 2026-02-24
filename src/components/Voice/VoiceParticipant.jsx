@@ -3,7 +3,7 @@ import { MicrophoneSlash, SpeakerSlash } from '@phosphor-icons/react';
 import Avatar from '../Avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import GuildMemberPopoverContent from '../GuildMember/GuildMemberPopoverContent';
-import UserProfileModal from '../UserProfileModal';
+import UserProfileModal from '@/components/modals/UserProfileModal';
 import { useModalStore } from '../../store/modal.store';
 import { useUsersStore } from '@/store/users.store';
 import { useVoiceStore } from '@/store/voice.store';

@@ -9,7 +9,7 @@ import { Popover, PopoverContent } from '../ui/popover';
 import Avatar from '../Avatar.jsx';
 import GuildMemberContextMenu from '../GuildMember/GuildMemberContextMenu';
 import GuildMemberPopoverContent from '../GuildMember/GuildMemberPopoverContent';
-import UserProfileModal from '../UserProfileModal';
+import UserProfileModal from '@/components/modals/UserProfileModal';
 import { useModalStore } from '../../store/modal.store';
 import MessageContent from './MessageContent.jsx';
 import MessageHeader from './MessageHeader';

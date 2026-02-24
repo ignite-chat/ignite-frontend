@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
-import InviteDialog from './InviteDialog';
+import InviteDialog from '@/components/modals/InviteDialog';
 import GuildMenuContent from './GuildMenuContent';
 
 const GuildSidebarHeader = ({

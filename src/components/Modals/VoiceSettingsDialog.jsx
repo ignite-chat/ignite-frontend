@@ -6,7 +6,7 @@ import { VoiceService } from '@/services/voice.service';
 import { useModalStore } from '@/store/modal.store';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import MicTestBars from './MicTestBars';
+import MicTestBars from '@/components/Voice/MicTestBars';
 
 // ─── Voice Settings Dialog ───────────────────────────────────────────────────
 

@@ -25,7 +25,7 @@ import { useVoiceStore } from '@/store/voice.store';
 import { useUsersStore } from '@/store/users.store';
 import { VoiceService } from '@/services/voice.service';
 import { useModalStore } from '@/store/modal.store';
-import VoiceSettingsDialog from './Voice/VoiceSettingsDialog';
+import VoiceSettingsDialog from '@/components/modals/VoiceSettingsDialog';
 
 function getPingInfo(ping) {
   if (ping === null || ping == 0) return { Icon: WifiHigh, color: 'text-gray-400', label: 'Measuring...' };

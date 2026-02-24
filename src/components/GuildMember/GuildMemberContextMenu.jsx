@@ -1,10 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useUsersStore } from '../../store/users.store';
 import api from '../../api';
 import { FriendsService } from '../../services/friends.service';
-import { GuildsService } from '../../services/guilds.service';
 import { useFriendsStore } from '../../store/friends.store';
 import {
   ContextMenuItem,
@@ -14,176 +13,18 @@ import {
   ContextMenuSubContent,
   ContextMenuCheckboxItem, // Using CheckboxItem is standard for toggling roles
 } from '../ui/context-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../ui/alert-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '../ui/dialog';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useRolesStore } from '../../store/roles.store';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { useModalStore } from '../../store/modal.store';
 import { RolesService } from '../../services/roles.service';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Permissions } from '@/constants/Permissions';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { KickBanDialog } from '@/components/modals/KickBanDialog';
+import { MemberDebugDialog } from '@/components/modals/MemberDebugDialog';
 
 const intToHex = (intColor) => {
   return `#${intColor.toString(16).padStart(6, '0')}`;
-};
-
-const highlightJson = (obj) => {
-  const raw = JSON.stringify(obj, null, 2);
-  const escaped = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return escaped.replace(
-    /("(\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
-    (match) => {
-      let cls = 'text-emerald-400';
-      if (/^"/.test(match)) {
-        cls = /:$/.test(match) ? 'text-blue-400' : 'text-amber-300';
-      } else if (/true|false/.test(match)) {
-        cls = 'text-purple-400';
-      } else if (/null/.test(match)) {
-        cls = 'text-red-400';
-      }
-      return `<span class="${cls}">${match}</span>`;
-    }
-  );
-};
-
-const DELETE_MESSAGE_OPTIONS = [
-  { value: '0', label: "Don't delete any" },
-  { value: '3600', label: 'Last hour' },
-  { value: '21600', label: 'Last 6 hours' },
-  { value: '43200', label: 'Last 12 hours' },
-  { value: '86400', label: 'Last 24 hours' },
-  { value: '259200', label: 'Last 3 days' },
-  { value: '604800', label: 'Last 7 days' },
-];
-
-/**
- * Confirmation dialog for kick/ban actions.
- * Pushed via useModalStore.push(KickBanDialog, { user, guildId, action }).
- */
-export const KickBanDialog = ({ modalId, user, guildId, action }) => {
-  const [reason, setReason] = useState('');
-  const [deleteSeconds, setDeleteSeconds] = useState('0');
-  const isBan = action === 'ban';
-
-  if (!user) return null;
-
-  const handleClose = (open) => {
-    if (!open) {
-      useModalStore.getState().close(modalId);
-    }
-  };
-
-  return (
-    <AlertDialog open onOpenChange={handleClose}>
-      <AlertDialogContent className={isBan ? '!max-w-md' : undefined}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {isBan ? `Ban ${user.username}` : `Kick ${user.username}`}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {isBan
-              ? `Are you sure you want to ban ${user.username}? They will not be able to rejoin unless unbanned.`
-              : `Are you sure you want to kick ${user.username} from the server? They can rejoin with a new invite.`}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {isBan && (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Reason</label>
-              <input
-                type="text"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Optional reason for the ban"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                maxLength={512}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Delete message history</label>
-              <Select value={deleteSeconds} onValueChange={setDeleteSeconds}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DELETE_MESSAGE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
-
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            onClick={() => {
-              if (isBan) {
-                GuildsService.banMember(guildId, user.id, reason || undefined, parseInt(deleteSeconds) || undefined);
-              } else {
-                GuildsService.kickMember(guildId, user.id);
-              }
-            }}
-          >
-            {isBan ? 'Ban' : 'Kick'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-};
-
-/**
- * Debug info dialog for a guild member.
- * Pushed via useModalStore.push(MemberDebugDialog, { user, guildId }).
- */
-export const MemberDebugDialog = ({ modalId, user, guildId }) => {
-  const getUser = useUsersStore((s) => s.getUser);
-  const guildMembers = useGuildsStore((s) => s.guildMembers);
-
-  const storeUser = user ? getUser(user.id) : null;
-  const member = user ? guildMembers[guildId]?.find((m) => m.user_id === user.id) : null;
-
-  if (!user) return null;
-
-  const debugData = { user: storeUser || null, member: member || null };
-
-  return (
-    <Dialog open onOpenChange={() => useModalStore.getState().close(modalId)}>
-      <DialogContent className="flex max-h-[80vh] flex-col sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Member Debug Info</DialogTitle>
-          <DialogDescription>{user.name || user.username}</DialogDescription>
-        </DialogHeader>
-        <pre
-          className="min-h-0 flex-1 overflow-auto rounded-md bg-black/40 p-4 text-xs leading-relaxed"
-          dangerouslySetInnerHTML={{ __html: highlightJson(debugData) }}
-        />
-      </DialogContent>
-    </Dialog>
-  );
 };
 
 const GuildMemberContextMenu = ({ user, onViewProfile }) => {

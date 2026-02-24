@@ -3,9 +3,9 @@ import Avatar from '../../Avatar';
 import { Button } from '../../ui/button';
 import { KeyRound } from 'lucide-react';
 import { Separator } from '../../ui/separator';
-import ChangeUsernameDialog from '../Dialogs/ChangeUsernameDialog';
-import ChangeEmailDialog from '../Dialogs/ChangeEmailDialog';
-import ChangePasswordDialog from '../Dialogs/ChangePasswordDialog';
+import ChangeUsernameDialog from '@/components/modals/ChangeUsernameDialog';
+import ChangeEmailDialog from '@/components/modals/ChangeEmailDialog';
+import ChangePasswordDialog from '@/components/modals/ChangePasswordDialog';
 import { useModalStore } from '@/store/modal.store';
 
 const TabMyAccount = ({ onNavigateToProfiles }) => {

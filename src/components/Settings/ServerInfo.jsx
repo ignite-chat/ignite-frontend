@@ -8,7 +8,7 @@ import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
 import { Switch } from '../ui/switch';
 import { Camera, Pencil, Trash2 } from 'lucide-react';
-import ImageCropperDialog from './ImageCropperDialog';
+import ImageCropperDialog from '@/components/modals/ImageCropperDialog';
 import GuildCard from '../Guild/GuildCard';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
