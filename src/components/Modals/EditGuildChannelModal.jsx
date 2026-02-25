@@ -1,23 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Info, Lock, FloppyDisk, Check } from '@phosphor-icons/react';
-import { InputGroup, InputGroupInput } from '../ui/input-group';
+import { Slash } from 'lucide-react';
 import api from '../../api';
 import { useGuildsStore } from '../../store/guilds.store';
-import { Slash } from 'lucide-react';
 import { Permissions } from '@/constants/Permissions';
+import { PERMISSION_GROUPS, PERMISSIONS_LIST, intToHex } from '@/constants/Roles';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { toast } from 'sonner';
 import { useModalStore } from '@/store/modal.store';
+import { useRolesStore } from '@/store/roles.store';
+import { ChannelType } from '@/constants/ChannelType';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 
-const permissions = {
-  2: 'Manage Guild', // 2
-  4: 'Manage Channels', // 4
-  8: 'Manage Messages', // 8
-  16: 'Kick Members', // 16
-  32: 'Ban Members', // 32
-};
-
-const OverviewTab = ({ guild, channel }) => {
+const OverviewTab = ({ guild, channel, isCategory }) => {
   const store = useGuildsStore();
 
   const [name, setName] = useState(channel?.name || '');
@@ -26,7 +26,6 @@ const OverviewTab = ({ guild, channel }) => {
 
   const canManageChannels = useHasPermission(guild?.id, null, Permissions.MANAGE_CHANNELS);
 
-  // Update local state if the channel prop changes externally
   useEffect(() => {
     setName(channel?.name || '');
     setDescription(channel?.description || '');
@@ -52,7 +51,6 @@ const OverviewTab = ({ guild, channel }) => {
       .then((response) => {
         console.log('Channel updated successfully:', response.data);
 
-        // Update the channel in the store
         const newGuilds = store.guilds.map((g) => {
           if (g.id === guild.id) {
             return {
@@ -78,66 +76,55 @@ const OverviewTab = ({ guild, channel }) => {
   };
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-md border border-white/5 bg-gray-900">
-      {/* Scrollable Content Area */}
-      <div className="scrollbar-thin scrollbar-thumb-gray-700 flex-1 overflow-y-auto bg-gray-900/50 p-6">
+    <div className="flex h-full flex-col">
+      <ScrollArea className="flex-1 px-10 py-8">
         <div className="flex max-w-lg flex-col gap-6">
-          <div>
-            <h3 className="mb-1 text-lg font-semibold text-gray-100">Channel Overview</h3>
-            <p className="mb-6 text-xs text-gray-400">Edit the basic details of this channel.</p>
+          <div className="space-y-2">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+              {isCategory ? 'Category Name' : 'Channel Name'}
+            </Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={isCategory ? 'Enter category name' : 'Enter channel name'}
+              required
+            />
           </div>
 
-          <div>
-            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">
-              Channel Name
-            </div>
-            <InputGroup>
-              <InputGroupInput
-                className="w-full rounded border border-white/5 bg-gray-800 p-2 text-gray-100 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter channel name"
-                required
-              />
-            </InputGroup>
-          </div>
-
-          <div>
-            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">
-              Channel Description
-            </div>
-            <InputGroup>
-              <InputGroupInput
-                className="w-full rounded border border-white/5 bg-gray-800 p-2 text-gray-100 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter channel description"
-              />
-            </InputGroup>
+          <div className="space-y-2">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+              {isCategory ? 'Category Description' : 'Channel Description'}
+            </Label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={isCategory ? 'Enter category description' : 'Enter channel description'}
+            />
           </div>
         </div>
-      </div>
+      </ScrollArea>
 
-      {/* Floating Action Bar */}
       <div
-        className={`border-t border-white/5 bg-gray-900 p-4 transition-all duration-300 ${hasChanged ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-50'}`}
+        className={cn(
+          'px-10 py-4 transition-all duration-300',
+          hasChanged ? 'opacity-100' : 'pointer-events-none opacity-0'
+        )}
       >
+        <Separator className="mb-4" />
         <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-400">
-            {hasChanged ? 'Careful - you have unsaved changes!' : 'Channel settings'}
-          </span>
-          <button
+          <span className="text-sm text-muted-foreground">Careful — you have unsaved changes!</span>
+          <Button
             onClick={handleSave}
             disabled={!hasChanged || isSaving || !canManageChannels}
-            className={`flex items-center gap-2 rounded px-4 py-2 text-sm font-medium text-white transition-colors ${
+            className={cn(
               hasChanged && canManageChannels
-                ? 'bg-green-600 shadow-lg shadow-green-900/20 hover:bg-green-500'
-                : 'cursor-not-allowed bg-gray-700 opacity-50'
-            }`}
+                ? 'bg-green-600 text-white shadow-lg shadow-green-900/20 hover:bg-green-500'
+                : ''
+            )}
           >
-            <FloppyDisk size={18} />
+            <FloppyDisk size={16} />
             {isSaving ? 'Saving...' : 'Save Changes'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -146,47 +133,53 @@ const OverviewTab = ({ guild, channel }) => {
 
 const PermissionRow = ({ label, state, onAllow, onDeny, onReset }) => {
   return (
-    <div className="flex items-center justify-between rounded px-2 py-3 transition-colors hover:bg-gray-800/40">
-      <span className="text-sm font-medium text-gray-200">{label}</span>
+    <div className="flex items-center justify-between rounded px-2 py-3 transition-colors hover:bg-muted/50">
+      <span className="text-sm font-medium text-foreground">{label}</span>
       <div className="flex items-center shadow-sm">
-        {/* Deny Button */}
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="icon"
           onClick={onDeny}
-          className={`flex h-8 w-8 items-center justify-center rounded-l border border-r-0 transition-all ${
+          className={cn(
+            'h-8 w-8 rounded-none rounded-l border-r-0',
             state === 0
-              ? 'border-red-500 bg-red-500/20 text-red-500'
-              : 'border-white/5 bg-gray-800 text-gray-500 hover:bg-gray-700 hover:text-red-400'
-          }`}
+              ? 'border-red-500 bg-red-500/20 text-red-500 hover:bg-red-500/30 hover:text-red-500'
+              : 'hover:text-red-400'
+          )}
         >
           <X weight="bold" size={14} />
-        </button>
+        </Button>
 
-        {/* Neutral/Reset Button */}
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="icon"
           onClick={onReset}
-          className={`flex h-8 w-8 items-center justify-center border transition-all ${
+          className={cn(
+            'h-8 w-8 rounded-none',
             state === 1
-              ? 'border-white/5 bg-gray-600/30 text-gray-200'
-              : 'border-white/5 bg-gray-800 text-gray-500 hover:bg-gray-700 hover:text-gray-300'
-          }`}
+              ? 'bg-muted/60 text-foreground hover:bg-muted/60'
+              : ''
+          )}
         >
-          <Slash weight="bold" size={14} />
-        </button>
+          <Slash size={14} />
+        </Button>
 
-        {/* Allow Button */}
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="icon"
           onClick={onAllow}
-          className={`flex h-8 w-8 items-center justify-center rounded-r border border-l-0 transition-all ${
+          className={cn(
+            'h-8 w-8 rounded-none rounded-r border-l-0',
             state === 2
-              ? 'border-green-500 bg-green-500/20 text-green-500'
-              : 'border-white/5 bg-gray-800 text-gray-500 hover:bg-gray-700 hover:text-green-400'
-          }`}
+              ? 'border-green-500 bg-green-500/20 text-green-500 hover:bg-green-500/30 hover:text-green-500'
+              : 'hover:text-green-400'
+          )}
         >
           <Check weight="bold" size={14} />
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -195,14 +188,11 @@ const PermissionRow = ({ label, state, onAllow, onDeny, onReset }) => {
 const PermissionsTab = ({ guild, channel }) => {
   const store = useGuildsStore();
   const [selectedRoleId, setSelectedRoleId] = useState();
-  const rolesList = guild?.roles ?? [];
+  const rolesList = useRolesStore((s) => s.guildRoles[guild?.id]) ?? [];
   const [savedPermissionsByRole, setSavedPermissionsByRole] = useState({});
-
-  // Track if changes have been made locally
   const [isSaving, setIsSaving] = useState(false);
-
-  const [allowedPermissions, setAllowedPermissions] = useState(0);
-  const [deniedPermissions, setDeniedPermissions] = useState(0);
+  const [allowedPermissions, setAllowedPermissions] = useState(0n);
+  const [deniedPermissions, setDeniedPermissions] = useState(0n);
 
   const canManageChannels = useHasPermission(guild?.id, null, Permissions.MANAGE_CHANNELS);
 
@@ -211,54 +201,49 @@ const PermissionsTab = ({ guild, channel }) => {
     const rolePerm = channel?.role_permissions?.find((rp) => rp.role_id === selectedRoleId);
     const baselinePerm = savedPerm || rolePerm;
     if (!baselinePerm) {
-      return allowedPermissions !== 0 || deniedPermissions !== 0;
+      return allowedPermissions !== 0n || deniedPermissions !== 0n;
     }
     return (
-      allowedPermissions !== Number(baselinePerm.allowed_permissions) ||
-      deniedPermissions !== Number(baselinePerm.denied_permissions)
+      allowedPermissions !== BigInt(baselinePerm.allowed_permissions) ||
+      deniedPermissions !== BigInt(baselinePerm.denied_permissions)
     );
   }, [allowedPermissions, deniedPermissions, selectedRoleId, channel, savedPermissionsByRole]);
 
-  // Load initial permissions when role changes
   useEffect(() => {
     const savedPerm = savedPermissionsByRole[selectedRoleId];
     const rolePerm = channel?.role_permissions?.find((rp) => rp.role_id === selectedRoleId);
     const baselinePerm = savedPerm || rolePerm;
     if (baselinePerm) {
-      setAllowedPermissions(Number(baselinePerm.allowed_permissions));
-      setDeniedPermissions(Number(baselinePerm.denied_permissions));
+      setAllowedPermissions(BigInt(baselinePerm.allowed_permissions));
+      setDeniedPermissions(BigInt(baselinePerm.denied_permissions));
     } else {
-      setAllowedPermissions(0);
-      setDeniedPermissions(0);
+      setAllowedPermissions(0n);
+      setDeniedPermissions(0n);
     }
   }, [selectedRoleId, channel, savedPermissionsByRole]);
 
-  // Select first role on mount
   useEffect(() => {
     if (rolesList.length > 0 && !selectedRoleId) {
       setSelectedRoleId(rolesList[0]?.id);
     }
   }, [rolesList, selectedRoleId]);
 
-  const handleDenyPermission = (permBit) => {
-    setAllowedPermissions((prev) => prev & ~permBit);
-    setDeniedPermissions((prev) => prev | permBit);
+  const handleDenyPermission = (bit) => {
+    setAllowedPermissions((prev) => prev & ~bit);
+    setDeniedPermissions((prev) => prev | bit);
   };
 
-  const handleAllowPermission = (permBit) => {
-    setAllowedPermissions((prev) => prev | permBit);
-    setDeniedPermissions((prev) => prev & ~permBit);
+  const handleAllowPermission = (bit) => {
+    setAllowedPermissions((prev) => prev | bit);
+    setDeniedPermissions((prev) => prev & ~bit);
   };
 
-  const handleResetPermission = (permBit) => {
-    setAllowedPermissions((prev) => prev & ~permBit);
-    setDeniedPermissions((prev) => prev & ~permBit);
+  const handleResetPermission = (bit) => {
+    setAllowedPermissions((prev) => prev & ~bit);
+    setDeniedPermissions((prev) => prev & ~bit);
   };
 
-  // 0 = Denied, 1 = Neutral (inherit), 2 = Allowed
-  const getPermissionState = (permBit) => {
-    // We cast to Number/Int to ensure bitwise works correctly
-    const bit = Number(permBit);
+  const getPermissionState = (bit) => {
     if (deniedPermissions & bit) return 0;
     if (allowedPermissions & bit) return 2;
     return 1;
@@ -272,16 +257,16 @@ const PermissionsTab = ({ guild, channel }) => {
     setIsSaving(true);
     api
       .put(`/channels/${channel.channel_id}/permissions/${selectedRoleId}`, {
-        allowed_permissions: allowedPermissions,
-        denied_permissions: deniedPermissions,
+        allowed_permissions: allowedPermissions.toString(),
+        denied_permissions: deniedPermissions.toString(),
       })
       .then((response) => {
         console.log('Permissions updated successfully:', response.data);
         setSavedPermissionsByRole((prev) => ({
           ...prev,
           [selectedRoleId]: {
-            allowed_permissions: allowedPermissions,
-            denied_permissions: deniedPermissions,
+            allowed_permissions: allowedPermissions.toString(),
+            denied_permissions: deniedPermissions.toString(),
           },
         }));
         const newGuilds = store.guilds.map((g) => {
@@ -312,16 +297,10 @@ const PermissionsTab = ({ guild, channel }) => {
               ];
             })();
 
-            return {
-              ...c,
-              role_permissions: newRolePerms,
-            };
+            return { ...c, role_permissions: newRolePerms };
           });
 
-          return {
-            ...g,
-            channels: newChannels,
-          };
+          return { ...g, channels: newChannels };
         });
         store.setGuilds(newGuilds);
       })
@@ -334,74 +313,92 @@ const PermissionsTab = ({ guild, channel }) => {
   };
 
   return (
-    <div className="flex h-[500px] w-full flex-col overflow-hidden rounded-md border border-white/5 bg-gray-900 md:flex-row">
-      {/* Sidebar: Roles List */}
-      <div className="flex w-full flex-col border-b border-white/5 bg-gray-900 md:w-48 md:border-b-0 md:border-r">
-        <div className="p-3 text-xs font-bold uppercase tracking-wider text-gray-500">Roles</div>
-        <div className="scrollbar-thin scrollbar-thumb-gray-700 flex-1 overflow-y-auto px-2 pb-2">
-          {rolesList.map((role) => (
-            <button
-              key={role.id}
-              onClick={() => setSelectedRoleId(role.id)}
-              className={`mb-1 flex w-full items-center justify-between rounded px-3 py-2 text-sm font-medium transition-colors ${
-                selectedRoleId === role.id
-                  ? 'bg-gray-800 text-white shadow-sm'
-                  : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
-              }`}
-            >
-              <span className="truncate">{role.name}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Content: Permissions List */}
-      <div className="relative flex flex-1 flex-col bg-gray-900/50">
-        <div className="scrollbar-thin scrollbar-thumb-gray-700 flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-100">
-              {rolesList.find((r) => r.id === selectedRoleId)?.name || 'Role'} Permissions
-            </h3>
-            <p className="text-xs text-gray-400">
-              Configure specific permissions for this role in this channel.
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            {Object.entries(permissions).map(([bit, permName]) => (
-              <PermissionRow
-                key={bit}
-                label={permName}
-                state={getPermissionState(bit)}
-                onAllow={() => handleAllowPermission(Number(bit))}
-                onDeny={() => handleDenyPermission(Number(bit))}
-                onReset={() => handleResetPermission(Number(bit))}
-              />
+    <div className="flex h-full flex-col">
+      <div className="flex flex-1 overflow-hidden">
+        {/* Roles sub-sidebar */}
+        <ScrollArea className="w-44 shrink-0 border-r border-border px-2 py-4">
+          <p className="mb-2 px-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Roles
+          </p>
+          <div className="space-y-0.5">
+            {rolesList.map((role) => (
+              <Button
+                key={role.id}
+                variant="ghost"
+                onClick={() => setSelectedRoleId(role.id)}
+                className={cn(
+                  'w-full justify-start gap-2 px-2.5 py-1.5 text-sm font-medium',
+                  selectedRoleId === role.id
+                    ? 'bg-background'
+                    : 'hover:bg-muted/50'
+                )}
+              >
+                <span
+                  className="h-3 w-3 shrink-0 rounded-full"
+                  style={{ backgroundColor: role.color ? intToHex(role.color) : '#99aab5' }}
+                />
+                <span className="truncate">{role.name}</span>
+              </Button>
             ))}
           </div>
-        </div>
+        </ScrollArea>
 
-        {/* Floating Action Bar (Only shows if there are changes) */}
-        <div
-          className={`border-t border-white/5 bg-gray-900 p-4 transition-all duration-300 ${hasChanged ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-50'}`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-400">
-              {hasChanged ? 'Careful - you have unsaved changes!' : 'Permission settings'}
-            </span>
-            <button
-              onClick={handleSave}
-              disabled={!hasChanged || isSaving || !canManageChannels}
-              className={`flex items-center gap-2 rounded px-4 py-2 text-sm font-medium text-white transition-colors ${
-                hasChanged && canManageChannels
-                  ? 'bg-green-600 shadow-lg shadow-green-900/20 hover:bg-green-500'
-                  : 'cursor-not-allowed bg-gray-700 opacity-50'
-              }`}
-            >
-              <FloppyDisk size={18} />
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </button>
+        {/* Permissions content */}
+        <ScrollArea className="flex-1 px-6 py-6">
+          <div className="mb-4">
+            <p className="text-xs text-muted-foreground">
+              Configure specific permissions for{' '}
+              <span className="font-medium text-foreground">
+                {rolesList.find((r) => r.id === selectedRoleId)?.name || 'this role'}
+              </span>{' '}
+              in this channel.
+            </p>
           </div>
+          <div className="space-y-4">
+            {PERMISSION_GROUPS.text.map((group, groupIdx) => (
+              <div key={groupIdx}>
+                <h4 className="sticky top-0 z-10 mb-1 border-b border-border bg-background/95 py-2 text-xs font-bold uppercase tracking-wide text-muted-foreground backdrop-blur">
+                  {group.name}
+                </h4>
+                <div className="space-y-1">
+                  {group.permissions.map((bit) => (
+                    <PermissionRow
+                      key={bit.toString()}
+                      label={PERMISSIONS_LIST[bit]}
+                      state={getPermissionState(bit)}
+                      onAllow={() => handleAllowPermission(bit)}
+                      onDeny={() => handleDenyPermission(bit)}
+                      onReset={() => handleResetPermission(bit)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      </div>
+
+      <div
+        className={cn(
+          'px-6 py-4 transition-all duration-300',
+          hasChanged ? 'opacity-100' : 'pointer-events-none opacity-0'
+        )}
+      >
+        <Separator className="mb-4" />
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Careful — you have unsaved changes!</span>
+          <Button
+            onClick={handleSave}
+            disabled={!hasChanged || isSaving || !canManageChannels}
+            className={cn(
+              hasChanged && canManageChannels
+                ? 'bg-green-600 text-white shadow-lg shadow-green-900/20 hover:bg-green-500'
+                : ''
+            )}
+          >
+            <FloppyDisk size={16} />
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </Button>
         </div>
       </div>
     </div>
@@ -413,20 +410,22 @@ const EditGuildChannelModal = ({ modalId, guild, initialTab = 'info', channel })
 
   const closeModal = () => useModalStore.getState().close(modalId);
 
+  const isCategory = channel?.type === ChannelType.GUILD_CATEGORY;
+
   const tabs = useMemo(
     () => [
       {
         id: 'info',
         label: 'Overview',
-        icon: <Info size={18} />,
-        component: <OverviewTab guild={guild} channel={channel} />,
+        icon: <Info size={16} />,
+        component: <OverviewTab guild={guild} channel={channel} isCategory={isCategory} />,
       },
       {
         id: 'roles',
         label: 'Permissions',
-        icon: <Lock size={18} />,
+        icon: <Lock size={16} />,
         component: <PermissionsTab guild={guild} channel={channel} />,
-      },
+      }
     ],
     [guild, channel]
   );
@@ -447,40 +446,66 @@ const EditGuildChannelModal = ({ modalId, guild, initialTab = 'info', channel })
   if (!channel) return null;
 
   const activeContent = tabs.find((tab) => tab.id === activeTab)?.component;
+  const activeTabLabel = tabs.find((tab) => tab.id === activeTab)?.label;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-6">
-      <div className="max-h-[calc(100vh-1.5rem)] w-full max-w-5xl overflow-y-auto rounded-lg bg-gray-900 text-gray-100 shadow-2xl">
-        <div className="flex flex-col gap-3 border-b border-white/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div>
-            <h2 className="text-xl font-bold">#{channel?.name}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3" onClick={closeModal}>
+      <div className="flex h-[90vh] w-full max-w-4xl overflow-hidden rounded-lg bg-background shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        {/* Sidebar */}
+        <div className="flex w-56 shrink-0 flex-col bg-muted/30">
+          {/* Channel header */}
+          <div className="flex items-center gap-1.5 px-4 py-4">
+            {!isCategory && <span className="shrink-0 text-sm text-muted-foreground">#</span>}
+            <p className="truncate text-sm font-semibold text-foreground">{channel.name}</p>
           </div>
-          <button
-            type="button"
-            className="self-start rounded p-2 text-gray-200 hover:bg-gray-800 sm:self-auto"
-            onClick={closeModal}
-            aria-label="Close"
-          >
-            <X size={20} />
-          </button>
-        </div>
-        <div className="flex min-h-[520px] flex-col md:flex-row">
-          <nav className="w-full shrink-0 border-b border-white/5 bg-gray-950/40 p-3 md:w-56 md:border-b-0 md:border-r md:p-4">
-            <div className="flex gap-2 overflow-x-auto text-sm font-medium md:block md:space-y-1">
+          <Separator />
+
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto px-2 py-4">
+            <h3 className="mb-2 px-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {isCategory ? 'Category Settings' : 'Channel Settings'}
+            </h3>
+            <div className="space-y-0.5">
               {tabs.map((tab) => (
-                <button
+                <Button
                   key={tab.id}
                   type="button"
-                  className={`flex items-center gap-2 whitespace-nowrap rounded px-3 py-2 text-left transition-colors md:w-full ${activeTab === tab.id ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/60'}`}
+                  variant="ghost"
                   onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'w-full justify-start gap-2.5 px-2.5 py-1.5 text-sm font-medium',
+                    activeTab === tab.id
+                      ? 'bg-background text-foreground'
+                      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                  )}
                 >
                   {tab.icon}
                   {tab.label}
-                </button>
+                </Button>
               ))}
             </div>
           </nav>
-          <div className="flex-1 p-4 sm:p-6">{activeContent}</div>
+        </div>
+
+        {/* Content area */}
+        <div className="flex flex-1 flex-col overflow-hidden bg-background">
+          {/* Header */}
+          <div className="flex h-14 shrink-0 items-center justify-between px-10">
+            <h1 className="text-base font-semibold text-foreground">{activeTabLabel}</h1>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={closeModal}
+              aria-label="Close"
+            >
+              <X size={18} />
+            </Button>
+          </div>
+          <Separator />
+
+          {/* Tab content */}
+          <div className="flex-1 overflow-hidden">{activeContent}</div>
         </div>
       </div>
     </div>

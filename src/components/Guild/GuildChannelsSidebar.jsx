@@ -198,12 +198,18 @@ const GuildSidebarCategory = ({
             </ContextMenuItem>
 
             {canManageChannels && (
-              <ContextMenuItem
-                onSelect={() => handleDeleteChannel(category)}
-                className="text-red-500 hover:bg-red-600/20"
-              >
-                Delete Category
-              </ContextMenuItem>
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuItem onSelect={() => onEditChannel?.(category)}>
+                  Edit Category
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onSelect={() => handleDeleteChannel(category)}
+                  className="text-red-500 hover:bg-red-600/20"
+                >
+                  Delete Category
+                </ContextMenuItem>
+              </>
             )}
           </ContextMenuContent>
         </ContextMenu>
@@ -491,7 +497,7 @@ const GuildChannelsSidebar = ({
     >
       <ContextMenu>
         <ContextMenuTrigger>
-          <div className="relative top-0 flex h-full w-80 flex-col bg-[#121214] text-gray-100">
+          <div className="relative top-0 flex h-full w-80 flex-col bg-[#121214] text-gray-100 select-none">
             <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto" ref={sidebarRef} onScroll={onSidebarScroll}>
               <GuildSidebarHeader
                 guildName={guild?.name}
