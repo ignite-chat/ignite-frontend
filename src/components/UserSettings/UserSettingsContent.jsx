@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useUsersStore } from '../../store/users.store';
-import { DialogContent, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog';
 import Avatar from '../Avatar';
 import { Button } from '../ui/button';
 import { SheetDescription } from '../ui/sheet';
 import { User, UserCircle, Mic, Bot, LogOut, X, Menu, Bell } from 'lucide-react';
 import { useAuthStore } from '../../store/auth.store';
+import { useModalStore } from '@/store/modal.store';
 import { cn } from '@/lib/utils';
 import TabMyAccount from './Tabs/TabMyAccount';
 import TabProfiles from './Tabs/TabProfiles';
@@ -34,7 +35,7 @@ const navigationSections = [
   },
 ];
 
-const UserSettingsContent = () => {
+const UserSettingsContent = ({ modalId }) => {
   const currentUser = useUsersStore((s) => s.getCurrentUser());
   const { logout } = useAuthStore();
 
@@ -67,6 +68,7 @@ const UserSettingsContent = () => {
   };
 
   return (
+    <Dialog open onOpenChange={() => useModalStore.getState().close(modalId)}>
     <DialogContent className="!inset-0 m-auto flex size-full !max-h-[90vh] !max-w-[90vw] !translate-x-0 !translate-y-0 flex-row overflow-hidden p-0">
       <DialogTitle className="sr-only">User Settings</DialogTitle>
       <SheetDescription className="sr-only">
@@ -178,6 +180,7 @@ const UserSettingsContent = () => {
         </div>
       </div>
     </DialogContent>
+    </Dialog>
   );
 };
 

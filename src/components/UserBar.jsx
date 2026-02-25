@@ -16,7 +16,6 @@ import {
   Waveform,
 } from '@phosphor-icons/react';
 import { useAuthStore } from '@/store/auth.store';
-import { Dialog, DialogTrigger } from './ui/dialog';
 import UserSettingsContent from './UserSettings';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 import { LogOut } from 'lucide-react';
@@ -196,18 +195,14 @@ const UserBar = () => {
             )}
           </button>
 
-          <Dialog>
-            <DialogTrigger asChild>
-              <button
-                type="button"
-                className="flex size-9 items-center justify-center rounded hover:bg-white/5"
-                title="User Settings"
-              >
-                <Gear className="size-5 text-gray-400 hover:text-gray-200" weight="fill" />
-              </button>
-            </DialogTrigger>
-            <UserSettingsContent />
-          </Dialog>
+          <button
+            type="button"
+            onClick={() => useModalStore.getState().push(UserSettingsContent)}
+            className="flex size-9 items-center justify-center rounded hover:bg-white/5"
+            title="User Settings"
+          >
+            <Gear className="size-5 text-gray-400 hover:text-gray-200" weight="fill" />
+          </button>
         </div>
       </div>
     </div>
