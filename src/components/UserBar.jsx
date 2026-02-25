@@ -25,6 +25,7 @@ import { useUsersStore } from '@/store/users.store';
 import { VoiceService } from '@/services/voice.service';
 import { useModalStore } from '@/store/modal.store';
 import VoiceSettingsModal from '@/components/modals/VoiceSettingsModal';
+import ScreenShareModal from '@/components/modals/ScreenShareModal';
 
 function getPingInfo(ping) {
   if (ping === null || ping == 0) return { Icon: WifiHigh, color: 'text-gray-400', label: 'Measuring...' };
@@ -88,11 +89,10 @@ const UserBar = () => {
             <button
               type="button"
               onClick={() => VoiceService.toggleCamera()}
-              className={`flex flex-1 items-center justify-center gap-2 rounded py-2 px-3 text-sm font-medium transition-colors ${
-                isCameraOn
+              className={`flex flex-1 items-center justify-center gap-2 rounded py-2 px-3 text-sm font-medium transition-colors ${isCameraOn
                   ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
                   : 'bg-[#2a2a2d] text-gray-300 hover:bg-[#35353a]'
-              }`}
+                }`}
               title={isCameraOn ? 'Turn Off Camera' : 'Turn On Camera'}
             >
               {isCameraOn ? (
@@ -105,12 +105,19 @@ const UserBar = () => {
 
             <button
               type="button"
-              onClick={() => VoiceService.toggleScreenShare()}
-              className={`flex flex-1 items-center justify-center gap-2 rounded py-2 px-3 text-sm font-medium transition-colors ${
-                isScreenSharing
+              onClick={() => {
+                if (isScreenSharing) {
+                  VoiceService.toggleScreenShare();
+                } else if (window.IgniteNative?.getDesktopSources) {
+                  useModalStore.getState().push(ScreenShareModal);
+                } else {
+                  VoiceService.toggleScreenShare();
+                }
+              }}
+              className={`flex flex-1 items-center justify-center gap-2 rounded py-2 px-3 text-sm font-medium transition-colors ${isScreenSharing
                   ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
                   : 'bg-[#2a2a2d] text-gray-300 hover:bg-[#35353a]'
-              }`}
+                }`}
               title={isScreenSharing ? 'Stop Sharing' : 'Share Screen'}
             >
               <Monitor className="size-5" weight="fill" />
@@ -164,11 +171,10 @@ const UserBar = () => {
           <button
             type="button"
             onClick={() => VoiceService.toggleMute()}
-            className={`flex size-9 items-center justify-center rounded transition-colors ${
-              isMuted
+            className={`flex size-9 items-center justify-center rounded transition-colors ${isMuted
                 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                 : 'hover:bg-white/5'
-            }`}
+              }`}
             title={isMuted ? 'Unmute' : 'Mute'}
           >
             {isMuted ? (
@@ -181,11 +187,10 @@ const UserBar = () => {
           <button
             type="button"
             onClick={() => VoiceService.toggleDeafen()}
-            className={`flex size-9 items-center justify-center rounded transition-colors ${
-              isDeafened
+            className={`flex size-9 items-center justify-center rounded transition-colors ${isDeafened
                 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                 : 'hover:bg-white/5'
-            }`}
+              }`}
             title={isDeafened ? 'Undeafen' : 'Deafen'}
           >
             {isDeafened ? (

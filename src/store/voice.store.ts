@@ -25,7 +25,6 @@ interface VoiceStoreState {
   isDeafened: boolean;
   isCameraOn: boolean;
   isScreenSharing: boolean;
-  isScreenSharePickerOpen: boolean;
   watchingScreens: string[];
   connectionState: 'disconnected' | 'connecting' | 'connected';
   ping: number | null;
@@ -49,7 +48,6 @@ interface VoiceStoreState {
   setDeafened: (deafened: boolean) => void;
   setCameraOn: (on: boolean) => void;
   setScreenSharing: (on: boolean) => void;
-  setScreenSharePickerOpen: (open: boolean) => void;
   addWatchingScreen: (identity: string) => void;
   removeWatchingScreen: (identity: string) => void;
   setPing: (ping: number | null) => void;
@@ -70,7 +68,6 @@ export const useVoiceStore = create<VoiceStoreState>((set) => ({
   isDeafened: false,
   isCameraOn: false,
   isScreenSharing: false,
-  isScreenSharePickerOpen: false,
   watchingScreens: [],
   connectionState: 'disconnected',
   ping: null,
@@ -113,7 +110,6 @@ export const useVoiceStore = create<VoiceStoreState>((set) => ({
   setDeafened: (isDeafened) => set({ isDeafened }),
   setCameraOn: (isCameraOn) => set({ isCameraOn }),
   setScreenSharing: (isScreenSharing) => set({ isScreenSharing }),
-  setScreenSharePickerOpen: (isScreenSharePickerOpen) => set({ isScreenSharePickerOpen }),
   addWatchingScreen: (identity) =>
     set((state) => ({
       watchingScreens: state.watchingScreens.includes(identity)
@@ -155,7 +151,6 @@ export const useVoiceStore = create<VoiceStoreState>((set) => ({
       isDeafened: false,
       isCameraOn: false,
       isScreenSharing: false,
-      isScreenSharePickerOpen: false,
       watchingScreens: [],
       connectionState: 'disconnected',
       ping: null,

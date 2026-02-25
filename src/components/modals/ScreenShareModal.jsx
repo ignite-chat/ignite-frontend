@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { Monitor, AppWindow, X, ArrowsClockwise } from '@phosphor-icons/react';
-import { useVoiceStore } from '@/store/voice.store';
+import { Monitor, AppWindow, ArrowsClockwise } from '@phosphor-icons/react';
 import { VoiceService } from '@/services/voice.service';
+import { useModalStore } from '@/store/modal.store';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 const QUALITY_PRESETS = [
   { label: '720p 30 FPS', width: 1280, height: 720, frameRate: 30 },
@@ -12,15 +12,14 @@ const QUALITY_PRESETS = [
   { label: '1440p 60 FPS', width: 2560, height: 1440, frameRate: 60 },
 ];
 
-const ScreenSharePicker = () => {
-  const isOpen = useVoiceStore((s) => s.isScreenSharePickerOpen);
-  const setOpen = useVoiceStore((s) => s.setScreenSharePickerOpen);
-
+const ScreenShareModal = ({ modalId }) => {
   const [sources, setSources] = useState([]);
   const [selectedSource, setSelectedSource] = useState(null);
   const [selectedQuality, setSelectedQuality] = useState(1); // Default 1080p 30fps
   const [tab, setTab] = useState('screens'); // 'screens' | 'windows'
   const [loading, setLoading] = useState(false);
+
+  const close = () => useModalStore.getState().close(modalId);
 
   const fetchSources = useCallback(async () => {
     if (!window.IgniteNative?.getDesktopSources) return;
@@ -36,14 +35,10 @@ const ScreenSharePicker = () => {
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchSources();
-      setSelectedSource(null);
-
-      const interval = setInterval(fetchSources, 2000);
-      return () => clearInterval(interval);
-    }
-  }, [isOpen, fetchSources]);
+    fetchSources();
+    const interval = setInterval(fetchSources, 2000);
+    return () => clearInterval(interval);
+  }, [fetchSources]);
 
   const screens = sources.filter((s) => s.id.startsWith('screen:'));
   const windows = sources.filter((s) => s.id.startsWith('window:'));
@@ -53,40 +48,38 @@ const ScreenSharePicker = () => {
     if (!selectedSource) return;
     const quality = QUALITY_PRESETS[selectedQuality];
     await VoiceService.startScreenShare(selectedSource.id, quality);
-    setOpen(false);
+    close();
   };
 
-  const handleClose = () => {
-    setOpen(false);
-    setSelectedSource(null);
-  };
+  return (
+    <Dialog open onOpenChange={close}>
+      <DialogContent
+        showCloseButton={false}
+        className="!max-w-2xl !gap-0 !rounded-2xl !border-border !bg-background !p-0 overflow-hidden !shadow-2xl"
+      >
+        <DialogTitle className="sr-only">Share Your Screen</DialogTitle>
 
-  if (!isOpen) return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-gray-800 shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
-          <h2 className="text-lg font-semibold text-gray-100">Share Your Screen</h2>
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+          <h2 className="text-[15px] font-semibold text-foreground">Share Your Screen</h2>
           <button
             type="button"
-            onClick={handleClose}
-            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200"
+            onClick={close}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
-            <X className="size-5" />
+            <span className="text-lg">&times;</span>
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-white/5 px-5">
+        <div className="flex border-b border-border px-5">
           <button
             type="button"
             onClick={() => setTab('screens')}
             className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
               tab === 'screens'
-                ? 'border-indigo-500 text-gray-100'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             <Monitor className="size-4" />
@@ -97,8 +90,8 @@ const ScreenSharePicker = () => {
             onClick={() => setTab('windows')}
             className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
               tab === 'windows'
-                ? 'border-indigo-500 text-gray-100'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             <AppWindow className="size-4" />
@@ -109,7 +102,7 @@ const ScreenSharePicker = () => {
               type="button"
               onClick={fetchSources}
               disabled={loading}
-              className="rounded-md p-2 text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200 disabled:opacity-50"
+              className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
               title="Refresh sources"
             >
               <ArrowsClockwise className={`size-4 ${loading ? 'animate-spin' : ''}`} />
@@ -118,13 +111,13 @@ const ScreenSharePicker = () => {
         </div>
 
         {/* Sources grid */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="max-h-[50vh] overflow-y-auto p-5">
           {loading && sources.length === 0 ? (
             <div className="flex h-40 items-center justify-center">
-              <div className="size-8 animate-spin rounded-full border-4 border-solid border-indigo-500 border-t-transparent" />
+              <div className="size-8 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent" />
             </div>
           ) : displayedSources.length === 0 ? (
-            <div className="flex h-40 items-center justify-center text-sm text-gray-400">
+            <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
               No {tab === 'screens' ? 'screens' : 'windows'} available
             </div>
           ) : (
@@ -136,11 +129,11 @@ const ScreenSharePicker = () => {
                   onClick={() => setSelectedSource(source)}
                   className={`group flex flex-col overflow-hidden rounded-lg border-2 transition-all ${
                     selectedSource?.id === source.id
-                      ? 'border-indigo-500 bg-indigo-500/10'
-                      : 'border-transparent bg-gray-700/50 hover:border-gray-500 hover:bg-gray-700'
+                      ? 'border-primary bg-primary/10'
+                      : 'border-transparent bg-card hover:border-muted-foreground/30 hover:bg-accent'
                   }`}
                 >
-                  <div className="relative aspect-video w-full overflow-hidden bg-gray-900">
+                  <div className="relative aspect-video w-full overflow-hidden bg-black/40">
                     <img
                       src={source.thumbnailDataUrl}
                       alt={source.name}
@@ -157,7 +150,7 @@ const ScreenSharePicker = () => {
                         draggable={false}
                       />
                     )}
-                    <span className="truncate text-xs text-gray-300">{source.name}</span>
+                    <span className="truncate text-xs text-foreground/85">{source.name}</span>
                   </div>
                 </button>
               ))}
@@ -166,13 +159,13 @@ const ScreenSharePicker = () => {
         </div>
 
         {/* Quality & Go Live */}
-        <div className="flex items-center justify-between border-t border-white/5 px-5 py-4">
+        <div className="flex items-center justify-between border-t border-border px-5 py-4">
           <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-gray-300">Stream Quality</label>
+            <label className="text-sm font-medium text-muted-foreground">Stream Quality</label>
             <select
               value={selectedQuality}
               onChange={(e) => setSelectedQuality(Number(e.target.value))}
-              className="rounded-md border border-white/10 bg-gray-700 px-3 py-1.5 text-sm text-gray-200 outline-none focus:border-indigo-500"
+              className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary"
             >
               {QUALITY_PRESETS.map((preset, i) => (
                 <option key={preset.label} value={i}>
@@ -185,15 +178,14 @@ const ScreenSharePicker = () => {
             type="button"
             onClick={handleGoLive}
             disabled={!selectedSource}
-            className="rounded-md bg-indigo-600 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Go Live
           </button>
         </div>
-      </div>
-    </div>,
-    document.body
+      </DialogContent>
+    </Dialog>
   );
 };
 
-export default ScreenSharePicker;
+export default ScreenShareModal;
