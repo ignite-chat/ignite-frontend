@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { X, Info, Lock, FloppyDisk, Check } from '@phosphor-icons/react';
 import { Slash } from 'lucide-react';
 import api from '../../api';
@@ -185,21 +185,36 @@ const PermissionRow = ({ label, state, onAllow, onDeny, onReset }) => {
   );
 };
 
+const EVERYONE_ID = '__everyone__';
+
 const PermissionsTab = ({ guild, channel }) => {
   const store = useGuildsStore();
-  const [selectedRoleId, setSelectedRoleId] = useState();
+  const [selectedRoleId, setSelectedRoleId] = useState(EVERYONE_ID);
   const rolesList = useRolesStore((s) => s.guildRoles[guild?.id]) ?? [];
   const [savedPermissionsByRole, setSavedPermissionsByRole] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [allowedPermissions, setAllowedPermissions] = useState(0n);
   const [deniedPermissions, setDeniedPermissions] = useState(0n);
 
+  const isEveryone = selectedRoleId === EVERYONE_ID;
   const canManageChannels = useHasPermission(guild?.id, null, Permissions.MANAGE_CHANNELS);
 
-  const hasChanged = useMemo(() => {
-    const savedPerm = savedPermissionsByRole[selectedRoleId];
+  const getBaseline = useCallback(() => {
+    if (isEveryone) {
+      const saved = savedPermissionsByRole[EVERYONE_ID];
+      if (saved) return saved;
+      return {
+        allowed_permissions: channel?.allowed_permissions || '0',
+        denied_permissions: channel?.denied_permissions || '0',
+      };
+    }
+    const saved = savedPermissionsByRole[selectedRoleId];
     const rolePerm = channel?.role_permissions?.find((rp) => rp.role_id === selectedRoleId);
-    const baselinePerm = savedPerm || rolePerm;
+    return saved || rolePerm || null;
+  }, [isEveryone, selectedRoleId, channel, savedPermissionsByRole]);
+
+  const hasChanged = useMemo(() => {
+    const baselinePerm = getBaseline();
     if (!baselinePerm) {
       return allowedPermissions !== 0n || deniedPermissions !== 0n;
     }
@@ -207,12 +222,10 @@ const PermissionsTab = ({ guild, channel }) => {
       allowedPermissions !== BigInt(baselinePerm.allowed_permissions) ||
       deniedPermissions !== BigInt(baselinePerm.denied_permissions)
     );
-  }, [allowedPermissions, deniedPermissions, selectedRoleId, channel, savedPermissionsByRole]);
+  }, [allowedPermissions, deniedPermissions, getBaseline]);
 
   useEffect(() => {
-    const savedPerm = savedPermissionsByRole[selectedRoleId];
-    const rolePerm = channel?.role_permissions?.find((rp) => rp.role_id === selectedRoleId);
-    const baselinePerm = savedPerm || rolePerm;
+    const baselinePerm = getBaseline();
     if (baselinePerm) {
       setAllowedPermissions(BigInt(baselinePerm.allowed_permissions));
       setDeniedPermissions(BigInt(baselinePerm.denied_permissions));
@@ -221,12 +234,6 @@ const PermissionsTab = ({ guild, channel }) => {
       setDeniedPermissions(0n);
     }
   }, [selectedRoleId, channel, savedPermissionsByRole]);
-
-  useEffect(() => {
-    if (rolesList.length > 0 && !selectedRoleId) {
-      setSelectedRoleId(rolesList[0]?.id);
-    }
-  }, [rolesList, selectedRoleId]);
 
   const handleDenyPermission = (bit) => {
     setAllowedPermissions((prev) => prev & ~bit);
@@ -255,25 +262,35 @@ const PermissionsTab = ({ guild, channel }) => {
       return;
     }
     setIsSaving(true);
-    api
-      .put(`/channels/${channel.channel_id}/permissions/${selectedRoleId}`, {
-        allowed_permissions: allowedPermissions.toString(),
-        denied_permissions: deniedPermissions.toString(),
-      })
-      .then((response) => {
-        console.log('Permissions updated successfully:', response.data);
+
+    const permPayload = {
+      allowed_permissions: allowedPermissions.toString(),
+      denied_permissions: deniedPermissions.toString(),
+    };
+
+    const request = isEveryone
+      ? api.patch(`/guilds/${guild.id}/channels/${channel.channel_id}`, permPayload)
+      : api.put(`/channels/${channel.channel_id}/permissions/${selectedRoleId}`, permPayload);
+
+    request
+      .then(() => {
         setSavedPermissionsByRole((prev) => ({
           ...prev,
-          [selectedRoleId]: {
-            allowed_permissions: allowedPermissions.toString(),
-            denied_permissions: deniedPermissions.toString(),
-          },
+          [selectedRoleId]: permPayload,
         }));
         const newGuilds = store.guilds.map((g) => {
           if (g.id !== guild.id) return g;
 
           const newChannels = (g.channels || []).map((c) => {
             if (c.channel_id !== channel.channel_id) return c;
+
+            if (isEveryone) {
+              return {
+                ...c,
+                allowed_permissions: allowedPermissions.toString(),
+                denied_permissions: deniedPermissions.toString(),
+              };
+            }
 
             const existingRolePerms = c.role_permissions || [];
             const newRolePerms = (() => {
@@ -340,6 +357,22 @@ const PermissionsTab = ({ guild, channel }) => {
                 <span className="truncate">{role.name}</span>
               </Button>
             ))}
+            <Button
+              variant="ghost"
+              onClick={() => setSelectedRoleId(EVERYONE_ID)}
+              className={cn(
+                'w-full justify-start gap-2 px-2.5 py-1.5 text-sm font-medium',
+                isEveryone
+                  ? 'bg-background'
+                  : 'hover:bg-muted/50'
+              )}
+            >
+              <span
+                className="h-3 w-3 shrink-0 rounded-full"
+                style={{ backgroundColor: '#99aab5' }}
+              />
+              <span className="truncate">@everyone</span>
+            </Button>
           </div>
         </ScrollArea>
 
@@ -349,7 +382,7 @@ const PermissionsTab = ({ guild, channel }) => {
             <p className="text-xs text-muted-foreground">
               Configure specific permissions for{' '}
               <span className="font-medium text-foreground">
-                {rolesList.find((r) => r.id === selectedRoleId)?.name || 'this role'}
+                {isEveryone ? '@everyone' : (rolesList.find((r) => r.id === selectedRoleId)?.name || 'this role')}
               </span>{' '}
               in this channel.
             </p>
