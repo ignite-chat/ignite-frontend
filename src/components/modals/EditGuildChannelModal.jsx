@@ -1,9 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { X, Info, Lock, FloppyDisk, Check } from '@phosphor-icons/react';
 import { Slash } from 'lucide-react';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import api from '../../api';
-import { useGuildsStore } from '../../store/guilds.store';
+import { ChannelsService } from '../../services/channels.service';
 import { Permissions } from '@/constants/Permissions';
 import { PERMISSION_GROUPS, PERMISSIONS_LIST, intToHex } from '@/constants/Roles';
 import { useHasPermission } from '@/hooks/useHasPermission';
@@ -20,8 +19,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 
 const OverviewTab = ({ guild, channel, isCategory }) => {
-  const store = useGuildsStore();
-
   const [name, setName] = useState(channel?.name || '');
   const [description, setDescription] = useState(channel?.description || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -37,7 +34,7 @@ const OverviewTab = ({ guild, channel, isCategory }) => {
     return name !== (channel?.name || '') || description !== (channel?.description || '');
   }, [name, description, channel]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canManageChannels) {
       toast.error('You do not have permission to manage channels.');
       return;
@@ -45,36 +42,14 @@ const OverviewTab = ({ guild, channel, isCategory }) => {
     if (!hasChanged) return;
     setIsSaving(true);
 
-    api
-      .patch(`/guilds/${guild.id}/channels/${channel.channel_id}`, {
+    try {
+      await ChannelsService.updateGuildChannel(guild.id, channel.channel_id, {
         name,
         description,
-      })
-      .then((response) => {
-        console.log('Channel updated successfully:', response.data);
-
-        const newGuilds = store.guilds.map((g) => {
-          if (g.id === guild.id) {
-            return {
-              ...g,
-              channels: g.channels.map((c) => {
-                if (c.channel_id === channel.channel_id) {
-                  return { ...c, name, description };
-                }
-                return c;
-              }),
-            };
-          }
-          return g;
-        });
-        store.setGuilds(newGuilds);
-      })
-      .catch((error) => {
-        console.error('Error updating channel:', error);
-      })
-      .finally(() => {
-        setIsSaving(false);
       });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -190,7 +165,6 @@ const PermissionRow = ({ label, state, onAllow, onDeny, onReset }) => {
 const EVERYONE_ID = '__everyone__';
 
 const PermissionsTab = ({ guild, channel }) => {
-  const store = useGuildsStore();
   const [selectedRoleId, setSelectedRoleId] = useState(EVERYONE_ID);
   const rolesList = useRolesStore((s) => s.guildRoles[guild?.id]) ?? [];
   const [savedPermissionsByRole, setSavedPermissionsByRole] = useState({});
@@ -258,7 +232,7 @@ const PermissionsTab = ({ guild, channel }) => {
     return 1;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canManageChannels) {
       toast.error('You do not have permission to manage channels.');
       return;
@@ -270,65 +244,20 @@ const PermissionsTab = ({ guild, channel }) => {
       denied_permissions: deniedPermissions.toString(),
     };
 
-    const request = isEveryone
-      ? api.patch(`/guilds/${guild.id}/channels/${channel.channel_id}`, permPayload)
-      : api.put(`/channels/${channel.channel_id}/permissions/${selectedRoleId}`, permPayload);
+    try {
+      if (isEveryone) {
+        await ChannelsService.updateGuildChannel(guild.id, channel.channel_id, permPayload);
+      } else {
+        await ChannelsService.updateChannelRolePermissions(channel.channel_id, selectedRoleId, permPayload);
+      }
 
-    request
-      .then(() => {
-        setSavedPermissionsByRole((prev) => ({
-          ...prev,
-          [selectedRoleId]: permPayload,
-        }));
-        const newGuilds = store.guilds.map((g) => {
-          if (g.id !== guild.id) return g;
-
-          const newChannels = (g.channels || []).map((c) => {
-            if (c.channel_id !== channel.channel_id) return c;
-
-            if (isEveryone) {
-              return {
-                ...c,
-                allowed_permissions: allowedPermissions.toString(),
-                denied_permissions: deniedPermissions.toString(),
-              };
-            }
-
-            const existingRolePerms = c.role_permissions || [];
-            const newRolePerms = (() => {
-              const updated = existingRolePerms.map((rp) => {
-                if (rp.role_id !== selectedRoleId) return rp;
-                return {
-                  ...rp,
-                  allowed_permissions: allowedPermissions,
-                  denied_permissions: deniedPermissions,
-                };
-              });
-              const hasRole = existingRolePerms.some((rp) => rp.role_id === selectedRoleId);
-              if (hasRole) return updated;
-              return [
-                ...updated,
-                {
-                  role_id: selectedRoleId,
-                  allowed_permissions: allowedPermissions,
-                  denied_permissions: deniedPermissions,
-                },
-              ];
-            })();
-
-            return { ...c, role_permissions: newRolePerms };
-          });
-
-          return { ...g, channels: newChannels };
-        });
-        store.setGuilds(newGuilds);
-      })
-      .catch((error) => {
-        console.error('Error updating permissions:', error);
-      })
-      .finally(() => {
-        setIsSaving(false);
-      });
+      setSavedPermissionsByRole((prev) => ({
+        ...prev,
+        [selectedRoleId]: permPayload,
+      }));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
