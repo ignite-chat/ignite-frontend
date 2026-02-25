@@ -3,9 +3,9 @@ import Avatar from '../../Avatar';
 import { Button } from '../../ui/button';
 import { KeyRound } from 'lucide-react';
 import { Separator } from '../../ui/separator';
-import ChangeUsernameDialog from '@/components/modals/ChangeUsernameDialog';
-import ChangeEmailDialog from '@/components/modals/ChangeEmailDialog';
-import ChangePasswordDialog from '@/components/modals/ChangePasswordDialog';
+import ChangeUsernameModal from '@/components/modals/ChangeUsernameModal';
+import ChangeEmailModal from '@/components/modals/ChangeEmailModal';
+import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import { useModalStore } from '@/store/modal.store';
 
 const TabMyAccount = ({ onNavigateToProfiles }) => {
@@ -56,7 +56,7 @@ const TabMyAccount = ({ onNavigateToProfiles }) => {
                 <p className="text-xs font-bold uppercase text-muted-foreground">Username</p>
                 <p className="mt-0.5 text-sm">{user?.username}</p>
               </div>
-              <Button variant="secondary" size="sm" onClick={() => useModalStore.getState().push(ChangeUsernameDialog)}>
+              <Button variant="secondary" size="sm" onClick={() => useModalStore.getState().push(ChangeUsernameModal)}>
                 Edit
               </Button>
             </div>
@@ -66,7 +66,7 @@ const TabMyAccount = ({ onNavigateToProfiles }) => {
                 <p className="text-xs font-bold uppercase text-muted-foreground">Email</p>
                 <p className="mt-0.5 text-sm">{user?.email || 'Not set'}</p>
               </div>
-              <Button variant="secondary" size="sm" onClick={() => useModalStore.getState().push(ChangeEmailDialog)}>
+              <Button variant="secondary" size="sm" onClick={() => useModalStore.getState().push(ChangeEmailModal)}>
                 Edit
               </Button>
             </div>
@@ -77,7 +77,7 @@ const TabMyAccount = ({ onNavigateToProfiles }) => {
       {/* Password & Authentication */}
       <div className="space-y-4">
         <h3 className="text-base font-semibold">Password and Authentication</h3>
-        <Button variant="secondary" onClick={() => useModalStore.getState().push(ChangePasswordDialog)}>
+        <Button variant="secondary" onClick={() => useModalStore.getState().push(ChangePasswordModal)}>
           <KeyRound className="mr-2 h-4 w-4" />
           Change Password
         </Button>

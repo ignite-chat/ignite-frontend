@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { X, Info, Lock, FloppyDisk, Check } from '@phosphor-icons/react';
 import { Slash } from 'lucide-react';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import api from '../../api';
 import { useGuildsStore } from '../../store/guilds.store';
 import { Permissions } from '@/constants/Permissions';
@@ -11,6 +12,7 @@ import { useModalStore } from '@/store/modal.store';
 import { useRolesStore } from '@/store/roles.store';
 import { ChannelType } from '@/constants/ChannelType';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -463,27 +465,18 @@ const EditGuildChannelModal = ({ modalId, guild, initialTab = 'info', channel })
     [guild, channel]
   );
 
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') closeModal();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [modalId]);
-
   if (!channel) return null;
 
   const activeContent = tabs.find((tab) => tab.id === activeTab)?.component;
   const activeTabLabel = tabs.find((tab) => tab.id === activeTab)?.label;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3" onClick={closeModal}>
-      <div className="flex h-[90vh] w-full max-w-4xl overflow-hidden rounded-lg bg-background shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={() => closeModal()}>
+      <DialogContent showCloseButton={false} className="flex h-[90vh] max-w-4xl gap-0 overflow-hidden p-0">
+        <VisuallyHidden>
+          <DialogTitle>{isCategory ? 'Category Settings' : 'Channel Settings'}</DialogTitle>
+        </VisuallyHidden>
+
         {/* Sidebar */}
         <div className="flex w-56 shrink-0 flex-col bg-muted/30">
           {/* Channel header */}
@@ -540,8 +533,8 @@ const EditGuildChannelModal = ({ modalId, guild, initialTab = 'info', channel })
           {/* Tab content */}
           <div className="flex-1 overflow-hidden">{activeContent}</div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

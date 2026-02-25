@@ -42,7 +42,7 @@ const MAX_USES_OPTIONS = [
   { label: '100 uses', value: '100' },
 ];
 
-const InviteDialog = ({ modalId, guildId }) => {
+const InviteModal = ({ modalId, guildId }) => {
   const [maxAge, setMaxAge] = useState('86400');
   const [maxUses, setMaxUses] = useState('0');
   const [loading, setLoading] = useState(false);
@@ -166,4 +166,4 @@ const InviteDialog = ({ modalId, guildId }) => {
   );
 };
 
-export default InviteDialog;
+export default InviteModal;

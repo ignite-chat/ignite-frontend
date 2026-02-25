@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { DotsThree, Prohibit, UserCircle, UserCircleMinus, Gavel } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import UserProfileModal from '@/components/modals/UserProfileModal';
-import { KickBanDialog } from '@/components/modals/KickBanDialog';
+import { KickBanModal } from '@/components/modals/KickBanModal';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { useModalStore } from '../../store/modal.store';
 import { useGuildsStore } from '../../store/guilds.store';
@@ -158,8 +158,8 @@ const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
     }
   };
 
-  const handleKick = () => useModalStore.getState().push(KickBanDialog, { user, guildId, action: 'kick' });
-  const handleBan = () => useModalStore.getState().push(KickBanDialog, { user, guildId, action: 'ban' });
+  const handleKick = () => useModalStore.getState().push(KickBanModal, { user, guildId, action: 'kick' });
+  const handleBan = () => useModalStore.getState().push(KickBanModal, { user, guildId, action: 'ban' });
 
   const handleBlock = () => {
     toast.info('Block feature coming soon!');

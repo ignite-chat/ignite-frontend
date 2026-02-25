@@ -69,7 +69,7 @@ const PermissionsList = ({ permissions, onPermissionChange }) => {
   );
 };
 
-const ChannelDialog = ({ modalId }) => {
+const ChannelModal = ({ modalId }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedRole, setSelectedRole] = useState(rolesList[0].id);
   const [permissions, setPermissions] = useState({});
@@ -172,4 +172,4 @@ const ChannelDialog = ({ modalId }) => {
   );
 };
 
-export default ChannelDialog;
+export default ChannelModal;

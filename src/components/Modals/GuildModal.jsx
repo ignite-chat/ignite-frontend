@@ -14,7 +14,7 @@ import FormError from '@/components/Form/FormError';
 import FormSubmit from '@/components/Form/FormSubmit';
 import { useModalStore } from '@/store/modal.store';
 
-const GuildDialog = ({ modalId }) => {
+const GuildModal = ({ modalId }) => {
   const [view, setView] = useState('menu');
   const createForm = useForm({ mode: 'onChange', defaultValues: { name: '' } });
   const joinForm = useForm({ mode: 'onChange', defaultValues: { invite: '' } });
@@ -207,4 +207,4 @@ const GuildDialog = ({ modalId }) => {
   );
 };
 
-export default GuildDialog;
+export default GuildModal;

@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useModalStore } from '@/store/modal.store';
 
-const ChangePasswordDialog = ({ modalId }) => {
+const ChangePasswordModal = ({ modalId }) => {
   const form = useForm({
     defaultValues: {
       currentPassword: '',
@@ -145,4 +145,4 @@ const ChangePasswordDialog = ({ modalId }) => {
   );
 };
 
-export default ChangePasswordDialog;
+export default ChangePasswordModal;

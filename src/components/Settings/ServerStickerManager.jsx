@@ -7,7 +7,7 @@ import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
 import { toast } from 'sonner';
 import { Upload, Trash2 } from 'lucide-react';
-import ImageCropperDialog from '@/components/modals/ImageCropperDialog';
+import ImageCropperModal from '@/components/modals/ImageCropperModal';
 import api from '../../api';
 
 const STICKER_SIZE = 320;
@@ -222,7 +222,7 @@ const ServerStickerManager = ({ guild }) => {
         </div>
       </div>
 
-      <ImageCropperDialog
+      <ImageCropperModal
         open={cropperOpen}
         onClose={handleCropClose}
         imageSrc={cropperSrc}

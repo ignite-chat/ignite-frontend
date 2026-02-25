@@ -8,7 +8,7 @@ import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
 import { toast } from 'sonner';
 import { Upload, Trash2 } from 'lucide-react';
-import ImageCropperDialog from '@/components/modals/ImageCropperDialog';
+import ImageCropperModal from '@/components/modals/ImageCropperModal';
 import api from '../../api';
 
 const EMOJI_SIZE = 128;
@@ -42,7 +42,7 @@ const ServerEmojiManager = ({ guild }) => {
     }
 
     const dataUrl = await fileToDataUrl(file);
-    useModalStore.getState().push(ImageCropperDialog, {
+    useModalStore.getState().push(ImageCropperModal, {
       imageSrc: dataUrl,
       title: 'Crop Emoji',
       aspect: 1,

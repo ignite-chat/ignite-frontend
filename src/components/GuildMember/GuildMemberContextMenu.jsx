@@ -20,8 +20,8 @@ import { useModalStore } from '../../store/modal.store';
 import { RolesService } from '../../services/roles.service';
 import { Permissions } from '@/constants/Permissions';
 import { useHasPermission } from '@/hooks/useHasPermission';
-import { KickBanDialog } from '@/components/modals/KickBanDialog';
-import { MemberDebugDialog } from '@/components/modals/MemberDebugDialog';
+import { KickBanModal } from '@/components/modals/KickBanModal';
+import { MemberDebugModal } from '@/components/modals/MemberDebugModal';
 
 const intToHex = (intColor) => {
   return `#${intColor.toString(16).padStart(6, '0')}`;
@@ -199,7 +199,7 @@ const GuildMemberContextMenu = ({ user, onViewProfile }) => {
       {canKickMember && (
         <ContextMenuItem
           className="text-[#f23f42] focus:bg-[#da373c] focus:text-white"
-          onSelect={() => useModalStore.getState().push(KickBanDialog, { user, guildId, action: 'kick' })}
+          onSelect={() => useModalStore.getState().push(KickBanModal, { user, guildId, action: 'kick' })}
         >
           Kick {user.username}
         </ContextMenuItem>
@@ -208,7 +208,7 @@ const GuildMemberContextMenu = ({ user, onViewProfile }) => {
       {canBanMember && (
         <ContextMenuItem
           className="text-[#f23f42] focus:bg-[#da373c] focus:text-white"
-          onSelect={() => useModalStore.getState().push(KickBanDialog, { user, guildId, action: 'ban' })}
+          onSelect={() => useModalStore.getState().push(KickBanModal, { user, guildId, action: 'ban' })}
         >
           Ban {user.username}
         </ContextMenuItem>
@@ -228,7 +228,7 @@ const GuildMemberContextMenu = ({ user, onViewProfile }) => {
         </span>
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => setTimeout(() => useModalStore.getState().push(MemberDebugDialog, { user, guildId }), 0)}>
+      <ContextMenuItem onSelect={() => setTimeout(() => useModalStore.getState().push(MemberDebugModal, { user, guildId }), 0)}>
         Debug Info
       </ContextMenuItem>
     </>

@@ -18,7 +18,7 @@ import {
 import { ChannelsService } from '@/services/channels.service';
 import { useModalStore } from '@/store/modal.store';
 
-const CreateGuildChannelDialog = ({ modalId, guild, categoryId }) => {
+const CreateGuildChannelModal = ({ modalId, guild, categoryId }) => {
   const {
     register,
     handleSubmit,
@@ -172,4 +172,4 @@ const CreateGuildChannelDialog = ({ modalId, guild, categoryId }) => {
   );
 };
 
-export default CreateGuildChannelDialog;
+export default CreateGuildChannelModal;

@@ -8,11 +8,11 @@ import { User, UserCircle, Mic, Bot, LogOut, X, Menu, Bell } from 'lucide-react'
 import { useAuthStore } from '../../store/auth.store';
 import { useModalStore } from '@/store/modal.store';
 import { cn } from '@/lib/utils';
-import TabMyAccount from './Tabs/TabMyAccount';
-import TabProfiles from './Tabs/TabProfiles';
-import TabVoiceAudio from './Tabs/TabVoiceAudio';
-import TabNotificationSounds from './Tabs/TabNotificationSounds';
-import TabBots from './Tabs/TabBots';
+import TabMyAccount from '../UserSettings/Tabs/TabMyAccount';
+import TabProfiles from '../UserSettings/Tabs/TabProfiles';
+import TabVoiceAudio from '../UserSettings/Tabs/TabVoiceAudio';
+import TabNotificationSounds from '../UserSettings/Tabs/TabNotificationSounds';
+import TabBots from '../UserSettings/Tabs/TabBots';
 
 const navigationSections = [
   {
@@ -35,7 +35,7 @@ const navigationSections = [
   },
 ];
 
-const UserSettingsContent = ({ modalId }) => {
+const UserSettingsModal = ({ modalId }) => {
   const currentUser = useUsersStore((s) => s.getCurrentUser());
   const { logout } = useAuthStore();
 
@@ -184,4 +184,4 @@ const UserSettingsContent = ({ modalId }) => {
   );
 };
 
-export default UserSettingsContent;
+export default UserSettingsModal;

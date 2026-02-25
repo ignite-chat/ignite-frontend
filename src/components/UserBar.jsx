@@ -16,7 +16,7 @@ import {
   Waveform,
 } from '@phosphor-icons/react';
 import { useAuthStore } from '@/store/auth.store';
-import UserSettingsContent from './UserSettings';
+import UserSettingsModal from '@/components/modals/UserSettingsModal';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 import { LogOut } from 'lucide-react';
 import Avatar from './Avatar';
@@ -24,7 +24,7 @@ import { useVoiceStore } from '@/store/voice.store';
 import { useUsersStore } from '@/store/users.store';
 import { VoiceService } from '@/services/voice.service';
 import { useModalStore } from '@/store/modal.store';
-import VoiceSettingsDialog from '@/components/modals/VoiceSettingsDialog';
+import VoiceSettingsModal from '@/components/modals/VoiceSettingsModal';
 
 function getPingInfo(ping) {
   if (ping === null || ping == 0) return { Icon: WifiHigh, color: 'text-gray-400', label: 'Measuring...' };
@@ -119,7 +119,7 @@ const UserBar = () => {
 
             <button
               type="button"
-              onClick={() => useModalStore.getState().push(VoiceSettingsDialog)}
+              onClick={() => useModalStore.getState().push(VoiceSettingsModal)}
               className="flex size-9 shrink-0 items-center justify-center rounded bg-[#2a2a2d] text-gray-300 transition-colors hover:bg-[#35353a] hover:text-gray-100"
               title="Voice Settings"
             >
@@ -197,7 +197,7 @@ const UserBar = () => {
 
           <button
             type="button"
-            onClick={() => useModalStore.getState().push(UserSettingsContent)}
+            onClick={() => useModalStore.getState().push(UserSettingsModal)}
             className="flex size-9 items-center justify-center rounded hover:bg-white/5"
             title="User Settings"
           >

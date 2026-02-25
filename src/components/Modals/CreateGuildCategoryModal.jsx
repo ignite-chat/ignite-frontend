@@ -19,7 +19,7 @@ import { GuildsService } from '@/services/guilds.service';
 import { ChannelsService } from '@/services/channels.service';
 import { useModalStore } from '@/store/modal.store';
 
-const CreateGuildCategoryDialog = ({ modalId, guild }) => {
+const CreateGuildCategoryModal = ({ modalId, guild }) => {
   const {
     register,
     handleSubmit,
@@ -118,4 +118,4 @@ const CreateGuildCategoryDialog = ({ modalId, guild }) => {
   );
 };
 
-export default CreateGuildCategoryDialog;
+export default CreateGuildCategoryModal;

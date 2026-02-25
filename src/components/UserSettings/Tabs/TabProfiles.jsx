@@ -12,7 +12,7 @@ import { FieldError } from '../../ui/field';
 import { toast } from 'sonner';
 import { Camera, Trash2 } from 'lucide-react';
 import { Separator } from '../../ui/separator';
-import ImageCropperDialog from '@/components/modals/ImageCropperDialog';
+import ImageCropperModal from '@/components/modals/ImageCropperModal';
 
 const AVATAR_OUTPUT_W = 512;
 const AVATAR_OUTPUT_H = 512;
@@ -52,7 +52,7 @@ const TabProfiles = () => {
     if (!file) return;
     const dataUrl = await fileToDataUrl(file);
     const isAvatar = mode === 'avatar';
-    useModalStore.getState().push(ImageCropperDialog, {
+    useModalStore.getState().push(ImageCropperModal, {
       imageSrc: dataUrl,
       title: isAvatar ? 'Crop Avatar' : 'Crop Banner',
       aspect: isAvatar ? 1 : BANNER_OUTPUT_W / BANNER_OUTPUT_H,

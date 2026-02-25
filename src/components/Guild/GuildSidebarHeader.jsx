@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
-import InviteDialog from '@/components/modals/InviteDialog';
+import InviteModal from '@/components/modals/InviteModal';
 import GuildMenuContent from './GuildMenuContent';
 
 const GuildSidebarHeader = ({
@@ -67,7 +67,7 @@ const GuildSidebarHeader = ({
 
   const handleInviteClick = () => {
     setPopoverOpen(false);
-    useModalStore.getState().push(InviteDialog, { guildId: guild?.id });
+    useModalStore.getState().push(InviteModal, { guildId: guild?.id });
   };
 
   return (

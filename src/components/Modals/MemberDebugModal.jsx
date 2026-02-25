@@ -30,9 +30,9 @@ const highlightJson = (obj) => {
 
 /**
  * Debug info dialog for a guild member.
- * Pushed via useModalStore.push(MemberDebugDialog, { user, guildId }).
+ * Pushed via useModalStore.push(MemberDebugModal, { user, guildId }).
  */
-export const MemberDebugDialog = ({ modalId, user, guildId }) => {
+export const MemberDebugModal = ({ modalId, user, guildId }) => {
   const getUser = useUsersStore((s) => s.getUser);
   const guildMembers = useGuildsStore((s) => s.guildMembers);
 

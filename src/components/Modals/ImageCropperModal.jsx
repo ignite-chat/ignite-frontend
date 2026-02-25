@@ -51,7 +51,7 @@ const getCroppedImg = async (src, pixelCrop, outputWidth, outputHeight) => {
  * @param {string}   props.title
  * @param {(dataUrl: string) => void} props.onConfirm
  */
-const ImageCropperDialog = ({
+const ImageCropperModal = ({
   modalId,
   imageSrc,
   aspect,
@@ -112,7 +112,7 @@ const ImageCropperDialog = ({
           <input
             type="range"
             min={1}
-            max={3}
+            max={5}
             step={0.01}
             value={zoom}
             onChange={(e) => setZoom(Number(e.target.value))}
@@ -136,4 +136,4 @@ const ImageCropperDialog = ({
   );
 };
 
-export default ImageCropperDialog;
+export default ImageCropperModal;

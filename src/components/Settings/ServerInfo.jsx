@@ -8,7 +8,7 @@ import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
 import { Switch } from '../ui/switch';
 import { Camera, Pencil, Trash2 } from 'lucide-react';
-import ImageCropperDialog from '@/components/modals/ImageCropperDialog';
+import ImageCropperModal from '@/components/modals/ImageCropperModal';
 import GuildCard from '../Guild/GuildCard';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
@@ -136,7 +136,7 @@ const ServerInfo = ({ guild }) => {
     if (!file) return;
     const dataUrl = await fileToDataUrl(file);
     const isIcon = mode === 'icon';
-    useModalStore.getState().push(ImageCropperDialog, {
+    useModalStore.getState().push(ImageCropperModal, {
       imageSrc: dataUrl,
       title: isIcon ? 'Crop Server Icon' : 'Crop Server Banner',
       aspect: isIcon ? 1 : BANNER_OUTPUT_W / BANNER_OUTPUT_H,

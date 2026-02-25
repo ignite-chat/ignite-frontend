@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useModalStore } from '@/store/modal.store';
 
-const ChangeUsernameDialog = ({ modalId }) => {
+const ChangeUsernameModal = ({ modalId }) => {
   const user = useUsersStore((s) => s.getCurrentUser());
   const setUser = useUsersStore((s) => s.setUser);
 
@@ -132,4 +132,4 @@ const ChangeUsernameDialog = ({ modalId }) => {
   );
 };
 
-export default ChangeUsernameDialog;
+export default ChangeUsernameModal;

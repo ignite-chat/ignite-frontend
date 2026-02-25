@@ -14,7 +14,7 @@ import { useVoiceStore } from '@/store/voice.store';
 import { VoiceService } from '@/services/voice.service';
 import { useModalStore } from '@/store/modal.store';
 import ScreenSharePicker from './ScreenSharePicker';
-import VoiceSettingsDialog from '@/components/modals/VoiceSettingsDialog';
+import VoiceSettingsModal from '@/components/modals/VoiceSettingsModal';
 
 const VoiceControls = () => {
   const { channelName, connectionState, isMuted, isDeafened, isCameraOn, isScreenSharing } =
@@ -95,7 +95,7 @@ const VoiceControls = () => {
 
         <button
           type="button"
-          onClick={() => useModalStore.getState().push(VoiceSettingsDialog)}
+          onClick={() => useModalStore.getState().push(VoiceSettingsModal)}
           className="flex size-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200"
           title="Voice Settings"
         >

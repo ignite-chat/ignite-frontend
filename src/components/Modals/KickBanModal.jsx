@@ -25,9 +25,9 @@ const DELETE_MESSAGE_OPTIONS = [
 
 /**
  * Confirmation dialog for kick/ban actions.
- * Pushed via useModalStore.push(KickBanDialog, { user, guildId, action }).
+ * Pushed via useModalStore.push(KickBanModal, { user, guildId, action }).
  */
-export const KickBanDialog = ({ modalId, user, guildId, action }) => {
+export const KickBanModal = ({ modalId, user, guildId, action }) => {
   const [reason, setReason] = useState('');
   const [deleteSeconds, setDeleteSeconds] = useState('0');
   const isBan = action === 'ban';

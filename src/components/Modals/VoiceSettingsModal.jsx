@@ -15,7 +15,7 @@ function filterDefaultDevice(devices) {
   return devices.filter((d) => d.deviceId !== 'default');
 }
 
-const VoiceSettingsDialog = ({ modalId }) => {
+const VoiceSettingsModal = ({ modalId }) => {
   const [inputDevices, setInputDevices] = useState([]);
   const [outputDevices, setOutputDevices] = useState([]);
   const audioInputDeviceId = useVoiceStore((s) => s.audioInputDeviceId);
@@ -212,4 +212,4 @@ const VoiceSettingsDialog = ({ modalId }) => {
   );
 };
 
-export default VoiceSettingsDialog;
+export default VoiceSettingsModal;

@@ -5,8 +5,8 @@ import ServerSettings from '../components/Settings/ServerSettings';
 import EditGuildChannelModal from '../components/modals/EditGuildChannelModal';
 import { useChannelsStore } from '@/store/channels.store';
 import GuildChannelsSidebar from '@/components/Guild/GuildChannelsSidebar';
-import CreateGuildChannelDialog from '@/components/modals/CreateGuildChannelDialog';
-import CreateGuildCategoryDialog from '@/components/modals/CreateGuildCategoryDialog';
+import CreateGuildChannelModal from '@/components/modals/CreateGuildChannelModal';
+import CreateGuildCategoryModal from '@/components/modals/CreateGuildCategoryModal';
 import { Permissions } from '@/constants/Permissions';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { useModalStore } from '@/store/modal.store';
@@ -73,10 +73,10 @@ const GuildLayout = ({ children, guild }) => {
             openEditChannelModal({ channelId: channel.channel_id || channel.id });
           }}
           onCreateChannel={(categoryId) => {
-            useModalStore.getState().push(CreateGuildChannelDialog, { guild, categoryId });
+            useModalStore.getState().push(CreateGuildChannelModal, { guild, categoryId });
           }}
           onCreateCategory={() => {
-            useModalStore.getState().push(CreateGuildCategoryDialog, { guild });
+            useModalStore.getState().push(CreateGuildCategoryModal, { guild });
           }}
           canOpenServerSettings={canManageGuild}
           canManageChannels={canManageChannels}
