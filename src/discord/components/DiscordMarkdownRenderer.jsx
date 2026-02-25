@@ -172,7 +172,6 @@ function renderInlineNode(node, index, guildId) {
             alt={node.kind.name}
             title={`:${node.kind.name}:`}
             className="inline size-6 object-contain align-text-bottom"
-            loading="lazy"
             draggable="false"
           />
         );
@@ -184,7 +183,6 @@ function renderInlineNode(node, index, guildId) {
           src={getTwemojiUrl(node.kind.surrogates)}
           alt={node.kind.name}
           className="inline size-5 object-contain align-text-bottom"
-          loading="lazy"
           draggable="false"
         />
       );
