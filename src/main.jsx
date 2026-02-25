@@ -24,7 +24,7 @@ import { useLastChannelStore } from './store/last-channel.store';
 import { useSoundStore } from './store/sound.store';
 import { useInvitesStore } from './store/invites.store';
 import { Toaster } from './components/ui/sonner';
-import { ModalRoot } from './store/modal.store';
+import { ModalRoot, useModalStore } from './store/modal.store';
 
 import { useEffect } from 'react';
 import { useLocation, useNavigationType } from 'react-router-dom';
@@ -149,6 +149,7 @@ window.__IGNITE_STORES__ = () => ({
   lastChannel: useLastChannelStore.getState(),
   sound: useSoundStore.getState(),
   invites: useInvitesStore.getState(),
+  modals: useModalStore.getState(),
 });
 
 ReactDOM.createRoot(document.getElementById('root')).render(
