@@ -16,7 +16,7 @@ const TabMyAccount = ({ onNavigateToProfiles }) => {
       {/* Profile Info Card */}
       <div className="overflow-hidden rounded-lg border border-border bg-card select-none">
         <div
-          className="h-24 bg-primary/20"
+          className="aspect-[3/1] bg-primary/20"
           style={{
             backgroundImage: user?.banner_url ? `url(${user.banner_url})` : 'none',
             backgroundSize: 'cover',

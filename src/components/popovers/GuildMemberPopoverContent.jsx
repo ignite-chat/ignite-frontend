@@ -168,7 +168,7 @@ const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
   return (
     <>
       <div className="w-80 overflow-hidden rounded-lg bg-[#111214] shadow-xl">
-        <div className="relative h-28">
+        <div className="relative aspect-[3/1]">
           <div
             className="h-full bg-primary"
             style={{

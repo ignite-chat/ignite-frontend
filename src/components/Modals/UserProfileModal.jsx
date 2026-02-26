@@ -155,7 +155,7 @@ const UserProfileModal = ({ modalId, userId, guildId }) => {
         <div className="w-full overflow-hidden rounded-xl bg-[#111214]">
           {/* Banner */}
           <div
-          className={cn('h-[120px] w-full', !user.banner_color && 'bg-primary')}
+          className={cn('aspect-[3/1] w-full', !user.banner_color && 'bg-primary')}
           style={{
             backgroundColor: user.banner_color,
             backgroundImage: user.banner_url ? `url(${user.banner_url})` : 'none',

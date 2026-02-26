@@ -17,7 +17,7 @@ import ImageCropperModal from '@/components/modals/ImageCropperModal';
 const AVATAR_OUTPUT_W = 512;
 const AVATAR_OUTPUT_H = 512;
 const BANNER_OUTPUT_W = 960;
-const BANNER_OUTPUT_H = 540;
+const BANNER_OUTPUT_H = 320;
 
 const fileToDataUrl = (file) =>
   new Promise((resolve, reject) => {
@@ -209,12 +209,12 @@ const TabProfiles = () => {
                     Banner
                   </Label>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    We recommend at least 960×540 for the banner.
+                    We recommend at least 960×320 for the banner.
                   </p>
                 </div>
 
                 <div
-                  className="group relative h-24 w-full cursor-pointer overflow-hidden rounded-md bg-muted"
+                  className="group relative aspect-[3/1] w-full cursor-pointer overflow-hidden rounded-md bg-muted"
                   onClick={() => bannerInputRef.current?.click()}
                 >
                   {displayBannerUrl && (
@@ -303,7 +303,7 @@ const TabProfiles = () => {
           </p>
           <div className="overflow-hidden rounded-lg border border-border bg-card">
             <div
-              className="h-16 bg-primary/20"
+              className="aspect-[3/1] bg-primary/20"
               style={{
                 backgroundImage: displayBannerUrl ? `url(${displayBannerUrl})` : 'none',
                 backgroundSize: 'cover',
