@@ -4,6 +4,7 @@ import ChannelInput from './ChannelInput';
 import ChannelMessages from './ChannelMessages';
 import { ChannelType } from '../../constants/ChannelType';
 import MemberList from './MemberList';
+import DMProfilePanel from './DMProfilePanel';
 import VoiceChannelView from '../Voice/VoiceChannelView';
 
 const Channel = ({ channel, messageId }) => {
@@ -33,7 +34,11 @@ const Channel = ({ channel, messageId }) => {
           <ChannelInput channel={channel} />
         </div>
 
-        {channel?.type !== ChannelType.DM && (
+        {channel?.type === ChannelType.DM ? (
+          <div className="hidden lg:flex">
+            <DMProfilePanel channel={channel} />
+          </div>
+        ) : (
           <div className="hidden lg:flex">
             <MemberList guildId={guildId} />
           </div>

@@ -7,6 +7,7 @@ import {
   Question,
   SpeakerHigh,
   Tray,
+  User,
   Users,
 } from '@phosphor-icons/react';
 import SearchModal from '../modals/SearchModal';
@@ -51,6 +52,9 @@ const IconButton = ({ icon, tooltipText, onClick }) => {
       break;
     case 'inbox':
       iconEl = <Tray className={iconClassName} />;
+      break;
+    case 'user-profile':
+      iconEl = <User className={iconClassName} weight="fill" />;
       break;
     case 'users':
       iconEl = <Users className={iconClassName} />;
@@ -113,10 +117,10 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-4">
-            {channel?.type !== ChannelType.DM && channel?.type !== ChannelType.GUILD_VOICE && (
+            {channel?.type !== ChannelType.GUILD_VOICE && (
               <IconButton
-                icon="users"
-                tooltipText="Show Member List"
+                icon={channel?.type === ChannelType.DM ? 'user-profile' : 'users'}
+                tooltipText={channel?.type === ChannelType.DM ? 'Show User Profile' : 'Show Member List'}
                 onClick={() => setMemberListOpen(!memberListOpen)}
               />
             )}
