@@ -101,7 +101,7 @@ export default function MentionPlugin({ members, resolveUser, menuContainer }) {
                   onClick={() => selectOptionAndCleanUp(option)}
                   onMouseDown={(e) => e.preventDefault()}
                 >
-                  <Avatar user={option.member.user} className="size-6 shrink-0" />
+                  <Avatar user={option.member.user} size={24} className="shrink-0" />
                   <div className="flex-1 truncate font-medium">
                     {option.member.user.name}
                   </div>

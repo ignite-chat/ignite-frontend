@@ -13,13 +13,6 @@ import { useUsersStore } from '@/store/users.store.ts';
 import { GuildsService } from '@/services/guilds.service.ts';
 import { CircleNotch, CaretDown, CaretRight } from '@phosphor-icons/react';
 
-const StatusBadge = ({ status, className = '' }) => {
-  if (status !== 'online') return null;
-  return (
-    <span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#1a1a1e] bg-green-500 ${className}`} />
-  );
-};
-
 const MemberListItem = ({ member, guildId, popoverOpen, setPopoverOpen }) => {
   const userFromStore = useUsersStore((state) => state.users[member.user.id]);
   const status = userFromStore?.status ?? member.user.status;
@@ -45,9 +38,8 @@ const MemberListItem = ({ member, guildId, popoverOpen, setPopoverOpen }) => {
         <PopoverTrigger className="w-full text-left">
           <ContextMenuTrigger>
             <div className={`flex items-center gap-3 rounded-md p-2 transition hover:bg-gray-700/50 ${status === 'offline' ? 'opacity-40' : ''}`}>
-              <div className="relative shrink-0">
-                <Avatar user={member.user} className="size-8" />
-                <StatusBadge status={status} />
+              <div className="shrink-0">
+                <Avatar user={member.user} size={32} showStatus showOffline />
               </div>
               <p
                 className="min-w-0 flex-1 truncate text-sm font-medium"

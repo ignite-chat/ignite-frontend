@@ -149,13 +149,8 @@ const UserBar = () => {
       {/* User Info Bar */}
       <div className="flex items-center rounded-lg bg-[#1a1a1d] px-2.5 py-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <div className="relative shrink-0">
-            <Avatar user={user} className="size-9" />
-            {user?.status !== 'offline' && (
-              <div className="absolute -bottom-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-[#1a1a1d]">
-                <div className="size-3 rounded-full bg-green-600"></div>
-              </div>
-            )}
+          <div className="shrink-0">
+            <Avatar user={user} size={36} showStatus showOffline />
           </div>
           <div className="flex min-w-0 flex-col">
             <span className="truncate text-base font-semibold leading-tight text-gray-100">

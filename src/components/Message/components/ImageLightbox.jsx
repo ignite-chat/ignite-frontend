@@ -105,7 +105,7 @@ const ImageLightbox = ({ src, alt, open, onOpenChange, author, timestamp }) => {
               className="absolute left-4 top-4 flex items-center gap-2.5"
               onClick={(e) => e.stopPropagation()}
             >
-              <Avatar user={author} className="size-8" />
+              <Avatar user={author} size={32} />
               <div className="flex flex-col">
                 <span className="text-[15px] font-semibold leading-tight text-[#f2f3f5]">
                   {author.name || author.username}

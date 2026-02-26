@@ -162,7 +162,7 @@ const ChannelMessage = memo(
                         avatarClickedRef.current = true;
                         setPopoverOpen((prev) => !prev);
                       }}>
-                        <Avatar user={message.author} className="size-10" />
+                        <Avatar user={message.author} size={40} />
                       </button>
                     </ContextMenuTrigger>
                     <ContextMenuContent>

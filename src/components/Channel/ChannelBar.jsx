@@ -90,7 +90,7 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
           <div className="relative flex min-w-0 flex-auto items-center overflow-hidden">
             {channel?.type === ChannelType.DM ? (
               <>
-                <Avatar user={otherRecipient} className="mr-2 size-8" />
+                <Avatar user={otherRecipient} className="mr-2" size={32} showStatus showOffline />
                 <h1 className="truncate text-sm font-semibold text-gray-100 sm:text-base">
                   {otherRecipient?.name}
                 </h1>

@@ -185,10 +185,7 @@ const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
               onClick={() => (onOpenProfile ? onOpenProfile() : useModalStore.getState().push(UserProfileModal, { userId, guildId }))}
               className="group relative rounded-full ring-[6px] ring-[#111214]"
             >
-              <Avatar user={user} className="size-20 !cursor-pointer text-3xl" />
-              {user.status === 'online' && (
-                <div className="absolute -bottom-0.5 -right-0.5 z-10 size-6 rounded-full border-4 border-[#111214] bg-[#23a559]" />
-              )}
+              <Avatar user={user} size={80} className="!cursor-pointer text-3xl" showStatus showOffline />
 
               <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100">
                 <span className="text-[10px] font-bold uppercase text-white drop-shadow-md">

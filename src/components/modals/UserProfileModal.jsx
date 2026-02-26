@@ -168,9 +168,8 @@ const UserProfileModal = ({ modalId, userId, guildId }) => {
           {/* Avatar Area */}
           <div className="absolute -top-[50px] left-4">
             <div className="rounded-full ring-[6px] ring-[#111214]">
-              <Avatar user={user} className="size-[94px] !cursor-default text-4xl" />
+              <Avatar user={user} size={94} className="!cursor-default text-4xl" showStatus showOffline />
             </div>
-            <div className="absolute bottom-0 right-0 size-6 rounded-full border-4 border-[#111214] bg-[#23a559]" />
           </div>
 
           {/* Actions Corner */}
@@ -408,7 +407,7 @@ const UserProfileModal = ({ modalId, userId, guildId }) => {
                         key={friend.id}
                         className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-white/5"
                       >
-                        <Avatar user={friend} className="size-8 !cursor-default text-xs" />
+                        <Avatar user={friend} size={32} className="!cursor-default text-xs" />
                         <span className="truncate text-sm font-medium text-gray-200">{friend.username}</span>
                       </div>
                     ))

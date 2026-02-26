@@ -70,7 +70,7 @@ const FriendsList = ({ friends, filter }: FriendsListProps) => {
                 className="border-white/5/30 group flex cursor-pointer items-center justify-between border-t px-2 py-3 hover:rounded-lg hover:bg-gray-600/30"
               >
                 <div className="flex items-center gap-3">
-                  <Avatar user={user} className="size-8 rounded-full" />
+                  <Avatar user={user} size={32} />
                   <div>
                     <div className="text-sm font-bold text-white">
                       {user.name}

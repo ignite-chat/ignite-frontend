@@ -34,7 +34,7 @@ const MessageReplyBar = ({ referenceMessageId, messages }) => {
     >
       {referencedMessage ? (
         <>
-          <Avatar user={referencedMessage.author} className="size-4 rounded-full" />
+          <Avatar user={referencedMessage.author} size={16} />
           <span className="font-semibold text-gray-300">
             {referencedMessage.author.name || referencedMessage.author.username}
           </span>

@@ -324,7 +324,7 @@ const ResultItem = ({ item, isSelected, onClick, onMouseEnter, friendIds, getGui
           disabled={loading}
           className={`${baseClass} disabled:opacity-50`}
         >
-          <Avatar user={item.data} className="size-8 shrink-0 rounded-full" />
+          <Avatar user={item.data} size={32} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-5 text-[#dbdee1]">
             {item.data.name || item.data.username}
           </span>
@@ -342,7 +342,7 @@ const ResultItem = ({ item, isSelected, onClick, onMouseEnter, friendIds, getGui
           onMouseEnter={onMouseEnter}
           className={baseClass}
         >
-          <Avatar user={item.data.user} className="size-8 shrink-0 rounded-full" />
+          <Avatar user={item.data.user} size={32} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-5 text-[#dbdee1]">
             {item.data.user?.name || item.data.user?.username || 'Unknown'}
           </span>

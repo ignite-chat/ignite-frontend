@@ -62,7 +62,7 @@ const DMChannelItem = ({
           )}
 
           <div className="relative">
-            <Avatar user={channel.user} className="size-8 rounded-full" />
+            <Avatar user={channel.user} size={32} showStatus showOffline />
           </div>
 
           <div className="flex min-w-0 flex-1 items-center justify-between">

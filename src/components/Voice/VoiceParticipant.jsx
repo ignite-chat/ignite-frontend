@@ -27,7 +27,7 @@ const VoiceParticipant = ({ voiceState }) => {
               className={`flex size-6 shrink-0 items-center justify-center rounded-full ${voiceState.speaking ? 'ring-2 ring-green-500' : ''
                 }`}
             >
-              <Avatar user={user || { name }} className="size-6 bg-gray-600 text-[10px] text-gray-300" />
+              <Avatar user={user || { name }} size={24} className="bg-gray-600 text-[10px] text-gray-300" />
             </div>
 
             <span className="flex-1 truncate text-left text-[13px] text-gray-400">{name}</span>
