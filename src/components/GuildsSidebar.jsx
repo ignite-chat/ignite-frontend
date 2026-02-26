@@ -56,6 +56,7 @@ import { useDiscordChannelsStore } from '../discord/store/discord-channels.store
 import { useDiscordReadStatesStore } from '../discord/store/discord-readstates.store';
 import { DiscordService } from '../discord/services/discord.service';
 import { useLastChannelStore } from '../store/last-channel.store';
+import { ChannelType } from '@/constants/ChannelType';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
@@ -64,6 +65,7 @@ const SidebarIcon = ({
   iconUrl = '',
   isActive = false,
   isServerIcon = false,
+  isDm = false,
   text = 'tooltip',
   isUnread = false,
   mentionCount = 0,
@@ -79,7 +81,7 @@ const SidebarIcon = ({
 
     <div className="relative mx-auto h-12 w-12">
       <div
-        className={`absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden transition-all duration-300 ease-out ${isActive ? 'rounded-xl' : 'rounded-2xl hover:rounded-xl'} ${isServerIcon ? (iconUrl ? 'bg-[#1d1d1e] text-gray-100' : isActive ? 'bg-primary text-white' : 'bg-[#1d1d1e] text-gray-100 hover:bg-primary hover:text-white') : 'bg-[#1d1d1e] text-green-500 hover:bg-green-500 hover:text-white'}`}
+        className={`absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden ${isDm ? 'rounded-full' : `transition-all duration-300 ease-out ${isActive ? 'rounded-xl' : 'rounded-2xl hover:rounded-xl'} ${isServerIcon ? (iconUrl ? 'bg-[#1d1d1e] text-gray-100' : isActive ? 'bg-primary text-white' : 'bg-[#1d1d1e] text-gray-100 hover:bg-primary hover:text-white') : 'bg-[#1d1d1e] text-green-500 hover:bg-green-500 hover:text-white'}`}`}
       >
         {icon ? (
           icon
@@ -325,42 +327,36 @@ const GuildsSidebar = () => {
     if (!channelUnreadsLoaded || !user) return [];
 
     return channels
-      .filter((c) => c.type === 1 && isChannelUnread(c))
+      .filter((c) => c.type === ChannelType.DM && isChannelUnread(c))
       .map((channel) => {
         const otherUser =
           (channel.recipients || []).find((r) => r.id !== user.id) ||
           channel.user || { username: 'Unknown' };
 
-        let unreadCount = 0;
+        const messages = channelMessages[channel.channel_id];
+        if (!messages || messages.length === 0) {
+          ChannelsService.loadChannelMessages(channel.channel_id);
+        }
+
+        let unreadCount = messages?.length || 0;
         const channelUnread = channelUnreads.find(
           (cu) => String(cu.channel_id) === String(channel.channel_id)
         );
-        if (channelUnread?.last_read_message_id) {
-          const messages = channelMessages[channel.channel_id];
-          if (messages?.length > 0) {
-            const lastReadId = BigInt(channelUnread.last_read_message_id);
-            unreadCount = messages.filter((msg) => {
-              try {
-                return BigInt(msg.id) > lastReadId;
-              } catch {
-                return false;
-              }
-            }).length;
-          }
+
+        if (channelUnread?.last_read_message_id && messages?.length > 0) {
+          const lastReadId = BigInt(channelUnread.last_read_message_id);
+          unreadCount = messages.filter((msg) => {
+            try {
+              return BigInt(msg.id) > lastReadId;
+            } catch {
+              return false;
+            }
+          }).length;
         }
 
-        return { ...channel, otherUser, unreadCount };
+        return { ...channel, otherUser, unreadCount: unreadCount > 0 ? unreadCount : 1 };
       });
   }, [channelUnreadsLoaded, channels, channelUnreads, channelMessages, user]);
-
-  useEffect(() => {
-    if (!channelUnreadsLoaded) return;
-    unreadDmChannels.forEach((dm) => {
-      if (!channelMessages[dm.channel_id] || channelMessages[dm.channel_id].length === 0) {
-        ChannelsService.loadChannelMessages(dm.channel_id);
-      }
-    });
-  }, [unreadDmChannels, channelMessages, channelUnreadsLoaded]);
 
   const confirmLeave = async () => {
     if (!leaveGuild?.id) return;
@@ -397,6 +393,7 @@ const GuildsSidebar = () => {
               icon={<Avatar user={dm.otherUser} className="size-full" />}
               text={dm.otherUser.username}
               isServerIcon={true}
+              isDm={true}
               isActive={channelId === dm.channel_id}
               isUnread={true}
               mentionCount={dm.unreadCount}

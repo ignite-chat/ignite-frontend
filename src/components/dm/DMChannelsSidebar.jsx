@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { UserStarIcon, SquarePen } from 'lucide-react';
+import { UserStarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '../ui/badge';
 import { useChannelsStore } from '@/store/channels.store';
@@ -82,6 +82,15 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
     <>
     <aside className="flex min-h-0 w-80 cursor-default select-none flex-col overflow-hidden bg-[#121214]">
       <div className="flex-1 overflow-y-auto p-2 pb-36">
+        <button
+          className="mb-2 flex w-full items-center text-white justify-center rounded-md bg-[#1e1f22] px-3 py-1.5 text-sm text-gray-400 hover:bg-[#2b2d31]"
+          onClick={() => useModalStore.getState().push(NewDMModal)}
+        >
+          <span>Find or start a conversation</span>
+        </button>
+
+        <div className="mx-2 my-2 border-b border-white/5" />
+
         <Button
           variant={activeChannelId === 'friends' ? 'secondary' : 'ghost'}
           className="mb-1 w-full justify-start gap-3"
@@ -94,15 +103,6 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
               {pendingCount}
             </Badge>
           )}
-        </Button>
-
-        <Button
-          variant="ghost"
-          className="mb-1 w-full justify-start gap-3"
-          onClick={() => useModalStore.getState().push(NewDMModal)}
-        >
-          <SquarePen className="h-5 w-5" />
-          <span className="font-medium">New Message</span>
         </Button>
 
         <div className="mx-2 my-2 border-b border-white/5" />
