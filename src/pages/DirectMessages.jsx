@@ -5,8 +5,10 @@ import { ChannelContextProvider } from '../contexts/ChannelContext';
 import Channel from '../components/Channel/Channel';
 import DMChannelsSidebar from '../components/dm/DMChannelsSidebar';
 import FriendsDashboard from '../components/Friends/FriendsDashboard';
+import PageTitle from '../components/PageTitle';
 import { useChannelsStore } from '../store/channels.store';
 import { useNotificationStore } from '../store/notification.store';
+import { useUsersStore } from '../store/users.store';
 
 const DirectMessagesPage = () => {
   const { channelId, messageId } = useParams();
@@ -18,6 +20,12 @@ const DirectMessagesPage = () => {
 
   // Find active channel object if we aren't in friends view
   const activeChannel = !isFriendsView ? channels.find((c) => c.channel_id === channelId) : null;
+
+  // Get the other user's name for the page title
+  const currentUser = useUsersStore((s) => s.getCurrentUser());
+  const dmRecipient = activeChannel
+    ? (activeChannel.recipients || []).find((r) => r.id !== currentUser?.id) || activeChannel.user
+    : null;
 
   // Track active channel for notification suppression
   useEffect(() => {
@@ -34,6 +42,7 @@ const DirectMessagesPage = () => {
         />
       }
     >
+      {!isFriendsView && <PageTitle title={`@${dmRecipient?.name}` || 'Direct Messages'} />}
       <main className="relative flex h-full flex-1 flex-col overflow-hidden bg-gray-700 text-gray-100">
         {isFriendsView ? (
           <FriendsDashboard />

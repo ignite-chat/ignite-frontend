@@ -9,6 +9,7 @@ import { useLastChannelStore } from '../store/last-channel.store';
 import GuildLayout from '../layouts/GuildLayout';
 import Channel from '../components/Channel/Channel';
 import { ChannelContextProvider } from '../contexts/ChannelContext';
+import PageTitle from '../components/PageTitle';
 import { StickersService } from '@/services/stickers.service';
 
 const GuildChannelPage = () => {
@@ -72,6 +73,7 @@ const GuildChannelPage = () => {
 
   return (
     <GuildLayout guild={guild}>
+      <PageTitle title={channel ? `#${channel.name}` : 'Server'} />
       <ChannelContextProvider>
         <Channel channel={channel} messageId={messageId} />
       </ChannelContextProvider>

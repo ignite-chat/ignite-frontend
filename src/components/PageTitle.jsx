@@ -5,7 +5,7 @@ const PageTitle = ({ title }) => {
   const location = useLocation();
 
   useEffect(() => {
-    document.title = title;
+    document.title = `• Ignite | ${title}`;
   }, [location, title]);
 
   return null;

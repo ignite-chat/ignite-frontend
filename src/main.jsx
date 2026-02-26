@@ -65,9 +65,7 @@ const WindowControlButton = ({ icon: Icon, onClick, variant = 'default', ariaLab
 };
 
 function WindowBar() {
-  if (!window.IgniteNative) return null;
-
-  const isMac = window.IgniteNative.platform === 'darwin';
+  const isMac = !window.IgniteNative || window.IgniteNative.platform === 'darwin';
 
   return (
     <div

@@ -204,19 +204,14 @@ function App() {
             path="/channels/@me"
             element={
               <>
-                <PageTitle title="Direct Messages" />
+                <PageTitle title="Friends" />
                 <DirectMessagesPage />
               </>
             }
           />
           <Route
             path="/channels/@me/:channelId/:messageId?"
-            element={
-              <>
-                <PageTitle title="Direct Messages" />
-                <DirectMessagesPage />
-              </>
-            }
+            element={<DirectMessagesPage />}
           />
           <Route
             path="/guild-discovery"
@@ -229,12 +224,7 @@ function App() {
           />
           <Route
             path="/channels/:guildId/:channelId?/:messageId?"
-            element={
-              <>
-                <PageTitle title="Guild Channel" />
-                <GuildChannelPage />
-              </>
-            }
+            element={<GuildChannelPage />}
           />
           <Route
             path="/discord/@me/:channelId?"
