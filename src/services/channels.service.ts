@@ -453,6 +453,38 @@ export const ChannelsService = {
     setMessageReactions(channel_id, message_id, reactions);
   },
 
+  /**
+   * Update a guild channel's properties (name, description, permissions, etc.)
+   */
+  async updateGuildChannel(guildId: string, channelId: string, data: Record<string, unknown>) {
+    try {
+      await api.patch(`/guilds/${guildId}/channels/${channelId}`, data);
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        toast.error(error.response.data?.message || 'Failed to update channel');
+      } else {
+        toast.error('Failed to update channel');
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Update permissions for a specific role on a channel.
+   */
+  async updateChannelRolePermissions(channelId: string, roleId: string, data: { allowed_permissions: string; denied_permissions: string }) {
+    try {
+      await api.put(`/channels/${channelId}/permissions/${roleId}`, data);
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        toast.error(error.response.data?.message || 'Failed to update permissions');
+      } else {
+        toast.error('Failed to update permissions');
+      }
+      throw error;
+    }
+  },
+
   handleChannelUpdated(event: ChannelEvent) {
     const { channels, setChannels } = useChannelsStore.getState();
     setChannels(

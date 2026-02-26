@@ -11,14 +11,13 @@ import { useChannelInputContext, useChannelContext } from '../../../contexts/Cha
 import Avatar from '../../Avatar.jsx';
 import { cn } from '@/lib/utils';
 import { useChannelsStore } from '../../../store/channels.store';
-import { X, Hash, Megaphone, SpeakerHigh, Keyboard } from '@phosphor-icons/react';
+import { X, Hash, Megaphone, SpeakerHigh, Keyboard, Smiley, Sticker as StickerIcon } from '@phosphor-icons/react';
 import { useGuildsStore } from '../../../store/guilds.store';
 import { useGuildContext } from '../../../contexts/GuildContext';
 import { ChannelType } from '../../../constants/ChannelType';
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { Button } from '../../ui/button';
 import {
-  Smile,
   Clock,
   PawPrint,
   Pizza,
@@ -29,6 +28,7 @@ import {
   Flag as FlagIcon,
   PlusCircle,
   FileText,
+  Plus,
 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../ui/tooltip';
 import { ChannelsService } from '../../../services/channels.service';
@@ -39,7 +39,6 @@ import emojisData from '../../../assets/emojis/emojis.json';
 import { useTypingText } from '@/hooks/useTypingText';
 import { useUsersStore } from '@/store/users.store';
 import StickerPicker from '../StickerPicker';
-import { Sticker } from 'lucide-react';
 import { Permissions } from '@/constants/Permissions';
 import { useHasPermission } from '@/hooks/useHasPermission';
 
@@ -409,10 +408,10 @@ const ChannelInput = ({ channel }) => {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                className="size-8 text-[#b5bac1] hover:text-[#dbdee1]"
+                className="size-8 text-[#949ba4] hover:text-[#dbdee1] [&_svg]:size-6"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <PlusCircle className="size-5" />
+                <Plus className="size-5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">Attach files</TooltipContent>
@@ -465,14 +464,15 @@ const ChannelInput = ({ channel }) => {
                   });
                 }}
                 className={cn(
-                  'size-8',
+                  'size-6',
+                  '[&_svg]:size-5',
                   silentTyping
                     ? 'text-[#dbdee1]'
-                    : 'text-[#b5bac1] hover:text-[#dbdee1]'
+                    : 'text-[#949ba4] hover:text-[#dbdee1]'
                 )}
               >
                 <div className="relative">
-                  <Keyboard className="size-5" />
+                  <Keyboard className="size-5" weight='fill'/>
                   {silentTyping && (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="h-[22px] w-[2px] rotate-45 rounded-full bg-red-500" />
@@ -489,9 +489,9 @@ const ChannelInput = ({ channel }) => {
             <Popover.Trigger asChild>
               <Button
                 variant="ghost"
-                className="size-8 text-[#b5bac1] hover:text-[#dbdee1]"
+                className="size-8 text-[#949ba4] hover:text-[#dbdee1] [&_svg]:size-5"
               >
-                <Sticker className="size-5" />
+                <StickerIcon weight="fill" />
               </Button>
             </Popover.Trigger>
             <Popover.Content
@@ -508,9 +508,9 @@ const ChannelInput = ({ channel }) => {
             <Popover.Trigger asChild>
               <Button
                 variant="ghost"
-                className="size-8 text-[#b5bac1] hover:text-[#dbdee1]"
+                className="size-8 text-[#949ba4] hover:text-[#dbdee1] [&_svg]:size-5"
               >
-                <Smile className="size-5" />
+                <Smiley weight="fill" />
               </Button>
             </Popover.Trigger>
             <Popover.Portal>
@@ -551,7 +551,7 @@ const ChannelInput = ({ channel }) => {
                           <Hash className="size-[20px]" />
                         ),
                       })),
-                      { id: 'people', label: 'People', icon: <Smile className="size-[20px]" /> },
+                      { id: 'people', label: 'People', icon: <Smiley className="size-[20px]" weight="fill" /> },
                       { id: 'nature', label: 'Nature', icon: <PawPrint className="size-[20px]" /> },
                       { id: 'food', label: 'Food', icon: <Pizza className="size-[20px]" /> },
                       { id: 'activity', label: 'Activities', icon: <Trophy className="size-[20px]" /> },

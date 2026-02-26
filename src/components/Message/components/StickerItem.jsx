@@ -33,7 +33,6 @@ const StickerItem = ({ sticker }) => {
                 src={stickerUrl}
                 alt={sticker.name}
                 className="size-40 object-contain"
-                loading="lazy"
                 decoding="async"
               />
             </button>

@@ -102,7 +102,6 @@ const DiscordAttachments = ({ attachments }) => {
                 alt={att.filename}
                 className="rounded-lg"
                 style={{ maxWidth: maxW, maxHeight: maxH }}
-                loading="lazy"
               />
             </a>
           );
@@ -189,7 +188,6 @@ const DiscordEmbeds = ({ embeds }) => {
                   src={embed.image.proxy_url || embed.image.url}
                   alt=""
                   className="mt-2 max-w-full rounded"
-                  loading="lazy"
                 />
               )}
               {embed.thumbnail && !embed.image && (
@@ -197,7 +195,6 @@ const DiscordEmbeds = ({ embeds }) => {
                   src={embed.thumbnail.proxy_url || embed.thumbnail.url}
                   alt=""
                   className="mt-2 max-h-20 rounded"
-                  loading="lazy"
                 />
               )}
               {embed.footer && (
@@ -238,7 +235,6 @@ const DiscordStickers = ({ stickerItems }) => {
             alt={sticker.name}
             title={sticker.name}
             className="size-[160px] object-contain"
-            loading="lazy"
             draggable="false"
           />
         );

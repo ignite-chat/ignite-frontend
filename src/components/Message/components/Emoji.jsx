@@ -41,7 +41,6 @@ const Emoji = ({ src, alt, emojiId, isTwemoji, isReply }) => {
         src={src}
         alt={name}
         className="inline h-4 w-4 object-contain align-text-bottom"
-        loading="lazy"
       />
     );
   }
@@ -62,7 +61,6 @@ const Emoji = ({ src, alt, emojiId, isTwemoji, isReply }) => {
                   'inline object-contain align-text-bottom',
                   isTwemoji ? 'h-6 w-6' : 'h-8 w-8'
                 )}
-                loading="lazy"
               />
             </button>
           </PopoverTrigger>

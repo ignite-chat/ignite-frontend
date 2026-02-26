@@ -30,7 +30,6 @@ const ImageAttachment = ({ attachment, author, timestamp }) => {
           src={attachment.url}
           alt={attachment.filename}
           className="max-h-[300px] rounded object-contain"
-          loading="lazy"
           decoding="async"
         />
       </button>

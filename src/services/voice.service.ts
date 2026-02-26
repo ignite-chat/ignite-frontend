@@ -386,12 +386,6 @@ export const VoiceService = {
       return;
     }
 
-    // In Electron, open the custom picker
-    if (window.IgniteNative?.getDesktopSources) {
-      store.setScreenSharePickerOpen(true);
-      return;
-    }
-
     // In browser, use the default picker
     try {
       await room.localParticipant.setScreenShareEnabled(true);
