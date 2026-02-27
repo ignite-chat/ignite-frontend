@@ -120,7 +120,7 @@ const DMProfilePanel = ({ channel }) => {
 
   return (
     <div
-      className={`relative z-0 transition-all duration-300 ${memberListOpen ? 'w-60 md:w-72' : 'w-0'}`}
+      className={`relative z-0 transition-all duration-300 ${memberListOpen ? 'w-72 md:w-96' : 'w-0'}`}
     >
       {memberListOpen && (
         <div className="flex h-full flex-col border-l border-white/5 bg-[#111214]">
