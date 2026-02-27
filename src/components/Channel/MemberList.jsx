@@ -39,7 +39,7 @@ const MemberListItem = ({ member, guildId, popoverOpen, setPopoverOpen }) => {
           <ContextMenuTrigger>
             <div className={`flex items-center gap-3 rounded-md p-2 transition hover:bg-gray-700/50 ${status === 'offline' ? 'opacity-40' : ''}`}>
               <div className="shrink-0">
-                <Avatar user={member.user} size={32} showStatus showOffline />
+                <Avatar user={member.user} size={32} showStatus />
               </div>
               <p
                 className="min-w-0 flex-1 truncate text-sm font-medium"
