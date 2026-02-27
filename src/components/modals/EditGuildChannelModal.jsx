@@ -401,7 +401,7 @@ const EditGuildChannelModal = ({ modalId, guild, initialTab = 'info', channel })
 
   return (
     <Dialog open onOpenChange={() => closeModal()}>
-      <DialogContent showCloseButton={false} className="flex h-[90vh] max-w-4xl gap-0 overflow-hidden p-0">
+      <DialogContent showCloseButton={false} className="!inset-0 m-auto flex size-full !max-h-[90vh] !max-w-[90vw] !translate-x-0 !translate-y-0 gap-0 overflow-hidden p-0">
         <VisuallyHidden>
           <DialogTitle>{isCategory ? 'Category Settings' : 'Channel Settings'}</DialogTitle>
         </VisuallyHidden>
