@@ -27,7 +27,8 @@ const TabMyAccount = ({ onNavigateToProfiles }) => {
           <div className="-mt-10 mb-2">
             <Avatar
               user={user}
-              className="size-20 rounded-full border-[5px] border-card text-2xl"
+              size={80}
+              className="rounded-full border-[5px] border-card text-2xl"
             />
           </div>
           <div className="mb-4 flex items-center justify-between">
