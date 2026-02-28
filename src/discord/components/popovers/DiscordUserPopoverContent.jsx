@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { UserCircle } from '@phosphor-icons/react';
 import { toast } from 'sonner';
-import { DiscordService } from '../../discord/services/discord.service';
-import { DiscordApiService } from '../../discord/services/discord-api.service';
-import { useDiscordGuildsStore } from '../../discord/store/discord-guilds.store';
-import { useDiscordUsersStore } from '../../discord/store/discord-users.store';
+import { DiscordService } from '../../services/discord.service';
+import { DiscordApiService } from '../../services/discord-api.service';
+import { useDiscordGuildsStore } from '../../store/discord-guilds.store';
+import { useDiscordUsersStore } from '../../store/discord-users.store';
 
 const DISCORD_EPOCH = 1420070400000;
 
@@ -17,6 +17,13 @@ const getCreatedAt = (userId) => {
 const getRoleColor = (color) => {
   if (!color || color === 0) return '#99aab5';
   return `#${color.toString(16).padStart(6, '0')}`;
+};
+
+const statusColors = {
+  online: 'bg-green-500',
+  idle: 'bg-yellow-500',
+  dnd: 'bg-red-500',
+  offline: 'bg-gray-500',
 };
 
 const DiscordUserPopoverContent = ({ author, member, guildId, onOpenProfile }) => {
@@ -98,6 +105,9 @@ const DiscordUserPopoverContent = ({ author, member, guildId, onOpenProfile }) =
                 View Profile
               </span>
             </div>
+            <div
+              className={`absolute -bottom-0.5 -right-0.5 size-5 rounded-full border-[3px] border-[#111214] ${statusColors[user.status] || statusColors.offline}`}
+            />
           </button>
         </div>
       </div>

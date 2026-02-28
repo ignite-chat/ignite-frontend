@@ -63,17 +63,31 @@ const DMChannelItem = ({ channel, isActive, currentUserId, usersMap }) => {
             : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
       )}
     >
-      {info.icon ? (
-        <img
-          src={info.icon}
-          alt={info.name}
-          className="size-8 shrink-0 rounded-full object-cover"
-        />
-      ) : (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#5865f2] text-sm font-medium text-white">
-          {info.isGroup ? info.recipientCount : info.name.charAt(0).toUpperCase()}
-        </div>
-      )}
+      <div className="relative shrink-0">
+        {info.icon ? (
+          <img
+            src={info.icon}
+            alt={info.name}
+            className="size-8 rounded-full object-cover"
+          />
+        ) : (
+          <div className="flex size-8 items-center justify-center rounded-full bg-[#5865f2] text-sm font-medium text-white">
+            {info.isGroup ? info.recipientCount : info.name.charAt(0).toUpperCase()}
+          </div>
+        )}
+        {!info.isGroup && info.user && (
+          <div
+            className={cn(
+              'absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full border-2 border-[#121214]',
+              {
+                online: 'bg-green-500',
+                idle: 'bg-yellow-500',
+                dnd: 'bg-red-500',
+              }[info.user.status] || 'bg-gray-500'
+            )}
+          />
+        )}
+      </div>
 
       <div className="min-w-0 flex-1">
         <div className={cn('truncate text-sm', isUnread ? 'font-semibold' : 'font-medium')}>

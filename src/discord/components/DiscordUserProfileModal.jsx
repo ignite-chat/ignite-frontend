@@ -19,6 +19,13 @@ const getRoleColor = (color) => {
   return `#${color.toString(16).padStart(6, '0')}`;
 };
 
+const statusColors = {
+  online: 'bg-green-500',
+  idle: 'bg-yellow-500',
+  dnd: 'bg-red-500',
+  offline: 'bg-gray-500',
+};
+
 const DiscordUserProfileModal = ({ author, member, guildId, open, onOpenChange }) => {
   const guilds = useDiscordGuildsStore((s) => s.guilds);
   const storeUser = useDiscordUsersStore((s) => s.users[author?.id]);
@@ -98,6 +105,9 @@ const DiscordUserProfileModal = ({ author, member, guildId, open, onOpenChange }
                     draggable="false"
                   />
                 )}
+                <div
+                  className={`absolute -bottom-0.5 -right-0.5 size-6 rounded-full border-4 border-[#111214] ${statusColors[user.status] || statusColors.offline}`}
+                />
               </div>
             </div>
 
