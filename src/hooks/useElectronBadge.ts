@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useUnreadsStore } from '../store/unreads.store';
 import { useChannelsStore } from '../store/channels.store';
 import { isChannelUnread, getChannelMentionCount, getUnreadMessageCount } from '../utils/unreads.utils';
+import { useFriendsStore } from '@/store/friends.store';
+import { useUsersStore } from '@/store/users.store';
 
 /**
  * Keeps the Electron taskbar overlay badge in sync with unread state.
@@ -16,6 +18,14 @@ export function useElectronBadge() {
   const channelUnreadsLoaded = useUnreadsStore((s) => s.channelUnreadsLoaded);
   const channels = useChannelsStore((s) => s.channels);
   const channelMessages = useChannelsStore((s) => s.channelMessages);
+  const { requests } = useFriendsStore();
+  const user = useUsersStore((s) => s.getCurrentUser());
+
+
+  const pendingCount = useMemo(() => {
+    if (!user) return 0;
+    return requests.filter((req) => req.sender_id != user.id).length;
+  }, [requests, user]);
 
   useEffect(() => {
     if (!window.IgniteNative?.setBadgeCount || !channelUnreadsLoaded) return;
@@ -41,14 +51,13 @@ export function useElectronBadge() {
     }
 
     let badgeCount: number;
-    if (totalMentions > 0) {
-      badgeCount = Math.min(totalMentions, 10);
-    } else if (hasUnread) {
+    badgeCount = Math.min(totalMentions, 10);
+    badgeCount += pendingCount;
+
+    if (hasUnread && badgeCount == 0) {
       badgeCount = 11; // unread but no mentions
-    } else {
-      badgeCount = 0; // clear badge
     }
 
     window.IgniteNative.setBadgeCount(badgeCount);
-  }, [channelUnreads, channelUnreadsLoaded, channels, channelMessages]);
+  }, [channelUnreads, channelUnreadsLoaded, channels, channelMessages, pendingCount]);
 }
