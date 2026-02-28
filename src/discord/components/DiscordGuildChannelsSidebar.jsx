@@ -214,7 +214,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
 
   return (
     <div className="relative top-0 flex h-full min-w-[240px] flex-col bg-[#121214] text-gray-100">
-      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto" ref={sidebarRef} onScroll={onSidebarScroll}>
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto pb-24" ref={sidebarRef} onScroll={onSidebarScroll}>
         {/* Guild Header */}
         <div className="w-full p-2">
           <div className="flex w-full items-center gap-2 rounded-md px-2 py-1">

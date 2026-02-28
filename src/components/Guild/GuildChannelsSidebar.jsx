@@ -498,7 +498,7 @@ const GuildChannelsSidebar = ({
       <ContextMenu>
         <ContextMenuTrigger>
           <div className="relative top-0 flex h-full w-80 flex-col bg-[#121214] text-gray-100 select-none">
-            <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto" ref={sidebarRef} onScroll={onSidebarScroll}>
+            <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto pb-36" ref={sidebarRef} onScroll={onSidebarScroll}>
               <GuildSidebarHeader
                 guildName={guild?.name}
                 guild={guild}

@@ -14,7 +14,17 @@ type DiscordUser = {
   } | null;
   bot?: boolean;
   public_flags?: number;
+  status?: 'online' | 'idle' | 'dnd' | 'offline';
+  activities?: any[];
+  client_status?: { desktop?: string; mobile?: string; web?: string };
   [key: string]: any;
+};
+
+type Presence = {
+  user_id: string;
+  status: 'online' | 'idle' | 'dnd' | 'offline';
+  activities?: any[];
+  client_status?: { desktop?: string; mobile?: string; web?: string };
 };
 
 type DiscordUsersStore = {
@@ -24,6 +34,8 @@ type DiscordUsersStore = {
   addUser: (user: DiscordUser) => void;
   addUsers: (users: DiscordUser[]) => void;
   getUser: (userId: string) => DiscordUser | undefined;
+  updatePresence: (presence: Presence) => void;
+  setPresences: (presences: Presence[]) => void;
   clear: () => void;
 };
 
@@ -50,6 +62,39 @@ export const useDiscordUsersStore = create<DiscordUsersStore>((set, get) => ({
     }),
 
   getUser: (userId) => get().users[userId],
+
+  updatePresence: (presence) =>
+    set((state) => {
+      const existing = state.users[presence.user_id];
+      if (!existing) return state;
+      return {
+        users: {
+          ...state.users,
+          [presence.user_id]: {
+            ...existing,
+            status: presence.status,
+            activities: presence.activities,
+            client_status: presence.client_status,
+          },
+        },
+      };
+    }),
+
+  setPresences: (presences) =>
+    set((state) => {
+      const updated = { ...state.users };
+      for (const p of presences) {
+        if (updated[p.user_id]) {
+          updated[p.user_id] = {
+            ...updated[p.user_id],
+            status: p.status,
+            activities: p.activities,
+            client_status: p.client_status,
+          };
+        }
+      }
+      return { users: updated };
+    }),
 
   clear: () => set({ users: {} }),
 }));

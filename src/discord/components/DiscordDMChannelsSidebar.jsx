@@ -1,10 +1,14 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { UserStarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordStore } from '../store/discord.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
+import { useDiscordRelationshipsStore, RelationshipType } from '../store/discord-relationships.store';
 import { DiscordService } from '../services/discord.service';
 
 const getDMDisplayInfo = (channel, currentUserId, usersMap) => {
@@ -96,6 +100,14 @@ const DiscordDMChannelsSidebar = () => {
   const currentUser = useDiscordStore((s) => s.user);
   const channels = useDiscordChannelsStore((s) => s.channels);
   const usersMap = useDiscordUsersStore((s) => s.users);
+  const relationships = useDiscordRelationshipsStore((s) => s.relationships);
+
+  const isFriendsView = !channelId;
+
+  const pendingCount = useMemo(
+    () => relationships.filter((r) => r.type === RelationshipType.INCOMING_REQUEST).length,
+    [relationships]
+  );
 
   const dmChannels = useMemo(() => {
     return channels
@@ -116,6 +128,23 @@ const DiscordDMChannelsSidebar = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">
+        <Link to="/discord/@me">
+          <Button
+            variant={isFriendsView ? 'secondary' : 'ghost'}
+            className="mb-1 w-full justify-start gap-3"
+          >
+            <UserStarIcon className="h-5 w-5" />
+            <span className="font-medium">Friends</span>
+            {pendingCount > 0 && (
+              <Badge className="ml-auto h-4 min-w-4 bg-[#f23f42] p-1 text-[11px] font-bold hover:bg-[#f23f42]">
+                {pendingCount}
+              </Badge>
+            )}
+          </Button>
+        </Link>
+
+        <div className="mx-2 my-2 border-b border-white/5" />
+
         <div className="mb-2 flex cursor-default select-none items-center px-2 text-[11px] font-bold uppercase tracking-wider text-gray-500">
           Direct Messages — {dmChannels.length}
         </div>

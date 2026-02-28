@@ -3,6 +3,7 @@ import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
+import { useDiscordRelationshipsStore } from '../store/discord-relationships.store';
 
 // Discord Gateway Opcodes
 const GatewayOp = {
@@ -240,6 +241,30 @@ export const DiscordGatewayService = {
       case 'MESSAGE_ACK':
         this._handleMessageAck(data);
         break;
+      case 'RELATIONSHIP_ADD':
+        if (data.user) {
+          useDiscordUsersStore.getState().addUser(data.user);
+        }
+        useDiscordRelationshipsStore.getState().addRelationship({ id: data.id, type: data.type, nickname: data.nickname, since: data.since });
+        break;
+      case 'RELATIONSHIP_REMOVE':
+        useDiscordRelationshipsStore.getState().removeRelationship(data.id);
+        break;
+      case 'RELATIONSHIP_UPDATE':
+        useDiscordRelationshipsStore.getState().updateRelationship(data.id, { type: data.type, nickname: data.nickname });
+        break;
+      case 'PRESENCE_UPDATE': {
+        const presenceUserId = data.user?.id || data.user_id;
+        if (presenceUserId) {
+          useDiscordUsersStore.getState().updatePresence({
+            user_id: presenceUserId,
+            status: data.status,
+            activities: data.activities,
+            client_status: data.client_status,
+          });
+        }
+        break;
+      }
       default:
         // Forward unhandled events to the external handler if set
         break;
@@ -254,7 +279,7 @@ export const DiscordGatewayService = {
   // ─── Dispatch Event Handlers ──────────────────────────────────────
 
   _handleReady(data: any) {
-    const { user, guilds, session_id, resume_gateway_url, private_channels, users, read_state, merged_members } = data;
+    const { user, guilds, session_id, resume_gateway_url, private_channels, users, read_state, merged_members, relationships, presences } = data;
 
     console.log(`[Discord Gateway] READY as ${user.username}#${user.discriminator} (${user.id})`);
     console.log(`[Discord Gateway] ${guilds.length} guilds, ${private_channels?.length || 0} DMs, ${users?.length || 0} users`);
@@ -306,6 +331,32 @@ export const DiscordGatewayService = {
       for (const channel of private_channels) {
         channelsStore.addChannel(channel);
       }
+    }
+
+    // Store relationships (friends, blocked, pending requests)
+    // Extract embedded users into the users store, keep relationships lean
+    if (relationships && relationships.length > 0) {
+      const relationshipUsers = relationships.filter((r: any) => r.user).map((r: any) => r.user);
+      if (relationshipUsers.length > 0) {
+        useDiscordUsersStore.getState().addUsers(relationshipUsers);
+      }
+      useDiscordRelationshipsStore.getState().setRelationships(
+        relationships.map((r: any) => ({ id: r.id, type: r.type, nickname: r.nickname, since: r.since }))
+      );
+    }
+
+    // Store presences (online status of friends) on the users store
+    // Discord v9 sends friend presences in merged_presences.friends
+    const friendPresences = data.merged_presences?.friends || presences || [];
+    if (friendPresences.length > 0) {
+      useDiscordUsersStore.getState().setPresences(
+        friendPresences.map((p: any) => ({
+          user_id: p.user?.id || p.user_id,
+          status: p.status,
+          activities: p.activities,
+          client_status: p.client_status,
+        }))
+      );
     }
   },
 

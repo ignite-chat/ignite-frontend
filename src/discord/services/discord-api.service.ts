@@ -111,6 +111,20 @@ export const DiscordApiService = {
   },
 
   /**
+   * Accept an incoming friend request (or send one by user ID).
+   */
+  async acceptFriendRequest(userId: string) {
+    await discordApi.put(`/users/@me/relationships/${userId}`, {});
+  },
+
+  /**
+   * Delete a relationship (decline request, cancel outgoing, or remove friend).
+   */
+  async deleteRelationship(userId: string) {
+    await discordApi.delete(`/users/@me/relationships/${userId}`);
+  },
+
+  /**
    * Acknowledge (mark as read) up to a specific message in a channel.
    */
   async ackMessage(channelId: string, messageId: string) {

@@ -4,6 +4,7 @@ import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
+import { useDiscordRelationshipsStore } from '../store/discord-relationships.store';
 import { DiscordGatewayService } from './discord-gateway.service';
 import { DiscordApiService } from './discord-api.service';
 
@@ -48,6 +49,7 @@ export const DiscordService = {
     useDiscordChannelsStore.getState().clear();
     useDiscordUsersStore.getState().clear();
     useDiscordReadStatesStore.getState().clear();
+    useDiscordRelationshipsStore.getState().clear();
     console.log('[Discord] Disconnected and stores cleared');
   },
 

@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Fire, Plus, Compass, DiscordLogo, ChatCircle, SignOut } from '@phosphor-icons/react';
+import { Fire, Plus, Compass, DiscordLogo, SignOut } from '@phosphor-icons/react';
 import {
   DndContext,
   DragOverlay,
@@ -219,7 +219,7 @@ const DiscordDMsIcon = ({ isActive }) => {
   return (
     <Link to="/discord/@me">
       <SidebarIcon
-        icon={<ChatCircle className="size-6" />}
+        icon={<DiscordLogo className="size-6" />}
         text="Discord DMs"
         isServerIcon={true}
         isActive={isActive}
@@ -401,7 +401,12 @@ const GuildsSidebar = () => {
           </Link>
         ))}
 
-        {unreadDmChannels.length > 0 && (
+        {/* Discord DMs icon — shown below unread Ignite DMs */}
+        {discordToken && discordConnected && (
+          <DiscordDMsIcon isActive={location.pathname.startsWith('/discord/@me')} />
+        )}
+
+        {(unreadDmChannels.length > 0 || (discordToken && discordConnected)) && (
           <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
         )}
 
@@ -460,7 +465,6 @@ const GuildsSidebar = () => {
             <hr className="mx-auto mb-2 mt-1 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
             {discordConnected ? (
               <>
-                <DiscordDMsIcon isActive={location.pathname.startsWith('/discord/@me')} />
                 {discordGuilds.map((guild) => (
                   <DiscordGuildIcon
                     key={`discord-${guild.id}`}
