@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { UserCircle } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { DiscordService } from '../services/discord.service';
@@ -82,7 +83,10 @@ const DiscordUserProfileModal = ({ author, member, guildId, open, onOpenChange }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl border-none bg-transparent p-0 shadow-2xl [&>button]:hidden">
+      <DialogContent aria-describedby={undefined} className="max-w-xl border-none bg-transparent p-0 shadow-2xl [&>button]:hidden">
+        <VisuallyHidden>
+          <DialogTitle>User Profile</DialogTitle>
+        </VisuallyHidden>
         <div className="w-full overflow-hidden rounded-xl bg-[#111214]">
           {/* Banner */}
           <div className="h-[120px] w-full" style={bannerStyle} />
