@@ -9,6 +9,10 @@ import { isMessageRead } from '@/utils/unreads.utils';
 import { scrollPositions } from '@/store/last-channel.store';
 import MessageList from '../Message/MessageList';
 
+function getSnowflakeTimestamp(id) {
+  return BigInt(id) >> 22n;
+}
+
 const ChannelMessages = ({ channel, messageId }) => {
   const { guildId } = useGuildContext();
   const { editingId, setEditingId, setReplyingId } = useChannelContext();
@@ -21,6 +25,7 @@ const ChannelMessages = ({ channel, messageId }) => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [newMessagesSeparatorId, setNewMessagesSeparatorId] = useState(null);
 
   const messagesRef = useRef();
   const contentRef = useRef();
@@ -84,6 +89,32 @@ const ChannelMessages = ({ channel, messageId }) => {
       }
     }
   }, [channel?.channel_id, channelMessages, messageId]);
+
+  // Snapshot last_read_message_id when switching channels to position the "NEW" separator
+  useEffect(() => {
+    if (!channel?.channel_id) {
+      setNewMessagesSeparatorId(null);
+      return;
+    }
+    const { channelUnreads } = useUnreadsStore.getState();
+    const unread = channelUnreads.find((u) => u.channel_id === channel.channel_id);
+    if (
+      unread?.last_read_message_id &&
+      channel.last_message_id &&
+      getSnowflakeTimestamp(channel.last_message_id) > getSnowflakeTimestamp(unread.last_read_message_id)
+    ) {
+      setNewMessagesSeparatorId(unread.last_read_message_id);
+    } else {
+      setNewMessagesSeparatorId(null);
+    }
+  }, [channel?.channel_id]);
+
+  // Clear the "NEW" separator when the user sends a message
+  useEffect(() => {
+    if (pendingMessages.length > 0) {
+      setNewMessagesSeparatorId(null);
+    }
+  }, [pendingMessages.length]);
 
   const lastScrolledIdRef = useRef(null);
 
@@ -244,6 +275,7 @@ const ChannelMessages = ({ channel, messageId }) => {
           isLoading={isLoading}
           hasMore={hasMore}
           loadingMore={loadingMore}
+          newMessagesSeparatorId={newMessagesSeparatorId}
         />
       </div>
     </div>

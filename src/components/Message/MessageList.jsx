@@ -2,6 +2,13 @@ import { CircleNotch } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import ChannelMessage from './ChannelMessage';
 
+const NewMessagesSeparator = () => (
+  <div className="flex items-center gap-1 pl-4 pr-3.5 mt-1.5 mb-0.5">
+    <div className="flex-1 h-px bg-destructive" />
+    <span className="text-[11px] font-bold text-destructive leading-none">NEW</span>
+  </div>
+);
+
 const MessageList = ({
   messages,
   pendingMessages,
@@ -12,6 +19,7 @@ const MessageList = ({
   isLoading,
   hasMore,
   loadingMore,
+  newMessagesSeparatorId,
 }) => {
   if (isLoading) {
     return <CircleNotch size={32} className="mx-auto animate-spin text-gray-500" />;
@@ -32,6 +40,9 @@ const MessageList = ({
       {messages?.map((message, index) => {
         const prevMessage = messages[index - 1] || null;
         const isHighlighted = highlightId === message.id;
+        const showNewSeparator = newMessagesSeparatorId &&
+          message.id.localeCompare(newMessagesSeparatorId) > 0 &&
+          (!prevMessage || prevMessage.id.localeCompare(newMessagesSeparatorId) <= 0);
         return (
           <div
             key={message.id}
@@ -41,6 +52,7 @@ const MessageList = ({
               isHighlighted && 'animate-message-highlight'
             )}
           >
+            {showNewSeparator && <NewMessagesSeparator />}
             <ChannelMessage
               message={message}
               prevMessage={prevMessage}
