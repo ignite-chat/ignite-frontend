@@ -1,5 +1,5 @@
 import { GuildContextProvider } from '@/ignite/contexts/GuildContext';
-import GuildsSidebar from '@/ignite/components/GuildsSidebar';
+import GuildsSidebar from '@/components/GuildsSidebar';
 import UserBar from '@/ignite/components/UserBar';
 
 const DefaultLayout = ({ children, sidebar }) => {

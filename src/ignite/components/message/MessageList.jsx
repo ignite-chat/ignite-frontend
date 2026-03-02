@@ -9,6 +9,21 @@ const NewMessagesSeparator = () => (
   </div>
 );
 
+const DateSeparator = ({ timestamp }) => {
+  const label = new Date(timestamp).toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  return (
+    <div className="my-2 flex items-center gap-2 px-4">
+      <div className="h-px flex-1 bg-white/10" />
+      <span className="text-[11px] font-semibold text-gray-400">{label}</span>
+      <div className="h-px flex-1 bg-white/10" />
+    </div>
+  );
+};
+
 const MessageList = ({
   messages,
   pendingMessages,
@@ -43,6 +58,10 @@ const MessageList = ({
         const showNewSeparator = newMessagesSeparatorId &&
           message.id.localeCompare(newMessagesSeparatorId) > 0 &&
           (!prevMessage || prevMessage.id.localeCompare(newMessagesSeparatorId) <= 0);
+
+        const showDateSeparator = prevMessage &&
+          new Date(message.created_at).toDateString() !== new Date(prevMessage.created_at).toDateString();
+
         return (
           <div
             key={message.id}
@@ -52,6 +71,7 @@ const MessageList = ({
               isHighlighted && 'animate-message-highlight'
             )}
           >
+            {showDateSeparator && <DateSeparator timestamp={message.created_at} />}
             {showNewSeparator && <NewMessagesSeparator />}
             <ChannelMessage
               message={message}

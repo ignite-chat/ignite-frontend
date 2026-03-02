@@ -6,14 +6,15 @@ import GuildMemberContextMenu from '../guild-member/GuildMemberContextMenu.jsx';
 import GuildMemberPopoverContent from '../popovers/GuildMemberPopoverContent.jsx';
 import UserProfileModal from '@/ignite/components/modals/UserProfileModal.jsx';
 import { useModalStore } from '../../store/modal.store';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import Avatar from '../Avatar.jsx';
 import { useRolesStore } from '../../store/roles.store.ts';
 import { useGuildsStore } from '@/ignite/store/guilds.store.ts';
 import { useUsersStore } from '@/ignite/store/users.store.ts';
 import { GuildsService } from '@/ignite/services/guilds.service.ts';
-import { CircleNotch, CaretDown, CaretRight } from '@phosphor-icons/react';
+import { CircleNotch, CaretDown, CaretRight, Crown } from '@phosphor-icons/react';
 
-const MemberListItem = ({ member, guildId, popoverOpen, setPopoverOpen }) => {
+const MemberListItem = ({ member, guildId, isOwner, popoverOpen, setPopoverOpen }) => {
   const userFromStore = useUsersStore((state) => state.users[member.user.id]);
   const status = userFromStore?.status ?? member.user.status;
 
@@ -41,12 +42,22 @@ const MemberListItem = ({ member, guildId, popoverOpen, setPopoverOpen }) => {
               <div className="shrink-0">
                 <Avatar user={member.user} size={32} showStatus />
               </div>
-              <p
-                className="min-w-0 flex-1 truncate text-sm font-medium"
-                style={{ color: topColor }}
-              >
-                {member.user.name ?? member.user.username}
-              </p>
+              <div className="flex min-w-0 flex-1 items-center gap-1">
+                <p
+                  className="truncate text-sm font-medium"
+                  style={{ color: topColor }}
+                >
+                  {member.user.name ?? member.user.username}
+                </p>
+                {isOwner && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Crown size={16} weight="fill" className="shrink-0 text-yellow-500" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Server Owner</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
             </div>
           </ContextMenuTrigger>
         </PopoverTrigger>
@@ -142,7 +153,7 @@ const MemberList = ({ guildId }) => {
 
     setMembersByRole(tempMembersByRole);
     setMembersWithoutRoles(tempMembersWithoutRoles);
-    setOfflineMembers((activeGuild?.member_count ?? 0) < 200 ? tempOfflineMembers : []);
+    setOfflineMembers((activeGuild?.member_count ?? 0) < 500 ? tempOfflineMembers : []);
 
     // Auto-collapse groups with more than 100 members
     const autoCollapsed = {};
@@ -185,7 +196,7 @@ const MemberList = ({ guildId }) => {
                       </div>
                       {!collapsedRoles[role.id] &&
                         membersByRole[role.id].map((member) => (
-                          <MemberListItem key={member.user.id} member={member} guildId={guildId} popoverOpen={openPopoverUserId === member.user.id} setPopoverOpen={makePopoverHandler(member.user.id)} />
+                          <MemberListItem key={member.user.id} member={member} guildId={guildId} isOwner={member.user.id === activeGuild?.owner_id} popoverOpen={openPopoverUserId === member.user.id} setPopoverOpen={makePopoverHandler(member.user.id)} />
                         ))}
                     </div>
                   ) : null
@@ -205,7 +216,7 @@ const MemberList = ({ guildId }) => {
                     </div>
                     {!collapsedRoles['no-role'] &&
                       membersWithoutRoles.map((member) => (
-                        <MemberListItem key={member.user.id} member={member} guildId={guildId} popoverOpen={openPopoverUserId === member.user.id} setPopoverOpen={makePopoverHandler(member.user.id)} />
+                        <MemberListItem key={member.user.id} member={member} guildId={guildId} isOwner={member.user.id === activeGuild?.owner_id} popoverOpen={openPopoverUserId === member.user.id} setPopoverOpen={makePopoverHandler(member.user.id)} />
                       ))}
                   </div>
                 )}
@@ -224,7 +235,7 @@ const MemberList = ({ guildId }) => {
                     </div>
                     {!collapsedRoles['offline'] &&
                       offlineMembers.map((member) => (
-                        <MemberListItem key={member.user.id} member={member} guildId={guildId} popoverOpen={openPopoverUserId === member.user.id} setPopoverOpen={makePopoverHandler(member.user.id)} />
+                        <MemberListItem key={member.user.id} member={member} guildId={guildId} isOwner={member.user.id === activeGuild?.owner_id} popoverOpen={openPopoverUserId === member.user.id} setPopoverOpen={makePopoverHandler(member.user.id)} />
                       ))}
                   </div>
                 )}

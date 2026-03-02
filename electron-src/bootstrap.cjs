@@ -68,6 +68,15 @@ const startCore = () => {
   const isDev = !app.isPackaged;
   mainWindow.loadURL(isDev ? "http://localhost:5173" : "https://app.ignite-chat.com");
 
+  // Rewrite Origin header for Discord remote auth gateway (requires https://discord.com)
+  mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
+    { urls: ['wss://remote-auth-gateway.discord.gg/*'] },
+    (details, callback) => {
+      details.requestHeaders['Origin'] = 'https://discord.com';
+      callback({ requestHeaders: details.requestHeaders });
+    }
+  );
+
   if (isDev) {
   //  mainWindow.webContents.openDevTools();
   }

@@ -12,24 +12,24 @@ import {
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
-import { useGuildsStore } from '../store/guilds.store';
-import GuildModal from '@/components/modals/GuildModal';
-import { useUnreadsStore } from '../store/unreads.store';
-import { useChannelsStore } from '../store/channels.store';
-import { useUsersStore } from '../store/users.store';
-import Avatar from '../components/Avatar';
-import { useFriendsStore } from '../store/friends.store';
-import { ChannelsService } from '../services/channels.service';
-import { GuildsService } from '../services/guilds.service';
-import { useGuildOrder } from '../hooks/useGuildOrder';
+import { useGuildsStore } from '@/ignite/store/guilds.store';
+import GuildModal from '@/ignite/components/modals/GuildModal';
+import { useUnreadsStore } from '@/ignite/store/unreads.store';
+import { useChannelsStore } from '@/ignite/store/channels.store';
+import { useUsersStore } from '@/ignite/store/users.store';
+import Avatar from '@/ignite/components/Avatar';
+import { useFriendsStore } from '@/ignite/store/friends.store';
+import { ChannelsService } from '@/ignite/services/channels.service';
+import { GuildsService } from '@/ignite/services/guilds.service';
+import { useGuildOrder } from '@/ignite/hooks/useGuildOrder';
 import {
   isChannelUnread as checkChannelUnread,
   getChannelMentionCount as getChannelMentions,
-} from '../utils/unreads.utils';
+} from '@/ignite/utils/unreads.utils';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
-import GuildContextMenu from '../components/guild/GuildContextMenu';
-import InviteModal from '@/components/modals/InviteModal';
-import { useModalStore } from '../store/modal.store';
+import GuildContextMenu from '@/ignite/components/guild/GuildContextMenu';
+import InviteModal from '@/ignite/components/modals/InviteModal';
+import { useModalStore } from '@/ignite/store/modal.store';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,23 +40,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import ConnectDiscordDialog from '../discord/components/ConnectDiscordDialog';
 import { useDiscordStore } from '../discord/store/discord.store';
 import { useDiscordGuildsStore } from '../discord/store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../discord/store/discord-channels.store';
 import { useDiscordReadStatesStore } from '../discord/store/discord-readstates.store';
 import { DiscordService } from '../discord/services/discord.service';
 import { useLastChannelStore } from '@/store/last-channel.store';
-import { ChannelType } from '@/constants/ChannelType';
+import { ChannelType } from '@/ignite/constants/ChannelType';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
@@ -242,7 +234,6 @@ const GuildsSidebar = () => {
   const [activeId, setActiveId] = useState(null);
   const [leaveGuild, setLeaveGuild] = useState(null);
   const [isDiscordDialogOpen, setIsDiscordDialogOpen] = useState(false);
-  const [discordTokenInput, setDiscordTokenInput] = useState('');
   const [isDiscordLogoutOpen, setIsDiscordLogoutOpen] = useState(false);
 
   // Discord state
@@ -508,50 +499,10 @@ const GuildsSidebar = () => {
         )}
       </div>
 
-      <Dialog
+      <ConnectDiscordDialog
         open={isDiscordDialogOpen}
-        onOpenChange={(open) => {
-          setIsDiscordDialogOpen(open);
-          if (!open) setDiscordTokenInput('');
-        }}
-      >
-        <DialogContent className="!max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Connect Discord</DialogTitle>
-            <DialogDescription>Enter your Discord token to connect your account.</DialogDescription>
-          </DialogHeader>
-          <Input
-            type="password"
-            name="ignite-discord-token"
-            autoComplete="off"
-            placeholder="Discord token"
-            value={discordTokenInput}
-            onChange={(e) => setDiscordTokenInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && discordTokenInput.trim()) {
-                useDiscordStore.getState().setToken(discordTokenInput.trim());
-                setDiscordTokenInput('');
-                setIsDiscordDialogOpen(false);
-              }
-            }}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDiscordDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!discordTokenInput.trim()}
-              onClick={() => {
-                useDiscordStore.getState().setToken(discordTokenInput.trim());
-                setDiscordTokenInput('');
-                setIsDiscordDialogOpen(false);
-              }}
-            >
-              Connect
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={setIsDiscordDialogOpen}
+      />
 
       <AlertDialog open={isDiscordLogoutOpen} onOpenChange={setIsDiscordLogoutOpen}>
         <AlertDialogContent>

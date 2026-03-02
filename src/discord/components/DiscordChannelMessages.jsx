@@ -35,6 +35,21 @@ const NewMessagesSeparator = () => (
   </div>
 );
 
+const DateSeparator = ({ timestamp }) => {
+  const label = new Date(timestamp).toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  return (
+    <div className="my-2 flex items-center gap-2 px-4">
+      <div className="h-px flex-1 bg-white/10" />
+      <span className="text-[11px] font-semibold text-gray-400">{label}</span>
+      <div className="h-px flex-1 bg-white/10" />
+    </div>
+  );
+};
+
 const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const channelId = channel.id;
   const guildId = channel.guild_id || null;
@@ -146,6 +161,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   // Ack the channel's last_message_id if scrolled to the bottom
   const ackIfAtBottom = useCallback(() => {
     if (!lastMessageId || lastAckedRef.current === lastMessageId) return;
+    return;
 
     // Debounce: clear any pending ack and schedule a new one
     if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
@@ -333,8 +349,15 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
               const showNewSeparator = unreadBarData &&
                 isAfterSeparator(msg.id) &&
                 (!prevMessage || !isAfterSeparator(prevMessage.id));
+
+              const msgTs = snowflakeToTimestamp(msg.id);
+              const prevTs = prevMessage ? snowflakeToTimestamp(prevMessage.id) : null;
+              const showDateSeparator = prevTs !== null &&
+                new Date(msgTs).toDateString() !== new Date(prevTs).toDateString();
+
               return (
                 <div key={msg.id}>
+                  {showDateSeparator && <DateSeparator timestamp={msgTs} />}
                   {showNewSeparator && <NewMessagesSeparator />}
                   <DiscordMessage
                     message={msg}

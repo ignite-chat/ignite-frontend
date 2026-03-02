@@ -325,7 +325,7 @@ export const ChannelsService = {
     // If we authored this message or are viewing this channel, mark as read immediately
     const currentUser = useUsersStore.getState().getCurrentUser();
     const { activeChannelId } = useNotificationStore.getState();
-    if (event.message.author.id === currentUser?.id || activeChannelId === channelId) {
+    if (event.message.author.id === currentUser?.id /*|| activeChannelId === channelId*/) {
       UnreadsService.setLastReadMessageId(channelId, event.message.id);
     }
 
