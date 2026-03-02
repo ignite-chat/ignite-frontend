@@ -30,7 +30,7 @@ const FriendsDashboard = () => {
   }, [friends, searchQuery]);
 
   return (
-    <div className="flex h-full flex-col bg-[#1a1a1e] select-none">
+    <div className="flex h-full flex-col select-none">
       {/* Header */}
       <header className="flex h-12 items-center justify-between border-b border-white/5 px-4 shadow-sm">
         <div className="flex items-center gap-4">

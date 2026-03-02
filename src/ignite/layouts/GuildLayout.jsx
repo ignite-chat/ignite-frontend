@@ -95,7 +95,7 @@ const GuildLayout = ({ children, guild }) => {
 
   return (
     <DefaultLayout sidebar={guildSidebar}>
-      <main className="relative flex h-full min-w-0 flex-1 flex-col bg-gray-700">{children}</main>
+      <main className="relative flex h-full min-w-0 flex-1 flex-col bg-[#1a1a1e]">{children}</main>
       <ServerSettings
         isOpen={isServerSettingsOpen}
         onClose={() => setIsServerSettingsOpen(false)}

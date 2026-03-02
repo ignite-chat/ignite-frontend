@@ -48,7 +48,7 @@ const Channel = ({ channel, messageId }) => {
 
   if (channel?.type === ChannelType.GUILD_VOICE) {
     return (
-      <div className="relative flex min-h-0 w-full flex-1 flex-col bg-[#1a1a1e]">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col">
         {channel?.type !== ChannelType.GUILD_VOICE && (
           <>
             <ChannelBar channel={channel} />
@@ -62,7 +62,7 @@ const Channel = ({ channel, messageId }) => {
 
   return (
     <div
-      className="relative flex min-h-0 w-full flex-1 flex-col bg-[#1a1a1e]"
+      className="relative flex min-h-0 w-full flex-1 flex-col"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

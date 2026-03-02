@@ -188,40 +188,6 @@ const DiscordGuildIcon = ({ guild, isActive }) => {
   );
 };
 
-const DiscordDMsIcon = ({ isActive }) => {
-  const channels = useDiscordChannelsStore((s) => s.channels);
-  const readStates = useDiscordReadStatesStore((s) => s.readStates);
-
-  const { unread, mentions } = useMemo(() => {
-    const dmChannels = channels.filter((c) => c.type === 1 || c.type === 3);
-    let hasUnread = false;
-    let totalMentions = 0;
-    for (const ch of dmChannels) {
-      if (ch.last_message_id) {
-        const entry = readStates[ch.id];
-        if (!entry?.last_message_id || ch.last_message_id > entry.last_message_id) {
-          hasUnread = true;
-        }
-      }
-      totalMentions += readStates[ch.id]?.mention_count ?? 0;
-    }
-    return { unread: hasUnread, mentions: totalMentions };
-  }, [channels, readStates]);
-
-  return (
-    <Link to="/discord/@me">
-      <SidebarIcon
-        icon={<DiscordLogo className="size-6" />}
-        text="Discord DMs"
-        isServerIcon={true}
-        isActive={isActive}
-        isUnread={unread}
-        mentionCount={mentions}
-      />
-    </Link>
-  );
-};
-
 const GuildsSidebar = () => {
   const { guildId, channelId } = useParams();
   const navigate = useNavigate();
@@ -392,12 +358,7 @@ const GuildsSidebar = () => {
           </Link>
         ))}
 
-        {/* Discord DMs icon — shown below unread Ignite DMs */}
-        {discordToken && discordConnected && (
-          <DiscordDMsIcon isActive={location.pathname.startsWith('/discord/@me')} />
-        )}
-
-        {(unreadDmChannels.length > 0 || (discordToken && discordConnected)) && (
+        {unreadDmChannels.length > 0 && (
           <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
         )}
 

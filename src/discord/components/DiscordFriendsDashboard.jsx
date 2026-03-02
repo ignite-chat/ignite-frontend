@@ -46,7 +46,7 @@ const FriendRow = ({ user }) => {
       (c) => c.type === 1 && c.recipient_ids?.includes(user.id)
     );
     if (existingChannel) {
-      navigate(`/discord/@me/${existingChannel.id}`);
+      navigate(`/channels/@me/${existingChannel.id}`);
     }
   };
 

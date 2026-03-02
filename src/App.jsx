@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from './ignite/store/auth.store';
 import PageTitle from './ignite/components/PageTitle';
 import LoginPage from './ignite/pages/Login';
@@ -9,7 +9,6 @@ import GuildChannelPage from './ignite/pages/GuildChannel';
 import InvitePage from './ignite/pages/InvitePage';
 import GuildDiscoveryPage from './ignite/pages/GuildDiscovery';
 import DiscordGuildPage from './discord/pages/DiscordGuildPage';
-import DiscordDMPage from './discord/pages/DiscordDMPage';
 import { InitializationService } from './ignite/services/initialization.service';
 import { EchoService } from './ignite/services/echo.service';
 import { useGuildsStore } from './ignite/store/guilds.store';
@@ -137,6 +136,11 @@ const PublicRoute = ({ children }) => {
   return children ? children : <Outlet />;
 };
 
+const DiscordDMRedirect = () => {
+  const { channelId } = useParams();
+  return <Navigate to={channelId ? `/channels/@me/${channelId}` : '/channels/@me'} replace />;
+};
+
 function App() {
   const { userId } = useAuthStore();
   const { pathname } = useLocation();
@@ -228,12 +232,7 @@ function App() {
           />
           <Route
             path="/discord/@me/:channelId?"
-            element={
-              <>
-                <PageTitle title="Discord DMs" />
-                <DiscordDMPage />
-              </>
-            }
+            element={<DiscordDMRedirect />}
           />
           <Route
             path="/discord/:guildId/:channelId?"
