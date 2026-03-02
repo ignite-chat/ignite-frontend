@@ -15,7 +15,7 @@ import { X, Hash, Megaphone, SpeakerHigh, Keyboard, Smiley, Sticker as StickerIc
 import { useGuildsStore } from '@/ignite/store/guilds.store';
 import { useGuildContext } from '../../../contexts/GuildContext';
 import { ChannelType } from '../../../constants/ChannelType';
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Clock,
@@ -72,15 +72,13 @@ const MAX_MESSAGE_LENGTH = 2000;
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 const ChannelInput = ({ channel }) => {
-  const { inputMessage, setInputMessage } = useChannelInputContext();
+  const { inputMessage, setInputMessage, addFilesRef } = useChannelInputContext();
   const { replyingId, setReplyingId, setEditingId } = useChannelContext();
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
   const menuContainerRef = useRef(null);
-  const dragCounterRef = useRef(0);
 
   const [stagedFiles, setStagedFiles] = useState([]);
-  const [isDragging, setIsDragging] = useState(false);
 
   const { guildId } = useGuildContext();
   const guildsStore = useGuildsStore();
@@ -167,35 +165,9 @@ const ChannelInput = ({ channel }) => {
     setStagedFiles((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const handleDragEnter = useCallback((e) => {
-    e.preventDefault();
-    dragCounterRef.current++;
-    if (e.dataTransfer.types.includes('Files')) {
-      setIsDragging(true);
-    }
-  }, []);
-
-  const handleDragOver = useCallback((e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-  }, []);
-
-  const handleDragLeave = useCallback((e) => {
-    e.preventDefault();
-    dragCounterRef.current--;
-    if (dragCounterRef.current === 0) {
-      setIsDragging(false);
-    }
-  }, []);
-
-  const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    dragCounterRef.current = 0;
-    setIsDragging(false);
-    if (e.dataTransfer.files?.length) {
-      addFiles(e.dataTransfer.files);
-    }
-  }, [addFiles]);
+  useEffect(() => {
+    if (addFilesRef) addFilesRef.current = addFiles;
+  }, [addFilesRef, addFiles]);
 
   /* ---------------- emojis ---------------- */
   const { recentEmojis, addRecentEmoji } = useEmojisStore();
@@ -310,13 +282,7 @@ const ChannelInput = ({ channel }) => {
   /* ---------------- render ---------------- */
 
   return (
-    <div
-      className={cn('bg-[#1a1a1e] p-2', isDragging && 'ring-2 ring-inset ring-primary/50')}
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
+    <div className="bg-[#1a1a1e] p-2">
       <div
         className={cn(
           'grid transition-all duration-200 ease-in-out',

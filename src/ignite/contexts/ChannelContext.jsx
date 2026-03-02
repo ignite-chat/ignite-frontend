@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useRef, useMemo } from 'react';
+import { createContext, useContext, useState, useRef, useMemo, useCallback } from 'react';
 
 export const ChannelContext = createContext();
 const ChannelInputContext = createContext();
@@ -6,14 +6,21 @@ const ChannelInputContext = createContext();
 const ChannelInputProvider = ({ children }) => {
   const [inputMessage, setInputMessage] = useState('');
   const inputRef = useRef(null);
+  const addFilesRef = useRef(null);
+
+  const addFiles = useCallback((files) => {
+    addFilesRef.current?.(files);
+  }, []);
 
   const value = useMemo(
     () => ({
       inputMessage,
       setInputMessage,
       inputRef,
+      addFilesRef,
+      addFiles,
     }),
-    [inputMessage]
+    [inputMessage, addFiles]
   );
 
   return <ChannelInputContext.Provider value={value}>{children}</ChannelInputContext.Provider>;
