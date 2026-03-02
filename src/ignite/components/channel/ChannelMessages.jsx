@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { Check } from '@phosphor-icons/react';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { useChannelContext } from '../../contexts/ChannelContext.jsx';
 import { useChannelsStore } from '../../store/channels.store';
@@ -11,6 +12,21 @@ import MessageList from '../message/MessageList';
 
 function getSnowflakeTimestamp(id) {
   return BigInt(id) >> 22n;
+}
+
+function formatSinceTime(dateStr) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+  const isToday = date.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  if (isToday) return `today at ${time}`;
+  if (isYesterday) return `yesterday at ${time}`;
+  return `${date.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} at ${time}`;
 }
 
 const ChannelMessages = ({ channel, messageId }) => {
@@ -26,6 +42,7 @@ const ChannelMessages = ({ channel, messageId }) => {
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [newMessagesSeparatorId, setNewMessagesSeparatorId] = useState(null);
+  const [unreadBannerDismissed, setUnreadBannerDismissed] = useState(false);
 
   const messagesRef = useRef();
   const contentRef = useRef();
@@ -48,19 +65,8 @@ const ChannelMessages = ({ channel, messageId }) => {
 
     setLoadingMore(true);
 
-    const el = messagesRef.current;
-    const prevScrollHeight = el?.scrollHeight || 0;
-
     const data = await ChannelsService.loadChannelMessages(channel?.channel_id, oldestMessage.id);
     setHasMore(data.length >= 50);
-
-    // Preserve scroll position so the view doesn't jump
-    requestAnimationFrame(() => {
-      if (el) {
-        el.scrollTop = el.scrollHeight - prevScrollHeight;
-      }
-    });
-
     setLoadingMore(false);
   }, [messages, loadingMore, hasMore, channel?.channel_id]);
 
@@ -240,15 +246,23 @@ const ChannelMessages = ({ channel, messageId }) => {
     }
   }, [channel?.channel_id, hasMore, loadingMore, onLoadMore]);
 
-  // Auto-scroll when content resizes (embed/image loads) and user was near bottom
+  // Auto-scroll when content resizes (embed/image loads) and user was near bottom,
+  // or preserve scroll position when content above the viewport expands
   useEffect(() => {
     const content = contentRef.current;
     const scrollEl = messagesRef.current;
     if (!content || !scrollEl) return;
 
+    let prevScrollHeight = scrollEl.scrollHeight;
     const observer = new ResizeObserver(() => {
+      const newScrollHeight = scrollEl.scrollHeight;
+      const delta = newScrollHeight - prevScrollHeight;
+      prevScrollHeight = newScrollHeight;
+
       if (wasNearBottomRef.current) {
-        scrollEl.scrollTop = scrollEl.scrollHeight;
+        scrollEl.scrollTop = newScrollHeight;
+      } else if (delta > 0) {
+        scrollEl.scrollTop += delta;
       }
     });
 

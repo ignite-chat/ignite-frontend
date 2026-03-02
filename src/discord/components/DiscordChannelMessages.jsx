@@ -2,12 +2,31 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { useDiscordStore } from '../store/discord.store';
+import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordHasPermission } from '../hooks/useDiscordPermission';
 import { MANAGE_MESSAGES, KICK_MEMBERS, BAN_MEMBERS } from '../constants/permissions';
 import { scrollPositions } from '@/store/last-channel.store';
 import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
+import { Check } from '@phosphor-icons/react';
 import DiscordMessage from './DiscordMessage';
+
+const DISCORD_EPOCH = 1420070400000;
+const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
+
+function formatSinceTime(date) {
+  const now = new Date();
+  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+  const isToday = date.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  if (isToday) return `today at ${time}`;
+  if (isYesterday) return `yesterday at ${time}`;
+  return `${date.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} at ${time}`;
+}
 
 const NewMessagesSeparator = () => (
   <div className="flex items-center gap-1 pl-4 pr-3.5 mt-1.5 mb-0.5">
@@ -39,6 +58,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const ackTimerRef = useRef(null);
   const lastAckedRef = useRef(null);
   const wasNearBottomRef = useRef(true);
+  const unreadCountRef = useRef(0);
 
   const channelPendingMessages = useDiscordChannelsStore((s) => s.channelPendingMessages);
 
@@ -56,6 +76,72 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     () => channels.find((c) => c.id === channelId)?.last_message_id,
     [channels, channelId]
   );
+
+  const readStateLastMessageId = useDiscordReadStatesStore(
+    (s) => s.readStates[channelId]?.last_message_id
+  );
+
+  const guilds = useDiscordGuildsStore((s) => s.guilds);
+  const guildMembers = useDiscordGuildsStore((s) => s.guildMembers);
+  const joinedAtMs = useMemo(() => {
+    if (!guildId) return null;
+    const guild = guilds.find((g) => g.id === guildId);
+    const members = guildMembers[guildId] || [];
+    const myMember = members.find((m) => m.user?.id === currentUser?.id || m.user_id === currentUser?.id);
+    const raw = guild?.joined_at || myMember?.joined_at;
+    return raw ? new Date(raw).getTime() : null;
+  }, [guildId, guilds, guildMembers, currentUser?.id]);
+
+  const unreadBarData = useMemo(() => {
+    if (messages.length === 0) return null;
+
+    const oldestLoadedId = messages[0].id;
+    if (!readStateLastMessageId) {
+      // No read state — use join date as the "last read" point
+      if (!joinedAtMs) return null;
+
+      const unreadCount = messages.filter(
+        (m) => snowflakeToTimestamp(m.id) > joinedAtMs
+      ).length;
+      if (unreadCount === 0) return null;
+
+      return {
+        count: unreadCount,
+        isExact: !hasMore || snowflakeToTimestamp(oldestLoadedId) <= joinedAtMs,
+        sinceText: formatSinceTime(new Date(joinedAtMs)),
+      };
+    }
+
+    const unreadCount = messages.filter((m) => m.id > readStateLastMessageId).length;
+    if (unreadCount === 0) return null;
+
+    const isExact = !hasMore || oldestLoadedId <= readStateLastMessageId;
+
+    const sinceText = formatSinceTime(new Date(snowflakeToTimestamp(readStateLastMessageId)));
+
+    return { count: unreadCount, isExact, sinceText };
+  }, [messages, readStateLastMessageId, hasMore, joinedAtMs]);
+
+  // Separator check: use read state ID when available, fall back to join date
+  const isAfterSeparator = useCallback(
+    (msgId) => {
+      if (newMessagesSeparatorId) return msgId > newMessagesSeparatorId;
+      if (!readStateLastMessageId && joinedAtMs) {
+        return snowflakeToTimestamp(msgId) > joinedAtMs;
+      }
+      return false;
+    },
+    [newMessagesSeparatorId, readStateLastMessageId, joinedAtMs]
+  );
+
+  unreadCountRef.current = unreadBarData?.count ?? 0;
+
+  const handleMarkAsRead = useCallback(() => {
+    if (!lastMessageId) return;
+    useDiscordReadStatesStore.getState().ackChannel(channelId, lastMessageId);
+    DiscordApiService.ackMessage(channelId, lastMessageId).catch(() => {});
+    setNewMessagesSeparatorId(null);
+  }, [channelId, lastMessageId]);
 
   // Ack the channel's last_message_id if scrolled to the bottom
   const ackIfAtBottom = useCallback(() => {
@@ -209,6 +295,22 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" ref={messagesRef} onScroll={onScroll}>
       <div ref={contentRef}>
+        {unreadBarData && (
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-destructive/30 bg-destructive/10 px-4 py-1.5 text-sm backdrop-blur-sm">
+            <span className="font-medium text-destructive">
+              {unreadBarData.count}{!unreadBarData.isExact && '+'} new message{unreadBarData.count !== 1 ? 's' : ''} since {unreadBarData.sinceText}
+            </span>
+            <button
+              type="button"
+              onClick={handleMarkAsRead}
+              className="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20"
+            >
+              Mark as Read
+              <Check size={14} weight="bold" />
+            </button>
+          </div>
+        )}
+
         {loadingMore && (
           <div className="flex justify-center py-3">
             <div className="size-6 animate-spin rounded-full border-2 border-solid border-primary border-t-transparent" />
@@ -228,9 +330,9 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
             )}
             {messages.map((msg, i) => {
               const prevMessage = i > 0 ? messages[i - 1] : null;
-              const showNewSeparator = newMessagesSeparatorId &&
-                msg.id > newMessagesSeparatorId &&
-                (!prevMessage || prevMessage.id <= newMessagesSeparatorId);
+              const showNewSeparator = unreadBarData &&
+                isAfterSeparator(msg.id) &&
+                (!prevMessage || !isAfterSeparator(prevMessage.id));
               return (
                 <div key={msg.id}>
                   {showNewSeparator && <NewMessagesSeparator />}
