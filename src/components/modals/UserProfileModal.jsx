@@ -19,14 +19,14 @@ import {
   X,
 } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
-import { useFriendsStore } from '@/store/friends.store';
-import { useUsersStore } from '@/store/users.store';
+import { useFriendsStore } from '@/ignite/store/friends.store';
+import { useUsersStore } from '@/ignite/store/users.store';
 import { FriendsService } from '@/services/friends.service';
 import { UsersService } from '@/services/users.service';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { useGuildsStore } from '@/store/guilds.store';
-import { useModalStore } from '@/store/modal.store';
+import { useGuildsStore } from '@/ignite/store/guilds.store';
+import { useModalStore } from '@/ignite/store/modal.store';
 import { ChannelsService } from '@/services/channels.service';
 import { useNavigate } from 'react-router-dom';
 

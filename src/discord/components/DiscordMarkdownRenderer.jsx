@@ -3,9 +3,9 @@ import { getTwemojiUrl } from '@/utils/emoji.utils';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
-import ExternalLink from '@/components/Message/components/ExternalLink';
-import SpoilerText from '@/components/Message/markdown/SpoilerText';
-import TimestampDisplay from '@/components/Message/markdown/TimestampDisplay';
+import ExternalLink from '@/components/message/components/ExternalLink';
+import SpoilerText from '@/components/message/markdown/SpoilerText';
+import TimestampDisplay from '@/components/message/markdown/TimestampDisplay';
 import { Info, Lightbulb, AlertTriangle, AlertOctagon, Flame } from 'lucide-react';
 
 const DISCORD_EMOJI_CDN = 'https://cdn.discordapp.com/emojis';

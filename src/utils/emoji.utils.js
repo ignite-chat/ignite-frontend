@@ -1,4 +1,4 @@
-import emojisData from '../assets/emojis/emojis.json';
+import emojisData from '@/assets/emojis/emojis.json';
 
 // Import all local SVG files as URLs at build time
 const svgModules = import.meta.glob('../assets/emojis/svg/*.svg', { eager: true, query: '?url', import: 'default' });

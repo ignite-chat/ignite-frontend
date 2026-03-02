@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Avatar from '@/components/Avatar';
-import { useChannelsStore } from '@/store/channels.store';
+import { useChannelsStore } from '@/ignite/store/channels.store';
 import {
   ContextMenu,
   ContextMenuContent,

@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import DefaultLayout from './DefaultLayout';
-import ServerSettings from '../components/Settings/ServerSettings';
+import ServerSettings from '../components/settings/ServerSettings';
 import EditGuildChannelModal from '../components/modals/EditGuildChannelModal';
-import { useChannelsStore } from '@/store/channels.store';
-import GuildChannelsSidebar from '@/components/Guild/GuildChannelsSidebar';
+import { useChannelsStore } from '@/ignite/store/channels.store';
+import GuildChannelsSidebar from '@/components/guild/GuildChannelsSidebar';
 import CreateGuildChannelModal from '@/components/modals/CreateGuildChannelModal';
 import CreateGuildCategoryModal from '@/components/modals/CreateGuildCategoryModal';
 import { Permissions } from '@/constants/Permissions';
 import { useHasPermission } from '@/hooks/useHasPermission';
-import { useModalStore } from '@/store/modal.store';
+import { useModalStore } from '@/ignite/store/modal.store';
 
 const GuildLayout = ({ children, guild }) => {
   const [isServerSettingsOpen, setIsServerSettingsOpen] = useState(false);

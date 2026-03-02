@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { At, Hash } from '@phosphor-icons/react';
 import { useDiscordStore } from '../store/discord.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
@@ -32,6 +32,9 @@ const DiscordChannel = ({ channel }) => {
       icon: DiscordService.getUserAvatarUrl(other.id, other.avatar, 32),
     };
   }, [channel, currentUser?.id, isDM, usersMap]);
+
+  const [messageSentCount, setMessageSentCount] = useState(0);
+  const onMessageSent = useCallback(() => setMessageSentCount((c) => c + 1), []);
 
   if (!channel) return null;
 
@@ -67,10 +70,10 @@ const DiscordChannel = ({ channel }) => {
       </div>
 
       {/* Messages */}
-      <DiscordChannelMessages channel={channel} />
+      <DiscordChannelMessages channel={channel} messageSentCount={messageSentCount} />
 
       {/* Input */}
-      <DiscordChannelInput channel={channel} channelName={placeholderName} />
+      <DiscordChannelInput channel={channel} channelName={placeholderName} onMessageSent={onMessageSent} />
     </div>
   );
 };

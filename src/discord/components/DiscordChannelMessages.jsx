@@ -9,7 +9,14 @@ import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
 import DiscordMessage from './DiscordMessage';
 
-const DiscordChannelMessages = ({ channel }) => {
+const NewMessagesSeparator = () => (
+  <div className="flex items-center gap-1 pl-4 pr-3.5 mt-1.5 mb-0.5">
+    <div className="flex-1 h-px bg-destructive" />
+    <span className="text-[11px] font-bold text-destructive leading-none">NEW</span>
+  </div>
+);
+
+const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const channelId = channel.id;
   const guildId = channel.guild_id || null;
   const currentUser = useDiscordStore((s) => s.user);
@@ -25,6 +32,7 @@ const DiscordChannelMessages = ({ channel }) => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [forceScrollDown, setForceScrollDown] = useState(false);
+  const [newMessagesSeparatorId, setNewMessagesSeparatorId] = useState(null);
 
   const messagesRef = useRef();
   const contentRef = useRef();
@@ -32,9 +40,16 @@ const DiscordChannelMessages = ({ channel }) => {
   const lastAckedRef = useRef(null);
   const wasNearBottomRef = useRef(true);
 
+  const channelPendingMessages = useDiscordChannelsStore((s) => s.channelPendingMessages);
+
   const messages = useMemo(
     () => channelMessages[channelId] || [],
     [channelMessages, channelId]
+  );
+
+  const pendingMessages = useMemo(
+    () => channelPendingMessages[channelId] || [],
+    [channelPendingMessages, channelId]
   );
 
   const lastMessageId = useMemo(
@@ -61,6 +76,24 @@ const DiscordChannelMessages = ({ channel }) => {
     return () => {
       if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
     };
+  }, [channelId]);
+
+  // Snapshot read state on channel switch to position the "NEW" separator
+  useEffect(() => {
+    if (!channelId) {
+      setNewMessagesSeparatorId(null);
+      return;
+    }
+    const entry = useDiscordReadStatesStore.getState().readStates[channelId];
+    if (
+      entry?.last_message_id &&
+      lastMessageId &&
+      lastMessageId > entry.last_message_id
+    ) {
+      setNewMessagesSeparatorId(entry.last_message_id);
+    } else {
+      setNewMessagesSeparatorId(null);
+    }
   }, [channelId]);
 
   // Load initial messages or restore scroll position
@@ -103,6 +136,13 @@ const DiscordChannelMessages = ({ channel }) => {
     setLoadingMore(false);
   }, [messages, loadingMore, hasMore, channelId]);
 
+  // Clear "NEW" separator when the current user sends a message
+  useEffect(() => {
+    if (messageSentCount > 0) {
+      setNewMessagesSeparatorId(null);
+    }
+  }, [messageSentCount]);
+
   // Auto-scroll on new messages when near bottom
   useEffect(() => {
     if (!messagesRef.current) return;
@@ -114,6 +154,12 @@ const DiscordChannelMessages = ({ channel }) => {
       ackIfAtBottom();
     }
   }, [messages, forceScrollDown, ackIfAtBottom]);
+
+  // Always scroll to bottom when pending messages appear (user just sent a message)
+  useEffect(() => {
+    if (!messagesRef.current || !pendingMessages.length) return;
+    messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+  }, [pendingMessages]);
 
   // Handle scroll position and auto-load more
   const onScroll = useCallback(() => {
@@ -180,18 +226,41 @@ const DiscordChannelMessages = ({ channel }) => {
                 This is the beginning of the channel.
               </div>
             )}
-            {messages.map((msg, i) => (
-              <DiscordMessage
-                key={msg.id}
-                message={msg}
-                prevMessage={i > 0 ? messages[i - 1] : null}
-                currentUserId={currentUser?.id}
-                guildId={guildId}
-                hasManageMessages={hasManageMessages}
-                hasKickMembers={hasKickMembers}
-                hasBanMembers={hasBanMembers}
-              />
-            ))}
+            {messages.map((msg, i) => {
+              const prevMessage = i > 0 ? messages[i - 1] : null;
+              const showNewSeparator = newMessagesSeparatorId &&
+                msg.id > newMessagesSeparatorId &&
+                (!prevMessage || prevMessage.id <= newMessagesSeparatorId);
+              return (
+                <div key={msg.id}>
+                  {showNewSeparator && <NewMessagesSeparator />}
+                  <DiscordMessage
+                    message={msg}
+                    prevMessage={prevMessage}
+                    currentUserId={currentUser?.id}
+                    guildId={guildId}
+                    hasManageMessages={hasManageMessages}
+                    hasKickMembers={hasKickMembers}
+                    hasBanMembers={hasBanMembers}
+                  />
+                </div>
+              );
+            })}
+            {pendingMessages.map((msg, i) => {
+              const prevMessage = i === 0
+                ? messages[messages.length - 1] || null
+                : pendingMessages[i - 1];
+              return (
+                <DiscordMessage
+                  key={msg.nonce}
+                  message={msg}
+                  prevMessage={prevMessage}
+                  currentUserId={currentUser?.id}
+                  guildId={guildId}
+                  pending
+                />
+              );
+            })}
           </div>
         )}
       </div>

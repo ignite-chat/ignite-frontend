@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'sonner';
 import { useDiscordStore } from '../store/discord.store';
 
 const discordApi = axios.create({
@@ -12,6 +13,20 @@ discordApi.interceptors.request.use((config) => {
   }
   return config;
 });
+
+discordApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (!(error.config as any)?._silent) {
+      const status = error.response?.status;
+      const message = error.response?.data?.message || error.message || 'Request failed';
+      toast.error(`Discord API Error (${status || 'network'}): ${message}`, {
+        duration: Infinity,
+      });
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const DiscordApiService = {
   /**
@@ -43,8 +58,8 @@ export const DiscordApiService = {
   /**
    * Send a message to a channel.
    */
-  async sendMessage(channelId: string, content: string) {
-    const { data } = await discordApi.post(`/channels/${channelId}/messages`, { content });
+  async sendMessage(channelId: string, content: string, nonce?: string) {
+    const { data } = await discordApi.post(`/channels/${channelId}/messages`, { content, nonce });
     return data;
   },
 
@@ -130,7 +145,8 @@ export const DiscordApiService = {
   async ackMessage(channelId: string, messageId: string) {
     const { data } = await discordApi.post(
       `/channels/${channelId}/messages/${messageId}/ack`,
-      { token: null }
+      { token: null },
+      { _silent: true } as any
     );
     return data;
   },

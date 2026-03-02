@@ -2,13 +2,13 @@ import { useMemo, useCallback } from 'react';
 import { UserStarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '../ui/badge';
-import { useChannelsStore } from '@/store/channels.store';
-import { useUsersStore } from '@/store/users.store';
-import { useUnreadsStore } from '@/store/unreads.store';
-import { useFriendsStore } from '@/store/friends.store';
+import { useChannelsStore } from '@/ignite/store/channels.store';
+import { useUsersStore } from '@/ignite/store/users.store';
+import { useUnreadsStore } from '@/ignite/store/unreads.store';
+import { useFriendsStore } from '@/ignite/store/friends.store';
 import DMChannelItem from './DMChannelItem';
 import NewDMModal from '@/components/modals/NewDMModal';
-import { useModalStore } from '@/store/modal.store';
+import { useModalStore } from '@/ignite/store/modal.store';
 
 const sortByLastMessage = (a, b) => {
   if (!a.last_message_id) return 1;

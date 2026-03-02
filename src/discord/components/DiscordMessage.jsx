@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { DiscordService } from '../services/discord.service';
-import { parseMarkdown } from '@/components/Message/markdown/parser';
+import { parseMarkdown } from '@/components/message/markdown/parser';
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
 import DiscordUserPopoverContent from '@/discord/components/popovers/DiscordUserPopoverContent';
 import DiscordUserProfileModal from './DiscordUserProfileModal';
@@ -279,7 +279,7 @@ const DiscordReplyBar = ({ referencedMessage }) => {
   );
 };
 
-const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, hasManageMessages, hasKickMembers, hasBanMembers }) => {
+const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, pending }) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
 
@@ -313,7 +313,8 @@ const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, has
   const messageClasses = cn(
     'group relative block py-1 transition-all duration-200 hover:bg-gray-800/40',
     shouldStack ? '' : 'mt-3.5',
-    isMentioned && 'border-l-2 border-yellow-500/70 bg-yellow-500/5 hover:bg-yellow-500/10'
+    isMentioned && 'border-l-2 border-yellow-500/70 bg-yellow-500/5 hover:bg-yellow-500/10',
+    pending && 'opacity-50 pointer-events-none'
   );
 
   return (

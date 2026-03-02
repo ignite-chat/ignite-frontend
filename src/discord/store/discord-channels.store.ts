@@ -32,9 +32,18 @@ type DiscordChannel = {
   [key: string]: any;
 };
 
+type PendingMessage = {
+  nonce: string;
+  channel_id: string;
+  content: string;
+  author: DiscordMessage['author'];
+  timestamp: string;
+};
+
 type DiscordChannelsStore = {
   channels: DiscordChannel[];
   channelMessages: { [channelId: string]: DiscordMessage[] };
+  channelPendingMessages: { [channelId: string]: PendingMessage[] };
 
   setChannels: (channels: DiscordChannel[]) => void;
   addChannel: (channel: DiscordChannel) => void;
@@ -47,12 +56,16 @@ type DiscordChannelsStore = {
   updateMessage: (channelId: string, messageId: string, updates: Partial<DiscordMessage>) => void;
   removeMessage: (channelId: string, messageId: string) => void;
 
+  addPendingMessage: (channelId: string, pending: PendingMessage) => void;
+  removePendingByNonce: (channelId: string, nonce: string) => void;
+
   clear: () => void;
 };
 
 export const useDiscordChannelsStore = create<DiscordChannelsStore>((set) => ({
   channels: [],
   channelMessages: {},
+  channelPendingMessages: {},
 
   setChannels: (channels) => set({ channels }),
 
@@ -127,5 +140,25 @@ export const useDiscordChannelsStore = create<DiscordChannelsStore>((set) => ({
       };
     }),
 
-  clear: () => set({ channels: [], channelMessages: {} }),
+  addPendingMessage: (channelId, pending) =>
+    set((state) => ({
+      channelPendingMessages: {
+        ...state.channelPendingMessages,
+        [channelId]: [...(state.channelPendingMessages[channelId] || []), pending],
+      },
+    })),
+
+  removePendingByNonce: (channelId, nonce) =>
+    set((state) => {
+      const pending = state.channelPendingMessages[channelId];
+      if (!pending) return state;
+      return {
+        channelPendingMessages: {
+          ...state.channelPendingMessages,
+          [channelId]: pending.filter((p) => p.nonce !== nonce),
+        },
+      };
+    }),
+
+  clear: () => set({ channels: [], channelMessages: {}, channelPendingMessages: {} }),
 }));

@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useDiscordStore } from '../store/discord.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
@@ -89,7 +90,12 @@ export const DiscordGatewayService = {
       this._stopHeartbeat();
       useDiscordStore.getState().setConnected(false);
 
-      if (!this.intentionalClose && event.code !== 4004) {
+      if (event.code === 4004) {
+        toast.error('Discord authentication failed. Your token may be invalid.', { duration: Infinity });
+        return;
+      }
+
+      if (!this.intentionalClose) {
         this._reconnect(token);
       }
     };
@@ -423,6 +429,11 @@ export const DiscordGatewayService = {
   },
 
   _handleMessageCreate(data: any) {
+    // Remove matching pending message by nonce
+    if (data.nonce) {
+      useDiscordChannelsStore.getState().removePendingByNonce(data.channel_id, data.nonce);
+    }
+
     useDiscordChannelsStore.getState().appendMessage(data.channel_id, data);
 
     // Update last_message_id on the channel
@@ -518,6 +529,7 @@ export const DiscordGatewayService = {
   _reconnect(token: string) {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('[Discord Gateway] Max reconnect attempts reached');
+      toast.error('Discord gateway connection lost. Max reconnect attempts reached.', { duration: Infinity });
       return;
     }
 

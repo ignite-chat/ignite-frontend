@@ -3,7 +3,7 @@ import { DiscordService } from '../services/discord.service';
 import { useDiscordHasPermission } from '../hooks/useDiscordPermission';
 import { SEND_MESSAGES } from '../constants/permissions';
 
-const DiscordChannelInput = ({ channel, channelName }) => {
+const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   const [value, setValue] = useState('');
   const inputRef = useRef(null);
 
@@ -31,7 +31,8 @@ const DiscordChannelInput = ({ channel, channelName }) => {
 
     DiscordService.sendMessage(channelId, trimmed);
     setValue('');
-  }, [value, channelId]);
+    onMessageSent?.();
+  }, [value, channelId, onMessageSent]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

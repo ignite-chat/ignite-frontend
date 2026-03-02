@@ -26,8 +26,8 @@ import {
   isChannelUnread as checkChannelUnread,
   getChannelMentionCount as getChannelMentions,
 } from '../utils/unreads.utils';
-import { ContextMenu, ContextMenuTrigger } from '../components/ui/context-menu';
-import GuildContextMenu from '../components/Guild/GuildContextMenu';
+import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
+import GuildContextMenu from '../components/guild/GuildContextMenu';
 import InviteModal from '@/components/modals/InviteModal';
 import { useModalStore } from '../store/modal.store';
 import {
@@ -39,7 +39,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../components/ui/alert-dialog';
+} from '@/components/ui/alert-dialog';
 import {
   Dialog,
   DialogContent,
@@ -47,15 +47,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../components/ui/dialog';
-import { Input } from '../components/ui/input';
-import { Button } from '../components/ui/button';
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { useDiscordStore } from '../discord/store/discord.store';
 import { useDiscordGuildsStore } from '../discord/store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../discord/store/discord-channels.store';
 import { useDiscordReadStatesStore } from '../discord/store/discord-readstates.store';
 import { DiscordService } from '../discord/services/discord.service';
-import { useLastChannelStore } from '../store/last-channel.store';
+import { useLastChannelStore } from '@/store/last-channel.store';
 import { ChannelType } from '@/constants/ChannelType';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;

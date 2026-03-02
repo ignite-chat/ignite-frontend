@@ -1,20 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
-import { useAuthStore } from './store/auth.store';
-import PageTitle from './components/PageTitle';
-import LoginPage from './pages/Login';
-import RegisterPage from './pages/Register';
-import DirectMessagesPage from './pages/DirectMessages';
-import GuildChannelPage from './pages/GuildChannel';
-import InvitePage from './pages/InvitePage';
-import GuildDiscoveryPage from './pages/GuildDiscovery';
+import { useAuthStore } from './ignite/store/auth.store';
+import PageTitle from './ignite/components/PageTitle';
+import LoginPage from './ignite/pages/Login';
+import RegisterPage from './ignite/pages/Register';
+import DirectMessagesPage from './ignite/pages/DirectMessages';
+import GuildChannelPage from './ignite/pages/GuildChannel';
+import InvitePage from './ignite/pages/InvitePage';
+import GuildDiscoveryPage from './ignite/pages/GuildDiscovery';
 import DiscordGuildPage from './discord/pages/DiscordGuildPage';
 import DiscordDMPage from './discord/pages/DiscordDMPage';
-import { InitializationService } from './services/initialization.service';
-import { EchoService } from './services/echo.service';
-import { useGuildsStore } from './store/guilds.store';
-import VoiceAudioRenderer from './components/Voice/VoiceAudioRenderer';
-import { useElectronBadge } from './hooks/useElectronBadge';
+import { InitializationService } from './ignite/services/initialization.service';
+import { EchoService } from './ignite/services/echo.service';
+import { useGuildsStore } from './ignite/store/guilds.store';
+import VoiceAudioRenderer from './ignite/components/voice/VoiceAudioRenderer';
+import { useElectronBadge } from './ignite/hooks/useElectronBadge';
 
 const AuthRoute = ({ children }) => {
   const { userId } = useAuthStore();
