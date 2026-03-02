@@ -12,6 +12,7 @@ import { useUsersStore } from '../store/users.store';
 import { useDiscordChannelsStore } from '@/discord/store/discord-channels.store';
 import { useDiscordStore } from '@/discord/store/discord.store';
 import { useDiscordUsersStore } from '@/discord/store/discord-users.store';
+import { useLastChannelStore } from '@/store/last-channel.store';
 import DiscordChannel from '@/discord/components/DiscordChannel';
 
 const DirectMessagesPage = () => {
@@ -53,6 +54,13 @@ const DirectMessagesPage = () => {
     const other = recipients.find((r) => r.id !== discordUser?.id) || recipients[0];
     return other ? (other.global_name || other.username) : 'Unknown User';
   }, [activeDiscordChannel, discordUsersMap]);
+
+  // Save last visited DM channel
+  useEffect(() => {
+    if (channelId && channelId !== 'friends') {
+      useLastChannelStore.getState().setLastChannel('@me', channelId);
+    }
+  }, [channelId]);
 
   // Track active channel for notification suppression
   useEffect(() => {

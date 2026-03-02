@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type DiscordUser = {
+export type DiscordUser = {
   id: string;
   username: string;
   discriminator: string;

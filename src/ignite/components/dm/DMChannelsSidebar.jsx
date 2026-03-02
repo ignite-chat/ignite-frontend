@@ -13,6 +13,7 @@ import { useDiscordStore } from '@/discord/store/discord.store';
 import { useDiscordChannelsStore } from '@/discord/store/discord-channels.store';
 import { useDiscordUsersStore } from '@/discord/store/discord-users.store';
 import { useDiscordReadStatesStore } from '@/discord/store/discord-readstates.store';
+import { useDiscordRelationshipsStore, RelationshipType } from '@/discord/store/discord-relationships.store';
 import { DiscordService } from '@/discord/services/discord.service';
 import DMChannelItem from './DMChannelItem';
 import NewDMModal from '@/ignite/components/modals/NewDMModal';
@@ -180,10 +181,15 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
     return { pinnedDms: pinned, mergedDms: merged };
   }, [channels, normalizeThread, discordConnected, discordChannels]);
 
-  const pendingCount = useMemo(
-    () => requests.filter((req) => req.sender_id !== currentUser.id).length,
-    [requests, currentUser.id]
-  );
+  const discordRelationships = useDiscordRelationshipsStore((s) => s.relationships);
+
+  const pendingCount = useMemo(() => {
+    const igniteCount = requests.filter((req) => req.sender_id !== currentUser.id).length;
+    const discordCount = discordConnected
+      ? discordRelationships.filter((r) => r.type === RelationshipType.INCOMING_REQUEST).length
+      : 0;
+    return igniteCount + discordCount;
+  }, [requests, currentUser.id, discordConnected, discordRelationships]);
 
   return (
     <>

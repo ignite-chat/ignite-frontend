@@ -47,6 +47,7 @@ import { useDiscordGuildsStore } from '../discord/store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../discord/store/discord-channels.store';
 import { useDiscordReadStatesStore } from '../discord/store/discord-readstates.store';
 import { DiscordService } from '../discord/services/discord.service';
+import { useDiscordRelationshipsStore, RelationshipType } from '../discord/store/discord-relationships.store';
 import { useLastChannelStore } from '@/store/last-channel.store';
 import { ChannelType } from '@/ignite/constants/ChannelType';
 
@@ -201,6 +202,7 @@ const GuildsSidebar = () => {
   const [leaveGuild, setLeaveGuild] = useState(null);
   const [isDiscordDialogOpen, setIsDiscordDialogOpen] = useState(false);
   const [isDiscordLogoutOpen, setIsDiscordLogoutOpen] = useState(false);
+  const lastDmChannelId = useLastChannelStore((s) => s.lastChannels['@me']);
 
   // Discord state
   const { token: discordToken, isConnected: discordConnected } = useDiscordStore();
@@ -275,10 +277,16 @@ const GuildsSidebar = () => {
     [channels, isChannelUnread]
   );
 
+  const discordRelationships = useDiscordRelationshipsStore((s) => s.relationships);
+
   const pendingCount = useMemo(() => {
     if (!user) return 0;
-    return requests.filter((req) => req.sender_id != user.id).length;
-  }, [requests, user]);
+    const igniteCount = requests.filter((req) => req.sender_id != user.id).length;
+    const discordCount = discordConnected
+      ? discordRelationships.filter((r) => r.type === RelationshipType.INCOMING_REQUEST).length
+      : 0;
+    return igniteCount + discordCount;
+  }, [requests, user, discordConnected, discordRelationships]);
 
   const unreadDmChannels = useMemo(() => {
     if (!channelUnreadsLoaded || !user) return [];
@@ -331,7 +339,7 @@ const GuildsSidebar = () => {
     <>
       <div className="scrollbar-none relative left-0 top-0 m-0 flex h-full min-w-min flex-col items-center overflow-y-auto border-r border-white/5 bg-[#121214] pb-36 pt-3 text-white shadow">
         {/* Home / Friends */}
-        <Link to="/channels/@me">
+        <Link to={lastDmChannelId ? `/channels/@me/${lastDmChannelId}` : '/channels/@me'}>
           <SidebarIcon
             icon={<Fire className="size-6" />}
             text="Friends"

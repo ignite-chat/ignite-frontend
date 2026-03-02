@@ -6,6 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { InputGroup, InputGroupInput, InputGroupAddon } from '@/components/ui/input-group';
 import { useFriendsStore } from '@/ignite/store/friends.store';
 import { useUsersStore } from '@/ignite/store/users.store';
+import { useDiscordRelationshipsStore, RelationshipType } from '@/discord/store/discord-relationships.store';
+import { useDiscordUsersStore } from '@/discord/store/discord-users.store';
+import { useDiscordStore } from '@/discord/store/discord.store';
 import AddFriendForm from './AddFriendForm';
 import FriendsList from './FriendsList';
 import PendingRequests from './PendingRequests';
@@ -18,7 +21,33 @@ const FriendsDashboard = () => {
   const { friends, requests } = useFriendsStore();
   const currentUser = useUsersStore((s) => s.getCurrentUser());
 
-  const pendingCount = requests.filter((req) => req.sender_id != currentUser?.id).length;
+  // Discord data
+  const discordConnected = useDiscordStore((s) => s.isConnected);
+  const discordRelationships = useDiscordRelationshipsStore((s) => s.relationships);
+  const discordUsersMap = useDiscordUsersStore((s) => s.users);
+
+  const discordFriends = useMemo(() => {
+    if (!discordConnected) return [];
+    return discordRelationships
+      .filter((r) => r.type === RelationshipType.FRIEND)
+      .map((r) => discordUsersMap[r.id])
+      .filter((u): u is NonNullable<typeof u> => !!u);
+  }, [discordConnected, discordRelationships, discordUsersMap]);
+
+  const discordPendingRequests = useMemo(() => {
+    if (!discordConnected) return [];
+    return discordRelationships
+      .filter((r) => r.type === RelationshipType.INCOMING_REQUEST || r.type === RelationshipType.OUTGOING_REQUEST)
+      .map((r) => ({
+        user: discordUsersMap[r.id],
+        isOutgoing: r.type === RelationshipType.OUTGOING_REQUEST,
+      }))
+      .filter((r): r is typeof r & { user: NonNullable<typeof r.user> } => !!r.user);
+  }, [discordConnected, discordRelationships, discordUsersMap]);
+
+  const ignitePendingCount = requests.filter((req) => req.sender_id != currentUser?.id).length;
+  const discordPendingCount = discordPendingRequests.filter((r) => !r.isOutgoing).length;
+  const pendingCount = ignitePendingCount + discordPendingCount;
 
   const filteredFriends = useMemo(() => {
     if (!searchQuery.trim()) return friends;
@@ -100,13 +129,13 @@ const FriendsDashboard = () => {
               </InputGroup>
             </div>
             <div className="flex-1 overflow-y-auto">
-              <FriendsList friends={filteredFriends} filter={activeTab} />
+              <FriendsList friends={filteredFriends} discordFriends={discordFriends} filter={activeTab} searchQuery={searchQuery} />
             </div>
           </>
         )}
 
         {activeTab === 'pending' && currentUser && (
-          <PendingRequests requests={requests} currentUser={currentUser} />
+          <PendingRequests requests={requests} currentUser={currentUser} discordRequests={discordPendingRequests} />
         )}
       </div>
     </div>
