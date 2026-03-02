@@ -98,19 +98,8 @@ const DiscordChannelMessages = ({ channel }) => {
 
     setLoadingMore(true);
 
-    const el = messagesRef.current;
-    const prevScrollHeight = el?.scrollHeight || 0;
-
     const data = await DiscordService.loadChannelMessages(channelId, oldestMessage.id);
     setHasMore(data.length >= 50);
-
-    // Preserve scroll position so the view doesn't jump
-    requestAnimationFrame(() => {
-      if (el) {
-        el.scrollTop = el.scrollHeight - prevScrollHeight;
-      }
-    });
-
     setLoadingMore(false);
   }, [messages, loadingMore, hasMore, channelId]);
 
@@ -147,15 +136,23 @@ const DiscordChannelMessages = ({ channel }) => {
     }
   }, [channelId, hasMore, loadingMore, onLoadMore, ackIfAtBottom]);
 
-  // Auto-scroll when content resizes (embed/image loads) and user was near bottom
+  // Auto-scroll when content resizes (embed/image loads) and user was near bottom,
+  // or preserve scroll position when content above the viewport expands
   useEffect(() => {
     const content = contentRef.current;
     const scrollEl = messagesRef.current;
     if (!content || !scrollEl) return;
 
+    let prevScrollHeight = scrollEl.scrollHeight;
     const observer = new ResizeObserver(() => {
+      const newScrollHeight = scrollEl.scrollHeight;
+      const delta = newScrollHeight - prevScrollHeight;
+      prevScrollHeight = newScrollHeight;
+
       if (wasNearBottomRef.current) {
-        scrollEl.scrollTop = scrollEl.scrollHeight;
+        scrollEl.scrollTop = newScrollHeight;
+      } else if (delta > 0) {
+        scrollEl.scrollTop += delta;
       }
     });
 
