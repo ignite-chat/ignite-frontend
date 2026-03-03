@@ -17,17 +17,8 @@ import { ChannelType } from '@/ignite/constants/ChannelType';
 import Avatar from '../Avatar';
 import { useUsersStore } from '@/ignite/store/users.store';
 import { useModalStore } from '../../store/modal.store';
-
-const Tooltip = ({ text = 'Hello' }) => {
-  return (
-    <div className="pointer-events-none absolute top-full z-50 mt-1 hidden flex-col items-center group-hover:flex">
-      <div className="-mb-2 size-3 rotate-45 bg-black"></div>
-      <div className="relative min-w-max rounded bg-black px-3 py-1.5 text-sm text-gray-100 shadow-lg">
-        {text}
-      </div>
-    </div>
-  );
-};
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import UserProfileModal from '../modals/UserProfileModal';
 
 const IconButton = ({ icon, tooltipText, onClick }) => {
   const iconClassName = 'size-6 cursor-pointer text-gray-400 hover:text-gray-200';
@@ -67,14 +58,18 @@ const IconButton = ({ icon, tooltipText, onClick }) => {
   }
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group relative flex h-6 items-center justify-center"
-    >
-      {iconEl}
-      <Tooltip text={tooltipText} />
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          className="flex h-6 items-center justify-center"
+        >
+          {iconEl}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{tooltipText}</TooltipContent>
+    </Tooltip>
   );
 };
 
@@ -87,6 +82,12 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
       ? (channel.recipients || []).find((r) => r.id !== currentUser?.id)
       : {};
 
+  const openRecipientProfile = () => {
+    if (otherRecipient?.id) {
+      useModalStore.getState().push(UserProfileModal, { userId: otherRecipient.id });
+    }
+  };
+
   return (
     <>
       <div className="relative">
@@ -94,10 +95,18 @@ const ChannelBar = ({ channel, onJumpToMessage }) => {
           <div className="relative flex min-w-0 flex-auto items-center overflow-hidden">
             {channel?.type === ChannelType.DM ? (
               <>
-                <Avatar user={otherRecipient} className="mr-2" size={32} showStatus showOffline />
-                <h1 className="truncate text-sm font-semibold text-gray-100 sm:text-base">
-                  {otherRecipient?.name}
-                </h1>
+                <Avatar user={otherRecipient} className="mr-2" size={24} showStatus showOffline />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <h1
+                      onClick={openRecipientProfile}
+                      className="cursor-pointer truncate text-sm font-semibold text-gray-100 sm:text-base"
+                    >
+                      {otherRecipient?.name}
+                    </h1>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">{otherRecipient?.username}</TooltipContent>
+                </Tooltip>
               </>
             ) : channel?.type === ChannelType.GUILD_VOICE ? (
               <>
