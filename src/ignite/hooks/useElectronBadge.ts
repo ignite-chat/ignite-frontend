@@ -4,6 +4,9 @@ import { useChannelsStore } from '../store/channels.store';
 import { isChannelUnread, getChannelMentionCount, getUnreadMessageCount } from '../utils/unreads.utils';
 import { useFriendsStore } from '@/ignite/store/friends.store';
 import { useUsersStore } from '@/ignite/store/users.store';
+import { useDiscordReadStatesStore } from '@/discord/store/discord-readstates.store';
+import { useDiscordChannelsStore } from '@/discord/store/discord-channels.store';
+import { useDiscordRelationshipsStore, RelationshipType } from '@/discord/store/discord-relationships.store';
 
 /**
  * Keeps the Electron taskbar overlay badge in sync with unread state.
@@ -20,12 +23,17 @@ export function useElectronBadge() {
   const channelMessages = useChannelsStore((s) => s.channelMessages);
   const { requests } = useFriendsStore();
   const user = useUsersStore((s) => s.getCurrentUser());
+  const discordReadStates = useDiscordReadStatesStore((s) => s.readStates);
+  const discordChannels = useDiscordChannelsStore((s) => s.channels);
+  const discordRelationships = useDiscordRelationshipsStore((s) => s.relationships);
 
 
   const pendingCount = useMemo(() => {
     if (!user) return 0;
-    return requests.filter((req) => req.sender_id != user.id).length;
-  }, [requests, user]);
+    const ignitePending = requests.filter((req) => req.sender_id != user.id).length;
+    const discordPending = discordRelationships.filter((r) => r.type === RelationshipType.INCOMING_REQUEST).length;
+    return ignitePending + discordPending;
+  }, [requests, user, discordRelationships]);
 
   useEffect(() => {
     if (!window.IgniteNative?.setBadgeCount || !channelUnreadsLoaded) return;
@@ -33,6 +41,7 @@ export function useElectronBadge() {
     let totalMentions = 0;
     let hasUnread = false;
 
+    // Ignite channels
     for (const channel of channels) {
       totalMentions += getChannelMentionCount(channel.channel_id, channelUnreads, channelUnreadsLoaded);
 
@@ -50,14 +59,24 @@ export function useElectronBadge() {
       }
     }
 
+    // Discord channels
+    for (const channel of discordChannels) {
+      const readState = discordReadStates[channel.id];
+      if (readState?.mention_count) {
+        totalMentions += readState.mention_count;
+      }
+      if (!hasUnread && channel.last_message_id && readState?.last_message_id && channel.last_message_id > readState.last_message_id) {
+        hasUnread = true;
+      }
+    }
+
     let badgeCount: number;
-    badgeCount = Math.min(totalMentions, 10);
-    badgeCount += pendingCount;
+    badgeCount = Math.min(totalMentions + pendingCount, 10);
 
     if (hasUnread && badgeCount == 0) {
       badgeCount = 11; // unread but no mentions
     }
 
     window.IgniteNative.setBadgeCount(badgeCount);
-  }, [channelUnreads, channelUnreadsLoaded, channels, channelMessages, pendingCount]);
+  }, [channelUnreads, channelUnreadsLoaded, channels, channelMessages, pendingCount, discordReadStates, discordChannels]);
 }

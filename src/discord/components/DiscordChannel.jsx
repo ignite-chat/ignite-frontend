@@ -42,7 +42,7 @@ const DiscordChannel = ({ channel }) => {
   const placeholderName = isDM ? `@${dmInfo?.name}` : `#${channel.name}`;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-[#1a1a1e]">
       {/* Channel header bar */}
       <div className="flex h-12 shrink-0 items-center border-b border-white/5 px-4 shadow-sm">
         {isDM ? (

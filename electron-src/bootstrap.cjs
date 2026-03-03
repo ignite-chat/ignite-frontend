@@ -341,6 +341,8 @@ const startUpdate = async () => {
 
 
 module.exports = () => {
+  app.setAppUserModelId('Ignite');
+
   app.whenReady().then(() => {
     createTray();
     startUpdate();

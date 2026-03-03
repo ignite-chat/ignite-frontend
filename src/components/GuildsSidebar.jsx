@@ -48,8 +48,10 @@ import { useDiscordChannelsStore } from '../discord/store/discord-channels.store
 import { useDiscordReadStatesStore } from '../discord/store/discord-readstates.store';
 import { DiscordService } from '../discord/services/discord.service';
 import { useDiscordRelationshipsStore, RelationshipType } from '../discord/store/discord-relationships.store';
+import { useDiscordUsersStore } from '../discord/store/discord-users.store';
 import { useLastChannelStore } from '@/store/last-channel.store';
 import { ChannelType } from '@/ignite/constants/ChannelType';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
@@ -63,40 +65,41 @@ const SidebarIcon = ({
   isUnread = false,
   mentionCount = 0,
 }) => (
-  <div className="group relative mb-2 min-w-min px-3">
-    <div
-      className={`absolute -left-1 top-1/2 block w-2 -translate-y-1/2 rounded-lg bg-white transition-all duration-200 ${
-        isActive
-          ? 'h-10'
-          : `group-hover:h-5 ${isUnread ? 'h-2' : 'h-0'}`
-      }`}
-    />
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <div className="group relative mb-2 min-w-min px-3">
+        <div
+          className={`absolute -left-1 top-1/2 block w-2 -translate-y-1/2 rounded-lg bg-white transition-all duration-200 ${isActive
+            ? 'h-10'
+            : `group-hover:h-5 ${isUnread ? 'h-2' : 'h-0'}`
+            }`}
+        />
 
-    <div className="relative mx-auto h-12 w-12">
-      <div
-        className={`absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden ${isDm ? 'rounded-full' : `transition-all duration-300 ease-out ${isActive ? 'rounded-xl' : 'rounded-2xl hover:rounded-xl'} ${isServerIcon ? (iconUrl ? 'bg-[#1d1d1e] text-gray-100' : isActive ? 'bg-primary text-white' : 'bg-[#1d1d1e] text-gray-100 hover:bg-primary hover:text-white') : 'bg-[#1d1d1e] text-green-500 hover:bg-green-500 hover:text-white'}`}`}
-      >
-        {icon ? (
-          icon
-        ) : iconUrl ? (
-          <img src={iconUrl} alt={text} className="size-full object-cover" />
-        ) : (
-          <span className="text-xl leading-none text-gray-400">{text.slice(0, 2)}</span>
-        )}
+        <div className="relative mx-auto h-12 w-12">
+          <div
+            className={`absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden ${isDm ? 'rounded-full' : `transition-all duration-300 ease-out ${isActive ? 'rounded-xl' : 'rounded-2xl hover:rounded-xl'} ${isServerIcon ? (iconUrl ? 'bg-[#1d1d1e] text-gray-100' : isActive ? 'bg-primary text-white' : 'bg-[#1d1d1e] text-gray-100 hover:bg-primary hover:text-white') : 'bg-[#1d1d1e] text-green-500 hover:bg-green-500 hover:text-white'}`}`}
+          >
+            {icon ? (
+              icon
+            ) : iconUrl ? (
+              <img src={iconUrl} alt={text} className="size-full object-cover" />
+            ) : (
+              <span className="text-xl leading-none text-gray-400">{text.slice(0, 2)}</span>
+            )}
+          </div>
 
-        {/* Tooltip */}
-        <span className="pointer-events-none absolute left-14 z-50 m-2 w-auto min-w-max origin-left scale-0 rounded-md bg-[#121214] p-2 text-sm font-bold text-white shadow-lg transition-all duration-100 group-hover:scale-100">
-          {text}
-        </span>
-      </div>
-
-      {mentionCount > 0 && (
-        <div className="absolute -bottom-1 -right-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#1a1a1e] bg-destructive px-1 text-[11px] font-bold text-white">
-          {mentionCount > 99 ? '99+' : mentionCount}
+          {mentionCount > 0 && (
+            <div className="absolute -bottom-1 -right-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#1a1a1e] bg-destructive px-1 text-[11px] font-bold text-white">
+              {mentionCount > 99 ? '99+' : mentionCount}
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  </div>
+      </div>
+    </TooltipTrigger>
+    <TooltipContent side="right" className="font-bold">
+      {text}
+    </TooltipContent>
+  </Tooltip>
 );
 
 const SortableGuildIcon = ({ guild, isActive, isUnread, mentionCount, isDragging: globalDragging, onLeave, onInvite }) => {
@@ -205,8 +208,12 @@ const GuildsSidebar = () => {
   const lastDmChannelId = useLastChannelStore((s) => s.lastChannels['@me']);
 
   // Discord state
-  const { token: discordToken, isConnected: discordConnected } = useDiscordStore();
+  const { token: discordToken, isConnected: discordConnected, user: discordUser } = useDiscordStore();
   const { guilds: discordGuilds } = useDiscordGuildsStore();
+  const discordUsersMap = useDiscordUsersStore((s) => s.users);
+  const discordChannels = useDiscordChannelsStore((s) => s.channels);
+  const discordChannelMessages = useDiscordChannelsStore((s) => s.channelMessages);
+  const discordReadStates = useDiscordReadStatesStore((s) => s.readStates);
 
   // Auto-connect to Discord if token exists
   useEffect(() => {
@@ -323,6 +330,45 @@ const GuildsSidebar = () => {
       });
   }, [channelUnreadsLoaded, channels, channelUnreads, channelMessages, user]);
 
+  const unreadDiscordDmChannels = useMemo(() => {
+    if (!discordConnected || !discordUser) return [];
+
+    return discordChannels
+      .filter((c) => (c.type === 1 || c.type === 3) && c.last_message_id)
+      .filter((c) => {
+        const entry = discordReadStates[c.id];
+        return !entry?.last_message_id || c.last_message_id > entry.last_message_id;
+      })
+      .map((channel) => {
+        const recipientIds = channel.recipient_ids || [];
+        const entry = discordReadStates[channel.id];
+
+        // Count unread messages from loaded messages
+        const messages = discordChannelMessages[channel.id];
+        let unreadCount = 0;
+        if (entry?.last_message_id && messages?.length > 0) {
+          unreadCount = messages.filter((msg) => msg.id > entry.last_message_id).length;
+        }
+        if (unreadCount === 0) unreadCount = 1; // fallback if messages aren't loaded
+
+        let name, icon;
+        if (channel.type === 3) {
+          const recipients = recipientIds.map((id) => discordUsersMap[id]).filter(Boolean);
+          name = channel.name || recipients.map((r) => r.global_name || r.username).join(', ');
+          icon = channel.icon
+            ? `https://cdn.discordapp.com/channel-icons/${channel.id}/${channel.icon}.png?size=64`
+            : null;
+        } else {
+          const otherId = recipientIds.find((id) => id !== discordUser.id) || recipientIds[0];
+          const other = otherId ? discordUsersMap[otherId] : null;
+          name = other?.global_name || other?.username || 'Unknown User';
+          icon = other ? DiscordService.getUserAvatarUrl(other.id, other.avatar, 64) : null;
+        }
+
+        return { id: channel.id, name, icon, mentionCount: unreadCount };
+      });
+  }, [discordConnected, discordUser, discordChannels, discordReadStates, discordUsersMap, discordChannelMessages]);
+
   const confirmLeave = async () => {
     if (!leaveGuild?.id) return;
     try {
@@ -349,8 +395,6 @@ const GuildsSidebar = () => {
           />
         </Link>
 
-        <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
-
         {/* Unread DMs */}
         {unreadDmChannels.map((dm) => (
           <Link key={dm.channel_id} to={`/channels/@me/${dm.channel_id}`}>
@@ -365,10 +409,21 @@ const GuildsSidebar = () => {
             />
           </Link>
         ))}
+        {unreadDiscordDmChannels.map((dm) => (
+          <Link key={`discord-dm-${dm.id}`} to={`/channels/@me/${dm.id}`}>
+            <SidebarIcon
+              iconUrl={dm.icon || ''}
+              text={dm.name}
+              isServerIcon={true}
+              isDm={true}
+              isActive={channelId === dm.id}
+              isUnread={true}
+              mentionCount={dm.mentionCount}
+            />
+          </Link>
+        ))}
 
-        {unreadDmChannels.length > 0 && (
-          <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
-        )}
+        <hr className="mx-auto mb-2 w-8 rounded-full border-1 border-white/5 bg-gray-800" />
 
         {/* Guilds — drag-to-reorder */}
         <DndContext
@@ -412,17 +467,11 @@ const GuildsSidebar = () => {
           </DragOverlay>
         </DndContext>
 
-        <button type="button" onClick={() => useModalStore.getState().push(GuildModal)}>
-          <SidebarIcon icon={<Plus className="size-6" />} text="Add a Server" />
-        </button>
-        <Link to="/guild-discovery">
-          <SidebarIcon icon={<Compass className="size-6" />} text="Discover Servers" />
-        </Link>
+        <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
 
         {/* Discord */}
         {discordToken && (
           <>
-            <hr className="mx-auto mb-2 mt-1 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
             {discordConnected ? (
               <>
                 {discordGuilds.map((guild) => (
@@ -454,7 +503,6 @@ const GuildsSidebar = () => {
 
         {!discordToken && (
           <>
-            <hr className="mx-auto mb-2 mt-1 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
             <button
               type="button"
               onClick={() => setIsDiscordDialogOpen(true)}
@@ -466,6 +514,13 @@ const GuildsSidebar = () => {
             </button>
           </>
         )}
+
+        <button type="button" onClick={() => useModalStore.getState().push(GuildModal)}>
+          <SidebarIcon icon={<Plus className="size-6" />} text="Add a Server" />
+        </button>
+        <Link to="/guild-discovery">
+          <SidebarIcon icon={<Compass className="size-6" />} text="Discover Servers" />
+        </Link>
       </div>
 
       <ConnectDiscordDialog

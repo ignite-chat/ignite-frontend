@@ -45,6 +45,7 @@ type DiscordGuildsStore = {
   updateGuild: (guildId: string, updates: Partial<DiscordGuild>) => void;
   removeGuild: (guildId: string) => void;
   setGuildMembers: (guildId: string, members: DiscordMember[]) => void;
+  addGuildMembers: (guildId: string, members: DiscordMember[]) => void;
   clear: () => void;
 };
 
@@ -82,6 +83,23 @@ export const useDiscordGuildsStore = create<DiscordGuildsStore>((set) => ({
     set((state) => ({
       guildMembers: { ...state.guildMembers, [guildId]: members },
     })),
+
+  addGuildMembers: (guildId, members) =>
+    set((state) => {
+      const existing = state.guildMembers[guildId] || [];
+      const merged = [...existing];
+      for (const member of members) {
+        const userId = member.user?.id || (member as any).user_id;
+        if (!userId) continue;
+        const idx = merged.findIndex((m) => (m.user?.id || (m as any).user_id) === userId);
+        if (idx >= 0) {
+          merged[idx] = { ...merged[idx], ...member };
+        } else {
+          merged.push(member);
+        }
+      }
+      return { guildMembers: { ...state.guildMembers, [guildId]: merged } };
+    }),
 
   clear: () => set({ guilds: [], guildMembers: {} }),
 }));

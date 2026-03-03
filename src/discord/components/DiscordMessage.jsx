@@ -1,8 +1,10 @@
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, useEffect, memo } from 'react';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { DiscordService } from '../services/discord.service';
+import { useDiscordGuildsStore } from '../store/discord-guilds.store';
+import { getTwemojiUrl } from '@/utils/emoji.utils';
 import { parseMarkdown } from '@/components/message/markdown/parser';
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
 import DiscordUserPopoverContent from '@/discord/components/popovers/DiscordUserPopoverContent';
@@ -23,9 +25,25 @@ const DiscordAvatar = ({ author, className = 'size-10' }) => {
   );
 };
 
-const DiscordMessageHeader = ({ message, onClickName }) => {
+const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
+  const guilds = useDiscordGuildsStore((s) => s.guilds);
+
   const displayName =
     message.member?.nick || message.author.global_name || message.author.username;
+
+  const nameColor = useMemo(() => {
+    if (!guildId || !message.member?.roles) return undefined;
+    const guild = guilds.find((g) => g.id === guildId);
+    if (!guild?.roles) return undefined;
+
+    const topColorRole = guild.roles
+      .filter((r) => message.member.roles.includes(r.id) && r.id !== guildId)
+      .sort((a, b) => (b.position || 0) - (a.position || 0))
+      .find((r) => r.color && r.color !== 0);
+
+    if (!topColorRole) return undefined;
+    return `#${topColorRole.color.toString(16).padStart(6, '0')}`;
+  }, [guildId, guilds, message.member?.roles]);
 
   const formattedDateTime = useMemo(() => {
     const date = new Date(message.timestamp);
@@ -57,7 +75,8 @@ const DiscordMessageHeader = ({ message, onClickName }) => {
     <div className="relative mb-1 flex items-baseline gap-2 leading-none">
       <button
         type="button"
-        className="font-semibold text-white hover:underline"
+        className="font-semibold hover:underline"
+        style={{ color: nameColor || 'white' }}
         onClick={onClickName}
       >
         {displayName}
@@ -279,6 +298,164 @@ const DiscordReplyBar = ({ referencedMessage }) => {
   );
 };
 
+const DISCORD_EMOJI_CDN = 'https://cdn.discordapp.com/emojis';
+
+const emojiColorCache = new Map();
+
+const getAverageColor = (src) => {
+  if (emojiColorCache.has(src)) return Promise.resolve(emojiColorCache.get(src));
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const size = 32;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, size, size);
+
+      const data = ctx.getImageData(0, 0, size, size).data;
+      let r = 0, g = 0, b = 0, count = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const a = data[i + 3];
+        if (a < 128) continue;
+        r += data[i];
+        g += data[i + 1];
+        b += data[i + 2];
+        count++;
+      }
+      if (count === 0) { resolve(null); return; }
+
+      r = Math.round(r / count);
+      g = Math.round(g / count);
+      b = Math.round(b / count);
+
+      // Boost saturation and brightness so the color pops
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      if (max > 0 && max !== min) {
+        const factor = 255 / max;
+        r = Math.min(255, Math.round(r * factor));
+        g = Math.min(255, Math.round(g * factor));
+        b = Math.min(255, Math.round(b * factor));
+      }
+
+      const hex = `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+      emojiColorCache.set(src, hex);
+      resolve(hex);
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+};
+
+const useEmojiColor = (emoji, fallback) => {
+  const [color, setColor] = useState(() => {
+    const isCustom = !!emoji.id;
+    const src = isCustom
+      ? `${DISCORD_EMOJI_CDN}/${emoji.id}.webp?size=32`
+      : getTwemojiUrl(emoji.name);
+    return emojiColorCache.get(src) || fallback;
+  });
+
+  useEffect(() => {
+    const isCustom = !!emoji.id;
+    const src = isCustom
+      ? `${DISCORD_EMOJI_CDN}/${emoji.id}.webp?size=32`
+      : getTwemojiUrl(emoji.name);
+
+    if (emojiColorCache.has(src)) {
+      setColor(emojiColorCache.get(src) || fallback);
+      return;
+    }
+
+    getAverageColor(src).then((c) => setColor(c || fallback));
+  }, [emoji.id, emoji.name, fallback]);
+
+  return color;
+};
+
+const ReactionEmoji = ({ emoji }) => {
+  const isCustom = !!emoji.id;
+  return isCustom ? (
+    <img
+      src={`${DISCORD_EMOJI_CDN}/${emoji.id}.${emoji.animated ? 'gif' : 'webp'}?size=48`}
+      alt={emoji.name}
+      className="size-5 object-contain"
+      draggable="false"
+    />
+  ) : (
+    <img
+      src={getTwemojiUrl(emoji.name)}
+      alt={emoji.name}
+      className="size-5 object-contain"
+      draggable="false"
+    />
+  );
+};
+
+const BurstReaction = ({ emoji, count }) => {
+  const burstColor = useEmojiColor(emoji, '#ffd661');
+
+  return (
+    <button
+      type="button"
+      className="flex h-8 cursor-pointer items-center gap-2 rounded-sm border px-2 brightness-150"
+      style={{ borderColor: burstColor, backgroundColor: `color-mix(in srgb, ${burstColor} 15%, #232428)` }}
+    >
+      <ReactionEmoji emoji={emoji} />
+      <span className="min-w-3 text-center text-sm font-bold" style={{ color: burstColor }}>
+        {count}
+      </span>
+    </button>
+  );
+};
+
+const DiscordReactions = ({ reactions }) => {
+  if (!reactions || reactions.length === 0) return null;
+
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {reactions.map((reaction, i) => {
+        const emoji = reaction.emoji;
+        const isCustom = !!emoji.id;
+        const key = isCustom ? emoji.id : `${emoji.name}-${i}`;
+        const burstCount = reaction.count_details?.burst || 0;
+        const normalCount = reaction.count_details?.normal || 0;
+        const hasBurst = burstCount > 0;
+        const hasNormal = normalCount > 0;
+
+        return (
+          <div key={key} className="flex items-center gap-1">
+            {hasBurst && <BurstReaction emoji={emoji} count={burstCount} />}
+            {hasNormal && (
+              <button
+                type="button"
+                className={cn(
+                  'flex h-8 cursor-pointer items-center gap-2 rounded-sm border px-2',
+                  reaction.me
+                    ? 'border-[#5865f2] bg-[#5865f2]/25 hover:border-[#7983f5]'
+                    : 'border-transparent bg-[#232428] hover:border-[#4e505c]'
+                )}
+              >
+                <ReactionEmoji emoji={emoji} />
+                <span className={cn(
+                  'min-w-3 text-center text-sm font-bold',
+                  reaction.me ? 'text-[#c9cdfb]' : 'text-[#b5bac1]'
+                )}>
+                  {normalCount}
+                </span>
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, pending }) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -354,7 +531,7 @@ const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, has
 
               <div className="flex flex-1 flex-col items-start justify-start overflow-hidden">
                 {!shouldStack && (
-                  <DiscordMessageHeader message={message} onClickName={openProfile} />
+                  <DiscordMessageHeader message={message} guildId={guildId} onClickName={openProfile} />
                 )}
 
                 <div className="whitespace-pre-wrap break-words text-gray-400 [overflow-wrap:anywhere]">
@@ -369,6 +546,11 @@ const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, has
                 <DiscordStickers stickerItems={message.sticker_items} />
               </div>
             </div>
+            {message.reactions?.length > 0 && (
+              <div className="pl-[72px]">
+                <DiscordReactions reactions={message.reactions} />
+              </div>
+            )}
           </ContextMenuTrigger>
 
           <DiscordMessageContextMenu message={message} canDelete={canDelete} />

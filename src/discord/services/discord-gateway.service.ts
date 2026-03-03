@@ -19,6 +19,7 @@ const GatewayOp = {
   INVALID_SESSION: 9,
   HELLO: 10,
   HEARTBEAT_ACK: 11,
+  GUILD_SUBSCRIPTIONS: 37,
 } as const;
 
 const GATEWAY_URL = 'wss://gateway.discord.gg/?encoding=json&v=9&compress=none';
@@ -128,6 +129,22 @@ export const DiscordGatewayService = {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     }
+  },
+
+  /**
+   * Subscribe to guild members to receive their member info (roles, nick, etc.).
+   */
+  subscribeGuildMembers(guildId: string, memberIds: string[]) {
+    this.send({
+      op: GatewayOp.GUILD_SUBSCRIPTIONS,
+      d: {
+        subscriptions: {
+          [guildId]: {
+            members: memberIds,
+          },
+        },
+      },
+    });
   },
 
   /**
@@ -258,6 +275,15 @@ export const DiscordGatewayService = {
         break;
       case 'RELATIONSHIP_UPDATE':
         useDiscordRelationshipsStore.getState().updateRelationship(data.id, { type: data.type, nickname: data.nickname });
+        break;
+      case 'GUILD_MEMBERS_CHUNK':
+        this._handleGuildMembersChunk(data);
+        break;
+      case 'GUILD_MEMBER_UPDATE':
+        this._handleGuildMemberUpdate(data);
+        break;
+      case 'GUILD_MEMBER_LIST_UPDATE':
+        this._handleGuildMemberListUpdate(data);
         break;
       case 'PRESENCE_UPDATE': {
         const presenceUserId = data.user?.id || data.user_id;
@@ -457,6 +483,71 @@ export const DiscordGatewayService = {
   _handleMessageAck(data: any) {
     if (data.channel_id && data.message_id) {
       useDiscordReadStatesStore.getState().ackChannel(data.channel_id, data.message_id);
+    }
+  },
+
+  _handleGuildMembersChunk(data: any) {
+    const { guild_id, members, presences } = data;
+    if (guild_id && members?.length > 0) {
+      useDiscordGuildsStore.getState().addGuildMembers(guild_id, members);
+
+      // Also store user objects and presences
+      const users = members.map((m: any) => m.user).filter(Boolean);
+      if (users.length > 0) {
+        useDiscordUsersStore.getState().addUsers(users);
+      }
+    }
+    if (presences?.length > 0) {
+      useDiscordUsersStore.getState().setPresences(
+        presences.map((p: any) => ({
+          user_id: p.user?.id || p.user_id,
+          status: p.status,
+          activities: p.activities,
+          client_status: p.client_status,
+        }))
+      );
+    }
+  },
+
+  _handleGuildMemberUpdate(data: any) {
+    const { guild_id, user, roles, nick } = data;
+    if (!guild_id || !user?.id) return;
+
+    const existing = useDiscordGuildsStore.getState().guildMembers[guild_id] || [];
+    const idx = existing.findIndex((m) => (m.user?.id || (m as any).user_id) === user.id);
+
+    if (idx >= 0) {
+      const updated = [...existing];
+      updated[idx] = { ...updated[idx], ...data, user };
+      useDiscordGuildsStore.getState().setGuildMembers(guild_id, updated);
+    } else {
+      useDiscordGuildsStore.getState().addGuildMembers(guild_id, [{ ...data, user }]);
+    }
+
+    // Update user object in users store
+    useDiscordUsersStore.getState().addUser(user);
+  },
+
+  _handleGuildMemberListUpdate(data: any) {
+    const { guild_id, ops } = data;
+    if (!guild_id || !ops) return;
+
+    for (const op of ops) {
+      if (op.op === 'SYNC' || op.op === 'INSERT' || op.op === 'UPDATE') {
+        const items = op.items || (op.item ? [op.item] : []);
+        const members = items
+          .filter((item: any) => item.member)
+          .map((item: any) => item.member);
+
+        if (members.length > 0) {
+          useDiscordGuildsStore.getState().addGuildMembers(guild_id, members);
+
+          const users = members.map((m: any) => m.user).filter(Boolean);
+          if (users.length > 0) {
+            useDiscordUsersStore.getState().addUsers(users);
+          }
+        }
+      }
     }
   },
 

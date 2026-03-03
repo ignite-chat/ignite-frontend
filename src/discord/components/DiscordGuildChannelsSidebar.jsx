@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Hash, SpeakerHigh, CaretDown, CaretRight, Megaphone } from '@phosphor-icons/react';
+import { Hash, SpeakerHigh, CaretDown, CaretRight, Megaphone, BookBookmark, MicrophoneStage, ChatsTeardrop, CheckSquare, LockKey } from '@phosphor-icons/react';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordStore } from '../store/discord.store';
 import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { DiscordService } from '../services/discord.service';
 import { computeChannelPermissions } from '../utils/permissions';
-import { VIEW_CHANNEL } from '../constants/permissions';
+import { VIEW_CHANNEL, CONNECT } from '../constants/permissions';
+import { useDiscordHasPermission } from '../hooks/useDiscordPermission';
 import { scrollPositions } from '@/store/last-channel.store';
 
 const DISCORD_EPOCH = 1420070400000;
@@ -25,26 +26,37 @@ const DiscordChannelType = {
   GUILD_FORUM: 15,
 };
 
-const ChannelIcon = ({ type, className }) => {
+const ChannelIcon = ({ type, isRules, isLocked, className }) => {
+  if (isRules) return <CheckSquare className={className} weight='fill' />;
+  if (isLocked) return <LockKey className={className} weight='fill' />;
   switch (type) {
     case DiscordChannelType.GUILD_VOICE:
+      return <SpeakerHigh className={className} weight='fill' />;
     case DiscordChannelType.GUILD_STAGE_VOICE:
-      return <SpeakerHigh className={className} />;
+      return <MicrophoneStage className={className} weight='fill' />;
     case DiscordChannelType.GUILD_ANNOUNCEMENT:
-      return <Megaphone className={className} />;
+      return <Megaphone className={`${className} -scale-x-100`} weight='fill' />;
+    case DiscordChannelType.GUILD_FORUM:
+      return <ChatsTeardrop className={className} weight='fill' />;
     default:
       return <Hash className={className} />;
   }
 };
 
-const DiscordChannelRow = ({ channel, isActive, joinedAtMs }) => {
+const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId }) => {
   const readStates = useDiscordReadStatesStore((s) => s.readStates);
   const entry = readStates[channel.id];
+  const isVoiceChannel = channel.type === DiscordChannelType.GUILD_VOICE || channel.type === DiscordChannelType.GUILD_STAGE_VOICE;
+  const canConnect = useDiscordHasPermission(channel.guild_id, isVoiceChannel ? channel : undefined, CONNECT);
 
   const isUnread =
     !isActive &&
     !!channel.last_message_id &&
     (() => {
+      if (channel.type == DiscordChannelType.GUILD_VOICE || channel.type == DiscordChannelType.GUILD_STAGE_VOICE) {
+        return false;
+      }
+
       if (entry?.last_message_id) {
         return BigInt(channel.last_message_id) > BigInt(entry.last_message_id);
       }
@@ -72,6 +84,8 @@ const DiscordChannelRow = ({ channel, isActive, joinedAtMs }) => {
       )}
       <ChannelIcon
         type={channel.type}
+        isRules={channel.id === rulesChannelId}
+        isLocked={isVoiceChannel && !canConnect}
         className={`size-5 shrink-0 ${isActive ? 'text-gray-200' : isUnread ? 'text-white' : 'text-gray-500'}`}
       />
       <p
@@ -90,17 +104,25 @@ const DiscordChannelRow = ({ channel, isActive, joinedAtMs }) => {
   );
 };
 
-const DiscordCategory = ({ category, channels, activeChannelId, joinedAtMs }) => {
+const DiscordCategory = ({ category, channels, activeChannelId, joinedAtMs, rulesChannelId }) => {
   const [expanded, setExpanded] = useState(true);
 
   const sortedChannels = useMemo(() => {
+    const isVoice = (c) =>
+      c.type === DiscordChannelType.GUILD_VOICE || c.type === DiscordChannelType.GUILD_STAGE_VOICE;
+
     return [...channels]
       .filter(
         (c) =>
           c.parent_id === category?.id &&
           c.type !== DiscordChannelType.GUILD_CATEGORY
       )
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      .sort((a, b) => {
+        const aVoice = isVoice(a) ? 1 : 0;
+        const bVoice = isVoice(b) ? 1 : 0;
+        if (aVoice !== bVoice) return aVoice - bVoice;
+        return (a.position ?? 0) - (b.position ?? 0);
+      });
   }, [channels, category?.id]);
 
   if (sortedChannels.length === 0) return null;
@@ -133,6 +155,7 @@ const DiscordCategory = ({ category, channels, activeChannelId, joinedAtMs }) =>
             channel={channel}
             isActive={channel.id === activeChannelId}
             joinedAtMs={joinedAtMs}
+            rulesChannelId={rulesChannelId}
           />
         </div>
       ))}
@@ -210,6 +233,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
     }
   }, [guildId]);
 
+  const rulesChannelId = guild?.rules_channel_id || guild?.properties?.rules_channel_id;
   const iconUrl = DiscordService.getGuildIconUrl(guild?.id, guild?.properties?.icon, 64);
 
   return (
@@ -237,13 +261,19 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
         {rootChannels.length > 0 && (
           <div className="flex w-full flex-col">
             {rootChannels
-              .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+              .sort((a, b) => {
+                const aVoice = (a.type === DiscordChannelType.GUILD_VOICE || a.type === DiscordChannelType.GUILD_STAGE_VOICE) ? 1 : 0;
+                const bVoice = (b.type === DiscordChannelType.GUILD_VOICE || b.type === DiscordChannelType.GUILD_STAGE_VOICE) ? 1 : 0;
+                if (aVoice !== bVoice) return aVoice - bVoice;
+                return (a.position ?? 0) - (b.position ?? 0);
+              })
               .map((channel) => (
                 <DiscordChannelRow
                   key={channel.id}
                   channel={channel}
                   isActive={channel.id === channelId}
                   joinedAtMs={joinedAtMs}
+                  rulesChannelId={rulesChannelId}
                 />
               ))}
           </div>
@@ -257,6 +287,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
             channels={guildChannels}
             activeChannelId={channelId}
             joinedAtMs={joinedAtMs}
+            rulesChannelId={rulesChannelId}
           />
         ))}
       </div>

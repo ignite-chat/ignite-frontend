@@ -85,11 +85,14 @@ export const getTwemojiUrl = (emoji) => {
   const cached = twemojiUrlCache.get(emoji);
   if (cached) return cached;
 
-  const code = [...emoji]
-    .map((char) => char.codePointAt(0).toString(16))
-    .filter((hex) => hex !== 'fe0f') // Remove VS16
-    .join('-');
-  const url = localSvgLookup.get(code) || `https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/${code}.svg`;
+  const codepoints = [...emoji].map((char) => char.codePointAt(0).toString(16));
+  const fullCode = codepoints.join('-');
+  const strippedCode = codepoints.filter((hex) => hex !== 'fe0f').join('-');
+
+  // Try full code with fe0f first (local files may include it), then stripped
+  const url = localSvgLookup.get(fullCode)
+    || localSvgLookup.get(strippedCode)
+    || `https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/${strippedCode}.svg`;
   twemojiUrlCache.set(emoji, url);
   return url;
 };
