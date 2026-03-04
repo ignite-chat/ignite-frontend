@@ -11,6 +11,7 @@ import { NORMAL_MESSAGE_TYPES, MessageType, getSystemMessageText } from '../cons
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
 import DiscordUserPopoverContent from '@/discord/components/popovers/DiscordUserPopoverContent';
 import DiscordUserProfileModal from './DiscordUserProfileModal';
+import { useModalStore } from '@/store/modal.store';
 import DiscordMessageContextMenu from './DiscordMessageContextMenu';
 import DiscordUserContextMenu from './DiscordUserContextMenu';
 
@@ -275,17 +276,53 @@ const DiscordStickers = ({ stickerItems }) => {
   );
 };
 
-const DiscordReplyBar = ({ referencedMessage }) => {
+const DiscordReplyBar = ({ referencedMessage, guildId }) => {
   if (!referencedMessage) return null;
+
+  const guilds = useDiscordGuildsStore((s) => s.guilds);
+  const storeMember = useDiscordMembersStore((s) =>
+    guildId && referencedMessage.author?.id ? s.members[guildId]?.[referencedMessage.author.id] : undefined
+  );
+  const member = referencedMessage.member || storeMember;
 
   const displayName =
     referencedMessage.author?.global_name || referencedMessage.author?.username || 'Unknown';
 
+  const nameColor = useMemo(() => {
+    if (!guildId || !member?.roles) return undefined;
+    const guild = guilds.find((g) => g.id === guildId);
+    const guildRoles = guild?.roles || guild?.properties?.roles;
+    if (!guildRoles) return undefined;
+    const topColorRole = guildRoles
+      .filter((r) => member.roles.includes(r.id) && r.id !== guildId)
+      .sort((a, b) => (b.position || 0) - (a.position || 0))
+      .find((r) => r.color && r.color !== 0);
+    if (!topColorRole) return undefined;
+    return `#${topColorRole.color.toString(16).padStart(6, '0')}`;
+  }, [guildId, guilds, member?.roles]);
+
+  const scrollToMessage = () => {
+    const el = document.querySelector(`[data-message-id="${referencedMessage.id}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.backgroundColor = 'rgba(255, 255, 255, 0.06)';
+      setTimeout(() => { el.style.backgroundColor = ''; }, 1500);
+    }
+  };
+
+  const openProfile = () => {
+    useModalStore.getState().push(DiscordUserProfileModal, {
+      author: referencedMessage.author,
+      member,
+      guildId,
+    });
+  };
+
   return (
     <div className="flex items-center gap-2 text-sm text-gray-400">
-      <svg width="33" height="20" viewBox="0 0 33 20" fill="none" className="text-gray-500">
+      <svg width="48" height="20" viewBox="0 0 48 20" fill="none" className="shrink-0 text-gray-500">
         <path
-          d="M17 15V10C17 5.58172 20.5817 2 25 2H33"
+          d="M20 20V16C20 12.69 22.69 10 26 10H48"
           stroke="currentColor"
           strokeWidth="2"
           strokeLinecap="round"
@@ -293,20 +330,62 @@ const DiscordReplyBar = ({ referencedMessage }) => {
         />
       </svg>
       {referencedMessage.author?.avatar && (
-        <img
-          src={DiscordService.getUserAvatarUrl(
-            referencedMessage.author.id,
-            referencedMessage.author.avatar,
-            32
-          )}
-          className="size-4 rounded-full"
-          alt=""
-        />
+        <Popover>
+          <PopoverTrigger asChild>
+            <button type="button" className="shrink-0 cursor-pointer">
+              <img
+                src={DiscordService.getUserAvatarUrl(
+                  referencedMessage.author.id,
+                  referencedMessage.author.avatar,
+                  32
+                )}
+                className="size-4 rounded-full"
+                alt=""
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-auto border-none bg-transparent p-0 shadow-none"
+            align="start"
+          >
+            <DiscordUserPopoverContent
+              author={referencedMessage.author}
+              member={member}
+              guildId={guildId}
+              onOpenProfile={openProfile}
+            />
+          </PopoverContent>
+        </Popover>
       )}
-      <span className="font-medium text-gray-300">{displayName}</span>
-      <span className="truncate text-gray-500">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="shrink-0 font-medium hover:underline"
+            style={{ color: nameColor || '#d1d5db' }}
+          >
+            @{displayName}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          className="w-auto border-none bg-transparent p-0 shadow-none"
+          align="start"
+        >
+          <DiscordUserPopoverContent
+            author={referencedMessage.author}
+            member={member}
+            guildId={guildId}
+            onOpenProfile={openProfile}
+          />
+        </PopoverContent>
+      </Popover>
+      <button
+        type="button"
+        onClick={scrollToMessage}
+        className="cursor-pointer truncate text-gray-500 hover:text-gray-300"
+      >
         {referencedMessage.content?.slice(0, 100) || 'Click to see attachment'}
-      </span>
+      </button>
     </div>
   );
 };
@@ -535,7 +614,6 @@ const SystemMessageIcon = ({ type }) => {
 };
 
 const DiscordSystemMessage = memo(({ message, prevMessage, guildId }) => {
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const guild = useDiscordGuildsStore((s) => s.guilds.find((g) => g.id === guildId));
   const guildName = guild?.properties?.name || guild?.name;
   const storeMember = useDiscordMembersStore((s) =>
@@ -609,7 +687,7 @@ const DiscordSystemMessage = memo(({ message, prevMessage, guildId }) => {
                     type="button"
                     className="font-semibold hover:underline"
                     style={{ color: nameColor || '#e5e7eb' }}
-                    onClick={() => setProfileModalOpen(true)}
+                    onClick={() => useModalStore.getState().push(DiscordUserProfileModal, { author: message.author, member, guildId })}
                   >
                     {p.text}
                   </button>
@@ -624,15 +702,6 @@ const DiscordSystemMessage = memo(({ message, prevMessage, guildId }) => {
           <span className="shrink-0 text-xs text-gray-500">{formattedTime}</span>
         </div>
       </div>
-      {message.author && (
-        <DiscordUserProfileModal
-          author={message.author}
-          member={member}
-          guildId={guildId}
-          open={profileModalOpen}
-          onOpenChange={setProfileModalOpen}
-        />
-      )}
     </>
   );
 });
@@ -641,7 +710,6 @@ DiscordSystemMessage.displayName = 'DiscordSystemMessage';
 
 const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, pending }) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   const hasReply = !!message.referenced_message || !!message.message_reference;
 
@@ -669,7 +737,7 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, guildI
 
   const openProfile = () => {
     setPopoverOpen(false);
-    setProfileModalOpen(true);
+    useModalStore.getState().push(DiscordUserProfileModal, { author: message.author, member: message.member, guildId });
   };
 
   const messageClasses = cn(
@@ -685,8 +753,8 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, guildI
         <ContextMenu>
           <ContextMenuTrigger className={messageClasses}>
             {hasReply && (
-              <div className="px-4">
-                <DiscordReplyBar referencedMessage={message.referenced_message} />
+              <div className="mb-1 px-4">
+                <DiscordReplyBar referencedMessage={message.referenced_message} guildId={guildId} />
               </div>
             )}
 
@@ -755,13 +823,6 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, guildI
         </PopoverContent>
       </Popover>
 
-      <DiscordUserProfileModal
-        author={message.author}
-        member={message.member}
-        guildId={guildId}
-        open={profileModalOpen}
-        onOpenChange={setProfileModalOpen}
-      />
     </>
   );
 });

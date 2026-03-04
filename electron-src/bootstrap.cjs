@@ -56,6 +56,7 @@ const startCore = () => {
       preload: join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: false,
     },
   });
 
@@ -70,9 +71,9 @@ const startCore = () => {
   const isDev = !app.isPackaged;
   mainWindow.loadURL(isDev ? "http://localhost:5173" : "https://app.ignite-chat.com");
 
-  // Rewrite Origin header for Discord remote auth gateway (requires https://discord.com)
+  // Rewrite Origin header for Discord requests so they appear to come from the Discord app
   mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
-    { urls: ['wss://remote-auth-gateway.discord.gg/*'] },
+    { urls: ['*://*.discord.com/*', '*://*.discord.gg/*', '*://*.discordapp.com/*'] },
     (details, callback) => {
       details.requestHeaders['Origin'] = 'https://discord.com';
       callback({ requestHeaders: details.requestHeaders });

@@ -400,7 +400,7 @@ const GuildsSidebar = () => {
           <Link key={dm.channel_id} to={`/channels/@me/${dm.channel_id}`}>
             <SidebarIcon
               icon={<Avatar user={dm.otherUser} className="size-full" />}
-              text={dm.otherUser.username}
+              text={dm.otherUser.name}
               isServerIcon={true}
               isDm={true}
               isActive={channelId === dm.channel_id}

@@ -99,6 +99,7 @@ const DiscordMemberList = ({ guildId }) => {
   const memberList = useDiscordMemberListStore((s) => s.memberLists[guildId]);
   const guild = useDiscordGuildsStore((s) => s.guilds.find((g) => g.id === guildId));
   const [openPopoverUserId, setOpenPopoverUserId] = useState(null);
+  const [collapsedGroups, setCollapsedGroups] = useState({});
 
   const makePopoverHandler = useCallback(
     (userId) => (open) => {
@@ -144,18 +145,38 @@ const DiscordMemberList = ({ guildId }) => {
                 : group.id === 'offline'
                   ? 'Offline'
                   : role?.name || group.id;
+            const collapsed = !!collapsedGroups[group.id];
 
             return (
-              <div
+              <button
+                type="button"
                 key={`group-${group.id}-${index}`}
-                className="mb-0.5 mt-4 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400 first:mt-0"
+                className="mb-0.5 mt-4 flex w-full items-center gap-0.5 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400 first:mt-0 hover:text-gray-300"
+                onClick={() => setCollapsedGroups((prev) => ({ ...prev, [group.id]: !prev[group.id] }))}
               >
+                <svg
+                  className={`size-2.5 shrink-0 transition-transform ${collapsed ? '-rotate-90' : ''}`}
+                  viewBox="0 0 10 10"
+                  fill="currentColor"
+                >
+                  <path d="M1 3l4 4 4-4H1z" />
+                </svg>
                 {label} — {groupCounts[group.id] ?? group.count}
-              </div>
+              </button>
             );
           }
 
           if ('member' in item && item.member) {
+            // Find which group this member belongs to by scanning backwards
+            let currentGroupId = null;
+            for (let j = index - 1; j >= 0; j--) {
+              if ('group' in items[j] && items[j].group) {
+                currentGroupId = items[j].group.id;
+                break;
+              }
+            }
+            if (currentGroupId && collapsedGroups[currentGroupId]) return null;
+
             const member = item.member;
             const userId = member.user?.id || member.user_id;
             if (!userId) return null;

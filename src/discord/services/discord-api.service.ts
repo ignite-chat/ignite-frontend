@@ -140,6 +140,14 @@ export const DiscordApiService = {
   },
 
   /**
+   * Get application info (icon, name, etc.) by application ID.
+   */
+  async getApplication(applicationId: string) {
+    const { data } = await discordApi.get(`/applications/${applicationId}/rpc`, { _silent: true } as any);
+    return data;
+  },
+
+  /**
    * Acknowledge (mark as read) up to a specific message in a channel.
    */
   async ackMessage(channelId: string, messageId: string) {

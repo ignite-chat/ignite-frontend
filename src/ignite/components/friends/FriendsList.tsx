@@ -22,6 +22,16 @@ import type { DiscordUser } from '@/discord/store/discord-users.store';
 import { DiscordService } from '@/discord/services/discord.service';
 import { useDiscordChannelsStore } from '@/discord/store/discord-channels.store';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { useDiscordActivitiesStore, ActivityType } from '@/discord/store/discord-activities.store';
+
+function getDiscordStatusText(activities: any[] | undefined): string | null {
+  if (!activities || activities.length === 0) return null;
+  const custom = activities.find((a: any) => a.type === ActivityType.CUSTOM);
+  if (custom?.state) return custom.state;
+  const activity = activities.find((a: any) => a.type !== ActivityType.CUSTOM);
+  if (activity) return activity.name;
+  return null;
+}
 
 type FriendRowProps = {
   friend: Friend;
@@ -121,8 +131,10 @@ type DiscordFriendRowProps = {
 const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
   const navigate = useNavigate();
   const channels = useDiscordChannelsStore((s) => s.channels);
+  const storeActivities = useDiscordActivitiesStore((s) => s.activities[user.id]);
   const status = user.status || 'offline';
   const avatarUrl = DiscordService.getUserAvatarUrl(user.id, user.avatar, 64);
+  const activities = storeActivities || user.activities;
 
   const statusColors: Record<string, string> = {
     online: 'bg-green-500',
@@ -169,7 +181,19 @@ const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
               <TooltipContent side="top">Discord</TooltipContent>
             </Tooltip>
           </div>
-          <div className="text-xs capitalize text-gray-400">{status}</div>
+          <div className="truncate text-xs text-gray-400">
+            {status === 'offline'
+              ? 'Offline'
+              : (() => {
+                  const text = getDiscordStatusText(activities);
+                  if (!text) return 'Online';
+                  return text.split(/(\*\*.*?\*\*)/).map((part, i) =>
+                    part.startsWith('**') && part.endsWith('**')
+                      ? <span key={i} className="font-semibold text-gray-300">{part.slice(2, -2)}</span>
+                      : part
+                  );
+                })()}
+          </div>
         </div>
       </div>
       <div className="flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">

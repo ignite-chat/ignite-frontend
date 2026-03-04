@@ -24,7 +24,7 @@ import { useLastChannelStore } from './store/last-channel.store';
 import { useSoundStore } from './ignite/store/sound.store';
 import { useInvitesStore } from './ignite/store/invites.store';
 import { Toaster } from './components/ui/sonner';
-import { ModalRoot, useModalStore } from './ignite/store/modal.store';
+import { ModalRoot, useModalStore } from './store/modal.store';
 
 import { useEffect } from 'react';
 import { useLocation, useNavigationType } from 'react-router-dom';

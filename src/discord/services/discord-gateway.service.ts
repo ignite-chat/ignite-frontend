@@ -7,6 +7,18 @@ import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { useDiscordRelationshipsStore } from '../store/discord-relationships.store';
 import { useDiscordMemberListStore } from '../store/discord-member-list.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
+import { useDiscordActivitiesStore } from '../store/discord-activities.store';
+import { useDiscordTypingStore } from '../store/discord-typing.store';
+
+/** Sync activities to the dedicated store from a list of presences */
+function syncActivities(presences: { user_id: string; activities?: any[] }[]) {
+  const entries = presences
+    .filter((p) => p.user_id)
+    .map((p) => ({ userId: p.user_id, activities: p.activities || [] }));
+  if (entries.length > 0) {
+    useDiscordActivitiesStore.getState().setMany(entries);
+  }
+}
 
 // Discord Gateway Opcodes
 const GatewayOp = {
@@ -284,6 +296,9 @@ export const DiscordGatewayService = {
       case 'READY':
         this._handleReady(data);
         break;
+      case 'READY_SUPPLEMENTAL':
+        this._handleReadySupplemental(data);
+        break;
       case 'RESUMED':
         console.log('[Discord Gateway] Successfully resumed');
         break;
@@ -341,19 +356,69 @@ export const DiscordGatewayService = {
         console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleGuildMemberListUpdate(data);
         break;
+      case 'MESSAGE_REACTION_ADD_MANY': {
+        const { channel_id, message_id, reactions: incomingReactions } = data;
+        if (!channel_id || !message_id || !incomingReactions) break;
+        const messages = useDiscordChannelsStore.getState().channelMessages[channel_id];
+        const msg = messages?.find((m: any) => m.id === message_id);
+        if (!msg) break;
+        const existing = [...(msg.reactions || [])];
+        for (const r of incomingReactions) {
+          const emoji = r.emoji;
+          const idx = existing.findIndex((e: any) =>
+            emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
+          );
+          if (idx >= 0) {
+            existing[idx] = {
+              ...existing[idx],
+              count: existing[idx].count + r.count,
+              count_details: {
+                burst: (existing[idx].count_details?.burst || 0) + (r.burst_count || 0),
+                normal: (existing[idx].count_details?.normal || 0) + (r.normal_count || r.count),
+              },
+            };
+          } else {
+            existing.push({
+              emoji,
+              count: r.count,
+              count_details: {
+                burst: r.burst_count || 0,
+                normal: r.normal_count || r.count,
+              },
+              me: false,
+              me_burst: false,
+            });
+          }
+        }
+        useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: existing });
+        break;
+      }
+      case 'TYPING_START': {
+        const typingUserId = data.user_id;
+        const currentUserId = useDiscordStore.getState().user?.id;
+        if (typingUserId && typingUserId !== currentUserId) {
+          const username = data.member?.user?.global_name || data.member?.user?.username || data.member?.nick || 'Someone';
+          const avatar = data.member?.user?.avatar || null;
+          useDiscordTypingStore.getState().addTypingUser(data.channel_id, { user_id: typingUserId, username, avatar });
+        }
+        break;
+      }
       case 'PRESENCE_UPDATE': {
         const presenceUserId = data.user?.id || data.user_id;
         if (presenceUserId) {
-          useDiscordUsersStore.getState().updatePresence({
+          const presence = {
             user_id: presenceUserId,
             status: data.status,
             activities: data.activities,
             client_status: data.client_status,
-          });
+          };
+          useDiscordUsersStore.getState().updatePresence(presence);
+          syncActivities([presence]);
         }
         break;
       }
       default:
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         // Forward unhandled events to the external handler if set
         break;
     }
@@ -394,10 +459,15 @@ export const DiscordGatewayService = {
         }
       }
       // Extract current user's member data for permissions
+      // merged_members entries often lack user/user_id — tag them with the current user's ID
       const memberGroup = merged_members?.[i];
       if (memberGroup?.length > 0) {
-        useDiscordGuildsStore.getState().setGuildMembers(guild.id, memberGroup);
-        useDiscordMembersStore.getState().addMembers(guild.id, memberGroup);
+        const tagged = memberGroup.map((m: any) => {
+          if (!m.user_id && !m.user?.id) return { ...m, user_id: user.id };
+          return m;
+        });
+        useDiscordGuildsStore.getState().setGuildMembers(guild.id, tagged);
+        useDiscordMembersStore.getState().addMembers(guild.id, tagged);
       }
     }
     if (allGuildChannels.length > 0) {
@@ -438,14 +508,67 @@ export const DiscordGatewayService = {
     // Discord v9 sends friend presences in merged_presences.friends
     const friendPresences = data.merged_presences?.friends || presences || [];
     if (friendPresences.length > 0) {
-      useDiscordUsersStore.getState().setPresences(
-        friendPresences.map((p: any) => ({
-          user_id: p.user?.id || p.user_id,
-          status: p.status,
-          activities: p.activities,
-          client_status: p.client_status,
-        }))
-      );
+      const mapped = friendPresences.map((p: any) => ({
+        user_id: p.user?.id || p.user_id,
+        status: p.status,
+        activities: p.activities,
+        client_status: p.client_status,
+      }));
+      useDiscordUsersStore.getState().setPresences(mapped);
+      syncActivities(mapped);
+    }
+  },
+
+  _handleReadySupplemental(data: any) {
+    console.log('[Discord Gateway] READY_SUPPLEMENTAL received', data);
+
+    const { guilds, merged_members, merged_presences } = data;
+
+    // merged_members[i] corresponds to guilds[i] — store member data
+    // Tag entries missing user_id with the current user's ID and merge (don't replace)
+    const currentUserId = useDiscordStore.getState().user?.id;
+    if (guilds && merged_members) {
+      for (let i = 0; i < guilds.length; i++) {
+        const guildId = guilds[i].id;
+        const members = merged_members[i];
+        if (members?.length > 0) {
+          const tagged = members.map((m: any) => {
+            if (!m.user_id && !m.user?.id && currentUserId) return { ...m, user_id: currentUserId };
+            return m;
+          });
+          useDiscordGuildsStore.getState().addGuildMembers(guildId, tagged);
+          useDiscordMembersStore.getState().addMembers(guildId, tagged);
+        }
+      }
+    }
+
+    // Guild presences from merged_presences.guilds[i] correspond to guilds[i]
+    if (merged_presences?.guilds && guilds) {
+      for (let i = 0; i < guilds.length; i++) {
+        const guildPresences = merged_presences.guilds[i];
+        if (guildPresences?.length > 0) {
+          const mapped = guildPresences.map((p: any) => ({
+            user_id: p.user_id,
+            status: p.status,
+            activities: p.activities,
+            client_status: p.client_status,
+          }));
+          useDiscordUsersStore.getState().setPresences(mapped);
+          syncActivities(mapped);
+        }
+      }
+    }
+
+    // Friend presences
+    if (merged_presences?.friends?.length > 0) {
+      const mapped = merged_presences.friends.map((p: any) => ({
+        user_id: p.user_id,
+        status: p.status,
+        activities: p.activities,
+        client_status: p.client_status,
+      }));
+      useDiscordUsersStore.getState().setPresences(mapped);
+      syncActivities(mapped);
     }
   },
 
@@ -521,9 +644,12 @@ export const DiscordGatewayService = {
 
     useDiscordChannelsStore.getState().appendMessage(data.channel_id, data);
 
-    // Store the author's user object in the users store
+    // Store the author's and mentioned users' objects in the users store
     if (data.author) {
       useDiscordUsersStore.getState().addUser(data.author);
+    }
+    if (data.mentions?.length > 0) {
+      useDiscordUsersStore.getState().addUsers(data.mentions);
     }
 
     // Store member data (roles, nick, etc.) in the members store
@@ -571,14 +697,14 @@ export const DiscordGatewayService = {
       }
     }
     if (presences?.length > 0) {
-      useDiscordUsersStore.getState().setPresences(
-        presences.map((p: any) => ({
-          user_id: p.user?.id || p.user_id,
-          status: p.status,
-          activities: p.activities,
-          client_status: p.client_status,
-        }))
-      );
+      const mapped = presences.map((p: any) => ({
+        user_id: p.user?.id || p.user_id,
+        status: p.status,
+        activities: p.activities,
+        client_status: p.client_status,
+      }));
+      useDiscordUsersStore.getState().setPresences(mapped);
+      syncActivities(mapped);
     }
   },
 
@@ -640,6 +766,7 @@ export const DiscordGatewayService = {
             .filter((p: any) => p.user_id);
           if (presences.length > 0) {
             useDiscordUsersStore.getState().setPresences(presences);
+            syncActivities(presences);
           }
         }
       }

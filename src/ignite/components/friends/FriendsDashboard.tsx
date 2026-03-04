@@ -12,6 +12,7 @@ import { useDiscordStore } from '@/discord/store/discord.store';
 import AddFriendForm from './AddFriendForm';
 import FriendsList from './FriendsList';
 import PendingRequests from './PendingRequests';
+import DiscordActivitiesPanel from '@/discord/components/DiscordActivitiesPanel';
 
 type Tab = 'online' | 'all' | 'pending' | 'add_friend';
 
@@ -94,49 +95,53 @@ const FriendsDashboard = () => {
         </div>
       </header>
 
-      {/* Content */}
-      <div className="flex flex-1 flex-col overflow-y-auto p-6">
-        {activeTab === 'add_friend' && <AddFriendForm />}
+      {/* Content + Activities sidebar */}
+      <div className="flex min-h-0 flex-1">
+        <div className="flex flex-1 flex-col overflow-y-auto p-6">
+          {activeTab === 'add_friend' && <AddFriendForm />}
 
-        {(activeTab === 'online' || activeTab === 'all') && (
-          <>
-            <div className="mb-4">
-              <InputGroup className="border-white/5 bg-[#17171a]">
-                <InputGroupAddon>
-                  <Search size={16} className="text-white" />
-                </InputGroupAddon>
-                <InputGroupInput
-                  type="text"
-                  placeholder="Search friends..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="text-white placeholder:text-gray-500"
-                />
-                {searchQuery && (
+          {(activeTab === 'online' || activeTab === 'all') && (
+            <>
+              <div className="mb-4">
+                <InputGroup className="border-white/5 bg-[#17171a]">
                   <InputGroupAddon>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setSearchQuery('')}
-                      className="h-6 w-6 text-gray-500 hover:bg-transparent hover:text-gray-300"
-                      type="button"
-                      aria-label="Clear search"
-                    >
-                      <X size={16} />
-                    </Button>
+                    <Search size={16} className="text-white" />
                   </InputGroupAddon>
-                )}
-              </InputGroup>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <FriendsList friends={filteredFriends} discordFriends={discordFriends} filter={activeTab} searchQuery={searchQuery} />
-            </div>
-          </>
-        )}
+                  <InputGroupInput
+                    type="text"
+                    placeholder="Search friends..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="text-white placeholder:text-gray-500"
+                  />
+                  {searchQuery && (
+                    <InputGroupAddon>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSearchQuery('')}
+                        className="h-6 w-6 text-gray-500 hover:bg-transparent hover:text-gray-300"
+                        type="button"
+                        aria-label="Clear search"
+                      >
+                        <X size={16} />
+                      </Button>
+                    </InputGroupAddon>
+                  )}
+                </InputGroup>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <FriendsList friends={filteredFriends} discordFriends={discordFriends} filter={activeTab} searchQuery={searchQuery} />
+              </div>
+            </>
+          )}
 
-        {activeTab === 'pending' && currentUser && (
-          <PendingRequests requests={requests} currentUser={currentUser} discordRequests={discordPendingRequests} />
-        )}
+          {activeTab === 'pending' && currentUser && (
+            <PendingRequests requests={requests} currentUser={currentUser} discordRequests={discordPendingRequests} />
+          )}
+        </div>
+
+        {discordConnected && <DiscordActivitiesPanel />}
       </div>
     </div>
   );

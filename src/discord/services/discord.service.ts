@@ -71,10 +71,12 @@ export const DiscordService = {
     try {
       const messages = await DiscordApiService.getChannelMessages(channelId, before);
 
-      // Store author user objects in the users store
+      // Store author and mentioned user objects in the users store
       const authors = messages.map((m: any) => m.author).filter(Boolean);
-      if (authors.length > 0) {
-        useDiscordUsersStore.getState().addUsers(authors);
+      const mentionedUsers = messages.flatMap((m: any) => m.mentions || []).filter(Boolean);
+      const allUsers = [...authors, ...mentionedUsers];
+      if (allUsers.length > 0) {
+        useDiscordUsersStore.getState().addUsers(allUsers);
       }
 
       // Store member data and request full guild members via Opcode 8
@@ -88,8 +90,8 @@ export const DiscordService = {
           useDiscordMembersStore.getState().addMembers(channel.guild_id, membersToAdd);
         }
 
-        // Request full member data for all unique authors via Opcode 8
-        const uniqueUserIds = [...new Set(authors.map((a: any) => a.id).filter(Boolean))] as string[];
+        // Request full member data for all unique authors + mentioned users via Opcode 8
+        const uniqueUserIds = [...new Set(allUsers.map((u: any) => u.id).filter(Boolean))] as string[];
         if (uniqueUserIds.length > 0) {
           DiscordGatewayService.requestGuildMembers(channel.guild_id, uniqueUserIds);
         }

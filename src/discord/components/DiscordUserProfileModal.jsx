@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import { UserCircle } from '@phosphor-icons/react';
+import { UserCircle, GameController, MusicNote, Broadcast, Eye, Trophy } from '@phosphor-icons/react';
 import { toast } from 'sonner';
+import { useModalStore } from '@/store/modal.store';
 import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
+import { useDiscordActivitiesStore, ActivityType } from '../store/discord-activities.store';
 
 const DISCORD_EPOCH = 1420070400000;
 
@@ -28,16 +30,164 @@ const statusColors = {
   offline: 'bg-gray-500',
 };
 
-const DiscordUserProfileModal = ({ author, member: memberProp, guildId, open, onOpenChange }) => {
+const RELEVANT_ACTIVITY_TYPES = new Set([
+  ActivityType.PLAYING,
+  ActivityType.STREAMING,
+  ActivityType.LISTENING,
+  ActivityType.WATCHING,
+  ActivityType.COMPETING,
+]);
+
+const getActivityLabel = (type) => {
+  switch (type) {
+    case ActivityType.PLAYING: return 'Playing';
+    case ActivityType.STREAMING: return 'Streaming';
+    case ActivityType.LISTENING: return 'Listening to Spotify';
+    case ActivityType.WATCHING: return 'Watching';
+    case ActivityType.COMPETING: return 'Competing in';
+    default: return null;
+  }
+};
+
+const getActivityImageUrl = (activity) => {
+  if (!activity.assets?.large_image) return null;
+  const img = activity.assets.large_image;
+  if (img.startsWith('mp:')) return `https://media.discordapp.net/${img.slice(3)}`;
+  if (activity.application_id) return `https://cdn.discordapp.com/app-assets/${activity.application_id}/${img}.png`;
+  return null;
+};
+
+const getSmallImageUrl = (activity) => {
+  if (!activity.assets?.small_image) return null;
+  const img = activity.assets.small_image;
+  if (img.startsWith('mp:')) return `https://media.discordapp.net/${img.slice(3)}`;
+  if (activity.application_id) return `https://cdn.discordapp.com/app-assets/${activity.application_id}/${img}.png`;
+  return null;
+};
+
+const formatElapsed = (ms) => {
+  const totalSecs = Math.floor((Date.now() - ms) / 1000);
+  const hrs = Math.floor(totalSecs / 3600);
+  const mins = Math.floor((totalSecs % 3600) / 60);
+  const secs = totalSecs % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  if (hrs > 0) return `${pad(hrs)}:${pad(mins)}:${pad(secs)} elapsed`;
+  return `${pad(mins)}:${pad(secs)} elapsed`;
+};
+
+const ActivityTypeIcon = ({ type, size = 24 }) => {
+  switch (type) {
+    case ActivityType.PLAYING: return <GameController size={size} weight="fill" />;
+    case ActivityType.STREAMING: return <Broadcast size={size} weight="fill" />;
+    case ActivityType.LISTENING: return <MusicNote size={size} weight="fill" />;
+    case ActivityType.WATCHING: return <Eye size={size} weight="fill" />;
+    case ActivityType.COMPETING: return <Trophy size={size} weight="fill" />;
+    default: return <GameController size={size} weight="fill" />;
+  }
+};
+
+const ActivitySection = ({ activity }) => {
+  const appIcon = useDiscordActivitiesStore((s) =>
+    activity.application_id ? s.appIcons[activity.application_id] : undefined
+  );
+  const fetchAppIcon = useDiscordActivitiesStore((s) => s.fetchAppIcon);
+  const label = getActivityLabel(activity.type);
+  const largeImage = getActivityImageUrl(activity);
+  const smallImage = getSmallImageUrl(activity);
+  const isStreaming = activity.type === ActivityType.STREAMING;
+  const isListening = activity.type === ActivityType.LISTENING;
+  const elapsed = activity.timestamps?.start || activity.created_at;
+
+  useEffect(() => {
+    if (!largeImage && activity.application_id) {
+      fetchAppIcon(activity.application_id);
+    }
+  }, [activity.application_id, largeImage, fetchAppIcon]);
+
+  const iconUrl = largeImage || appIcon;
+
+  return (
+    <div className="space-y-2">
+      <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isStreaming ? 'text-[#9147ff]' : isListening ? 'text-[#1db954]' : 'text-gray-400'}`}>
+        {label}
+      </h3>
+      <div className="rounded-md bg-[#1a1a1e] p-2.5">
+        <div className="flex gap-2.5">
+          {iconUrl ? (
+            <div className="relative shrink-0">
+              <img
+                src={iconUrl}
+                alt={activity.assets?.large_text || ''}
+                className="size-[60px] rounded-lg object-cover"
+              />
+              {smallImage && (
+                <img
+                  src={smallImage}
+                  alt={activity.assets?.small_text || ''}
+                  className="absolute -bottom-1 -right-1 size-5 rounded-full border-2 border-[#1a1a1e] object-cover"
+                  title={activity.assets?.small_text}
+                />
+              )}
+            </div>
+          ) : (
+            <div className="flex size-[60px] shrink-0 items-center justify-center rounded-lg bg-[#2b2d31] text-gray-400">
+              <ActivityTypeIcon type={activity.type} />
+            </div>
+          )}
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+            <div className="truncate text-sm font-semibold text-white">{activity.name}</div>
+            {activity.details && (
+              <div className="truncate text-[13px] text-gray-300">{activity.details}</div>
+            )}
+            {activity.state && (
+              <div className="truncate text-[13px] text-gray-400">{activity.state}</div>
+            )}
+            {activity.party?.size && (
+              <div className="text-[11px] text-gray-500">
+                {activity.party.size[0]} of {activity.party.size[1]}
+              </div>
+            )}
+            {elapsed && (
+              <div className="text-[11px] text-gray-500">{formatElapsed(elapsed)}</div>
+            )}
+          </div>
+        </div>
+        {activity.buttons?.length > 0 && (
+          <div className="mt-2 flex gap-2">
+            {activity.buttons.map((btn, i) => (
+              <div
+                key={i}
+                className="flex-1 truncate rounded bg-[#4e5058]/50 px-3 py-1.5 text-center text-xs font-medium text-gray-300"
+              >
+                {typeof btn === 'string' ? btn : btn.label}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId }) => {
+  const closeModal = () => useModalStore.getState().close(modalId);
   const guilds = useDiscordGuildsStore((s) => s.guilds);
   const storeUser = useDiscordUsersStore((s) => s.users[author?.id]);
   const storeMember = useDiscordMembersStore((s) => guildId && author?.id ? s.members[guildId]?.[author.id] : undefined);
   const [profile, setProfile] = useState(null);
   const [note, setNote] = useState('');
+  const [rolesExpanded, setRolesExpanded] = useState(false);
+
+  const userActivities = useDiscordActivitiesStore((s) => author?.id ? s.activities[author.id] : undefined);
 
   const member = memberProp || storeMember;
   const user = { ...author, ...storeUser };
   const guild = guildId ? guilds.find((g) => g.id === guildId) : null;
+
+  const relevantActivities = useMemo(() => {
+    if (!userActivities) return [];
+    return userActivities.filter((a) => RELEVANT_ACTIVITY_TYPES.has(a.type));
+  }, [userActivities]);
 
   const displayName = member?.nick || user?.global_name || user?.username;
   const avatarUrl = user?.id ? DiscordService.getUserAvatarUrl(user.id, user.avatar, 128) : null;
@@ -71,12 +221,12 @@ const DiscordUserProfileModal = ({ author, member: memberProp, guildId, open, on
   }, [member, guild, guildId]);
 
   useEffect(() => {
-    if (!open || !author?.id) return;
+    if (!author?.id) return;
     setProfile(null);
     DiscordApiService.getUserProfile(author.id, guildId)
       .then(setProfile)
       .catch(() => {});
-  }, [open, author?.id, guildId]);
+  }, [author?.id, guildId]);
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(user.id);
@@ -86,7 +236,7 @@ const DiscordUserProfileModal = ({ author, member: memberProp, guildId, open, on
   if (!author) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open onOpenChange={closeModal}>
       <DialogContent aria-describedby={undefined} className="max-w-xl border-none bg-transparent p-0 shadow-2xl [&>button]:hidden">
         <VisuallyHidden>
           <DialogTitle>User Profile</DialogTitle>
@@ -160,6 +310,10 @@ const DiscordUserProfileModal = ({ author, member: memberProp, guildId, open, on
                 </div>
               )}
 
+              {relevantActivities.map((activity, i) => (
+                <ActivitySection key={activity.application_id || activity.name || i} activity={activity} />
+              ))}
+
               {member?.joined_at && (
                 <div className="space-y-2">
                   <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
@@ -194,7 +348,7 @@ const DiscordUserProfileModal = ({ author, member: memberProp, guildId, open, on
                     Roles
                   </h3>
                   <div className="flex flex-wrap gap-1">
-                    {roles.map((role) => (
+                    {(rolesExpanded ? roles : roles.slice(0, 4)).map((role) => (
                       <span
                         key={role.id}
                         className="flex items-center gap-1 rounded bg-[#2b2d31] px-2 py-0.5 text-[11px] font-bold text-gray-200"
@@ -206,6 +360,15 @@ const DiscordUserProfileModal = ({ author, member: memberProp, guildId, open, on
                         {role.name}
                       </span>
                     ))}
+                    {!rolesExpanded && roles.length > 4 && (
+                      <button
+                        type="button"
+                        onClick={() => setRolesExpanded(true)}
+                        className="flex items-center rounded bg-[#2b2d31] px-2 py-0.5 text-[11px] font-bold text-gray-200 transition-colors hover:bg-[#35373c]"
+                      >
+                        +{roles.length - 4}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

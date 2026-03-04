@@ -10,6 +10,9 @@ import { computeChannelPermissions } from '../utils/permissions';
 import { VIEW_CHANNEL, CONNECT } from '../constants/permissions';
 import { useDiscordHasPermission } from '../hooks/useDiscordPermission';
 import { scrollPositions } from '@/store/last-channel.store';
+import { useDiscordTypingStore } from '../store/discord-typing.store';
+import AvatarStack from '@/components/ui/avatar-stack';
+import TypingDots from '@/components/ui/typing-dots';
 
 const DISCORD_EPOCH = 1420070400000;
 const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
@@ -48,6 +51,7 @@ const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId }) =>
   const entry = readStates[channel.id];
   const isVoiceChannel = channel.type === DiscordChannelType.GUILD_VOICE || channel.type === DiscordChannelType.GUILD_STAGE_VOICE;
   const canConnect = useDiscordHasPermission(channel.guild_id, isVoiceChannel ? channel : undefined, CONNECT);
+  const typingUsers = useDiscordTypingStore((s) => s.typing[channel.id] || []);
 
   const isUnread =
     !isActive &&
@@ -65,6 +69,7 @@ const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId }) =>
       return snowflakeToTimestamp(channel.last_message_id) > joinedAtMs;
     })();
   const mentionCount = entry?.mention_count ?? 0;
+  const showTyping = !isVoiceChannel && typingUsers.length > 0 && !mentionCount;
 
   return (
     <Link
@@ -89,12 +94,25 @@ const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId }) =>
         className={`size-5 shrink-0 ${isActive ? 'text-gray-200' : isUnread ? 'text-white' : 'text-gray-500'}`}
       />
       <p
-        className={`ml-1 flex-1 select-none truncate text-base ${
+        className={`ml-1 select-none truncate text-base ${showTyping ? '' : 'flex-1'} ${
           isActive ? 'font-semibold text-white' : isUnread ? 'font-semibold' : 'font-medium'
         }`}
       >
         {channel.name}
       </p>
+      {showTyping && (
+        <span className="ml-auto flex items-center gap-1">
+          <AvatarStack
+            avatars={typingUsers.map((u) => ({
+              key: u.user_id,
+              src: DiscordService.getUserAvatarUrl(u.user_id, u.avatar, 32),
+            }))}
+            maxVisible={3}
+            size={16}
+          />
+          <TypingDots />
+        </span>
+      )}
       {mentionCount > 0 && (
         <div className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-bold text-white">
           {mentionCount > 99 ? '99+' : mentionCount}

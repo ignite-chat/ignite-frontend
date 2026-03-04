@@ -32,6 +32,7 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
   const storeUser = useDiscordUsersStore((s) => s.users[author.id]);
   const storeMember = useDiscordMembersStore((s) => guildId ? s.members[guildId]?.[author.id] : undefined);
   const [profile, setProfile] = useState(null);
+  const [rolesExpanded, setRolesExpanded] = useState(false);
 
   const member = memberProp || storeMember;
   const user = { ...author, ...storeUser };
@@ -178,7 +179,7 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
                 Roles
               </h3>
               <div className="flex flex-wrap gap-1">
-                {roles.map((role) => (
+                {(rolesExpanded ? roles : roles.slice(0, 4)).map((role) => (
                   <span
                     key={role.id}
                     className="flex items-center gap-1 rounded bg-[#2b2d31] px-2 py-0.5 text-[11px] font-bold text-gray-200"
@@ -190,6 +191,15 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
                     {role.name}
                   </span>
                 ))}
+                {!rolesExpanded && roles.length > 4 && (
+                  <button
+                    type="button"
+                    onClick={() => setRolesExpanded(true)}
+                    className="flex items-center rounded bg-[#2b2d31] px-2 py-0.5 text-[11px] font-bold text-gray-200 transition-colors hover:bg-[#35373c]"
+                  >
+                    +{roles.length - 4}
+                  </button>
+                )}
               </div>
             </div>
           )}

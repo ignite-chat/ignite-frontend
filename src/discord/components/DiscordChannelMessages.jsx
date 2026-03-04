@@ -58,7 +58,8 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const hasManageMessages = useDiscordHasPermission(guildId, channel, MANAGE_MESSAGES);
   const hasKickMembers = useDiscordHasPermission(guildId, channel, KICK_MEMBERS);
   const hasBanMembers = useDiscordHasPermission(guildId, channel, BAN_MEMBERS);
-  const hasReadMessageHistory = useDiscordHasPermission(guildId, channel, READ_MESSAGE_HISTORY);
+  const _hasReadMessageHistory = useDiscordHasPermission(guildId, channel, READ_MESSAGE_HISTORY);
+  const hasReadMessageHistory = !guildId || _hasReadMessageHistory;
 
   const channelMessages = useDiscordChannelsStore((s) => s.channelMessages);
   const channels = useDiscordChannelsStore((s) => s.channels);
@@ -310,28 +311,28 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   }, []);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto" ref={messagesRef} onScroll={onScroll}>
+    <div className="relative min-h-0 flex-1 overflow-y-auto" ref={messagesRef} onScroll={onScroll}>
+      {hasReadMessageHistory && unreadBarData && (
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-destructive/30 bg-destructive/10 px-4 py-1.5 text-sm backdrop-blur-sm">
+          <span className="font-medium text-destructive">
+            {unreadBarData.count}{!unreadBarData.isExact && '+'} new message{unreadBarData.count !== 1 ? 's' : ''} since {unreadBarData.sinceText}
+          </span>
+          <button
+            type="button"
+            onClick={handleMarkAsRead}
+            className="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20"
+          >
+            Mark as Read
+            <Check size={14} weight="bold" />
+          </button>
+        </div>
+      )}
       <div ref={contentRef} className="flex min-h-full flex-col justify-end">
         {!hasReadMessageHistory && (
           <div className="px-4 pb-4 pt-8">
             <p className="text-sm text-gray-400">
               You do not have permission to view the message history of #{channel.name}
             </p>
-          </div>
-        )}
-        {hasReadMessageHistory && unreadBarData && (
-          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-destructive/30 bg-destructive/10 px-4 py-1.5 text-sm backdrop-blur-sm">
-            <span className="font-medium text-destructive">
-              {unreadBarData.count}{!unreadBarData.isExact && '+'} new message{unreadBarData.count !== 1 ? 's' : ''} since {unreadBarData.sinceText}
-            </span>
-            <button
-              type="button"
-              onClick={handleMarkAsRead}
-              className="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20"
-            >
-              Mark as Read
-              <Check size={14} weight="bold" />
-            </button>
           </div>
         )}
 
@@ -364,7 +365,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
                 new Date(msgTs).toDateString() !== new Date(prevTs).toDateString();
 
               return (
-                <div key={msg.id}>
+                <div key={msg.id} data-message-id={msg.id}>
                   {showDateSeparator && <DateSeparator timestamp={msgTs} />}
                   {showNewSeparator && <NewMessagesSeparator />}
                   <DiscordMessage
