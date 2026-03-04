@@ -113,6 +113,12 @@ const DiscordMessageContent = ({ content, guildId }) => {
   return <DiscordMarkdownRenderer nodes={ast} guildId={guildId} />;
 };
 
+function fitDimensions(w, h, maxW, maxH) {
+  if (!w || !h) return { width: maxW, height: maxH };
+  const scale = Math.min(maxW / w, maxH / h, 1);
+  return { width: Math.round(w * scale), height: Math.round(h * scale) };
+}
+
 const DiscordAttachments = ({ attachments }) => {
   if (!attachments || attachments.length === 0) return null;
 
@@ -123,8 +129,7 @@ const DiscordAttachments = ({ attachments }) => {
         const isVideo = att.content_type?.startsWith('video/');
 
         if (isImage) {
-          const maxW = Math.min(att.width || 400, 400);
-          const maxH = Math.min(att.height || 300, 300);
+          const { width, height } = fitDimensions(att.width, att.height, 400, 300);
           return (
             <a
               key={att.id}
@@ -136,19 +141,23 @@ const DiscordAttachments = ({ attachments }) => {
                 src={att.proxy_url || att.url}
                 alt={att.filename}
                 className="rounded-lg"
-                style={{ maxWidth: maxW, maxHeight: maxH }}
+                width={width}
+                height={height}
               />
             </a>
           );
         }
 
         if (isVideo) {
+          const { width, height } = fitDimensions(att.width, att.height, 400, 300);
           return (
             <video
               key={att.id}
               src={att.proxy_url || att.url}
               controls
-              className="max-h-[300px] max-w-[400px] rounded-lg"
+              className="rounded-lg"
+              width={width}
+              height={height}
             />
           );
         }
@@ -218,20 +227,30 @@ const DiscordEmbeds = ({ embeds }) => {
               {embed.description && (
                 <p className="text-sm text-gray-300">{embed.description}</p>
               )}
-              {embed.image && (
-                <img
-                  src={embed.image.proxy_url || embed.image.url}
-                  alt=""
-                  className="mt-2 max-w-full rounded"
-                />
-              )}
-              {embed.thumbnail && !embed.image && (
-                <img
-                  src={embed.thumbnail.proxy_url || embed.thumbnail.url}
-                  alt=""
-                  className="mt-2 max-h-20 rounded"
-                />
-              )}
+              {embed.image && (() => {
+                const { width, height } = fitDimensions(embed.image.width, embed.image.height, 496, 400);
+                return (
+                  <img
+                    src={embed.image.proxy_url || embed.image.url}
+                    alt=""
+                    className="mt-2 rounded"
+                    width={width}
+                    height={height}
+                  />
+                );
+              })()}
+              {embed.thumbnail && !embed.image && (() => {
+                const { width, height } = fitDimensions(embed.thumbnail.width, embed.thumbnail.height, 80, 80);
+                return (
+                  <img
+                    src={embed.thumbnail.proxy_url || embed.thumbnail.url}
+                    alt=""
+                    className="mt-2 rounded"
+                    width={width}
+                    height={height}
+                  />
+                );
+              })()}
               {embed.footer && (
                 <div className="mt-2 text-xs text-gray-500">{embed.footer.text}</div>
               )}

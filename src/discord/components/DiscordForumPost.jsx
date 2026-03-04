@@ -80,114 +80,127 @@ const DiscordForumPost = ({ thread, firstMessage, owner, guildId, availableTags 
     navigate(`/discord/${guildId}/${thread.id}`);
   };
 
+  const createdTime = useMemo(() => {
+    return formatRelativeTime(snowflakeToTimestamp(thread.id));
+  }, [thread.id]);
+
   return (
     <button
       type="button"
       onClick={handleClick}
-      className="flex w-full cursor-pointer flex-col gap-2 rounded-lg bg-[#2b2d31] p-4 text-left transition-colors hover:bg-[#32353b]"
+      className="flex aspect-square w-full cursor-pointer flex-col rounded-lg bg-[#232428] p-4 text-left transition-colors hover:bg-[#2a2d31]"
     >
-      {/* Title */}
-      <h3 className="text-base font-semibold text-white">{thread.name}</h3>
-
-      {/* Content preview */}
-      {contentAst && (
-        <div className="line-clamp-3 text-sm text-gray-400 [overflow-wrap:anywhere]">
-          <DiscordMarkdownRenderer nodes={contentAst} guildId={guildId} />
-        </div>
-      )}
-
-      {/* First message attachments preview */}
-      {firstMessage?.attachments?.length > 0 && (
-        <div className="flex gap-2">
-          {firstMessage.attachments.slice(0, 3).map((att) => {
-            if (att.content_type?.startsWith('image/')) {
-              return (
-                <img
-                  key={att.id}
-                  src={att.proxy_url || att.url}
-                  alt={att.filename}
-                  className="h-20 max-w-[120px] rounded object-cover"
-                />
-              );
-            }
-            return null;
-          })}
-        </div>
-      )}
-
-      {/* Reactions */}
-      {reactions?.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {reactions.map((reaction, i) => {
-            const emoji = reaction.emoji;
-            const isCustom = !!emoji.id;
-            const key = isCustom ? emoji.id : `${emoji.name}-${i}`;
-            const count = reaction.count || 0;
-            return (
-              <div
-                key={key}
-                className="flex items-center gap-1 rounded-sm bg-[#232428] px-1.5 py-0.5"
-              >
-                {isCustom ? (
-                  <img
-                    src={`${DISCORD_EMOJI_CDN}/${emoji.id}.${emoji.animated ? 'gif' : 'webp'}?size=32`}
-                    alt={emoji.name}
-                    className="size-4 object-contain"
-                  />
-                ) : (
-                  <img
-                    src={getTwemojiUrl(emoji.name)}
-                    alt={emoji.name}
-                    className="size-4 object-contain"
-                  />
-                )}
-                <span className="text-xs text-gray-400">{count}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Tags */}
-      {appliedTagObjects.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {appliedTagObjects.map((tag) => (
-            <span
-              key={tag.id}
-              className="flex items-center gap-1 rounded bg-[#3f4147] px-2 py-0.5 text-xs text-gray-300"
-            >
-              {tag.emoji_name && (
-                tag.emoji_id ? (
-                  <img
-                    src={`${DISCORD_EMOJI_CDN}/${tag.emoji_id}.webp?size=16`}
-                    alt=""
-                    className="size-3.5"
-                  />
-                ) : (
-                  <span className="text-sm leading-none">{tag.emoji_name}</span>
-                )
-              )}
-              {tag.name}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Footer: author + message count + last activity */}
-      <div className="flex items-center gap-3 text-xs text-gray-500">
+      {/* Author header */}
+      <div className="flex items-center gap-1.5 text-xs">
         {authorAvatar && (
-          <div className="flex items-center gap-1.5">
-            <img src={authorAvatar} alt="" className="size-4 rounded-full" />
-            <span className="text-gray-400">{authorName}</span>
-          </div>
+          <img src={authorAvatar} alt="" className="size-4 rounded-full" />
         )}
-        {thread.message_count > 0 && (
-          <div className="flex items-center gap-1">
-            <ChatCircle size={14} />
-            <span>{thread.message_count} {thread.message_count === 1 ? 'reply' : 'replies'}</span>
+        <span className="font-medium text-gray-300">{authorName}</span>
+        <span className="text-gray-500">Posted {createdTime}</span>
+      </div>
+
+      {/* Title */}
+      <h3 className="mt-2.5 line-clamp-2 text-base font-semibold text-white">{thread.name}</h3>
+
+      {/* Content card */}
+      {(contentAst || firstMessage?.attachments?.length > 0 || appliedTagObjects.length > 0) && (
+        <div className="mt-2.5 flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border p-3">
+          <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden">
+            {contentAst && (
+              <div className="line-clamp-3 text-sm text-gray-400 [overflow-wrap:anywhere]">
+                <DiscordMarkdownRenderer nodes={contentAst} guildId={guildId} />
+              </div>
+            )}
+            {firstMessage?.attachments?.length > 0 && (
+              <div className="flex gap-2 overflow-hidden">
+                {firstMessage.attachments.slice(0, 3).map((att) => {
+                  if (att.content_type?.startsWith('image/')) {
+                    return (
+                      <img
+                        key={att.id}
+                        src={att.proxy_url || att.url}
+                        alt={att.filename}
+                        className="h-20 max-w-[120px] rounded object-cover"
+                      />
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+            )}
           </div>
+          {/* Tags inside card */}
+          {appliedTagObjects.length > 0 && (
+            <div className="mt-2.5 flex flex-wrap gap-1 overflow-hidden" style={{ maxHeight: '1.5rem' }}>
+              {appliedTagObjects.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="flex items-center gap-1 rounded-full border border-white/10 bg-[#2b2d31] px-2 py-0.5 text-xs text-gray-300"
+                >
+                  {tag.emoji_name && (
+                    tag.emoji_id ? (
+                      <img
+                        src={`${DISCORD_EMOJI_CDN}/${tag.emoji_id}.webp?size=16`}
+                        alt=""
+                        className="size-3.5"
+                      />
+                    ) : (
+                      <img
+                        src={getTwemojiUrl(tag.emoji_name)}
+                        alt={tag.emoji_name}
+                        className="size-3.5"
+                      />
+                    )
+                  )}
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Spacer when no content */}
+      {!contentAst && !firstMessage?.attachments?.length && !appliedTagObjects.length && <div className="flex-1" />}
+
+      {/* Footer: reply count (left) + reactions (right) */}
+      <div className="mt-2.5 flex items-center gap-1.5 text-xs text-gray-500">
+        <ChatCircle size={14} weight="fill" />
+        <span>{thread.message_count}</span>
+        {reactions?.length > 0 && (
+          <>
+            <div className="flex-1" />
+            <div className="flex gap-1 overflow-hidden">
+              {reactions.map((reaction, i) => {
+                const emoji = reaction.emoji;
+                const isCustom = !!emoji.id;
+                const key = isCustom ? emoji.id : `${emoji.name}-${i}`;
+                const count = reaction.count || 0;
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center gap-1 rounded bg-[#1a1b1e] px-1.5 py-1"
+                  >
+                    {isCustom ? (
+                      <img
+                        src={`${DISCORD_EMOJI_CDN}/${emoji.id}.${emoji.animated ? 'gif' : 'webp'}?size=32`}
+                        alt={emoji.name}
+                        className="size-4 object-contain"
+                      />
+                    ) : (
+                      <img
+                        src={getTwemojiUrl(emoji.name)}
+                        alt={emoji.name}
+                        className="size-4 object-contain"
+                      />
+                    )}
+                    <span className="text-xs text-gray-400">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
-        {lastActivityTime && <span>{lastActivityTime}</span>}
       </div>
     </button>
   );

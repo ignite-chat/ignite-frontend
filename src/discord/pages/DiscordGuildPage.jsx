@@ -4,6 +4,7 @@ import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordStore } from '../store/discord.store';
 import { useLastChannelStore } from '@/store/last-channel.store';
+import { GUILD_TEXT } from '../constants/channel-types';
 import { DiscordGatewayService } from '../services/discord-gateway.service';
 import { DiscordApiService } from '../services/discord-api.service';
 import DiscordGuildLayout from '../layouts/DiscordGuildLayout';
@@ -47,7 +48,7 @@ const DiscordGuildPage = () => {
         return;
       }
       const textChannels = guildChannels
-        .filter((c) => c.type === 0)
+        .filter((c) => c.type === GUILD_TEXT)
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
       if (textChannels.length > 0) {
         navigate(`/discord/${guildId}/${textChannels[0].id}`, { replace: true });

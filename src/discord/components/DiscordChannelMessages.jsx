@@ -64,10 +64,11 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const channelMessages = useDiscordChannelsStore((s) => s.channelMessages);
   const channels = useDiscordChannelsStore((s) => s.channels);
 
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [forceScrollDown, setForceScrollDown] = useState(false);
+  const scrollTopOnRenderRef = useRef(false);
   const [newMessagesSeparatorId, setNewMessagesSeparatorId] = useState(null);
 
   const messagesRef = useRef();
@@ -200,17 +201,20 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     }
   }, [channelId]);
 
-  // Load initial messages or restore scroll position
+  // Load initial messages or restore scroll position (only on channel switch)
   useEffect(() => {
     if (!channelId || !hasReadMessageHistory) return;
-    if (channelMessages[channelId] != null) {
-      // Already loaded — restore saved scroll position or stay at bottom
+
+    // Read imperatively — avoids re-running this effect when messages populate mid-load
+    const cached = useDiscordChannelsStore.getState().channelMessages[channelId];
+    if (cached != null) {
+      // Already loaded — restore saved scroll position or position at top
       if (messagesRef.current) {
         const saved = scrollPositions.getMessage(channelId);
         if (saved != null) {
           messagesRef.current.scrollTop = saved;
         } else {
-          messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+          scrollTopOnRenderRef.current = true;
         }
       }
       return;
@@ -218,13 +222,13 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
 
     setIsLoading(true);
     setHasMore(true);
+    scrollTopOnRenderRef.current = true;
     DiscordService.loadChannelMessages(channelId)
       .then((data) => {
         setHasMore(data.length >= 50);
-        setTimeout(() => setForceScrollDown(true), 0);
       })
       .finally(() => setIsLoading(false));
-  }, [channelId, channelMessages, hasReadMessageHistory]);
+  }, [channelId, hasReadMessageHistory]);
 
   // Load older messages on scroll to top
   const onLoadMore = useCallback(async () => {
@@ -247,9 +251,15 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     }
   }, [messageSentCount]);
 
-  // Auto-scroll on new messages when near bottom
+  // Scroll to top after initial load, or auto-scroll on new messages when near bottom
   useEffect(() => {
-    if (!messagesRef.current) return;
+    if (!messagesRef.current || isLoading) return;
+    if (scrollTopOnRenderRef.current && messages.length > 0) {
+      messagesRef.current.scrollTop = 200;
+      scrollTopOnRenderRef.current = false;
+      wasNearBottomRef.current = false;
+      return;
+    }
     const el = messagesRef.current;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
     if (forceScrollDown || nearBottom) {
@@ -257,7 +267,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
       if (forceScrollDown) setForceScrollDown(false);
       ackIfAtBottom();
     }
-  }, [messages, forceScrollDown, ackIfAtBottom]);
+  }, [messages, forceScrollDown, ackIfAtBottom, isLoading]);
 
   // Always scroll to bottom when pending messages appear (user just sent a message)
   useEffect(() => {
@@ -295,6 +305,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
 
     let prevScrollHeight = scrollEl.scrollHeight;
     const observer = new ResizeObserver(() => {
+      if (scrollTopOnRenderRef.current) return;
       const newScrollHeight = scrollEl.scrollHeight;
       const delta = newScrollHeight - prevScrollHeight;
       prevScrollHeight = newScrollHeight;
@@ -313,14 +324,14 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   return (
     <div className="relative min-h-0 flex-1 overflow-y-auto" ref={messagesRef} onScroll={onScroll}>
       {hasReadMessageHistory && unreadBarData && (
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-destructive/30 bg-destructive/10 px-4 py-1.5 text-sm backdrop-blur-sm">
-          <span className="font-medium text-destructive">
+        <div className="sticky top-0 z-10 flex items-center justify-between bg-[#5865f2] px-4 py-0.5 text-sm">
+          <span className="font-medium text-white">
             {unreadBarData.count}{!unreadBarData.isExact && '+'} new message{unreadBarData.count !== 1 ? 's' : ''} since {unreadBarData.sinceText}
           </span>
           <button
             type="button"
             onClick={handleMarkAsRead}
-            className="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20"
+            className="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold text-white transition-colors hover:text-white/80"
           >
             Mark as Read
             <Check size={14} weight="bold" />

@@ -1,0 +1,11 @@
+export const GUILD_TEXT = 0;
+export const DM = 1;
+export const GUILD_VOICE = 2;
+export const GROUP_DM = 3;
+export const GUILD_CATEGORY = 4;
+export const GUILD_ANNOUNCEMENT = 5;
+export const ANNOUNCEMENT_THREAD = 10;
+export const PUBLIC_THREAD = 11;
+export const PRIVATE_THREAD = 12;
+export const GUILD_STAGE_VOICE = 13;
+export const GUILD_FORUM = 15;

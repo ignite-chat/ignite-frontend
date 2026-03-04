@@ -417,6 +417,33 @@ export const DiscordGatewayService = {
         }
         break;
       }
+      case 'SESSIONS_REPLACE': {
+        // data is an array of sessions — derive the current user's active status
+        // Pick the most "active" session status: online > idle > dnd > offline
+        const currentUserId = useDiscordStore.getState().user?.id;
+        if (currentUserId && Array.isArray(data) && data.length > 0) {
+          const statusPriority: Record<string, number> = { online: 3, dnd: 2, idle: 1, offline: 0 };
+          let bestStatus = 'offline';
+          let bestActivities: any[] = [];
+          let bestClientStatus: any = {};
+          for (const session of data) {
+            const s = session.status || 'offline';
+            if ((statusPriority[s] ?? 0) > (statusPriority[bestStatus] ?? 0)) {
+              bestStatus = s;
+              bestActivities = session.activities || [];
+              bestClientStatus = session.client_status || {};
+            }
+          }
+          useDiscordUsersStore.getState().updatePresence({
+            user_id: currentUserId,
+            status: bestStatus as any,
+            activities: bestActivities,
+            client_status: bestClientStatus,
+          });
+          syncActivities([{ user_id: currentUserId, activities: bestActivities }]);
+        }
+        break;
+      }
       default:
         console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         // Forward unhandled events to the external handler if set
@@ -440,6 +467,9 @@ export const DiscordGatewayService = {
     useDiscordStore.getState().setUser(user);
     useDiscordStore.getState().setSessionId(session_id);
     useDiscordStore.getState().setConnected(true);
+
+    // Store the current user in the users store so presence can be tracked
+    useDiscordUsersStore.getState().addUser({ ...user, status: 'online' });
 
     if (resume_gateway_url) {
       this.resumeGatewayUrl = resume_gateway_url;

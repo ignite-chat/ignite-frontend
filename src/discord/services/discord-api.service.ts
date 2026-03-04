@@ -183,8 +183,10 @@ export const DiscordApiService = {
   /**
    * Get post data for a forum channel (thread metadata + first messages + owners).
    */
-  async getForumPostData(channelId: string) {
-    const { data } = await discordApi.get(`/channels/${channelId}/post-data`);
+  async getForumPostData(channelId: string, threadIds: string[]) {
+    const { data } = await discordApi.post(`/channels/${channelId}/post-data`, {
+      thread_ids: threadIds,
+    });
     return data;
   },
 

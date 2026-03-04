@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Gear,
   Microphone,
@@ -14,16 +15,26 @@ import {
   VideoCameraSlash,
   Monitor,
   Waveform,
+  DiscordLogo,
+  UserCircle,
+  Check,
 } from '@phosphor-icons/react';
 import { useAuthStore } from '@/ignite/store/auth.store';
 import UserSettingsModal from '@/ignite/components/modals/UserSettingsModal';
+import UserProfileModal from '@/ignite/components/modals/UserProfileModal';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { LogOut } from 'lucide-react';
 import Avatar from './Avatar';
 import { useVoiceStore } from '@/ignite/store/voice.store';
 import { useUsersStore } from '@/ignite/store/users.store';
 import { VoiceService } from '@/ignite/services/voice.service';
 import { useModalStore } from '@/ignite/store/modal.store';
+import { useModalStore as useSharedModalStore } from '@/store/modal.store';
+import { useDiscordStore } from '@/discord/store/discord.store';
+import { useDiscordUsersStore } from '@/discord/store/discord-users.store';
+import { DiscordService } from '@/discord/services/discord.service';
+import DiscordUserProfileModal from '@/discord/components/DiscordUserProfileModal';
 import VoiceSettingsModal from '@/ignite/components/modals/VoiceSettingsModal';
 import ScreenShareModal from '@/ignite/components/modals/ScreenShareModal';
 
@@ -35,11 +46,166 @@ function getPingInfo(ping) {
   return { Icon: WifiSlash, color: 'text-red-500', label: `${Math.round(ping)} ms` };
 }
 
+const DISCORD_STATUS = {
+  online: { color: 'bg-green-500', label: 'Online' },
+  idle: { color: 'bg-yellow-500', label: 'Idle' },
+  dnd: { color: 'bg-red-500', label: 'Do Not Disturb' },
+  offline: { color: 'bg-gray-500', label: 'Invisible' },
+};
+
+const DiscordAvatarWithStatus = ({ avatarUrl, name, status, size = 36 }) => {
+  const dotSize = Math.round(size * 0.33);
+  const statusInfo = DISCORD_STATUS[status] || DISCORD_STATUS.online;
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <img
+        src={avatarUrl}
+        alt={name}
+        className="rounded-full object-cover select-none"
+        style={{ width: size, height: size }}
+      />
+      <div
+        className={`absolute bottom-0 right-0 rounded-full border-2 border-[#1a1a1d] ${statusInfo.color}`}
+        style={{ width: dotSize, height: dotSize }}
+      />
+    </div>
+  );
+};
+
+const useDiscordStatus = (userId) => {
+  const storedUser = useDiscordUsersStore((s) => userId ? s.users[userId] : undefined);
+  const isConnected = useDiscordStore((s) => s.isConnected);
+  // The user's status from presence data, default to 'online' when connected
+  return storedUser?.status || (isConnected ? 'online' : 'offline');
+};
+
+const UserProfilePopoverMenu = ({ igniteUser, activeDisplay, onSwitch }) => {
+  const discordUser = useDiscordStore((s) => s.user);
+  const isDiscordConnected = useDiscordStore((s) => s.isConnected);
+  const discordStatus = useDiscordStatus(discordUser?.id);
+
+  const discordAvatarUrl = discordUser
+    ? DiscordService.getUserAvatarUrl(discordUser.id, discordUser.avatar, 64)
+    : null;
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      {/* Ignite user */}
+      <button
+        type="button"
+        onClick={() => onSwitch('ignite')}
+        className={`flex items-center gap-2.5 rounded-sm px-2.5 py-2 text-sm transition-colors ${
+          activeDisplay === 'ignite'
+            ? 'bg-white/5 text-white'
+            : 'text-gray-400 hover:bg-white/5 hover:text-white'
+        }`}
+      >
+        <div className="relative shrink-0">
+          {igniteUser?.avatar_url ? (
+            <img src={igniteUser.avatar_url} alt="" className="size-7 rounded-full" />
+          ) : (
+            <div className="flex size-7 items-center justify-center rounded-full bg-[#2b2d31] text-xs font-semibold text-gray-300">
+              {igniteUser?.username?.slice(0, 1).toUpperCase()}
+            </div>
+          )}
+          <div
+            className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-[#1a1a1d] ${
+              igniteUser?.status === 'online' ? 'bg-green-500' : 'bg-gray-500'
+            }`}
+          />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col text-left">
+          <span className="truncate text-sm font-medium">{igniteUser?.name || 'Ignite User'}</span>
+          <span className="truncate text-[11px] text-gray-500">Ignite - {igniteUser?.status === 'online' ? 'Online' : 'Offline'}</span>
+        </div>
+        {activeDisplay === 'ignite' && <Check size={14} weight="bold" className="shrink-0 text-primary" />}
+      </button>
+
+      {/* Discord user */}
+      {isDiscordConnected && discordUser && (
+        <button
+          type="button"
+          onClick={() => onSwitch('discord')}
+          className={`flex items-center gap-2.5 rounded-sm px-2.5 py-2 text-sm transition-colors ${
+            activeDisplay === 'discord'
+              ? 'bg-white/5 text-white'
+              : 'text-gray-400 hover:bg-white/5 hover:text-white'
+          }`}
+        >
+          <div className="shrink-0">
+            {discordAvatarUrl ? (
+              <DiscordAvatarWithStatus avatarUrl={discordAvatarUrl} name="" status={discordStatus} size={28} />
+            ) : (
+              <div className="flex size-7 items-center justify-center rounded-full bg-[#5865f2]">
+                <DiscordLogo size={16} weight="fill" className="text-white" />
+              </div>
+            )}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col text-left">
+            <span className="truncate text-sm font-medium">{discordUser.global_name || discordUser.username}</span>
+            <span className="truncate text-[11px] text-gray-500">Discord - {DISCORD_STATUS[discordStatus]?.label || 'Online'}</span>
+          </div>
+          {activeDisplay === 'discord' && <Check size={14} weight="bold" className="shrink-0 text-primary" />}
+        </button>
+      )}
+
+      <div className="my-0.5 h-px bg-white/5" />
+      <button
+        type="button"
+        onClick={() => {
+          if (activeDisplay === 'discord' && discordUser) {
+            useSharedModalStore.getState().push(DiscordUserProfileModal, { author: discordUser });
+          } else if (igniteUser?.id) {
+            useModalStore.getState().push(UserProfileModal, { userId: igniteUser.id });
+          }
+        }}
+        className="flex items-center gap-2.5 rounded-sm px-2.5 py-2 text-sm text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+      >
+        <UserCircle size={18} weight="fill" />
+        View Active Profile
+      </button>
+    </div>
+  );
+};
+
 const UserBar = () => {
   const { logout } = useAuthStore();
   const { channelName, connectionState, isMuted, isDeafened, isCameraOn, isScreenSharing, room, ping } =
     useVoiceStore();
   const user = useUsersStore((state) => state.getCurrentUser());
+  const discordUser = useDiscordStore((s) => s.user);
+  const isDiscordConnected = useDiscordStore((s) => s.isConnected);
+
+  const location = useLocation();
+  const [activeDisplay, setActiveDisplay] = useState('ignite');
+
+  // Auto-switch based on current route
+  useEffect(() => {
+    const isOnDiscordRoute = location.pathname.startsWith('/discord/');
+    if (isOnDiscordRoute && isDiscordConnected && discordUser) {
+      setActiveDisplay('discord');
+    } else {
+      setActiveDisplay('ignite');
+    }
+  }, [location.pathname, isDiscordConnected, discordUser]);
+
+  const handleSwitch = (mode) => {
+    setActiveDisplay(mode);
+  };
+
+  const discordStatus = useDiscordStatus(discordUser?.id);
+
+  const showDiscord = activeDisplay === 'discord' && isDiscordConnected && discordUser;
+  const displayName = showDiscord
+    ? (discordUser.global_name || discordUser.username)
+    : user?.name;
+  const displayStatus = showDiscord
+    ? (DISCORD_STATUS[discordStatus]?.label || 'Online')
+    : (user?.status || 'Online');
+  const discordAvatarUrl = showDiscord
+    ? DiscordService.getUserAvatarUrl(discordUser.id, discordUser.avatar, 64)
+    : null;
 
   const isConnected = connectionState !== 'disconnected';
 
@@ -148,19 +314,39 @@ const UserBar = () => {
 
       {/* User Info Bar */}
       <div className="flex items-center rounded-lg bg-[#1a1a1d] px-2.5 py-2.5">
-        <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <div className="shrink-0">
-            <Avatar user={user} size={36} showStatus showOffline />
-          </div>
-          <div className="flex min-w-0 flex-col">
-            <span className="truncate text-base font-semibold leading-tight text-gray-100">
-              {user?.name}
-            </span>
-            <span className="truncate text-xs text-gray-500">
-              {user?.status || 'Online'}
-            </span>
-          </div>
-        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button type="button" className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-0.5 py-0.5 transition-colors hover:bg-white/5">
+              <div className="shrink-0">
+                {showDiscord ? (
+                  <DiscordAvatarWithStatus
+                    avatarUrl={discordAvatarUrl}
+                    name={displayName}
+                    status={discordStatus}
+                    size={36}
+                  />
+                ) : (
+                  <Avatar user={user} size={36} showStatus showOffline />
+                )}
+              </div>
+              <div className="flex min-w-0 flex-col text-left">
+                <span className="truncate text-base font-semibold leading-tight text-gray-100">
+                  {displayName}
+                </span>
+                <span className="truncate text-xs text-gray-500">
+                  {displayStatus}
+                </span>
+              </div>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="top" align="start" className="w-56 border-white/10 bg-[#1a1a1d] p-1">
+            <UserProfilePopoverMenu
+              igniteUser={user}
+              activeDisplay={activeDisplay}
+              onSwitch={handleSwitch}
+            />
+          </PopoverContent>
+        </Popover>
 
         <div className="flex shrink-0 items-center gap-0.5">
           <button

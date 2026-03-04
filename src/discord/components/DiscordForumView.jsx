@@ -1,8 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ChatsTeardrop } from '@phosphor-icons/react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { MagnifyingGlass, SlidersHorizontal, Check, ChatsTeardrop, CaretDown } from '@phosphor-icons/react';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { getTwemojiUrl } from '@/utils/emoji.utils';
 import { DiscordApiService } from '../services/discord-api.service';
 import { useDiscordUsersStore } from '../store/discord-users.store';
+import { useDiscordMembersStore } from '../store/discord-members.store';
+import DiscordChannelHeader from './DiscordChannelHeader';
 import DiscordForumPost from './DiscordForumPost';
+import DiscordForumPostList from './DiscordForumPostList';
 
 const DiscordForumView = ({ channel }) => {
   const [threads, setThreads] = useState([]);
@@ -12,6 +17,10 @@ const DiscordForumView = ({ channel }) => {
   const [offset, setOffset] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedTags, setSelectedTags] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('recent_activity');
+  const [viewAs, setViewAs] = useState('list');
+  const [tagMatch, setTagMatch] = useState('some');
 
   const channelId = channel.id;
   const guildId = channel.guild_id;
@@ -26,6 +35,19 @@ const DiscordForumView = ({ channel }) => {
         const authors = (data.first_messages || []).map((m) => m.author).filter(Boolean);
         if (authors.length > 0) {
           useDiscordUsersStore.getState().addUsers(authors);
+        }
+
+        // Store member/owner data from threads into the members store
+        const members = (data.threads || [])
+          .map((t) => t.owner)
+          .filter((o) => o && (o.user?.id || o.user_id));
+        if (members.length > 0) {
+          useDiscordMembersStore.getState().addMembers(guildId, members);
+          // Also store the nested user objects
+          const users = members.map((m) => m.user).filter(Boolean);
+          if (users.length > 0) {
+            useDiscordUsersStore.getState().addUsers(users);
+          }
         }
 
         // Build first_messages lookup by channel_id (thread id)
@@ -48,7 +70,7 @@ const DiscordForumView = ({ channel }) => {
         console.error('[Discord] Failed to load forum threads:', error);
       }
     },
-    [channelId]
+    [channelId, guildId]
   );
 
   useEffect(() => {
@@ -73,54 +95,177 @@ const DiscordForumView = ({ channel }) => {
   }, []);
 
   const filteredThreads = useMemo(() => {
-    if (selectedTags.length === 0) return threads;
-    return threads.filter((thread) =>
-      selectedTags.some((tagId) => thread.applied_tags?.includes(tagId))
-    );
-  }, [threads, selectedTags]);
+    let result = threads;
+    if (selectedTags.length > 0) {
+      result = result.filter((thread) => {
+        const tags = thread.applied_tags || [];
+        return tagMatch === 'all'
+          ? selectedTags.every((tagId) => tags.includes(tagId))
+          : selectedTags.some((tagId) => tags.includes(tagId));
+      });
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter((thread) => thread.name?.toLowerCase().includes(q));
+    }
+    if (sortBy === 'date_posted') {
+      result = [...result].sort((a, b) => {
+        const aId = BigInt(a.id);
+        const bId = BigInt(b.id);
+        return bId > aId ? 1 : bId < aId ? -1 : 0;
+      });
+    }
+    // Pinned threads first (flags bit 1 = PINNED)
+    result = [...result].sort((a, b) => {
+      const aPinned = (a.flags & 2) !== 0 ? 1 : 0;
+      const bPinned = (b.flags & 2) !== 0 ? 1 : 0;
+      return bPinned - aPinned;
+    });
+    return result;
+  }, [threads, selectedTags, searchQuery, sortBy, tagMatch]);
+
+  const resetSortView = useCallback(() => {
+    setSortBy('recent_activity');
+    setViewAs('list');
+    setTagMatch('some');
+  }, []);
+
+  const tagsContainerRef = useRef(null);
+  const [overflowCount, setOverflowCount] = useState(0);
+
+  useEffect(() => {
+    const container = tagsContainerRef.current;
+    if (!container) return;
+    const check = () => {
+      const children = Array.from(container.children);
+      let hidden = 0;
+      for (const child of children) {
+        if (child.offsetLeft + child.offsetWidth > container.offsetLeft + container.offsetWidth) {
+          hidden++;
+        }
+      }
+      setOverflowCount(hidden);
+    };
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [availableTags, selectedTags]);
 
   return (
     <div className="flex h-full flex-col bg-[#1a1a1e]">
-      {/* Channel header */}
-      <div className="flex h-12 shrink-0 items-center border-b border-white/5 px-4 shadow-sm">
-        <ChatsTeardrop className="mr-1 size-5 text-gray-400" weight="fill" />
-        <span className="font-semibold text-white">{channel.name}</span>
-        {channel.topic && (
-          <>
-            <div className="mx-3 h-6 w-px bg-white/10" />
-            <span className="truncate text-sm text-gray-400">{channel.topic}</span>
-          </>
-        )}
+      <DiscordChannelHeader channel={channel} />
+
+      {/* Search bar */}
+      <div className="px-4 py-3">
+        <div className="flex items-center gap-2 rounded bg-[#111214] px-3 py-1.5">
+          <MagnifyingGlass className="size-4 shrink-0 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search"
+            className="w-full bg-transparent text-sm text-gray-200 placeholder-gray-500 outline-none"
+          />
+        </div>
       </div>
 
-      {/* Tag filters */}
+      {/* Tag filters & Sort/View */}
       {availableTags.length > 0 && (
-        <div className="flex gap-1.5 border-b border-white/5 px-4 py-2">
-          {availableTags.map((tag) => (
+        <div className="flex items-center gap-1.5 px-4 pb-3">
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="flex shrink-0 items-center gap-1 rounded-md bg-[#2b2d31] px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-[#32353b] hover:text-white"
+              >
+                <SlidersHorizontal className="size-3.5" />
+                Sort &amp; View
+                <CaretDown className="size-3 text-gray-400" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="bottom" align="start" className="w-56 border-white/10 bg-[#111214] p-2">
+              <div className="flex flex-col gap-1">
+                <span className="px-2 py-1 text-[11px] font-bold uppercase text-gray-500">Sort by</span>
+                <button type="button" onClick={() => setSortBy('recent_activity')} className="flex items-center justify-between rounded px-2 py-1.5 text-sm text-gray-300 hover:bg-white/5">
+                  Recently Active
+                  {sortBy === 'recent_activity' && <Check size={14} weight="bold" className="text-primary" />}
+                </button>
+                <button type="button" onClick={() => setSortBy('date_posted')} className="flex items-center justify-between rounded px-2 py-1.5 text-sm text-gray-300 hover:bg-white/5">
+                  Date Posted
+                  {sortBy === 'date_posted' && <Check size={14} weight="bold" className="text-primary" />}
+                </button>
+
+                <div className="my-1 h-px bg-white/5" />
+                <span className="px-2 py-1 text-[11px] font-bold uppercase text-gray-500">View as</span>
+                <button type="button" onClick={() => setViewAs('list')} className="flex items-center justify-between rounded px-2 py-1.5 text-sm text-gray-300 hover:bg-white/5">
+                  List
+                  {viewAs === 'list' && <Check size={14} weight="bold" className="text-primary" />}
+                </button>
+                <button type="button" onClick={() => setViewAs('gallery')} className="flex items-center justify-between rounded px-2 py-1.5 text-sm text-gray-300 hover:bg-white/5">
+                  Gallery
+                  {viewAs === 'gallery' && <Check size={14} weight="bold" className="text-primary" />}
+                </button>
+
+                <div className="my-1 h-px bg-white/5" />
+                <span className="px-2 py-1 text-[11px] font-bold uppercase text-gray-500">Tag Matching</span>
+                <button type="button" onClick={() => setTagMatch('some')} className="flex items-center justify-between rounded px-2 py-1.5 text-sm text-gray-300 hover:bg-white/5">
+                  Match Some
+                  {tagMatch === 'some' && <Check size={14} weight="bold" className="text-primary" />}
+                </button>
+                <button type="button" onClick={() => setTagMatch('all')} className="flex items-center justify-between rounded px-2 py-1.5 text-sm text-gray-300 hover:bg-white/5">
+                  Match All
+                  {tagMatch === 'all' && <Check size={14} weight="bold" className="text-primary" />}
+                </button>
+
+                <div className="my-1 h-px bg-white/5" />
+                <button type="button" onClick={resetSortView} className="rounded px-2 py-1.5 text-sm text-gray-400 hover:bg-white/5 hover:text-white">
+                  Reset to Default
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
+          <div className="mx-0.5 h-4 w-px bg-white/10" />
+          <div ref={tagsContainerRef} className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+            {availableTags.map((tag) => (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => toggleTag(tag.id)}
+                className={`flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  selectedTags.includes(tag.id)
+                    ? 'bg-[#5865f2] text-white'
+                    : 'bg-[#2b2d31] text-gray-300 hover:bg-[#32353b]'
+                }`}
+              >
+                {tag.emoji_name && (
+                  tag.emoji_id ? (
+                    <img
+                      src={`https://cdn.discordapp.com/emojis/${tag.emoji_id}.webp?size=16`}
+                      alt=""
+                      className="size-3.5"
+                    />
+                  ) : (
+                    <img
+                      src={getTwemojiUrl(tag.emoji_name)}
+                      alt={tag.emoji_name}
+                      className="size-3.5"
+                    />
+                  )
+                )}
+                {tag.name}
+              </button>
+            ))}
+          </div>
+          {overflowCount > 0 && (
             <button
-              key={tag.id}
               type="button"
-              onClick={() => toggleTag(tag.id)}
-              className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs transition-colors ${
-                selectedTags.includes(tag.id)
-                  ? 'bg-[#5865f2] text-white'
-                  : 'bg-[#2b2d31] text-gray-300 hover:bg-[#32353b]'
-              }`}
+              className="flex shrink-0 items-center gap-0.5 rounded-md bg-[#2b2d31] px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-[#32353b]"
             >
-              {tag.emoji_name && (
-                tag.emoji_id ? (
-                  <img
-                    src={`https://cdn.discordapp.com/emojis/${tag.emoji_id}.webp?size=16`}
-                    alt=""
-                    className="size-3.5"
-                  />
-                ) : (
-                  <span className="text-sm leading-none">{tag.emoji_name}</span>
-                )
-              )}
-              {tag.name}
+              {overflowCount}
+              <CaretDown className="size-3 text-gray-400" />
             </button>
-          ))}
+          )}
         </div>
       )}
 
@@ -136,17 +281,20 @@ const DiscordForumView = ({ channel }) => {
             <p className="text-sm">No posts yet</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-2 p-4">
-            {filteredThreads.map((thread) => (
-              <DiscordForumPost
-                key={thread.id}
-                thread={thread}
-                firstMessage={firstMessages[thread.id]}
-                owner={firstMessages[thread.id]?.author}
-                guildId={guildId}
-                availableTags={availableTags}
-              />
-            ))}
+          <div className={viewAs === 'gallery' ? 'grid grid-cols-2 gap-2 p-4 xl:grid-cols-4' : 'flex flex-col gap-0.5 p-4'}>
+            {filteredThreads.map((thread) => {
+              const PostComponent = viewAs === 'gallery' ? DiscordForumPost : DiscordForumPostList;
+              return (
+                <PostComponent
+                  key={thread.id}
+                  thread={thread}
+                  firstMessage={firstMessages[thread.id]}
+                  owner={firstMessages[thread.id]?.author}
+                  guildId={guildId}
+                  availableTags={availableTags}
+                />
+              );
+            })}
 
             {hasMore && (
               <button

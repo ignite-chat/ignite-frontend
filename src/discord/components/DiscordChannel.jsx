@@ -1,8 +1,9 @@
 import { useMemo, useCallback, useState } from 'react';
-import { At, Hash } from '@phosphor-icons/react';
 import { useDiscordStore } from '../store/discord.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { DiscordService } from '../services/discord.service';
+import { GUILD_FORUM, DM, GROUP_DM } from '../constants/channel-types';
+import DiscordChannelHeader from './DiscordChannelHeader';
 import DiscordChannelMessages from './DiscordChannelMessages';
 import DiscordChannelInput from './DiscordChannelInput';
 import DiscordForumView from './DiscordForumView';
@@ -11,15 +12,15 @@ const DiscordChannel = ({ channel }) => {
   const currentUser = useDiscordStore((s) => s.user);
   const usersMap = useDiscordUsersStore((s) => s.users);
 
-  const isForum = channel?.type === 15;
-  const isDM = channel?.type === 1 || channel?.type === 3;
+  const isForum = channel?.type === GUILD_FORUM;
+  const isDM = channel?.type === DM || channel?.type === GROUP_DM;
 
   const dmInfo = useMemo(() => {
     if (!isDM || !channel) return null;
     const recipientIds = channel.recipient_ids || [];
     const recipients = recipientIds.map((id) => usersMap[id]).filter(Boolean);
 
-    if (channel.type === 3) {
+    if (channel.type === GROUP_DM) {
       // Group DM
       const name = channel.name || recipients.map((r) => r.global_name || r.username).join(', ');
       return { name, icon: null };
@@ -49,31 +50,7 @@ const DiscordChannel = ({ channel }) => {
 
   return (
     <div className="flex h-full flex-col bg-[#1a1a1e]">
-      {/* Channel header bar */}
-      <div className="flex h-12 shrink-0 items-center border-b border-white/5 px-4 shadow-sm">
-        {isDM ? (
-          <>
-            {dmInfo?.properties?.icon ? (
-              <img
-                src={dmInfo.properties?.icon}
-                alt={dmInfo.properties?.name}
-                className="mr-2 size-6 rounded-full object-cover"
-              />
-            ) : (
-              <At className="mr-1 size-5 text-gray-400" />
-            )}
-          </>
-        ) : (
-          <Hash className="mr-1 size-5 text-gray-400" />
-        )}
-        <span className="font-semibold text-white">{displayName}</span>
-        {!isDM && channel.topic && (
-          <>
-            <div className="mx-3 h-6 w-px bg-white/10" />
-            <span className="truncate text-sm text-gray-400">{channel.topic}</span>
-          </>
-        )}
-      </div>
+      <DiscordChannelHeader channel={channel} displayName={displayName} isDM={isDM} dmInfo={dmInfo} />
 
       {/* Messages */}
       <DiscordChannelMessages channel={channel} messageSentCount={messageSentCount} />

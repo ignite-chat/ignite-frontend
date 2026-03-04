@@ -9,6 +9,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { $createChannelMentionNode } from '@/ignite/components/channel/ChannelInput/nodes/ChannelMentionNode';
 import { Hash, Megaphone, SpeakerHigh } from '@phosphor-icons/react';
+import { GUILD_TEXT, GUILD_VOICE, GUILD_ANNOUNCEMENT } from '@/discord/constants/channel-types';
 
 const SUGGESTIONS_LIMIT = 7;
 
@@ -32,7 +33,7 @@ export default function DiscordChannelMentionPlugin({ channels, menuContainer })
   const options = useMemo(() => {
     if (queryString === null) return [];
 
-    const available = channels.filter((c) => c.type === 0);
+    const available = channels.filter((c) => c.type === GUILD_TEXT);
     const q = queryString.toLowerCase();
 
     if (q === '') {
@@ -104,9 +105,9 @@ export default function DiscordChannelMentionPlugin({ channels, menuContainer })
                   onClick={() => selectOptionAndCleanUp(option)}
                   onMouseDown={(e) => e.preventDefault()}
                 >
-                  {option.channel.type === 2 ? (
+                  {option.channel.type === GUILD_VOICE ? (
                     <SpeakerHigh className="size-4 text-gray-400" />
-                  ) : option.channel.type === 5 ? (
+                  ) : option.channel.type === GUILD_ANNOUNCEMENT ? (
                     <Megaphone className="size-4 text-gray-400" />
                   ) : (
                     <Hash className="size-4 text-gray-400" />
