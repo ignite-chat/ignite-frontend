@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useDiscordStore } from '../store/discord.store';
+import { requestCaptchaSolution } from './discord-captcha-bridge';
 
 const discordApi = axios.create({
   baseURL: 'https://discord.com/api/v9',
@@ -16,10 +17,50 @@ discordApi.interceptors.request.use((config) => {
 
 discordApi.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (!(error.config as any)?._silent) {
+  async (error) => {
+    const data = error.response?.data;
+    const config = error.config as any;
+
+    // Detect captcha challenge (avoid infinite retry with _captchaRetried flag)
+    const isCaptchaRequired =
+      error.response?.status === 400 &&
+      Array.isArray(data?.captcha_key) &&
+      data.captcha_key.includes('captcha-required') &&
+      data.captcha_sitekey &&
+      !config?._captchaRetried;
+
+    if (isCaptchaRequired) {
+      try {
+        const solution = await requestCaptchaSolution({
+          captcha_sitekey: data.captcha_sitekey,
+          captcha_service: data.captcha_service,
+          captcha_rqdata: data.captcha_rqdata,
+          captcha_rqtoken: data.captcha_rqtoken,
+          captcha_session_id: data.captcha_session_id,
+        });
+
+        // Retry the original request with captcha headers
+        config._captchaRetried = true;
+        config.headers['X-Captcha-Key'] = solution.captcha_key;
+        if (solution.captcha_rqtoken) {
+          config.headers['X-Captcha-Rqtoken'] = solution.captcha_rqtoken;
+        }
+        if (solution.captcha_session_id) {
+          config.headers['X-Captcha-Session-Id'] = solution.captcha_session_id;
+        }
+
+        return discordApi.request(config);
+      } catch {
+        if (!config?._silent) {
+          toast.error('Captcha verification was cancelled.', { duration: 5000 });
+        }
+        return Promise.reject(error);
+      }
+    }
+
+    if (!config?._silent) {
       const status = error.response?.status;
-      const message = error.response?.data?.message || error.message || 'Request failed';
+      const message = data?.message || error.message || 'Request failed';
       toast.error(`Discord API Error (${status || 'network'}): ${message}`, {
         duration: Infinity,
       });
