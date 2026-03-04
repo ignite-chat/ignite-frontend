@@ -49,7 +49,7 @@ function RouteLogger() {
 const WindowControlButton = ({ icon: Icon, onClick, variant = 'default', ariaLabel }) => {
   const colorClasses =
     variant === 'close'
-      ? 'text-red-400 hover:text-red-200 hover:bg-red-900/40'
+      ? 'text-gray-400 hover:text-gray-200 hover:bg-red-900'
       : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700';
 
   return (
@@ -60,7 +60,7 @@ const WindowControlButton = ({ icon: Icon, onClick, variant = 'default', ariaLab
       className={`flex size-8 items-center justify-center transition-colors duration-100 ${colorClasses}`}
       style={{ WebkitAppRegion: 'no-drag' }}
     >
-      <Icon className="size-5" weight="regular" />
+      <Icon className="size-5" weight="thin" />
     </button>
   );
 };

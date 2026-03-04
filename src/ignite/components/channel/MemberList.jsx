@@ -6,13 +6,13 @@ import GuildMemberContextMenu from '../guild-member/GuildMemberContextMenu.jsx';
 import GuildMemberPopoverContent from '../popovers/GuildMemberPopoverContent.jsx';
 import UserProfileModal from '@/ignite/components/modals/UserProfileModal.jsx';
 import { useModalStore } from '../../store/modal.store';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import Avatar from '../Avatar.jsx';
 import { useRolesStore } from '../../store/roles.store.ts';
 import { useGuildsStore } from '@/ignite/store/guilds.store.ts';
 import { useUsersStore } from '@/ignite/store/users.store.ts';
 import { GuildsService } from '@/ignite/services/guilds.service.ts';
-import { CircleNotch, CaretDown, CaretRight, Crown } from '@phosphor-icons/react';
+import { CircleNotch, CaretDown, CaretRight } from '@phosphor-icons/react';
+import OwnerCrown from '@/components/OwnerCrown';
 
 const MemberListItem = ({ member, guildId, isOwner, popoverOpen, setPopoverOpen }) => {
   const userFromStore = useUsersStore((state) => state.users[member.user.id]);
@@ -49,14 +49,7 @@ const MemberListItem = ({ member, guildId, isOwner, popoverOpen, setPopoverOpen 
                 >
                   {member.user.name ?? member.user.username}
                 </p>
-                {isOwner && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Crown size={16} weight="fill" className="shrink-0 text-yellow-500" />
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Server Owner</TooltipContent>
-                  </Tooltip>
-                )}
+                {isOwner && <OwnerCrown />}
               </div>
             </div>
           </ContextMenuTrigger>

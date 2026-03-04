@@ -5,6 +5,8 @@ import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordStore } from '../store/discord.store';
 import { useLastChannelStore } from '@/store/last-channel.store';
 import { GUILD_TEXT } from '../constants/channel-types';
+import { VIEW_CHANNEL } from '../constants/permissions';
+import { computeChannelPermissions } from '../utils/permissions';
 import { DiscordGatewayService } from '../services/discord-gateway.service';
 import { DiscordApiService } from '../services/discord-api.service';
 import DiscordGuildLayout from '../layouts/DiscordGuildLayout';
@@ -38,23 +40,37 @@ const DiscordGuildPage = () => {
     }
   }, [guildId, channelId]);
 
-  // Restore last channel or redirect to first text channel if no channelId
+  // Restore last channel or redirect to first accessible text channel if no channelId
   useEffect(() => {
     if (guildChannels.length > 0 && !channelId) {
+      const currentUserId = useDiscordStore.getState().user?.id;
+      const guildData = guilds.find((g) => g.id === guildId);
+      const guildRoles = guildData?.roles || guildData?.properties?.roles || [];
+      const guildOwnerId = guildData?.owner_id || guildData?.properties?.owner_id;
+      const members = useDiscordGuildsStore.getState().guildMembers[guildId] || [];
+      const me = members.find((m) => m.user?.id === currentUserId || m.user_id === currentUserId);
+      const memberRoleIds = me?.roles || [];
+
+      const canView = (ch) => {
+        if (!currentUserId) return true;
+        const perms = computeChannelPermissions(ch, memberRoleIds, guildRoles, guildId, guildOwnerId, currentUserId);
+        return (perms & VIEW_CHANNEL) === VIEW_CHANNEL;
+      };
+
       const lastChannelId = useLastChannelStore.getState().getLastChannel(guildId);
       const lastChannel = lastChannelId && guildChannels.find((c) => c.id === lastChannelId);
-      if (lastChannel) {
+      if (lastChannel && canView(lastChannel)) {
         navigate(`/discord/${guildId}/${lastChannelId}`, { replace: true });
         return;
       }
       const textChannels = guildChannels
-        .filter((c) => c.type === GUILD_TEXT)
+        .filter((c) => c.type === GUILD_TEXT && canView(c))
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
       if (textChannels.length > 0) {
         navigate(`/discord/${guildId}/${textChannels[0].id}`, { replace: true });
       }
     }
-  }, [guildChannels, channelId, guildId, navigate]);
+  }, [guildChannels, channelId, guildId, guilds, navigate]);
 
   // Subscribe to guild member list when we have a channel selected
   useEffect(() => {
@@ -86,7 +102,7 @@ const DiscordGuildPage = () => {
   const pageTitle = activeChannel ? `#${activeChannel.name} | ${guildName}` : guildName;
 
   return (
-    <DiscordGuildLayout guild={guild}>
+    <DiscordGuildLayout guild={guild} channel={activeChannel}>
       <PageTitle title={pageTitle} />
       {activeChannel ? (
         <DiscordChannel channel={activeChannel} />

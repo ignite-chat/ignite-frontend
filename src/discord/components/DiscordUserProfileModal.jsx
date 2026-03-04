@@ -10,6 +10,8 @@ import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useDiscordActivitiesStore, ActivityType } from '../store/discord-activities.store';
+import { parseMarkdown } from '@/components/message/markdown/parser';
+import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
 
 const DISCORD_EPOCH = 1420070400000;
 
@@ -304,9 +306,9 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
                   <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
                     About Me
                   </h3>
-                  <p className="text-[15px] leading-normal text-gray-200">
-                    {profile.user.bio}
-                  </p>
+                  <div className="text-[15px] leading-normal text-gray-200">
+                    <DiscordMarkdownRenderer nodes={parseMarkdown(profile.user.bio)} />
+                  </div>
                 </div>
               )}
 

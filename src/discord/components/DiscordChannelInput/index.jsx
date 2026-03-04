@@ -8,7 +8,7 @@ import {
   EmojiPickerSidebar,
 } from '@/components/ui/emoji-picker';
 import { cn } from '@/lib/utils';
-import { X, Smiley } from '@phosphor-icons/react';
+import { X, Smiley, Timer } from '@phosphor-icons/react';
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,7 +27,7 @@ import { emojiMap, registerEmoji, getTwemojiUrl } from '@/utils/emoji.utils';
 import { useEmojisStore } from '@/ignite/store/emojis.store';
 import emojisData from '@/assets/emojis/emojis.json';
 import { useDiscordHasPermission } from '../../hooks/useDiscordPermission';
-import { SEND_MESSAGES } from '../../constants/permissions';
+import { SEND_MESSAGES, MANAGE_MESSAGES, MANAGE_CHANNELS } from '../../constants/permissions';
 import { useDiscordTypingStore } from '../../store/discord-typing.store';
 import { useDiscordReplyStore } from '../../store/discord-reply.store';
 import { useDiscordGuildsStore } from '../../store/discord-guilds.store';
@@ -64,6 +64,18 @@ import EditablePlugin from './plugins/EditablePlugin';
 const MAX_MESSAGE_LENGTH = 2000;
 const DISCORD_EMOJI_CDN = 'https://cdn.discordapp.com/emojis';
 
+function formatSlowmodeDuration(seconds) {
+  if (seconds >= 3600) {
+    const h = Math.floor(seconds / 3600);
+    return `${h} hour${h !== 1 ? 's' : ''}`;
+  }
+  if (seconds >= 60) {
+    const m = Math.floor(seconds / 60);
+    return `${m} minute${m !== 1 ? 's' : ''}`;
+  }
+  return `${seconds} second${seconds !== 1 ? 's' : ''}`;
+}
+
 const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   const [inputMessage, setInputMessage] = useState('');
   const editorRef = useRef(null);
@@ -76,6 +88,42 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   // Permissions
   const canSend = useDiscordHasPermission(guildId, channel, SEND_MESSAGES);
   const canSendMessages = isDM || canSend;
+
+  // Slowmode bypass: MANAGE_MESSAGES or MANAGE_CHANNELS skip slowmode
+  const hasManageMessages = useDiscordHasPermission(guildId, channel, MANAGE_MESSAGES);
+  const hasManageChannels = useDiscordHasPermission(guildId, channel, MANAGE_CHANNELS);
+  const bypassSlowmode = isDM || hasManageMessages || hasManageChannels;
+
+  // Slowmode
+  const slowmodeSeconds = bypassSlowmode ? 0 : (channel?.rate_limit_per_user || 0);
+  const [cooldownEnd, setCooldownEnd] = useState(null);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+
+  useEffect(() => {
+    setCooldownEnd(null);
+    setCooldownRemaining(0);
+  }, [channelId]);
+
+  useEffect(() => {
+    if (!cooldownEnd) {
+      setCooldownRemaining(0);
+      return;
+    }
+    const tick = () => {
+      const left = Math.ceil((cooldownEnd - Date.now()) / 1000);
+      if (left <= 0) {
+        setCooldownEnd(null);
+        setCooldownRemaining(0);
+      } else {
+        setCooldownRemaining(left);
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [cooldownEnd]);
+
+  const isOnCooldown = cooldownRemaining > 0;
 
   // Typing indicator
   const typingUsers = useDiscordTypingStore((s) => (channelId ? s.typing[channelId] || [] : []));
@@ -161,7 +209,7 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   /* ---------------- send message ---------------- */
 
   const sendMessage = useCallback(() => {
-    if (!canSendMessages) return;
+    if (!canSendMessages || isOnCooldown) return;
     if (!channelId || !inputMessage.trim()) return;
     if (inputMessage.length > MAX_MESSAGE_LENGTH) return;
 
@@ -170,10 +218,14 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
     clearReply();
     onMessageSent?.();
 
+    if (slowmodeSeconds > 0) {
+      setCooldownEnd(Date.now() + slowmodeSeconds * 1000);
+    }
+
     if (editorRef.current) {
       editorRef.current.dispatchCommand(CLEAR_EDITOR_COMMAND, undefined);
     }
-  }, [canSendMessages, channelId, inputMessage, replyingMessageId, clearReply, onMessageSent]);
+  }, [canSendMessages, isOnCooldown, channelId, inputMessage, replyingMessageId, clearReply, onMessageSent, slowmodeSeconds]);
 
   const handleEmojiSelect = useCallback(({ id, label, emoji, url }) => {
     addRecentEmoji({
@@ -233,8 +285,27 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
 
   return (
     <div className="relative bg-[#1a1a1e] p-2">
+      {slowmodeSeconds > 0 && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="absolute bottom-[calc(100%-8px)] right-0 z-10 flex items-center gap-1.5 px-5 pb-0.5 pt-4 text-xs text-gray-400">
+              <Timer size={14} weight={'fill'} className={isOnCooldown ? 'text-[#f0b132]' : ''} />
+              <span className={isOnCooldown ? 'text-[#f0b132]' : ''}>
+                {isOnCooldown ? `Slowmode ${cooldownRemaining}s` : 'Slowmode is enabled'}
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="w-56 text-sm">
+            <p>Slowmode is enabled.</p>
+            <p>Members can send one message every {formatSlowmodeDuration(slowmodeSeconds)}.</p>
+          </TooltipContent>
+        </Tooltip>
+      )}
       {typingUsers.length > 0 && (
-        <div className="absolute bottom-[calc(100%-8px)] left-0 right-0 flex items-center gap-1 bg-gradient-to-t from-[#1a1a1e] to-transparent px-5 pb-0.5 pt-4 text-xs text-gray-400">
+        <div className={cn(
+          'absolute bottom-[calc(100%-8px)] left-0 flex items-center gap-1 bg-gradient-to-t from-[#1a1a1e] to-transparent px-5 pb-0.5 pt-4 text-xs text-gray-400',
+          slowmodeSeconds > 0 ? 'right-40' : 'right-0'
+        )}>
           <TypingDots />
           <span>
             {typingUsers.length === 1 && (
@@ -293,7 +364,7 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
                 contentEditable={
                   <ContentEditable
                     className={`max-h-[50vh] min-h-[44px] w-full overflow-y-auto px-3 py-3 text-sm outline-none [&_.channel-input-paragraph]:m-0 ${
-                      !canSendMessages ? 'cursor-not-allowed opacity-50' : ''
+                      !canSendMessages || isOnCooldown ? 'cursor-not-allowed opacity-50' : ''
                     }`}
                   />
                 }
@@ -308,7 +379,7 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
               <ClearEditorPlugin />
               <EditorRefPlugin editorRef={editorRef} />
 
-              <EditablePlugin editable={canSendMessages} />
+              <EditablePlugin editable={canSendMessages && !isOnCooldown} />
               <EditBridgePlugin setInputMessage={setInputMessage} />
               {guildId && (
                 <DiscordMentionPlugin

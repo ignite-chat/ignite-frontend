@@ -3,7 +3,6 @@ import { useDiscordStore } from '../store/discord.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { DiscordService } from '../services/discord.service';
 import { GUILD_FORUM, DM, GROUP_DM } from '../constants/channel-types';
-import DiscordChannelHeader from './DiscordChannelHeader';
 import DiscordChannelMessages from './DiscordChannelMessages';
 import DiscordChannelInput from './DiscordChannelInput';
 import DiscordForumView from './DiscordForumView';
@@ -49,9 +48,7 @@ const DiscordChannel = ({ channel }) => {
   const placeholderName = isDM ? `@${dmInfo?.name}` : `#${channel.name}`;
 
   return (
-    <div className="flex h-full flex-col bg-[#1a1a1e]">
-      <DiscordChannelHeader channel={channel} displayName={displayName} isDM={isDM} dmInfo={dmInfo} />
-
+    <div className="flex h-full flex-col">
       {/* Messages */}
       <DiscordChannelMessages channel={channel} messageSentCount={messageSentCount} />
 

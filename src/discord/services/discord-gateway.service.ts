@@ -150,6 +150,9 @@ export const DiscordGatewayService = {
    * typing indicators, threads, activities, and optionally specific member IDs.
    */
   subscribeGuild(guildId: string, channelId: string, memberIds: string[] = [], range: [number, number] = [0, 99]) {
+    // Mark that we're waiting for a fresh SYNC — any INVALIDATE arriving
+    // before the SYNC belongs to the old subscription and should be ignored.
+    useDiscordMemberListStore.getState().markPendingSync(guildId);
     this.send({
       op: GatewayOp.GUILD_SUBSCRIPTIONS,
       d: {
@@ -300,6 +303,7 @@ export const DiscordGatewayService = {
         this._handleReadySupplemental(data);
         break;
       case 'RESUMED':
+        useDiscordStore.getState().setConnected(true);
         console.log('[Discord Gateway] Successfully resumed');
         break;
       case 'GUILD_CREATE':
@@ -391,6 +395,72 @@ export const DiscordGatewayService = {
           }
         }
         useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: existing });
+        break;
+      }
+      case 'MESSAGE_REACTION_ADD': {
+        const { channel_id, message_id, user_id, emoji, burst } = data;
+        if (!channel_id || !message_id || !emoji) break;
+        const raMessages = useDiscordChannelsStore.getState().channelMessages[channel_id];
+        const raMsg = raMessages?.find((m: any) => m.id === message_id);
+        if (!raMsg) break;
+        const raExisting = [...(raMsg.reactions || [])];
+        const raIdx = raExisting.findIndex((e: any) =>
+          emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
+        );
+        const currentUserId = useDiscordStore.getState().user?.id;
+        const isMe = user_id === currentUserId;
+        if (raIdx >= 0) {
+          raExisting[raIdx] = {
+            ...raExisting[raIdx],
+            count: raExisting[raIdx].count + 1,
+            count_details: {
+              burst: (raExisting[raIdx].count_details?.burst || 0) + (burst ? 1 : 0),
+              normal: (raExisting[raIdx].count_details?.normal || 0) + (burst ? 0 : 1),
+            },
+            me: isMe ? true : raExisting[raIdx].me,
+            me_burst: isMe && burst ? true : raExisting[raIdx].me_burst,
+          };
+        } else {
+          raExisting.push({
+            emoji,
+            count: 1,
+            count_details: { burst: burst ? 1 : 0, normal: burst ? 0 : 1 },
+            me: isMe,
+            me_burst: isMe && !!burst,
+          });
+        }
+        useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: raExisting });
+        break;
+      }
+      case 'MESSAGE_REACTION_REMOVE': {
+        const { channel_id, message_id, user_id, emoji, burst } = data;
+        if (!channel_id || !message_id || !emoji) break;
+        const rrMessages = useDiscordChannelsStore.getState().channelMessages[channel_id];
+        const rrMsg = rrMessages?.find((m: any) => m.id === message_id);
+        if (!rrMsg) break;
+        let rrExisting = [...(rrMsg.reactions || [])];
+        const rrIdx = rrExisting.findIndex((e: any) =>
+          emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
+        );
+        if (rrIdx < 0) break;
+        const rrCurrentUserId = useDiscordStore.getState().user?.id;
+        const rrIsMe = user_id === rrCurrentUserId;
+        const updated = {
+          ...rrExisting[rrIdx],
+          count: rrExisting[rrIdx].count - 1,
+          count_details: {
+            burst: Math.max(0, (rrExisting[rrIdx].count_details?.burst || 0) - (burst ? 1 : 0)),
+            normal: Math.max(0, (rrExisting[rrIdx].count_details?.normal || 0) - (burst ? 0 : 1)),
+          },
+          me: rrIsMe && !burst ? false : rrExisting[rrIdx].me,
+          me_burst: rrIsMe && burst ? false : rrExisting[rrIdx].me_burst,
+        };
+        if (updated.count <= 0) {
+          rrExisting.splice(rrIdx, 1);
+        } else {
+          rrExisting[rrIdx] = updated;
+        }
+        useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: rrExisting });
         break;
       }
       case 'TYPING_START': {

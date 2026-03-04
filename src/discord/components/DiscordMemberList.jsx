@@ -7,6 +7,7 @@ import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
 import { DiscordService } from '../services/discord.service';
 import DiscordUserPopoverContent from './popovers/DiscordUserPopoverContent';
+import OwnerCrown from '@/components/OwnerCrown';
 
 const statusColors = {
   online: 'bg-green-500',
@@ -15,7 +16,7 @@ const statusColors = {
   offline: 'bg-gray-500',
 };
 
-const MemberItem = ({ member: rawMember, guildId, popoverOpen, setPopoverOpen }) => {
+const MemberItem = ({ member: rawMember, guildId, ownerId, popoverOpen, setPopoverOpen }) => {
   // Resolve the user ID from whatever shape the SYNC item has
   const userId = rawMember.user?.id || rawMember.user_id;
   if (!userId) return null;
@@ -44,6 +45,7 @@ const MemberItem = ({ member: rawMember, guildId, popoverOpen, setPopoverOpen })
   }, [guildRoles, memberRoles]);
 
   const displayName = member.nick || user.global_name || user.username;
+  const isOwner = userId === ownerId;
   const isBot = user.bot;
   const isVerifiedBot = isBot && (user.public_flags & 65536) !== 0;
 
@@ -66,6 +68,7 @@ const MemberItem = ({ member: rawMember, guildId, popoverOpen, setPopoverOpen })
             >
               {displayName}
             </span>
+            {isOwner && <OwnerCrown />}
             {isBot && (
               <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
                 {isVerifiedBot && (
@@ -108,6 +111,8 @@ const DiscordMemberList = ({ guildId }) => {
     []
   );
 
+  const ownerId = guild?.owner_id || guild?.properties?.owner_id;
+
   // Build a role lookup from guild data
   const guildRoles = guild?.roles || guild?.properties?.roles || [];
   const roleMap = useMemo(() => {
@@ -133,7 +138,7 @@ const DiscordMemberList = ({ guildId }) => {
   //if (items.length === 0) return null;
 
   return (
-    <div className="flex h-full w-60 shrink-0 flex-col border-l border-white/5 bg-[#1a1a1e]">
+    <div className="flex h-full w-60 shrink-0 flex-col border-l border-white/5">
       <div className="flex-1 overflow-y-auto px-2 py-4">
         {items.map((item, index) => {
           if ('group' in item && item.group) {
@@ -186,6 +191,7 @@ const DiscordMemberList = ({ guildId }) => {
                 key={userId}
                 member={member}
                 guildId={guildId}
+                ownerId={ownerId}
                 popoverOpen={openPopoverUserId === userId}
                 setPopoverOpen={makePopoverHandler(userId)}
               />

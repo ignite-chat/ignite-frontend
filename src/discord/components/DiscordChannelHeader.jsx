@@ -1,7 +1,7 @@
-import { At, ChatsTeardrop, Hash } from '@phosphor-icons/react';
+import { At, ChatsTeardrop, Hash, MagnifyingGlass, Users } from '@phosphor-icons/react';
 import { GUILD_FORUM } from '../constants/channel-types';
 
-const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo }) => {
+const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, guildName, memberListOpen, onToggleMemberList }) => {
   const isForum = channel?.type === GUILD_FORUM;
 
   const icon = isDM ? (
@@ -21,9 +21,40 @@ const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo }) => {
   );
 
   return (
-    <div className="flex h-12 shrink-0 items-center overflow-hidden border-b border-white/5 px-4 shadow-sm">
-      {icon}
-      <span className="shrink-0 whitespace-nowrap font-medium text-white">{displayName || channel?.name}</span>
+    <div className="flex h-12 shrink-0 items-center border-b border-white/5 px-2 shadow-sm">
+      <div className="flex min-w-0 items-center px-2">
+        {icon}
+        <span className="truncate text-[15px] font-semibold text-white">{displayName || channel?.name}</span>
+      </div>
+
+      {channel?.topic && (
+        <>
+          <div className="mx-2 h-6 w-px shrink-0 bg-white/10" />
+          <span className="min-w-0 truncate text-sm text-gray-400">{channel.topic}</span>
+        </>
+      )}
+
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        {onToggleMemberList && (
+          <button
+            type="button"
+            onClick={onToggleMemberList}
+            className={`rounded p-1.5 transition hover:bg-white/10 ${memberListOpen ? 'text-white' : 'text-gray-400'}`}
+            aria-label="Toggle member list"
+          >
+            <Users size={20} weight={memberListOpen ? 'fill' : 'regular'} />
+          </button>
+        )}
+
+        <div className="flex h-8 w-56 items-center rounded-sm border border-white/10 bg-[#111214]">
+          <input
+            type="text"
+            placeholder={`Search ${guildName || 'Server'}`}
+            className="h-full w-full bg-transparent px-2 text-sm text-gray-200 placeholder-gray-500 outline-none"
+          />
+          <MagnifyingGlass size={16} className="mr-2 shrink-0 text-gray-400" />
+        </div>
+      </div>
     </div>
   );
 };

@@ -21,6 +21,12 @@ type DiscordMemberListStore = {
   /** memberLists[guildId] holds the current member list data */
   memberLists: { [guildId: string]: MemberListData };
 
+  /** Tracks whether we're waiting for a fresh SYNC after a new subscription */
+  pendingSyncs: { [guildId: string]: boolean };
+
+  /** Mark that a new subscription was sent and we're waiting for a SYNC */
+  markPendingSync: (guildId: string) => void;
+
   /** Handle a full GUILD_MEMBER_LIST_UPDATE event */
   handleListUpdate: (guildId: string, data: any) => void;
 
@@ -30,14 +36,25 @@ type DiscordMemberListStore = {
 
 export const useDiscordMemberListStore = create<DiscordMemberListStore>((set) => ({
   memberLists: {},
+  pendingSyncs: {},
+
+  markPendingSync: (guildId) =>
+    set((state) => ({
+      pendingSyncs: { ...state.pendingSyncs, [guildId]: true },
+    })),
 
   handleListUpdate: (guildId, data) =>
     set((state) => {
       const { id, ops, groups, member_count, online_count } = data;
       const existing = state.memberLists[guildId];
-
-      // Check if this update has a SYNC op — that means it's a fresh list for a (possibly new) channel
+      const isPending = state.pendingSyncs[guildId];
       const hasSyncOp = ops?.some((op: any) => op.op === 'SYNC');
+
+      // If we've just subscribed to a new channel and are waiting for fresh data,
+      // ignore any non-SYNC updates (they belong to the old subscription).
+      if (isPending && !hasSyncOp) {
+        return state;
+      }
 
       if (existing && id !== existing.id && !hasSyncOp) {
         // This update is for a stale list ID (e.g. an INVALIDATE for the old channel).
@@ -103,8 +120,12 @@ export const useDiscordMemberListStore = create<DiscordMemberListStore>((set) =>
             online_count: online_count ?? base.online_count,
           },
         },
+        // Clear pending flag once we've received a SYNC
+        pendingSyncs: hasSyncOp
+          ? { ...state.pendingSyncs, [guildId]: false }
+          : state.pendingSyncs,
       };
     }),
 
-  clear: () => set({ memberLists: {} }),
+  clear: () => set({ memberLists: {}, pendingSyncs: {} }),
 }));

@@ -5,7 +5,6 @@ import { getTwemojiUrl } from '@/utils/emoji.utils';
 import { DiscordApiService } from '../services/discord-api.service';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
-import DiscordChannelHeader from './DiscordChannelHeader';
 import DiscordForumPost from './DiscordForumPost';
 import DiscordForumPostList from './DiscordForumPostList';
 
@@ -154,8 +153,6 @@ const DiscordForumView = ({ channel }) => {
 
   return (
     <div className="flex h-full flex-col bg-[#1a1a1e]">
-      <DiscordChannelHeader channel={channel} />
-
       {/* Search bar */}
       <div className="px-4 py-3">
         <div className="flex items-center gap-2 rounded bg-[#111214] px-3 py-1.5">

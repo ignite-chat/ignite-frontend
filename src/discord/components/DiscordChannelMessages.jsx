@@ -10,6 +10,7 @@ import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
 import { Check } from '@phosphor-icons/react';
 import DiscordMessage from './DiscordMessage';
+import MessageSkeletonList from '@/components/message/MessageSkeleton';
 
 const DISCORD_EPOCH = 1420070400000;
 const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
@@ -354,9 +355,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
         )}
 
         {isLoading ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="size-8 animate-spin rounded-full border-2 border-solid border-primary border-t-transparent" />
-          </div>
+          <MessageSkeletonList />
         ) : (
           <div className="pb-4">
             {!hasMore && messages.length > 0 && (

@@ -1,16 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import DefaultLayout from '../../layouts/DefaultLayout';
 import DiscordGuildChannelsSidebar from '../components/DiscordGuildChannelsSidebar';
+import DiscordChannelHeader from '../components/DiscordChannelHeader';
 import DiscordMemberList from '../components/DiscordMemberList';
 
-const DiscordGuildLayout = ({ children, guild }) => {
+const DiscordGuildLayout = ({ children, guild, channel, dmInfo }) => {
   const { channelId } = useParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [memberListOpen, setMemberListOpen] = useState(true);
 
   useEffect(() => {
     setIsSidebarOpen(true);
   }, [guild?.id]);
+
+  const isDM = false; // Guild layout is never used for DMs
+  const displayName = channel?.name;
+  const guildName = guild?.properties?.name || guild?.name || 'Server';
+  const toggleMemberList = useCallback(() => setMemberListOpen((v) => !v), []);
 
   const guildSidebar = (
     <>
@@ -42,9 +49,22 @@ const DiscordGuildLayout = ({ children, guild }) => {
 
   return (
     <DefaultLayout sidebar={guildSidebar}>
-      <main className="relative flex h-full min-w-0 flex-1 bg-black">
-        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-        {guild?.id && channelId && <DiscordMemberList guildId={guild.id} />}
+      <main className="relative flex h-full min-w-0 flex-1 flex-col bg-[#1a1a1e]">
+        {channel && (
+          <DiscordChannelHeader
+            channel={channel}
+            displayName={displayName}
+            isDM={isDM}
+            dmInfo={dmInfo}
+            guildName={guildName}
+            memberListOpen={memberListOpen}
+            onToggleMemberList={toggleMemberList}
+          />
+        )}
+        <div className="flex min-w-0 flex-1 overflow-hidden">
+          <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+          {guild?.id && channelId && memberListOpen && <DiscordMemberList guildId={guild.id} />}
+        </div>
       </main>
     </DefaultLayout>
   );

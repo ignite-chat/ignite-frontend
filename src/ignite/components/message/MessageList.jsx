@@ -1,6 +1,6 @@
-import { CircleNotch } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import ChannelMessage from './ChannelMessage';
+import MessageSkeletonList from '@/components/message/MessageSkeleton';
 
 const NewMessagesSeparator = () => (
   <div className="flex items-center gap-1 pl-4 pr-3.5 mt-1.5 mb-0.5">
@@ -37,7 +37,7 @@ const MessageList = ({
   newMessagesSeparatorId,
 }) => {
   if (isLoading) {
-    return <CircleNotch size={32} className="mx-auto animate-spin text-gray-500" />;
+    return <MessageSkeletonList />;
   }
 
   return (

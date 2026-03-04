@@ -183,6 +183,8 @@ const DiscordAttachments = ({ attachments }) => {
   );
 };
 
+const IFRAME_PROVIDERS = ['YouTube', 'Twitch', 'Vimeo', 'Dailymotion', 'Spotify'];
+
 const DiscordEmbeds = ({ embeds }) => {
   if (!embeds || embeds.length === 0) return null;
 
@@ -193,13 +195,20 @@ const DiscordEmbeds = ({ embeds }) => {
           ? `#${embed.color.toString(16).padStart(6, '0')}`
           : '#202225';
 
+        const hasVideo = !!embed.video;
+        const videoUrl = embed.video?.url || embed.video?.proxy_url;
+        const isIframeProvider = hasVideo && embed.provider && IFRAME_PROVIDERS.includes(embed.provider.name);
+
         return (
           <div
             key={i}
-            className="max-w-[520px] overflow-hidden rounded bg-[#2f3136] border-l-4"
+            className="max-w-[520px] overflow-hidden rounded border border-[#313137] bg-[#242429] border-l-4"
             style={{ borderLeftColor: borderColor }}
           >
             <div className="p-3">
+              {embed.provider && (
+                <div className="mb-1 text-xs text-gray-400">{embed.provider.name}</div>
+              )}
               {embed.author && (
                 <div className="mb-1 flex items-center gap-2 text-sm">
                   {embed.author.icon_url && (
@@ -227,8 +236,25 @@ const DiscordEmbeds = ({ embeds }) => {
               {embed.description && (
                 <p className="text-sm text-gray-300">{embed.description}</p>
               )}
-              {embed.image && (() => {
-                const { width, height } = fitDimensions(embed.image.width, embed.image.height, 496, 400);
+              {isIframeProvider && videoUrl && (() => {
+                const { width, height } = fitDimensions(
+                  embed.video.width || 400,
+                  embed.video.height || 225,
+                  400,
+                  400
+                );
+                return (
+                  <iframe
+                    src={videoUrl}
+                    width={width}
+                    height={height}
+                    className="mt-2 rounded"
+                    allowFullScreen
+                  />
+                );
+              })()}
+              {embed.image && !isIframeProvider && (() => {
+                const { width, height } = fitDimensions(embed.image.width, embed.image.height, 400, 400);
                 return (
                   <img
                     src={embed.image.proxy_url || embed.image.url}
@@ -239,8 +265,8 @@ const DiscordEmbeds = ({ embeds }) => {
                   />
                 );
               })()}
-              {embed.thumbnail && !embed.image && (() => {
-                const { width, height } = fitDimensions(embed.thumbnail.width, embed.thumbnail.height, 80, 80);
+              {embed.thumbnail && !embed.image && !isIframeProvider && (() => {
+                const { width, height } = fitDimensions(embed.thumbnail.width, embed.thumbnail.height, 400, 400);
                 return (
                   <img
                     src={embed.thumbnail.proxy_url || embed.thumbnail.url}
@@ -307,7 +333,7 @@ const DiscordReplyBar = ({ referencedMessage, guildId }) => {
   const member = referencedMessage.member || storeMember;
 
   const displayName =
-    referencedMessage.author?.global_name || referencedMessage.author?.username || 'Unknown';
+    member?.nick || referencedMessage.author?.global_name || referencedMessage.author?.username || 'Unknown';
 
   const nameColor = useMemo(() => {
     if (!guildId || !member?.roles) return undefined;
@@ -403,7 +429,7 @@ const DiscordReplyBar = ({ referencedMessage, guildId }) => {
       <button
         type="button"
         onClick={scrollToMessage}
-        className="cursor-pointer truncate text-gray-500 hover:text-gray-300"
+        className="cursor-pointer truncate text-gray-300 hover:text-gray-300"
       >
         {referencedMessage.content?.slice(0, 100) || 'Click to see attachment'}
       </button>
