@@ -8,6 +8,7 @@ import { DiscordGatewayService } from '../services/discord-gateway.service';
 import { DiscordApiService } from '../services/discord-api.service';
 import DiscordGuildLayout from '../layouts/DiscordGuildLayout';
 import DiscordChannel from '../components/DiscordChannel';
+import PageTitle from '@/ignite/components/PageTitle';
 
 const DiscordGuildPage = () => {
   const navigate = useNavigate();
@@ -80,8 +81,12 @@ const DiscordGuildPage = () => {
       .finally(() => setFetchingThread(false));
   }, [channelId, activeChannel, isConnected, guildId, guildChannels.length]);
 
+  const guildName = guild?.properties?.name || guild?.name || 'Server';
+  const pageTitle = activeChannel ? `#${activeChannel.name} | ${guildName}` : guildName;
+
   return (
     <DiscordGuildLayout guild={guild}>
+      <PageTitle title={pageTitle} />
       {activeChannel ? (
         <DiscordChannel channel={activeChannel} />
       ) : (

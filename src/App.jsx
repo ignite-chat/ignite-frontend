@@ -231,17 +231,8 @@ function App() {
             element={<GuildChannelPage />}
           />
           <Route
-            path="/discord/@me/:channelId?"
-            element={<DiscordDMRedirect />}
-          />
-          <Route
             path="/discord/:guildId/:channelId?"
-            element={
-              <>
-                <PageTitle title="Discord" />
-                <DiscordGuildPage />
-              </>
-            }
+            element={<DiscordGuildPage />}
           />
         </Route>
       </Routes>
