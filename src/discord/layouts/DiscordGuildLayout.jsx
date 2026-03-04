@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import DefaultLayout from '../../layouts/DefaultLayout';
 import DiscordGuildChannelsSidebar from '../components/DiscordGuildChannelsSidebar';
+import DiscordMemberList from '../components/DiscordMemberList';
 
 const DiscordGuildLayout = ({ children, guild }) => {
+  const { channelId } = useParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -39,8 +42,9 @@ const DiscordGuildLayout = ({ children, guild }) => {
 
   return (
     <DefaultLayout sidebar={guildSidebar}>
-      <main className="relative flex h-full min-w-0 flex-1 flex-col bg-black">
-        {children}
+      <main className="relative flex h-full min-w-0 flex-1 bg-black">
+        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+        {guild?.id && channelId && <DiscordMemberList guildId={guild.id} />}
       </main>
     </DefaultLayout>
   );

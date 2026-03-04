@@ -4,8 +4,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { DiscordService } from '../services/discord.service';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
+import { useDiscordMembersStore } from '../store/discord-members.store';
 import { getTwemojiUrl } from '@/utils/emoji.utils';
 import { parseMarkdown } from '@/components/message/markdown/parser';
+import { NORMAL_MESSAGE_TYPES, MessageType, getSystemMessageText } from '../constants/message-types';
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
 import DiscordUserPopoverContent from '@/discord/components/popovers/DiscordUserPopoverContent';
 import DiscordUserProfileModal from './DiscordUserProfileModal';
@@ -27,23 +29,29 @@ const DiscordAvatar = ({ author, className = 'size-10' }) => {
 
 const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
   const guilds = useDiscordGuildsStore((s) => s.guilds);
+  const storeMember = useDiscordMembersStore((s) =>
+    guildId ? s.members[guildId]?.[message.author.id] : undefined
+  );
+
+  const member = message.member || storeMember;
 
   const displayName =
-    message.member?.nick || message.author.global_name || message.author.username;
+    member?.nick || message.author.global_name || message.author.username;
 
   const nameColor = useMemo(() => {
-    if (!guildId || !message.member?.roles) return undefined;
+    if (!guildId || !member?.roles) return undefined;
     const guild = guilds.find((g) => g.id === guildId);
-    if (!guild?.roles) return undefined;
+    const guildRoles = guild?.roles || guild?.properties?.roles;
+    if (!guildRoles) return undefined;
 
-    const topColorRole = guild.roles
-      .filter((r) => message.member.roles.includes(r.id) && r.id !== guildId)
+    const topColorRole = guildRoles
+      .filter((r) => member.roles.includes(r.id) && r.id !== guildId)
       .sort((a, b) => (b.position || 0) - (a.position || 0))
       .find((r) => r.color && r.color !== 0);
 
     if (!topColorRole) return undefined;
     return `#${topColorRole.color.toString(16).padStart(6, '0')}`;
-  }, [guildId, guilds, message.member?.roles]);
+  }, [guildId, guilds, member?.roles]);
 
   const formattedDateTime = useMemo(() => {
     const date = new Date(message.timestamp);
@@ -81,8 +89,13 @@ const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
       >
         {displayName}
         {message.author.bot && (
-          <span className="ml-1.5 inline-flex items-center rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium uppercase text-white no-underline">
-            Bot
+          <span className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white no-underline">
+            {(message.author.public_flags & 65536) !== 0 && (
+              <svg className="size-2.5" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
+              </svg>
+            )}
+            APP
           </span>
         )}
       </button>
@@ -456,7 +469,177 @@ const DiscordReactions = ({ reactions }) => {
   );
 };
 
-const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, pending }) => {
+const SystemMessageIcon = ({ type }) => {
+  // Join / welcome
+  if (type === MessageType.USER_JOIN) {
+    return (
+      <svg className="size-4 text-green-400" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M15.32 8.94a1.5 1.5 0 0 0 0-1.89l-1.42-1.84a.2.2 0 0 1-.04-.1L13.5 3a1.5 1.5 0 0 0-1.33-1.22l-2.35-.22a.2.2 0 0 1-.09-.04L8.15.26a1.5 1.5 0 0 0-1.89 0L4.73 1.53a.2.2 0 0 1-.1.04L2.28 1.78A1.5 1.5 0 0 0 1.06 3l-.36 2.11a.2.2 0 0 1-.04.1L.24 7.05a1.5 1.5 0 0 0 0 1.89l1.42 1.84a.2.2 0 0 1 .04.1L2.06 13a1.5 1.5 0 0 0 1.33 1.22l2.35.22a.2.2 0 0 1 .09.04l1.57 1.27a1.5 1.5 0 0 0 1.89 0l1.53-1.27a.2.2 0 0 1 .1-.04l2.35-.22c.67-.06 1.2-.57 1.33-1.22l.36-2.11a.2.2 0 0 1 .04-.1l1.32-1.84zM7.2 11.5l-3.7-3.2 1.3-1.5 2.1 1.8L10.6 5l1.6 1.2-5 5.3z" />
+      </svg>
+    );
+  }
+  // Boost
+  if (type >= MessageType.GUILD_BOOST && type <= MessageType.GUILD_BOOST_TIER_3) {
+    return (
+      <svg className="size-4 text-[#f47fff]" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8.13 1.2a.4.4 0 0 0-.26 0l-5.4 2.1a.4.4 0 0 0-.25.38v4.25a7.47 7.47 0 0 0 5.52 7.22.4.4 0 0 0 .26 0 7.47 7.47 0 0 0 5.52-7.22V3.68a.4.4 0 0 0-.25-.38L8.13 1.2z" />
+      </svg>
+    );
+  }
+  // Pin
+  if (type === MessageType.CHANNEL_PINNED_MESSAGE) {
+    return (
+      <svg className="size-4 text-gray-400" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M4.32 1.81c0-.53.43-.96.96-.96h5.44c.53 0 .96.43.96.96v2.71l1.7 2.56a.5.5 0 0 1-.42.77H8.5V12l-.5 2-.5-2V7.85H3.04a.5.5 0 0 1-.42-.77l1.7-2.56V1.81z" />
+      </svg>
+    );
+  }
+  // Thread
+  if (type === MessageType.THREAD_CREATED) {
+    return (
+      <svg className="size-4 text-gray-400" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M5.43 2h1.39l-.74 3.78h2.87L9.69 2h1.39l-.74 3.78H13v1.34h-2.91l-.57 2.88H12v1.34H9.26L8.52 15H7.14l.74-3.66H4.99L4.26 15H2.87l.74-3.66H1v-1.34h2.86l.57-2.88H2v-1.34h2.69L5.43 2zm1.56 5.12-.57 2.88h2.89l.57-2.88H6.99z" />
+      </svg>
+    );
+  }
+  // Call
+  if (type === MessageType.CALL) {
+    return (
+      <svg className="size-4 text-green-400" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M2.7 1.44c.53-.18 1.1.03 1.36.5l1.37 2.45a1.06 1.06 0 0 1-.22 1.3l-.83.72a6.55 6.55 0 0 0 5.21 5.21l.72-.83a1.06 1.06 0 0 1 1.3-.22l2.45 1.37c.47.26.68.83.5 1.36l-.62 1.85a1.06 1.06 0 0 1-1.15.7A13.06 13.06 0 0 1 1.44 4.51c-.14-.58.14-1.18.7-1.15l1.85-.62-.29.7.29-.7z" />
+      </svg>
+    );
+  }
+  // Channel name / icon change
+  if (type === MessageType.CHANNEL_NAME_CHANGE || type === MessageType.CHANNEL_ICON_CHANGE) {
+    return (
+      <svg className="size-4 text-gray-400" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M12.41 2.58a2 2 0 0 1 2.83 2.83l-7.07 7.07-3.54.71.71-3.54 7.07-7.07z" />
+      </svg>
+    );
+  }
+  // Recipient add/remove
+  if (type === MessageType.RECIPIENT_ADD || type === MessageType.RECIPIENT_REMOVE) {
+    return (
+      <svg className="size-4 text-gray-400" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 2c-3.31 0-6 1.34-6 3v1h12v-1c0-1.66-2.69-3-6-3z" />
+      </svg>
+    );
+  }
+  // Default fallback
+  return (
+    <svg className="size-4 text-gray-400" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.75 4a.75.75 0 1 1 1.5 0 .75.75 0 0 1-1.5 0zM7 7h2v4H7V7z" />
+    </svg>
+  );
+};
+
+const DiscordSystemMessage = memo(({ message, prevMessage, guildId }) => {
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const guild = useDiscordGuildsStore((s) => s.guilds.find((g) => g.id === guildId));
+  const guildName = guild?.properties?.name || guild?.name;
+  const storeMember = useDiscordMembersStore((s) =>
+    guildId && message.author?.id ? s.members[guildId]?.[message.author.id] : undefined
+  );
+  const member = message.member || storeMember;
+
+  const text = useMemo(() => getSystemMessageText(message, guildName), [message, guildName]);
+
+  const authorName = message.author?.global_name || message.author?.username || 'Unknown';
+
+  const nameColor = useMemo(() => {
+    if (!guildId || !member?.roles) return undefined;
+    const guildRoles = guild?.roles || guild?.properties?.roles;
+    if (!guildRoles) return undefined;
+    const topColorRole = guildRoles
+      .filter((r) => member.roles.includes(r.id) && r.id !== guildId)
+      .sort((a, b) => (b.position || 0) - (a.position || 0))
+      .find((r) => r.color && r.color !== 0);
+    if (!topColorRole) return undefined;
+    return `#${topColorRole.color.toString(16).padStart(6, '0')}`;
+  }, [guildId, guild, member?.roles]);
+
+  const formattedTime = useMemo(() => {
+    const date = new Date(message.timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isToday = date.toDateString() === today.toDateString();
+    const isYesterday = date.toDateString() === yesterday.toDateString();
+    const day = isToday ? 'Today' : isYesterday ? 'Yesterday' : date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return `${day} at ${time}`;
+  }, [message.timestamp]);
+
+  // Parse bold text marked with ** **, tagging the author part specially
+  const parts = useMemo(() => {
+    const result = [];
+    const regex = /\*\*(.+?)\*\*/g;
+    let last = 0;
+    let match;
+    let foundAuthor = false;
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > last) result.push({ text: text.slice(last, match.index), type: 'text' });
+      // The first bold part that matches the author name is clickable
+      if (!foundAuthor && match[1] === authorName) {
+        result.push({ text: match[1], type: 'author' });
+        foundAuthor = true;
+      } else {
+        result.push({ text: match[1], type: 'bold' });
+      }
+      last = regex.lastIndex;
+    }
+    if (last < text.length) result.push({ text: text.slice(last), type: 'text' });
+    return result;
+  }, [text, authorName]);
+
+  return (
+    <>
+      <div className="group relative flex items-center gap-4 px-4 py-1 hover:bg-gray-800/40">
+        <div className="flex w-10 shrink-0 items-center justify-center">
+          <SystemMessageIcon type={message.type} />
+        </div>
+        <div className="flex min-w-0 flex-1 items-baseline gap-2">
+          <span className="text-sm text-gray-400">
+            {parts.map((p, i) => {
+              if (p.type === 'author') {
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    className="font-semibold hover:underline"
+                    style={{ color: nameColor || '#e5e7eb' }}
+                    onClick={() => setProfileModalOpen(true)}
+                  >
+                    {p.text}
+                  </button>
+                );
+              }
+              if (p.type === 'bold') {
+                return <strong key={i} className="font-semibold text-gray-200">{p.text}</strong>;
+              }
+              return <span key={i}>{p.text}</span>;
+            })}
+          </span>
+          <span className="shrink-0 text-xs text-gray-500">{formattedTime}</span>
+        </div>
+      </div>
+      {message.author && (
+        <DiscordUserProfileModal
+          author={message.author}
+          member={member}
+          guildId={guildId}
+          open={profileModalOpen}
+          onOpenChange={setProfileModalOpen}
+        />
+      )}
+    </>
+  );
+});
+
+DiscordSystemMessage.displayName = 'DiscordSystemMessage';
+
+const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, pending }) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
 
@@ -465,6 +648,8 @@ const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, has
   const shouldStack = useMemo(() => {
     if (hasReply) return false;
     if (!prevMessage) return false;
+    // Don't stack after a system message
+    if (!NORMAL_MESSAGE_TYPES.has(prevMessage.type)) return false;
     const sameAuthor = prevMessage.author.id === message.author.id;
     const timeDiff =
       (new Date(message.timestamp) - new Date(prevMessage.timestamp)) / 1000;
@@ -578,6 +763,26 @@ const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, has
         onOpenChange={setProfileModalOpen}
       />
     </>
+  );
+});
+
+DiscordNormalMessage.displayName = 'DiscordNormalMessage';
+
+const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, pending }) => {
+  if (!NORMAL_MESSAGE_TYPES.has(message.type)) {
+    return <DiscordSystemMessage message={message} prevMessage={prevMessage} guildId={guildId} />;
+  }
+  return (
+    <DiscordNormalMessage
+      message={message}
+      prevMessage={prevMessage}
+      currentUserId={currentUserId}
+      guildId={guildId}
+      hasManageMessages={hasManageMessages}
+      hasKickMembers={hasKickMembers}
+      hasBanMembers={hasBanMembers}
+      pending={pending}
+    />
   );
 });
 

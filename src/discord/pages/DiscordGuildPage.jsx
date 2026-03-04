@@ -4,6 +4,7 @@ import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordStore } from '../store/discord.store';
 import { useLastChannelStore } from '@/store/last-channel.store';
+import { DiscordGatewayService } from '../services/discord-gateway.service';
 import DiscordGuildLayout from '../layouts/DiscordGuildLayout';
 import DiscordChannel from '../components/DiscordChannel';
 
@@ -51,6 +52,12 @@ const DiscordGuildPage = () => {
       }
     }
   }, [guildChannels, channelId, guildId, navigate]);
+
+  // Subscribe to guild member list when we have a channel selected
+  useEffect(() => {
+    if (!isConnected || !guildId || !channelId) return;
+    DiscordGatewayService.subscribeGuild(guildId, channelId);
+  }, [isConnected, guildId, channelId]);
 
   const activeChannel = useMemo(
     () => guildChannels.find((c) => c.id === channelId),

@@ -24,7 +24,7 @@ export function useDiscordPermission(guildId: string | undefined, channel: Chann
     const guild = guilds.find((g) => g.id === guildId);
     if (!guild) return 0n;
 
-    const guildRoles = guild.roles || [];
+    const guildRoles = guild.roles || guild.properties?.roles || [];
     const guildOwnerId = guild.owner_id || guild.properties?.owner_id;
     const userId = currentUser.id;
 

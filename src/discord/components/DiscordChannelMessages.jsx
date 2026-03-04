@@ -4,7 +4,7 @@ import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { useDiscordStore } from '../store/discord.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordHasPermission } from '../hooks/useDiscordPermission';
-import { MANAGE_MESSAGES, KICK_MEMBERS, BAN_MEMBERS } from '../constants/permissions';
+import { MANAGE_MESSAGES, KICK_MEMBERS, BAN_MEMBERS, READ_MESSAGE_HISTORY } from '../constants/permissions';
 import { scrollPositions } from '@/store/last-channel.store';
 import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
@@ -58,6 +58,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const hasManageMessages = useDiscordHasPermission(guildId, channel, MANAGE_MESSAGES);
   const hasKickMembers = useDiscordHasPermission(guildId, channel, KICK_MEMBERS);
   const hasBanMembers = useDiscordHasPermission(guildId, channel, BAN_MEMBERS);
+  const hasReadMessageHistory = useDiscordHasPermission(guildId, channel, READ_MESSAGE_HISTORY);
 
   const channelMessages = useDiscordChannelsStore((s) => s.channelMessages);
   const channels = useDiscordChannelsStore((s) => s.channels);
@@ -200,7 +201,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
 
   // Load initial messages or restore scroll position
   useEffect(() => {
-    if (!channelId) return;
+    if (!channelId || !hasReadMessageHistory) return;
     if (channelMessages[channelId] != null) {
       // Already loaded — restore saved scroll position or stay at bottom
       if (messagesRef.current) {
@@ -222,7 +223,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
         setTimeout(() => setForceScrollDown(true), 0);
       })
       .finally(() => setIsLoading(false));
-  }, [channelId, channelMessages]);
+  }, [channelId, channelMessages, hasReadMessageHistory]);
 
   // Load older messages on scroll to top
   const onLoadMore = useCallback(async () => {
@@ -310,8 +311,15 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" ref={messagesRef} onScroll={onScroll}>
-      <div ref={contentRef}>
-        {unreadBarData && (
+      <div ref={contentRef} className="flex min-h-full flex-col justify-end">
+        {!hasReadMessageHistory && (
+          <div className="px-4 pb-4 pt-8">
+            <p className="text-sm text-gray-400">
+              You do not have permission to view the message history of #{channel.name}
+            </p>
+          </div>
+        )}
+        {hasReadMessageHistory && unreadBarData && (
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-destructive/30 bg-destructive/10 px-4 py-1.5 text-sm backdrop-blur-sm">
             <span className="font-medium text-destructive">
               {unreadBarData.count}{!unreadBarData.isExact && '+'} new message{unreadBarData.count !== 1 ? 's' : ''} since {unreadBarData.sinceText}

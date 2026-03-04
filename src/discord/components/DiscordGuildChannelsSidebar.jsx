@@ -171,7 +171,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
   const sidebarRef = useRef();
 
   const guildId = guild?.id;
-  const guildRoles = guild?.roles || [];
+  const guildRoles = guild?.roles || guild?.properties?.roles || [];
   const guildOwnerId = guild?.owner_id || guild?.properties?.owner_id;
   const userId = currentUser?.id;
 

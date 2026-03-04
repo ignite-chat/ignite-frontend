@@ -6,6 +6,7 @@ import { DiscordService } from '../../services/discord.service';
 import { DiscordApiService } from '../../services/discord-api.service';
 import { useDiscordGuildsStore } from '../../store/discord-guilds.store';
 import { useDiscordUsersStore } from '../../store/discord-users.store';
+import { useDiscordMembersStore } from '../../store/discord-members.store';
 
 const DISCORD_EPOCH = 1420070400000;
 
@@ -26,11 +27,13 @@ const statusColors = {
   offline: 'bg-gray-500',
 };
 
-const DiscordUserPopoverContent = ({ author, member, guildId, onOpenProfile }) => {
+const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpenProfile }) => {
   const guilds = useDiscordGuildsStore((s) => s.guilds);
   const storeUser = useDiscordUsersStore((s) => s.users[author.id]);
+  const storeMember = useDiscordMembersStore((s) => guildId ? s.members[guildId]?.[author.id] : undefined);
   const [profile, setProfile] = useState(null);
 
+  const member = memberProp || storeMember;
   const user = { ...author, ...storeUser };
   const guild = guildId ? guilds.find((g) => g.id === guildId) : null;
 
@@ -58,8 +61,9 @@ const DiscordUserPopoverContent = ({ author, member, guildId, onOpenProfile }) =
   }, [profile, user.id]);
 
   const roles = useMemo(() => {
-    if (!member?.roles || !guild?.roles) return [];
-    return guild.roles
+    const guildRoles = guild?.roles || guild?.properties?.roles;
+    if (!member?.roles || !guildRoles) return [];
+    return guildRoles
       .filter((r) => member.roles.includes(r.id) && r.id !== guildId)
       .sort((a, b) => (b.position || 0) - (a.position || 0));
   }, [member, guild, guildId]);
@@ -117,8 +121,13 @@ const DiscordUserPopoverContent = ({ author, member, guildId, onOpenProfile }) =
           <h2 className="flex items-center gap-1.5 text-lg font-bold text-white">
             {displayName}
             {user.bot && (
-              <span className="inline-flex items-center rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium uppercase text-white">
-                Bot
+              <span className="inline-flex items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
+                {(user.public_flags & 65536) !== 0 && (
+                  <svg className="size-2.5" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
+                  </svg>
+                )}
+                APP
               </span>
             )}
           </h2>

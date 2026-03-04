@@ -5,6 +5,8 @@ import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { useDiscordRelationshipsStore } from '../store/discord-relationships.store';
+import { useDiscordMemberListStore } from '../store/discord-member-list.store';
+import { useDiscordMembersStore } from '../store/discord-members.store';
 
 // Discord Gateway Opcodes
 const GatewayOp = {
@@ -132,15 +134,66 @@ export const DiscordGatewayService = {
   },
 
   /**
-   * Subscribe to guild members to receive their member info (roles, nick, etc.).
+   * Send a full guild subscription for a channel — requests member sidebar,
+   * typing indicators, threads, activities, and optionally specific member IDs.
    */
-  subscribeGuildMembers(guildId: string, memberIds: string[]) {
+  subscribeGuild(guildId: string, channelId: string, memberIds: string[] = [], range: [number, number] = [0, 99]) {
     this.send({
       op: GatewayOp.GUILD_SUBSCRIPTIONS,
       d: {
         subscriptions: {
           [guildId]: {
+            typing: true,
+            threads: true,
+            activities: true,
             members: memberIds,
+            member_updates: false,
+            channels: {
+              [channelId]: [range],
+            },
+            thread_member_lists: [],
+          },
+        },
+      },
+    });
+  },
+
+  /**
+   * Request full member data for specific user IDs via Opcode 8.
+   * Discord responds with GUILD_MEMBERS_CHUNK events.
+   */
+  requestGuildMembers(guildId: string, userIds: string[]) {
+    if (!userIds.length) return;
+    // Discord limits to 100 user IDs per request
+    for (let i = 0; i < userIds.length; i += 100) {
+      this.send({
+        op: GatewayOp.REQUEST_GUILD_MEMBERS,
+        d: {
+          guild_id: guildId,
+          user_ids: userIds.slice(i, i + 100),
+        },
+      });
+    }
+  },
+
+  /**
+   * Update the member list range for a channel (e.g. when scrolling the member sidebar).
+   */
+  updateMemberListRange(guildId: string, channelId: string, ranges: [number, number][]) {
+    this.send({
+      op: GatewayOp.GUILD_SUBSCRIPTIONS,
+      d: {
+        subscriptions: {
+          [guildId]: {
+            typing: true,
+            threads: true,
+            activities: true,
+            members: [],
+            member_updates: false,
+            channels: {
+              [channelId]: ranges,
+            },
+            thread_member_lists: [],
           },
         },
       },
@@ -225,7 +278,7 @@ export const DiscordGatewayService = {
    * Handle DISPATCH events by routing to the appropriate handler.
    */
   _handleDispatch(eventName: string, data: any) {
-    console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
+    //console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
 
     switch (eventName) {
       case 'READY':
@@ -277,12 +330,15 @@ export const DiscordGatewayService = {
         useDiscordRelationshipsStore.getState().updateRelationship(data.id, { type: data.type, nickname: data.nickname });
         break;
       case 'GUILD_MEMBERS_CHUNK':
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleGuildMembersChunk(data);
         break;
       case 'GUILD_MEMBER_UPDATE':
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleGuildMemberUpdate(data);
         break;
       case 'GUILD_MEMBER_LIST_UPDATE':
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleGuildMemberListUpdate(data);
         break;
       case 'PRESENCE_UPDATE': {
@@ -341,6 +397,7 @@ export const DiscordGatewayService = {
       const memberGroup = merged_members?.[i];
       if (memberGroup?.length > 0) {
         useDiscordGuildsStore.getState().setGuildMembers(guild.id, memberGroup);
+        useDiscordMembersStore.getState().addMembers(guild.id, memberGroup);
       }
     }
     if (allGuildChannels.length > 0) {
@@ -413,6 +470,7 @@ export const DiscordGatewayService = {
       }
       if (currentMember) {
         useDiscordGuildsStore.getState().setGuildMembers(data.id, [currentMember]);
+        useDiscordMembersStore.getState().addMember(data.id, currentMember);
       }
     }
 
@@ -437,6 +495,7 @@ export const DiscordGatewayService = {
 
   _handleGuildDelete(data: any) {
     useDiscordGuildsStore.getState().removeGuild(data.id);
+    useDiscordMembersStore.getState().removeGuild(data.id);
     // Also remove channels belonging to this guild
     const { channels, setChannels } = useDiscordChannelsStore.getState();
     setChannels(channels.filter((c) => c.guild_id !== data.id));
@@ -461,6 +520,19 @@ export const DiscordGatewayService = {
     }
 
     useDiscordChannelsStore.getState().appendMessage(data.channel_id, data);
+
+    // Store the author's user object in the users store
+    if (data.author) {
+      useDiscordUsersStore.getState().addUser(data.author);
+    }
+
+    // Store member data (roles, nick, etc.) in the members store
+    if (data.member && data.guild_id && data.author?.id) {
+      useDiscordMembersStore.getState().addMember(data.guild_id, {
+        ...data.member,
+        user: data.author,
+      });
+    }
 
     // Update last_message_id on the channel
     useDiscordChannelsStore.getState().updateChannel(data.channel_id, {
@@ -490,6 +562,7 @@ export const DiscordGatewayService = {
     const { guild_id, members, presences } = data;
     if (guild_id && members?.length > 0) {
       useDiscordGuildsStore.getState().addGuildMembers(guild_id, members);
+      useDiscordMembersStore.getState().addMembers(guild_id, members);
 
       // Also store user objects and presences
       const users = members.map((m: any) => m.user).filter(Boolean);
@@ -524,6 +597,9 @@ export const DiscordGatewayService = {
       useDiscordGuildsStore.getState().addGuildMembers(guild_id, [{ ...data, user }]);
     }
 
+    // Update member in dedicated members store
+    useDiscordMembersStore.getState().addMember(guild_id, { ...data, user });
+
     // Update user object in users store
     useDiscordUsersStore.getState().addUser(user);
   },
@@ -532,6 +608,10 @@ export const DiscordGatewayService = {
     const { guild_id, ops } = data;
     if (!guild_id || !ops) return;
 
+    // Update the member list store (groups + items for the sidebar)
+    useDiscordMemberListStore.getState().handleListUpdate(guild_id, data);
+
+    // Also extract members/users/presences into existing stores
     for (const op of ops) {
       if (op.op === 'SYNC' || op.op === 'INSERT' || op.op === 'UPDATE') {
         const items = op.items || (op.item ? [op.item] : []);
@@ -541,10 +621,25 @@ export const DiscordGatewayService = {
 
         if (members.length > 0) {
           useDiscordGuildsStore.getState().addGuildMembers(guild_id, members);
+          useDiscordMembersStore.getState().addMembers(guild_id, members);
 
           const users = members.map((m: any) => m.user).filter(Boolean);
           if (users.length > 0) {
             useDiscordUsersStore.getState().addUsers(users);
+          }
+
+          // Extract presences from member items
+          const presences = members
+            .filter((m: any) => m.presence)
+            .map((m: any) => ({
+              user_id: m.user?.id,
+              status: m.presence.status,
+              activities: m.presence.activities,
+              client_status: m.presence.client_status,
+            }))
+            .filter((p: any) => p.user_id);
+          if (presences.length > 0) {
+            useDiscordUsersStore.getState().setPresences(presences);
           }
         }
       }

@@ -5,6 +5,7 @@ import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { useDiscordRelationshipsStore } from '../store/discord-relationships.store';
+import { useDiscordMembersStore } from '../store/discord-members.store';
 import { DiscordGatewayService } from './discord-gateway.service';
 import { DiscordApiService } from './discord-api.service';
 
@@ -69,6 +70,30 @@ export const DiscordService = {
   async loadChannelMessages(channelId: string, before?: string) {
     try {
       const messages = await DiscordApiService.getChannelMessages(channelId, before);
+
+      // Store author user objects in the users store
+      const authors = messages.map((m: any) => m.author).filter(Boolean);
+      if (authors.length > 0) {
+        useDiscordUsersStore.getState().addUsers(authors);
+      }
+
+      // Store member data and request full guild members via Opcode 8
+      const channel = useDiscordChannelsStore.getState().channels.find((c) => c.id === channelId);
+      if (channel?.guild_id) {
+        // Store inline member data from messages
+        const membersToAdd = messages
+          .filter((m: any) => m.member && m.author?.id)
+          .map((m: any) => ({ ...m.member, user: m.author }));
+        if (membersToAdd.length > 0) {
+          useDiscordMembersStore.getState().addMembers(channel.guild_id, membersToAdd);
+        }
+
+        // Request full member data for all unique authors via Opcode 8
+        const uniqueUserIds = [...new Set(authors.map((a: any) => a.id).filter(Boolean))] as string[];
+        if (uniqueUserIds.length > 0) {
+          DiscordGatewayService.requestGuildMembers(channel.guild_id, uniqueUserIds);
+        }
+      }
 
       const { channelMessages, setChannelMessages } = useDiscordChannelsStore.getState();
       const existing = channelMessages[channelId] || [];
