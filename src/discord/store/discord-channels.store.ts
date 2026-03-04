@@ -38,6 +38,7 @@ type PendingMessage = {
   content: string;
   author: DiscordMessage['author'];
   timestamp: string;
+  type: number;
 };
 
 type DiscordChannelsStore = {

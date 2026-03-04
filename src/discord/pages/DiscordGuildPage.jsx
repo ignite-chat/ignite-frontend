@@ -1,10 +1,11 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordStore } from '../store/discord.store';
 import { useLastChannelStore } from '@/store/last-channel.store';
 import { DiscordGatewayService } from '../services/discord-gateway.service';
+import { DiscordApiService } from '../services/discord-api.service';
 import DiscordGuildLayout from '../layouts/DiscordGuildLayout';
 import DiscordChannel from '../components/DiscordChannel';
 
@@ -64,16 +65,31 @@ const DiscordGuildPage = () => {
     [guildChannels, channelId]
   );
 
+  // Fetch thread channel if not in the store (e.g. navigating to a forum thread directly)
+  const [fetchingThread, setFetchingThread] = useState(false);
+  useEffect(() => {
+    if (!channelId || activeChannel || !isConnected || guildChannels.length === 0) return;
+    setFetchingThread(true);
+    DiscordApiService.getChannel(channelId)
+      .then((channel) => {
+        if (channel && channel.guild_id === guildId) {
+          useDiscordChannelsStore.getState().addChannel(channel);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setFetchingThread(false));
+  }, [channelId, activeChannel, isConnected, guildId, guildChannels.length]);
+
   return (
     <DiscordGuildLayout guild={guild}>
       {activeChannel ? (
         <DiscordChannel channel={activeChannel} />
       ) : (
         <div className="flex h-full items-center justify-center text-gray-500">
-          {guildChannels.length === 0 ? (
+          {guildChannels.length === 0 || fetchingThread ? (
             <div className="flex flex-col items-center gap-2">
               <div className="size-8 animate-spin rounded-full border-2 border-solid border-primary border-t-transparent" />
-              <p className="text-sm">Loading channels...</p>
+              <p className="text-sm">{fetchingThread ? 'Loading thread...' : 'Loading channels...'}</p>
             </div>
           ) : (
             <p className="text-sm">Select a channel from the sidebar</p>

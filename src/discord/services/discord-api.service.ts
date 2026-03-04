@@ -58,9 +58,42 @@ export const DiscordApiService = {
   /**
    * Send a message to a channel.
    */
-  async sendMessage(channelId: string, content: string, nonce?: string) {
-    const { data } = await discordApi.post(`/channels/${channelId}/messages`, { content, nonce });
+  async sendMessage(channelId: string, content: string, nonce?: string, messageReference?: { message_id: string }) {
+    const body: any = { content, nonce };
+    if (messageReference) {
+      body.message_reference = messageReference;
+      body.allowed_mentions = { replied_user: true };
+    }
+    const { data } = await discordApi.post(`/channels/${channelId}/messages`, body);
     return data;
+  },
+
+  /**
+   * Send a typing indicator to a channel.
+   */
+  async sendTyping(channelId: string) {
+    await discordApi.post(`/channels/${channelId}/typing`, {}, { _silent: true } as any);
+  },
+
+  /**
+   * Add a reaction to a message.
+   */
+  async addReaction(channelId: string, messageId: string, emoji: string) {
+    await discordApi.put(
+      `/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`,
+      {},
+      { _silent: true } as any
+    );
+  },
+
+  /**
+   * Remove own reaction from a message.
+   */
+  async removeReaction(channelId: string, messageId: string, emoji: string) {
+    await discordApi.delete(
+      `/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`,
+      { _silent: true } as any
+    );
   },
 
   /**
@@ -144,6 +177,36 @@ export const DiscordApiService = {
    */
   async getApplication(applicationId: string) {
     const { data } = await discordApi.get(`/applications/${applicationId}/rpc`, { _silent: true } as any);
+    return data;
+  },
+
+  /**
+   * Get post data for a forum channel (thread metadata + first messages + owners).
+   */
+  async getForumPostData(channelId: string) {
+    const { data } = await discordApi.get(`/channels/${channelId}/post-data`);
+    return data;
+  },
+
+  /**
+   * Search threads in a forum channel with pagination.
+   */
+  async searchForumThreads(
+    channelId: string,
+    offset = 0,
+    limit = 25,
+    sortBy = 'last_message_time',
+    sortOrder = 'desc'
+  ) {
+    const { data } = await discordApi.get(`/channels/${channelId}/threads/search`, {
+      params: {
+        sort_by: sortBy,
+        sort_order: sortOrder,
+        limit,
+        offset,
+        tag_setting: 'match_some',
+      },
+    });
     return data;
   },
 

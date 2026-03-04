@@ -120,9 +120,20 @@ export const DiscordService = {
    * Creates a pending message immediately for instant UI feedback,
    * then removes it once the server confirms via MESSAGE_CREATE.
    */
-  async sendMessage(channelId: string, content: string) {
+  async sendMessage(channelId: string, content: string, replyToMessageId?: string | null) {
     const nonce = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
     const currentUser = useDiscordStore.getState().user;
+
+    const messageReference = replyToMessageId
+      ? { message_id: replyToMessageId }
+      : undefined;
+
+    // Look up the referenced message for UI feedback
+    let referencedMessage = undefined;
+    if (replyToMessageId) {
+      const messages = useDiscordChannelsStore.getState().channelMessages[channelId] || [];
+      referencedMessage = messages.find((m) => m.id === replyToMessageId) || undefined;
+    }
 
     // Add pending message for instant UI feedback
     if (currentUser) {
@@ -138,11 +149,14 @@ export const DiscordService = {
           avatar: currentUser.avatar,
         },
         timestamp: new Date().toISOString(),
+        type: 0,
+        ...(messageReference && { message_reference: messageReference }),
+        ...(referencedMessage && { referenced_message: referencedMessage }),
       });
     }
 
     try {
-      await DiscordApiService.sendMessage(channelId, content, nonce);
+      await DiscordApiService.sendMessage(channelId, content, nonce, messageReference);
       // The real message arrives via MESSAGE_CREATE which removes the pending one by nonce
       return true;
     } catch (error) {

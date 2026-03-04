@@ -5,6 +5,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/component
 import { DiscordService } from '../services/discord.service';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
+import { useDiscordReplyStore } from '../store/discord-reply.store';
 import { getTwemojiUrl } from '@/utils/emoji.utils';
 import { parseMarkdown } from '@/components/message/markdown/parser';
 import { NORMAL_MESSAGE_TYPES, MessageType, getSystemMessageText } from '../constants/message-types';
@@ -14,6 +15,7 @@ import DiscordUserProfileModal from './DiscordUserProfileModal';
 import { useModalStore } from '@/store/modal.store';
 import DiscordMessageContextMenu from './DiscordMessageContextMenu';
 import DiscordUserContextMenu from './DiscordUserContextMenu';
+import { ArrowBendUpLeft } from '@phosphor-icons/react';
 
 const DiscordAvatar = ({ author, className = 'size-10' }) => {
   const url = DiscordService.getUserAvatarUrl(author.id, author.avatar, 80);
@@ -752,6 +754,23 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, guildI
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <ContextMenu>
           <ContextMenuTrigger className={messageClasses}>
+            {/* Hover action bar */}
+            {!pending && (
+              <div className="absolute -top-3.5 right-4 z-10 hidden items-center gap-0.5 rounded border border-white/10 bg-[#2b2d31] p-0.5 shadow-md group-hover:flex">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    useDiscordReplyStore.getState().setReplyingMessage(message.id, message);
+                  }}
+                  className="rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200"
+                  title="Reply"
+                >
+                  <ArrowBendUpLeft size={16} />
+                </button>
+              </div>
+            )}
+
             {hasReply && (
               <div className="mb-1 px-4">
                 <DiscordReplyBar referencedMessage={message.referenced_message} guildId={guildId} />

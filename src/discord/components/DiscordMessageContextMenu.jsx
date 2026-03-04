@@ -6,8 +6,13 @@ import {
 } from '@/components/ui/context-menu';
 import { DiscordApiService } from '../services/discord-api.service';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
+import { useDiscordReplyStore } from '../store/discord-reply.store';
 
 const DiscordMessageContextMenu = ({ message, canDelete }) => {
+  const handleReply = () => {
+    useDiscordReplyStore.getState().setReplyingMessage(message.id, message);
+  };
+
   const handleCopyText = () => {
     navigator.clipboard.writeText(message.content);
     toast.success('Message text copied to clipboard.');
@@ -30,6 +35,8 @@ const DiscordMessageContextMenu = ({ message, canDelete }) => {
 
   return (
     <ContextMenuContent className="w-52">
+      <ContextMenuItem onSelect={handleReply}>Reply</ContextMenuItem>
+      <ContextMenuSeparator />
       {message.content && (
         <ContextMenuItem onSelect={handleCopyText}>Copy Text</ContextMenuItem>
       )}

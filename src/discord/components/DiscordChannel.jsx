@@ -5,11 +5,13 @@ import { useDiscordUsersStore } from '../store/discord-users.store';
 import { DiscordService } from '../services/discord.service';
 import DiscordChannelMessages from './DiscordChannelMessages';
 import DiscordChannelInput from './DiscordChannelInput';
+import DiscordForumView from './DiscordForumView';
 
 const DiscordChannel = ({ channel }) => {
   const currentUser = useDiscordStore((s) => s.user);
   const usersMap = useDiscordUsersStore((s) => s.users);
 
+  const isForum = channel?.type === 15;
   const isDM = channel?.type === 1 || channel?.type === 3;
 
   const dmInfo = useMemo(() => {
@@ -37,6 +39,10 @@ const DiscordChannel = ({ channel }) => {
   const onMessageSent = useCallback(() => setMessageSentCount((c) => c + 1), []);
 
   if (!channel) return null;
+
+  if (isForum) {
+    return <DiscordForumView channel={channel} />;
+  }
 
   const displayName = isDM ? dmInfo?.name : channel.name;
   const placeholderName = isDM ? `@${dmInfo?.name}` : `#${channel.name}`;
