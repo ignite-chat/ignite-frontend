@@ -93,11 +93,13 @@ const TabVoiceAudio = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="default">Default</SelectItem>
-                {inputDevices.map((device) => (
-                  <SelectItem key={device.deviceId} value={device.deviceId}>
-                    {device.label || `Microphone (${device.deviceId.slice(0, 8)}...)`}
-                  </SelectItem>
-                ))}
+                {inputDevices
+                  .filter((device) => device.deviceId !== 'default')
+                  .map((device) => (
+                    <SelectItem key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Microphone (${device.deviceId.slice(0, 8)}...)`}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </Field>
@@ -109,11 +111,13 @@ const TabVoiceAudio = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="default">Default</SelectItem>
-                {outputDevices.map((device) => (
-                  <SelectItem key={device.deviceId} value={device.deviceId}>
-                    {device.label || `Speaker (${device.deviceId.slice(0, 8)}...)`}
-                  </SelectItem>
-                ))}
+                {outputDevices
+                  .filter((device) => device.deviceId !== 'default')
+                  .map((device) => (
+                    <SelectItem key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Speaker (${device.deviceId.slice(0, 8)}...)`}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </Field>
@@ -129,7 +133,7 @@ const TabVoiceAudio = () => {
             <div>
               <p className="text-sm font-semibold">Noise Suppression</p>
               <p className="text-xs text-muted-foreground">
-                Powered by Krisp — make some noise while speaking and your friends will only hear your voice.
+                Make some noise while speaking and your friends will only hear your voice.
               </p>
             </div>
           </div>
@@ -150,21 +154,6 @@ const TabVoiceAudio = () => {
             </Button>
             {isTesting && <MicTestBars deviceId={audioInputDeviceId} outputDeviceId={audioOutputDeviceId} />}
           </div>
-        </div>
-
-        {/* Krisp branding */}
-        <Separator />
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Powered by</span>
-          <span className="text-sm font-bold">krisp</span>
-          <a
-            href="https://krisp.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline"
-          >
-            Learn More
-          </a>
         </div>
       </div>
     </div>
