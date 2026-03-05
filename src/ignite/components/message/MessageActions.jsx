@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { NotePencil, Trash, Smiley, ArrowBendUpLeft, Hash } from '@phosphor-icons/react';
+import { NotePencil, Trash, Smiley, ArrowBendUpLeft, Hash, Pencil, Link } from '@phosphor-icons/react';
 import * as Popover from '@radix-ui/react-popover';
 import {
   EmojiPicker,
@@ -9,6 +9,7 @@ import {
   EmojiPickerSidebar,
 } from '@/components/ui/emoji-picker';
 import { ChannelsService } from '@/ignite/services/channels.service';
+import { toast } from 'sonner';
 import { useGuildContext } from '../../contexts/GuildContext';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useEmojisStore } from '../../store/emojis.store';
@@ -77,6 +78,19 @@ const MessageActions = ({ message, channelId, canEdit, canDelete, onEdit, onDele
     >
       <button
         type="button"
+        onClick={() => {
+          const gPart = guildId || '@me';
+          const link = `${window.location.origin}/channels/${gPart}/${channelId}/${message.id}`;
+          navigator.clipboard.writeText(link);
+          toast.success('Message link copied to clipboard.');
+        }}
+        className="rounded-md p-2 text-sm text-white/90 hover:bg-primary/10 hover:text-primary"
+      >
+        <Link className="size-5" weight="bold" />
+      </button>
+
+      <button
+        type="button"
         onClick={onReply}
         className="rounded-md p-2 text-sm text-white/90 hover:bg-primary/10 hover:text-primary"
       >
@@ -92,7 +106,7 @@ const MessageActions = ({ message, channelId, canEdit, canDelete, onEdit, onDele
             type="button"
             className="rounded-md p-2 text-sm text-white/90 hover:bg-primary/10 hover:text-primary"
           >
-            <Smiley className="size-5" />
+            <Smiley className="size-5" weight="fill" />
           </button>
         </Popover.Trigger>
         <Popover.Portal>
@@ -169,7 +183,7 @@ const MessageActions = ({ message, channelId, canEdit, canDelete, onEdit, onDele
           onClick={onEdit}
           className="rounded-md p-2 text-sm text-white/90 hover:bg-primary/10 hover:text-primary"
         >
-          <NotePencil className="size-5" />
+          <Pencil className="size-5" weight="fill" />
         </button>
       )}
 
@@ -177,9 +191,9 @@ const MessageActions = ({ message, channelId, canEdit, canDelete, onEdit, onDele
         <button
           type="button"
           onClick={onDelete}
-          className="rounded-md p-2 text-sm text-white/90 hover:bg-primary/10 hover:text-primary"
+          className="rounded-md p-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300"
         >
-          <Trash className="size-5" />
+          <Trash className="size-5" weight="fill" />
         </button>
       )}
     </div>
