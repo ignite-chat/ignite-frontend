@@ -65,7 +65,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const channelMessages = useDiscordChannelsStore((s) => s.channelMessages);
   const channels = useDiscordChannelsStore((s) => s.channels);
 
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [forceScrollDown, setForceScrollDown] = useState(false);

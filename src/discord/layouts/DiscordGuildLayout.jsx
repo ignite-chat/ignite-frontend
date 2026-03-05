@@ -4,11 +4,14 @@ import DefaultLayout from '../../layouts/DefaultLayout';
 import DiscordGuildChannelsSidebar from '../components/DiscordGuildChannelsSidebar';
 import DiscordChannelHeader from '../components/DiscordChannelHeader';
 import DiscordMemberList from '../components/DiscordMemberList';
+import DiscordSearchPanel from '../components/DiscordSearchPanel';
 
 const DiscordGuildLayout = ({ children, guild, channel, dmInfo }) => {
   const { channelId } = useParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [memberListOpen, setMemberListOpen] = useState(true);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     setIsSidebarOpen(true);
@@ -18,6 +21,14 @@ const DiscordGuildLayout = ({ children, guild, channel, dmInfo }) => {
   const displayName = channel?.name;
   const guildName = guild?.properties?.name || guild?.name || 'Server';
   const toggleMemberList = useCallback(() => setMemberListOpen((v) => !v), []);
+  const handleSearch = useCallback((query) => {
+    setSearchQuery(query);
+    setSearchOpen(true);
+  }, []);
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setSearchQuery('');
+  }, []);
 
   const guildSidebar = (
     <>
@@ -59,11 +70,14 @@ const DiscordGuildLayout = ({ children, guild, channel, dmInfo }) => {
             guildName={guildName}
             memberListOpen={memberListOpen}
             onToggleMemberList={toggleMemberList}
+            searchOpen={searchOpen}
+            onSearch={handleSearch}
           />
         )}
         <div className="flex min-w-0 flex-1 overflow-hidden">
           <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-          {guild?.id && channelId && memberListOpen && <DiscordMemberList guildId={guild.id} />}
+          {guild?.id && channelId && memberListOpen && !searchOpen && <DiscordMemberList guildId={guild.id} />}
+          {guild?.id && searchOpen && <DiscordSearchPanel key={searchQuery} guildId={guild.id} initialQuery={searchQuery} onClose={closeSearch} />}
         </div>
       </main>
     </DefaultLayout>

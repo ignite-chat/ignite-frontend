@@ -264,4 +264,19 @@ export const DiscordApiService = {
     );
     return data;
   },
+
+  /**
+   * Search messages in a guild.
+   */
+  async searchGuildMessages(guildId: string, content: string, offset = 0) {
+    const { data } = await discordApi.get(`/guilds/${guildId}/messages/search`, {
+      params: {
+        content,
+        sort_by: 'timestamp',
+        sort_order: 'desc',
+        offset,
+      },
+    });
+    return data;
+  },
 };

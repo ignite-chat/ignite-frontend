@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { At, ChatsTeardrop, Hash, MagnifyingGlass, Users } from '@phosphor-icons/react';
 import { GUILD_FORUM } from '../constants/channel-types';
 
-const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, guildName, memberListOpen, onToggleMemberList }) => {
+const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, guildName, memberListOpen, onToggleMemberList, searchOpen, onSearch }) => {
   const isForum = channel?.type === GUILD_FORUM;
+  const [searchValue, setSearchValue] = useState('');
 
   const icon = isDM ? (
     dmInfo?.properties?.icon ? (
@@ -19,6 +21,12 @@ const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, guildName, m
   ) : (
     <Hash className="mr-1 size-5 shrink-0 text-gray-400" />
   );
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && searchValue.trim()) {
+      onSearch(searchValue.trim());
+    }
+  };
 
   return (
     <div className="flex h-12 shrink-0 items-center border-b border-white/5 px-2 shadow-sm">
@@ -46,9 +54,12 @@ const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, guildName, m
           </button>
         )}
 
-        <div className="flex h-8 w-56 items-center rounded-sm border border-white/10 bg-[#111214]">
+        <div className={`flex h-8 w-56 items-center rounded-sm border bg-[#111214] transition ${searchOpen ? 'border-white/20' : 'border-white/10'}`}>
           <input
             type="text"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder={`Search ${guildName || 'Server'}`}
             className="h-full w-full bg-transparent px-2 text-sm text-gray-200 placeholder-gray-500 outline-none"
           />
