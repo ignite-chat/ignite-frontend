@@ -279,4 +279,21 @@ export const DiscordApiService = {
     });
     return data;
   },
+
+  /**
+   * Send a message component interaction (e.g. button click).
+   */
+  async sendInteraction(payload: {
+    type: number;
+    application_id: string;
+    channel_id: string;
+    guild_id?: string;
+    data: any;
+    message_flags?: number;
+    message_id: string;
+    nonce: string;
+    session_id: string;
+  }) {
+    await discordApi.post('/interactions', payload, { _silent: true } as any);
+  },
 };

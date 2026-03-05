@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
+import { useDiscordStore } from '../store/discord.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useDiscordReplyStore } from '../store/discord-reply.store';
@@ -19,7 +20,7 @@ import DiscordUserProfileModal from './DiscordUserProfileModal';
 import { useModalStore } from '@/store/modal.store';
 import DiscordMessageContextMenu from './DiscordMessageContextMenu';
 import DiscordUserContextMenu from './DiscordUserContextMenu';
-import { ArrowBendUpLeft, Smiley, Plus } from '@phosphor-icons/react';
+import { ArrowBendUpLeft, Smiley, Plus, ArrowSquareOut } from '@phosphor-icons/react';
 import {
   EmojiPicker,
   EmojiPickerContent,
@@ -206,7 +207,13 @@ const DiscordAttachments = ({ attachments }) => {
 
 const IFRAME_PROVIDERS = ['YouTube', 'Twitch', 'Vimeo', 'Dailymotion', 'Spotify'];
 
-const DiscordEmbeds = ({ embeds }) => {
+const EmbedMarkdown = ({ content, guildId }) => {
+  const ast = useMemo(() => parseMarkdown(content), [content]);
+  if (!content) return null;
+  return <DiscordMarkdownRenderer nodes={ast} guildId={guildId} />;
+};
+
+const DiscordEmbeds = ({ embeds, guildId }) => {
   if (!embeds || embeds.length === 0) return null;
 
   return (
@@ -247,15 +254,33 @@ const DiscordEmbeds = ({ embeds }) => {
                       rel="noopener noreferrer"
                       className="font-semibold text-blue-400 hover:underline"
                     >
-                      {embed.title}
+                      <EmbedMarkdown content={embed.title} guildId={guildId} />
                     </a>
                   ) : (
-                    <span className="font-semibold text-white">{embed.title}</span>
+                    <span className="font-semibold text-white">
+                      <EmbedMarkdown content={embed.title} guildId={guildId} />
+                    </span>
                   )}
                 </div>
               )}
               {embed.description && (
-                <p className="text-sm text-gray-300">{embed.description}</p>
+                <div className="text-sm text-gray-300">
+                  <EmbedMarkdown content={embed.description} guildId={guildId} />
+                </div>
+              )}
+              {embed.fields?.length > 0 && (
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {embed.fields.map((field, fi) => (
+                    <div key={fi} className={field.inline ? 'col-span-1' : 'col-span-3'}>
+                      <div className="text-xs font-semibold text-white">
+                        <EmbedMarkdown content={field.name} guildId={guildId} />
+                      </div>
+                      <div className="text-sm text-gray-300">
+                        <EmbedMarkdown content={field.value} guildId={guildId} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
               {isIframeProvider && videoUrl && (() => {
                 const { width, height } = fitDimensions(
@@ -338,6 +363,116 @@ const DiscordStickers = ({ stickerItems }) => {
             className="size-[160px] object-contain"
             draggable="false"
           />
+        );
+      })}
+    </div>
+  );
+};
+
+const BUTTON_STYLE_CLASSES = {
+  1: 'bg-[#5865f2] hover:bg-[#4752c4] text-white',        // Primary
+  2: 'bg-[#4e5058] hover:bg-[#6d6f78] text-white',        // Secondary
+  3: 'bg-[#248046] hover:bg-[#1a6334] text-white',        // Success
+  4: 'bg-[#da373c] hover:bg-[#a12d31] text-white',        // Danger
+  5: 'bg-[#4e5058] hover:bg-[#6d6f78] text-white',        // Link
+};
+
+const DiscordComponentEmoji = ({ emoji }) => {
+  if (!emoji) return null;
+  if (emoji.id) {
+    return (
+      <img
+        src={`${DISCORD_EMOJI_CDN}/${emoji.id}.${emoji.animated ? 'gif' : 'webp'}?size=48`}
+        alt={emoji.name}
+        className="size-[1.1em] object-contain"
+        draggable="false"
+      />
+    );
+  }
+  return (
+    <img
+      src={getTwemojiUrl(emoji.name)}
+      alt={emoji.name}
+      className="size-[1.1em] object-contain"
+      draggable="false"
+    />
+  );
+};
+
+const DiscordButton = ({ button, onInteract }) => {
+  const [loading, setLoading] = useState(false);
+  const isLink = button.style === 5;
+  const isDisabled = button.disabled || loading;
+
+  const handleClick = async () => {
+    if (isDisabled) return;
+    if (isLink) {
+      if (button.url) window.open(button.url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    setLoading(true);
+    try {
+      await onInteract(button);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      disabled={isDisabled}
+      onClick={handleClick}
+      className={cn(
+        'flex h-8 items-center gap-1.5 rounded px-4 text-sm font-medium transition-colors',
+        BUTTON_STYLE_CLASSES[button.style] || BUTTON_STYLE_CLASSES[2],
+        isDisabled && 'cursor-not-allowed opacity-50'
+      )}
+    >
+      <DiscordComponentEmoji emoji={button.emoji} />
+      {button.label && <span>{button.label}</span>}
+      {isLink && <ArrowSquareOut size={14} className="ml-0.5 opacity-70" />}
+    </button>
+  );
+};
+
+const DiscordMessageComponents = ({ components, channelId, messageId, guildId, applicationId }) => {
+  if (!components || components.length === 0) return null;
+
+  const handleInteract = useCallback(async (button) => {
+    const sessionId = useDiscordStore.getState().sessionId;
+    if (!sessionId || !applicationId) return;
+
+    const nonce = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+    await DiscordApiService.sendInteraction({
+      type: 3,
+      application_id: applicationId,
+      channel_id: channelId,
+      guild_id: guildId || undefined,
+      data: {
+        component_type: button.type,
+        custom_id: button.custom_id,
+      },
+      message_flags: 0,
+      message_id: messageId,
+      nonce,
+      session_id: sessionId,
+    });
+  }, [channelId, messageId, guildId, applicationId]);
+
+  return (
+    <div className="mt-1.5 flex flex-col gap-1">
+      {components.map((row, ri) => {
+        if (row.type !== 1 || !row.components) return null;
+        return (
+          <div key={ri} className="flex flex-wrap gap-1">
+            {row.components.map((comp, ci) => {
+              if (comp.type === 2) {
+                return <DiscordButton key={comp.id || ci} button={comp} onInteract={handleInteract} />;
+              }
+              return null;
+            })}
+          </div>
         );
       })}
     </div>
@@ -1042,8 +1177,15 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
                 </div>
 
                 <DiscordAttachments attachments={message.attachments} />
-                <DiscordEmbeds embeds={message.embeds} />
+                <DiscordEmbeds embeds={message.embeds} guildId={guildId} />
                 <DiscordStickers stickerItems={message.sticker_items} />
+                <DiscordMessageComponents
+                  components={message.components}
+                  channelId={channelId}
+                  messageId={message.id}
+                  guildId={guildId}
+                  applicationId={message.application_id || message.interaction_metadata?.id_of_integration_owner || message.author?.id}
+                />
               </div>
             </div>
             {message.reactions?.length > 0 && (
