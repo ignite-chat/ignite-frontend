@@ -202,6 +202,8 @@ function AutoDetectContent({
 }: {
   onAuthenticated: (token: string) => void;
 }) {
+  const hasAutoDetect = typeof window.IgniteNative?.getDiscordLocalTokens === 'function';
+
   const [phase, setPhase] = useState<'idle' | 'scanning' | 'validating' | 'done' | 'error'>(
     // Load from cache instantly if fresh
     tokenCache && Date.now() - tokenCache.timestamp < CACHE_TTL ? 'done' : 'idle',
@@ -211,6 +213,19 @@ function AutoDetectContent({
   );
   const [errorMsg, setErrorMsg] = useState('');
   const [showInvalid, setShowInvalid] = useState(false);
+
+  if (!hasAutoDetect) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-6 text-center">
+        <p className="text-sm text-gray-400">
+          This version of Ignite does not support automatic Discord token detection.
+        </p>
+        <p className="text-xs text-gray-500">
+          Please update Ignite or use the QR Code / Token tab instead.
+        </p>
+      </div>
+    );
+  }
 
   const scan = useCallback(async (skipCache = false) => {
     if (!skipCache && tokenCache && Date.now() - tokenCache.timestamp < CACHE_TTL) {

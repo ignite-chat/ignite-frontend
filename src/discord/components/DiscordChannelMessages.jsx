@@ -382,6 +382,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
                     message={msg}
                     prevMessage={prevMessage}
                     currentUserId={currentUser?.id}
+                    channelId={channelId}
                     guildId={guildId}
                     hasManageMessages={hasManageMessages}
                     hasKickMembers={hasKickMembers}
@@ -400,6 +401,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
                   message={msg}
                   prevMessage={prevMessage}
                   currentUserId={currentUser?.id}
+                  channelId={channelId}
                   guildId={guildId}
                   pending
                 />

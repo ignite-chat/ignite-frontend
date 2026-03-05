@@ -1,12 +1,16 @@
-import { useState, useMemo, useEffect, memo } from 'react';
+import { useState, useMemo, useEffect, useCallback, memo } from 'react';
+import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { DiscordService } from '../services/discord.service';
+import { DiscordApiService } from '../services/discord-api.service';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useDiscordReplyStore } from '../store/discord-reply.store';
 import { getTwemojiUrl } from '@/utils/emoji.utils';
+import { useEmojisStore } from '@/ignite/store/emojis.store';
+import emojisData from '@/assets/emojis/emojis.json';
 import { parseMarkdown } from '@/components/message/markdown/parser';
 import { NORMAL_MESSAGE_TYPES, MessageType, getSystemMessageText } from '../constants/message-types';
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
@@ -15,7 +19,24 @@ import DiscordUserProfileModal from './DiscordUserProfileModal';
 import { useModalStore } from '@/store/modal.store';
 import DiscordMessageContextMenu from './DiscordMessageContextMenu';
 import DiscordUserContextMenu from './DiscordUserContextMenu';
-import { ArrowBendUpLeft } from '@phosphor-icons/react';
+import { ArrowBendUpLeft, Smiley, Plus } from '@phosphor-icons/react';
+import {
+  EmojiPicker,
+  EmojiPickerContent,
+  EmojiPickerFooter,
+  EmojiPickerSearch,
+  EmojiPickerSidebar,
+} from '@/components/ui/emoji-picker';
+import {
+  Clock,
+  PawPrint,
+  Pizza,
+  Trophy,
+  Plane,
+  Lightbulb,
+  Shapes,
+  Flag as FlagIcon,
+} from 'lucide-react';
 
 const DiscordAvatar = ({ author, className = 'size-10' }) => {
   const url = DiscordService.getUserAvatarUrl(author.id, author.avatar, 80);
@@ -516,6 +537,119 @@ const useEmojiColor = (emoji, fallback) => {
   return color;
 };
 
+/** Build the emoji identifier string for the Discord reaction API. */
+const getReactionEmojiString = (emoji) => {
+  if (emoji.id) return `${emoji.name}:${emoji.id}`;
+  return emoji.name;
+};
+
+const SIDEBAR_CATEGORIES = [
+  { id: 'recent', icon: <Clock className="size-full" />, label: 'Recently Used' },
+  { id: 'people', icon: <Smiley size={20} />, label: 'People' },
+  { id: 'nature', icon: <PawPrint className="size-full" />, label: 'Nature' },
+  { id: 'food', icon: <Pizza className="size-full" />, label: 'Food' },
+  { id: 'activities', icon: <Trophy className="size-full" />, label: 'Activities' },
+  { id: 'travel', icon: <Plane className="size-full" />, label: 'Travel' },
+  { id: 'objects', icon: <Lightbulb className="size-full" />, label: 'Objects' },
+  { id: 'symbols', icon: <Shapes className="size-full" />, label: 'Symbols' },
+  { id: 'flags', icon: <FlagIcon className="size-full" />, label: 'Flags' },
+];
+
+const ReactionEmojiPicker = ({ channelId, messageId, guildId, open, onOpenChange }) => {
+  const [emojiSearch, setEmojiSearch] = useState('');
+  const [hoveredEmoji, setHoveredEmoji] = useState(null);
+  const { recentEmojis, addRecentEmoji } = useEmojisStore();
+
+  const guild = useDiscordGuildsStore((s) => s.guilds.find((g) => g.id === guildId));
+  const guildEmojis = useMemo(() => guild?.emojis || [], [guild]);
+
+  const guildEmojiGroups = useMemo(() => {
+    if (!guildEmojis.length || !guild) return [];
+    return [{
+      id: `guild-${guild.id}`,
+      name: guild.properties?.name || guild.name,
+      icon: guild.properties?.icon || guild.icon
+        ? DiscordService.getGuildIconUrl(guild.id, guild.properties?.icon || guild.icon, 32)
+        : undefined,
+      emojis: guildEmojis.map((e) => ({
+        id: e.id,
+        name: e.name,
+        url: `${DISCORD_EMOJI_CDN}/${e.id}.${e.animated ? 'gif' : 'webp'}?size=48`,
+      })),
+    }];
+  }, [guild, guildEmojis]);
+
+  const [activeCategory, setActiveCategory] = useState(
+    recentEmojis.length > 0 ? 'recent' : guildEmojiGroups.length > 0 ? `guild-${guildId}` : 'people'
+  );
+
+  const categories = useMemo(() => {
+    const cats = [];
+    if (recentEmojis.length > 0) cats.push(SIDEBAR_CATEGORIES[0]);
+    guildEmojiGroups.forEach((g) => {
+      cats.push({
+        id: `guild-${g.id}`,
+        icon: g.icon ? <img src={g.icon} className="size-full rounded-full" /> : <Shapes className="size-full" />,
+        label: g.name,
+      });
+    });
+    cats.push(...SIDEBAR_CATEGORIES.slice(1));
+    return cats;
+  }, [recentEmojis.length, guildEmojiGroups]);
+
+  const handleEmojiSelect = useCallback(({ id, label, emoji, url }) => {
+    addRecentEmoji({ id, label, surrogates: emoji, url, isCustom: !!url });
+
+    const emojiString = id ? `${label}:${id}` : emoji;
+    DiscordApiService.addReaction(channelId, messageId, emojiString);
+    onOpenChange(false);
+    setEmojiSearch('');
+  }, [channelId, messageId, addRecentEmoji, onOpenChange]);
+
+  return (
+    <PopoverPrimitive.Root open={open} onOpenChange={onOpenChange} modal={false}>
+      <PopoverPrimitive.Anchor className="absolute" />
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          side="top"
+          align="end"
+          sideOffset={4}
+          collisionPadding={16}
+          className="z-[1000] flex h-[430px] w-[452px] border-none bg-transparent p-0 shadow-none data-[state=closed]:pointer-events-none data-[state=closed]:invisible"
+        >
+          <EmojiPicker className="flex size-full flex-row">
+            <EmojiPickerSidebar
+              activeCategory={activeCategory}
+              onCategorySelect={(id) => {
+                setActiveCategory(id);
+                const el = document.getElementById(`category-${id}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              categories={categories}
+            />
+            <div className="flex min-w-0 flex-1 flex-col bg-[#2b2d31]">
+              <EmojiPickerSearch
+                value={emojiSearch}
+                onChange={(e) => setEmojiSearch(e.target.value)}
+              />
+              <EmojiPickerContent
+                searchValue={emojiSearch}
+                standardEmojis={emojisData}
+                recentEmojis={recentEmojis}
+                onCategoryVisible={setActiveCategory}
+                guildEmojis={guildEmojiGroups}
+                onHoverEmojiChange={setHoveredEmoji}
+                onEmojiSelect={handleEmojiSelect}
+              />
+              <EmojiPickerFooter hoveredEmoji={hoveredEmoji} />
+            </div>
+          </EmojiPicker>
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
+  );
+};
+
 const ReactionEmoji = ({ emoji }) => {
   const isCustom = !!emoji.id;
   return isCustom ? (
@@ -552,7 +686,18 @@ const BurstReaction = ({ emoji, count }) => {
   );
 };
 
-const DiscordReactions = ({ reactions }) => {
+const DiscordReactions = ({ reactions, channelId, messageId, guildId }) => {
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const toggleReaction = useCallback((emoji, currentlyMe) => {
+    const emojiString = getReactionEmojiString(emoji);
+    if (currentlyMe) {
+      DiscordApiService.removeReaction(channelId, messageId, emojiString);
+    } else {
+      DiscordApiService.addReaction(channelId, messageId, emojiString);
+    }
+  }, [channelId, messageId]);
+
   if (!reactions || reactions.length === 0) return null;
 
   return (
@@ -572,6 +717,7 @@ const DiscordReactions = ({ reactions }) => {
             {hasNormal && (
               <button
                 type="button"
+                onClick={() => toggleReaction(emoji, reaction.me)}
                 className={cn(
                   'flex h-8 cursor-pointer items-center gap-2 rounded-sm border px-2',
                   reaction.me
@@ -591,6 +737,22 @@ const DiscordReactions = ({ reactions }) => {
           </div>
         );
       })}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="flex h-8 cursor-pointer items-center justify-center rounded-sm border border-transparent bg-[#232428] px-2 hover:border-[#4e505c]"
+        >
+          <Plus size={16} className="text-[#b5bac1]" />
+        </button>
+        <ReactionEmojiPicker
+          channelId={channelId}
+          messageId={messageId}
+          guildId={guildId}
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+        />
+      </div>
     </div>
   );
 };
@@ -755,8 +917,9 @@ const DiscordSystemMessage = memo(({ message, prevMessage, guildId }) => {
 
 DiscordSystemMessage.displayName = 'DiscordSystemMessage';
 
-const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, pending }) => {
+const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channelId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, pending }) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
 
   const hasReply = !!message.referenced_message || !!message.message_reference;
 
@@ -802,6 +965,26 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, guildI
             {/* Hover action bar */}
             {!pending && (
               <div className="absolute -top-3.5 right-4 z-10 hidden items-center gap-0.5 rounded border border-white/10 bg-[#2b2d31] p-0.5 shadow-md group-hover:flex">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setReactionPickerOpen(true);
+                    }}
+                    className="rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200"
+                    title="Add Reaction"
+                  >
+                    <Smiley size={16} />
+                  </button>
+                  <ReactionEmojiPicker
+                    channelId={channelId}
+                    messageId={message.id}
+                    guildId={guildId}
+                    open={reactionPickerOpen}
+                    onOpenChange={setReactionPickerOpen}
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -865,7 +1048,7 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, guildI
             </div>
             {message.reactions?.length > 0 && (
               <div className="pl-[72px]">
-                <DiscordReactions reactions={message.reactions} />
+                <DiscordReactions reactions={message.reactions} channelId={channelId} messageId={message.id} guildId={guildId} />
               </div>
             )}
           </ContextMenuTrigger>
@@ -893,7 +1076,7 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, guildI
 
 DiscordNormalMessage.displayName = 'DiscordNormalMessage';
 
-const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, pending }) => {
+const DiscordMessage = memo(({ message, prevMessage, currentUserId, channelId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, pending }) => {
   if (!NORMAL_MESSAGE_TYPES.has(message.type)) {
     return <DiscordSystemMessage message={message} prevMessage={prevMessage} guildId={guildId} />;
   }
@@ -902,6 +1085,7 @@ const DiscordMessage = memo(({ message, prevMessage, currentUserId, guildId, has
       message={message}
       prevMessage={prevMessage}
       currentUserId={currentUserId}
+      channelId={channelId}
       guildId={guildId}
       hasManageMessages={hasManageMessages}
       hasKickMembers={hasKickMembers}
