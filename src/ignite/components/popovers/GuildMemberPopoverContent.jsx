@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUsersStore } from '@/ignite/store/users.store';
 import { MessageSquare, Plus, UserCheck, UserMinus, UserPlus, UserX, X } from 'lucide-react';
 import Avatar from '../Avatar';
+import { useAverageColor } from '@/ignite/hooks/useAverageColor';
 import { FriendsService } from '../../services/friends.service';
 import { ChannelsService } from '../../services/channels.service';
 import { RolesService } from '../../services/roles.service';
@@ -29,6 +30,7 @@ const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
   const { guildMembers } = useGuildsStore();
 
   const user = useMemo(() => getUser(userId), [userId, getUser]);
+  const avatarAvgColor = useAverageColor(user?.avatar_url);
 
   const member = useMemo(() => {
     if (!guildId) return null;
@@ -172,7 +174,7 @@ const GuildMemberPopoverContent = ({ userId, onOpenProfile }) => {
           <div
             className="h-full bg-primary"
             style={{
-              backgroundColor: user.banner_color,
+              backgroundColor: user.banner_color || avatarAvgColor || undefined,
               backgroundImage: user.banner_url ? `url(${user.banner_url})` : 'none',
               backgroundSize: 'cover',
               backgroundPosition: 'center',

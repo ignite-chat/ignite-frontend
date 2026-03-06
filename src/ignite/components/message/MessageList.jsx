@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import ChannelMessage from './ChannelMessage';
+import Message from './Message';
 import MessageSkeletonList from '@/components/message/MessageSkeleton';
 import { CircleNotch } from '@phosphor-icons/react';
 
@@ -74,7 +74,7 @@ const MessageList = ({
           >
             {showDateSeparator && <DateSeparator timestamp={message.created_at} />}
             {showNewSeparator && <NewMessagesSeparator />}
-            <ChannelMessage
+            <Message
               message={message}
               prevMessage={prevMessage}
               allMessages={messages}
@@ -90,7 +90,7 @@ const MessageList = ({
       {pendingMessages?.map((message, index) => {
         const prevMessage = pendingMessages[index - 1] || messages[messages.length - 1] || null;
         return (
-          <ChannelMessage
+          <Message
             key={message.nonce}
             message={message}
             prevMessage={prevMessage}
