@@ -39,18 +39,18 @@ export const NotificationService = {
     const channelId: string = event.channel.id;
     const authorId: string = event.message.author.id;
 
-    // 1. Don't notify for own messages
+    // Don't notify for own messages
     if (authorId === user?.id) return;
 
-    // 2. Don't notify if the user is currently viewing this channel
-    if (activeChannelId === channelId) return;
+    // Don't notify if the user is currently viewing this channel and the window is focused
+    // if (activeChannelId === channelId && document.hasFocus()) return;
 
     const channel = channels.find((c) => String(c.channel_id) === String(channelId));
 
-    // 6. Channel must exist in our store
+    // Channel must exist in our store
     if (!channel) return;
 
-    // 7. Apply per-guild notification settings
+    // Apply per-guild notification settings
     if (channel.guild_id) {
       const settings = guildSettings[String(channel.guild_id)];
       if (settings) {
