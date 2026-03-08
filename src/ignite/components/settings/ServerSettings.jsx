@@ -76,19 +76,6 @@ const ServerSettingsModal = ({ modalId, guild, initialTab = 'info' }) => {
             </div>
           ))}
         </nav>
-
-        <div className="border-t border-border p-4">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="w-full justify-between text-muted-foreground hover:text-foreground"
-          >
-            <span className="text-xs font-medium uppercase">ESC</span>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
       {/* Content */}
