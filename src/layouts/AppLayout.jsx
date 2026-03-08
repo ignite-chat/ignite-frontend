@@ -1,8 +1,9 @@
+import { Outlet } from 'react-router-dom';
 import { GuildContextProvider } from '@/ignite/contexts/GuildContext';
 import GuildsSidebar from '@/components/GuildsSidebar';
 import UserBar from '@/ignite/components/UserBar';
 
-const DefaultLayout = ({ children, sidebar }) => {
+const AppLayout = () => {
   return (
     <GuildContextProvider>
       <div className="flex h-full flex-col overflow-hidden">
@@ -10,17 +11,16 @@ const DefaultLayout = ({ children, sidebar }) => {
           <div className="relative flex shrink-0">
             <div className="relative z-0 flex min-h-0 flex-1 overflow-hidden">
               <GuildsSidebar />
-              {sidebar}
             </div>
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
               <UserBar />
             </div>
           </div>
-          <div className="flex flex-1 overflow-hidden">{children}</div>
+          <Outlet />
         </div>
       </div>
     </GuildContextProvider>
   );
 };
 
-export default DefaultLayout;
+export default AppLayout;

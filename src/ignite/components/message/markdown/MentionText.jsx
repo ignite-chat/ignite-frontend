@@ -5,7 +5,7 @@ import { useGuildContext } from '../../../contexts/GuildContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import GuildMemberPopoverContent from '../../popovers/GuildMemberPopoverContent';
-import GuildMemberContextMenu from '../../guild-member/GuildMemberContextMenu';
+import GuildMemberContextMenu from '../../context-menus/GuildMemberContextMenu';
 
 const MentionText = ({ userId, isReply = false }) => {
   const { getUser } = useUsersStore();

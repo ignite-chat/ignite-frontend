@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import DefaultLayout from '../../layouts/DefaultLayout';
 import DiscordDMChannelsSidebar from '../components/DiscordDMChannelsSidebar';
 
 const DiscordDMLayout = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  const dmSidebar = (
+  return (
     <>
       {isSidebarOpen && (
         <button
@@ -30,15 +29,10 @@ const DiscordDMLayout = ({ children }) => {
           aria-label="Open sidebar"
         />
       )}
-    </>
-  );
-
-  return (
-    <DefaultLayout sidebar={dmSidebar}>
       <main className="relative flex h-full min-w-0 flex-1 flex-col bg-black">
         {children}
       </main>
-    </DefaultLayout>
+    </>
   );
 };
 

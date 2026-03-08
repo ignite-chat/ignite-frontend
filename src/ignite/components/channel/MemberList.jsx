@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, act } from 'react';
 import { useChannelContext } from '../../contexts/ChannelContext.jsx';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import GuildMemberContextMenu from '../guild-member/GuildMemberContextMenu.jsx';
+import GuildMemberContextMenu from '../context-menus/GuildMemberContextMenu.jsx';
 import GuildMemberPopoverContent from '../popovers/GuildMemberPopoverContent.jsx';
 import UserProfileModal from '@/ignite/components/modals/UserProfileModal.jsx';
 import { useModalStore } from '../../store/modal.store';

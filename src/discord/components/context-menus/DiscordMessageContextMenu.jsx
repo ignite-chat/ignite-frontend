@@ -1,12 +1,13 @@
 import { toast } from 'sonner';
+import { ArrowBendUpLeft, Copy, Trash } from '@phosphor-icons/react';
 import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
-import { DiscordApiService } from '../services/discord-api.service';
-import { useDiscordChannelsStore } from '../store/discord-channels.store';
-import { useDiscordReplyStore } from '../store/discord-reply.store';
+import { DiscordApiService } from '../../services/discord-api.service';
+import { useDiscordChannelsStore } from '../../store/discord-channels.store';
+import { useDiscordReplyStore } from '../../store/discord-reply.store';
 
 const DiscordMessageContextMenu = ({ message, canDelete }) => {
   const handleReply = () => {
@@ -35,10 +36,16 @@ const DiscordMessageContextMenu = ({ message, canDelete }) => {
 
   return (
     <ContextMenuContent className="w-52">
-      <ContextMenuItem onSelect={handleReply}>Reply</ContextMenuItem>
+      <ContextMenuItem className="justify-between" onSelect={handleReply}>
+        Reply
+        <ArrowBendUpLeft className="ml-auto size-[18px]" weight="fill" />
+      </ContextMenuItem>
       <ContextMenuSeparator />
       {message.content && (
-        <ContextMenuItem onSelect={handleCopyText}>Copy Text</ContextMenuItem>
+        <ContextMenuItem className="justify-between" onSelect={handleCopyText}>
+          Copy Text
+          <Copy className="ml-auto size-[18px]" weight="fill" />
+        </ContextMenuItem>
       )}
       <ContextMenuItem className="justify-between" onSelect={handleCopyId}>
         Copy Message ID
@@ -50,9 +57,10 @@ const DiscordMessageContextMenu = ({ message, canDelete }) => {
           <ContextMenuSeparator />
           <ContextMenuItem
             onSelect={handleDelete}
-            className="text-[#f23f42] focus:bg-[#da373c] focus:text-white"
+            className="justify-between text-[#f23f42] focus:bg-[#da373c] focus:text-white"
           >
             Delete Message
+            <Trash className="ml-auto size-[18px]" weight="fill" />
           </ContextMenuItem>
         </>
       )}

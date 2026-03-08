@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { MagnifyingGlass, Compass } from '@phosphor-icons/react';
 import { GuildsService } from '../services/guilds.service';
 import { useGuildsStore } from '../store/guilds.store';
-import DefaultLayout from '@/layouts/DefaultLayout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import GuildCard from '../components/guild/GuildCard';
@@ -72,7 +71,8 @@ const GuildDiscovery = () => {
   );
 
   return (
-    <DefaultLayout sidebar={discoverySidebar}>
+    <>
+      <div className="shrink-0">{discoverySidebar}</div>
       <div className="flex flex-1 flex-col overflow-hidden bg-body">
         {/* Header */}
         <div className="border-b border-white/5 px-6 py-4">
@@ -120,7 +120,7 @@ const GuildDiscovery = () => {
           )}
         </div>
       </div>
-    </DefaultLayout>
+    </>
   );
 };
 

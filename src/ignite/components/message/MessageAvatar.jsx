@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import Avatar from '../Avatar';
-import GuildMemberContextMenu from '../guild-member/GuildMemberContextMenu';
+import GuildMemberContextMenu from '../context-menus/GuildMemberContextMenu';
 import GuildMemberPopoverContent from '../popovers/GuildMemberPopoverContent';
 import UserProfileModal from '@/ignite/components/modals/UserProfileModal';
 import { useModalStore } from '../../store/modal.store';

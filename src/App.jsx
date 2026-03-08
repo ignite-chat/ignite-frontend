@@ -9,6 +9,7 @@ import GuildChannelPage from './ignite/pages/GuildChannel';
 import InvitePage from './ignite/pages/InvitePage';
 import GuildDiscoveryPage from './ignite/pages/GuildDiscovery';
 import DiscordGuildPage from './discord/pages/DiscordGuildPage';
+import AppLayout from './layouts/AppLayout';
 import { InitializationService } from './ignite/services/initialization.service';
 import { EchoService } from './ignite/services/echo.service';
 import { useGuildsStore } from './ignite/store/guilds.store';
@@ -204,36 +205,38 @@ function App() {
           />
         </Route>
         <Route element={<AuthRoute />}>
-          <Route
-            path="/channels/@me"
-            element={
-              <>
-                <PageTitle title="Friends" />
-                <DirectMessagesPage />
-              </>
-            }
-          />
-          <Route
-            path="/channels/@me/:channelId/:messageId?"
-            element={<DirectMessagesPage />}
-          />
-          <Route
-            path="/guild-discovery"
-            element={
-              <>
-                <PageTitle title="Discover Servers" />
-                <GuildDiscoveryPage />
-              </>
-            }
-          />
-          <Route
-            path="/channels/:guildId/:channelId?/:messageId?"
-            element={<GuildChannelPage />}
-          />
-          <Route
-            path="/discord/:guildId/:channelId?"
-            element={<DiscordGuildPage />}
-          />
+          <Route element={<AppLayout />}>
+            <Route
+              path="/channels/@me"
+              element={
+                <>
+                  <PageTitle title="Friends" />
+                  <DirectMessagesPage />
+                </>
+              }
+            />
+            <Route
+              path="/channels/@me/:channelId/:messageId?"
+              element={<DirectMessagesPage />}
+            />
+            <Route
+              path="/guild-discovery"
+              element={
+                <>
+                  <PageTitle title="Discover Servers" />
+                  <GuildDiscoveryPage />
+                </>
+              }
+            />
+            <Route
+              path="/channels/:guildId/:channelId?/:messageId?"
+              element={<GuildChannelPage />}
+            />
+            <Route
+              path="/discord/:guildId/:channelId?"
+              element={<DiscordGuildPage />}
+            />
+          </Route>
         </Route>
       </Routes>
     </>

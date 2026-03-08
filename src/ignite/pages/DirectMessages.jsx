@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import DefaultLayout from '@/layouts/DefaultLayout';
 import { ChannelContextProvider } from '../contexts/ChannelContext';
 import Channel from '../components/channel/Channel';
 import DMChannelsSidebar from '../components/dm/DMChannelsSidebar';
@@ -73,34 +72,35 @@ const DirectMessagesPage = () => {
     : `@${dmRecipient?.name}` || 'Direct Messages';
 
   return (
-    <DefaultLayout
-      sidebar={
+    <>
+      <div className="shrink-0">
         <DMChannelsSidebar
           activeChannelId={channelId || 'friends'}
           onNavigate={(id) => navigate(`/channels/@me/${id}`)}
         />
-      }
-    >
-      {!isFriendsView && <PageTitle title={pageTitle} />}
-      <main className={`relative flex h-full flex-1 flex-col overflow-hidden text-gray-100 bg-[#1a1a1e]`}>
-        {isFriendsView ? (
-          <FriendsDashboard />
-        ) : isDiscordChannel ? (
-          <DiscordChannel channel={activeDiscordChannel} />
-        ) : activeIgniteChannel ? (
-          <ChannelContextProvider>
-            <Channel channel={activeIgniteChannel} messageId={messageId} />
-          </ChannelContextProvider>
-        ) : channelId ? (
-          <div className="flex h-full items-center justify-center text-gray-500">
-            <div className="flex flex-col items-center gap-2">
-              <div className="size-8 animate-spin rounded-full border-2 border-solid border-primary border-t-transparent" />
-              <p className="text-sm">Loading conversation...</p>
+      </div>
+      <div className="flex flex-1 overflow-hidden">
+        {!isFriendsView && <PageTitle title={pageTitle} />}
+        <main className={`relative flex h-full flex-1 flex-col overflow-hidden text-gray-100 bg-[#1a1a1e]`}>
+          {isFriendsView ? (
+            <FriendsDashboard />
+          ) : isDiscordChannel ? (
+            <DiscordChannel channel={activeDiscordChannel} />
+          ) : activeIgniteChannel ? (
+            <ChannelContextProvider>
+              <Channel channel={activeIgniteChannel} messageId={messageId} />
+            </ChannelContextProvider>
+          ) : channelId ? (
+            <div className="flex h-full items-center justify-center text-gray-500">
+              <div className="flex flex-col items-center gap-2">
+                <div className="size-8 animate-spin rounded-full border-2 border-solid border-primary border-t-transparent" />
+                <p className="text-sm">Loading conversation...</p>
+              </div>
             </div>
-          </div>
-        ) : null}
-      </main>
-    </DefaultLayout>
+          ) : null}
+        </main>
+      </div>
+    </>
   );
 };
 

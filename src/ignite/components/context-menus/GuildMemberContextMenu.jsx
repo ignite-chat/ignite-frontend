@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { User, ChatCircle, PencilSimple, UserPlus, UserMinus, XCircle, CheckCircle, Prohibit, Gavel, Bug } from '@phosphor-icons/react';
 import { useUsersStore } from '../../store/users.store';
 import api from '@/ignite/api';
 import { FriendsService } from '../../services/friends.service';
@@ -107,53 +108,65 @@ const GuildMemberContextMenu = ({ user, onViewProfile }) => {
   return (
     <>
       <ContextMenuItem
+        className="justify-between"
         onSelect={() =>
           onViewProfile ? onViewProfile() : toast.info('Profile feature coming soon.')
         }
       >
         View Profile
+        <User className="ml-auto size-[18px]" weight="fill" />
       </ContextMenuItem>
 
       {user.id !== currentUser.id && (
-        <ContextMenuItem onSelect={() => onSendMessage(user)}>Message</ContextMenuItem>
+        <ContextMenuItem className="justify-between" onSelect={() => onSendMessage(user)}>
+          Message
+          <ChatCircle className="ml-auto size-[18px]" weight="fill" />
+        </ContextMenuItem>
       )}
 
       {user.id !== currentUser.id && (
         <>
           <ContextMenuSeparator />
 
-          <ContextMenuItem onSelect={() => toast.info('Change Nickname coming soon.')}>
+          <ContextMenuItem className="justify-between" onSelect={() => toast.info('Change Nickname coming soon.')}>
             Change Nickname
+            <PencilSimple className="ml-auto size-[18px]" weight="fill" />
           </ContextMenuItem>
 
           {!isFriend && !hasSentRequest && !hasReceivedRequest && (
             <ContextMenuItem
+              className="justify-between"
               onSelect={() => handleFriendsAction(FriendsService.sendRequest, user.username)}
             >
               Add Friend
+              <UserPlus className="ml-auto size-[18px]" weight="fill" />
             </ContextMenuItem>
           )}
           {isFriend && (
-            <ContextMenuItem onSelect={() => handleFriendsAction(FriendsService.removeFriend)}>
+            <ContextMenuItem className="justify-between" onSelect={() => handleFriendsAction(FriendsService.removeFriend)}>
               Remove Friend
+              <UserMinus className="ml-auto size-[18px]" weight="fill" />
             </ContextMenuItem>
           )}
           {hasSentRequest && (
-            <ContextMenuItem onSelect={() => handleFriendsAction(FriendsService.cancelRequest)}>
+            <ContextMenuItem className="justify-between" onSelect={() => handleFriendsAction(FriendsService.cancelRequest)}>
               Cancel Friend Request
+              <XCircle className="ml-auto size-[18px]" weight="fill" />
             </ContextMenuItem>
           )}
           {hasReceivedRequest && (
-            <ContextMenuItem onSelect={() => handleFriendsAction(FriendsService.acceptRequest)}>
+            <ContextMenuItem className="justify-between" onSelect={() => handleFriendsAction(FriendsService.acceptRequest)}>
               Accept Friend Request
+              <CheckCircle className="ml-auto size-[18px]" weight="fill" />
             </ContextMenuItem>
           )}
 
           <ContextMenuItem
-            className="text-[#f23f42] focus:bg-[#da373c] focus:text-white"
+            className="justify-between text-[#f23f42] focus:bg-[#da373c] focus:text-white"
             onSelect={() => toast.info('Block feature coming soon.')}
           >
             Block
+            <Prohibit className="ml-auto size-[18px]" weight="fill" />
           </ContextMenuItem>
         </>
       )}
@@ -198,19 +211,21 @@ const GuildMemberContextMenu = ({ user, onViewProfile }) => {
 
       {canKickMember && (
         <ContextMenuItem
-          className="text-[#f23f42] focus:bg-[#da373c] focus:text-white"
+          className="justify-between text-[#f23f42] focus:bg-[#da373c] focus:text-white"
           onSelect={() => useModalStore.getState().push(KickBanModal, { user, guildId, action: 'kick' })}
         >
           Kick {user.username}
+          <UserMinus className="ml-auto size-[18px]" weight="fill" />
         </ContextMenuItem>
       )}
 
       {canBanMember && (
         <ContextMenuItem
-          className="text-[#f23f42] focus:bg-[#da373c] focus:text-white"
+          className="justify-between text-[#f23f42] focus:bg-[#da373c] focus:text-white"
           onSelect={() => useModalStore.getState().push(KickBanModal, { user, guildId, action: 'ban' })}
         >
           Ban {user.username}
+          <Gavel className="ml-auto size-[18px]" weight="fill" />
         </ContextMenuItem>
       )}
 
@@ -228,8 +243,9 @@ const GuildMemberContextMenu = ({ user, onViewProfile }) => {
         </span>
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => setTimeout(() => useModalStore.getState().push(MemberDebugModal, { user, guildId }), 0)}>
+      <ContextMenuItem className="justify-between" onSelect={() => setTimeout(() => useModalStore.getState().push(MemberDebugModal, { user, guildId }), 0)}>
         Debug Info
+        <Bug className="ml-auto size-[18px]" weight="fill" />
       </ContextMenuItem>
     </>
   );

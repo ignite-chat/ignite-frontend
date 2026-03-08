@@ -11,7 +11,7 @@ import MessageHeader from './MessageHeader';
 import MessageEditor from './MessageEditor';
 import MessageReactions from './MessageReactions';
 import MessageActions from './MessageActions';
-import MessageContextMenu from './MessageContextMenu';
+import MessageContextMenu from '../context-menus/MessageContextMenu';
 import MessageReplyBar from './MessageReplyBar';
 import { Paperclip } from 'lucide-react';
 import { Permissions } from '@/ignite/constants/Permissions';

@@ -18,8 +18,8 @@ import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
 import DiscordUserPopoverContent from '@/discord/components/popovers/DiscordUserPopoverContent';
 import DiscordUserProfileModal from './DiscordUserProfileModal';
 import { useModalStore } from '@/store/modal.store';
-import DiscordMessageContextMenu from './DiscordMessageContextMenu';
-import DiscordUserContextMenu from './DiscordUserContextMenu';
+import DiscordMessageContextMenu from './context-menus/DiscordMessageContextMenu';
+import DiscordUserContextMenu from './context-menus/DiscordUserContextMenu';
 import { ArrowBendUpLeft, Smiley, Plus, ArrowSquareOut } from '@phosphor-icons/react';
 import {
   EmojiPicker,

@@ -27,7 +27,7 @@ import {
   getChannelMentionCount as getChannelMentions,
 } from '@/ignite/utils/unreads.utils';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
-import GuildContextMenu from '@/ignite/components/guild/GuildContextMenu';
+import GuildContextMenu from '@/ignite/components/context-menus/GuildContextMenu';
 import InviteModal from '@/ignite/components/modals/InviteModal';
 import { useModalStore } from '@/ignite/store/modal.store';
 import {

@@ -1,57 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import DefaultLayout from './DefaultLayout';
-import ServerSettings from '../components/settings/ServerSettings';
-import EditGuildChannelModal from '../components/modals/EditGuildChannelModal';
-import { useChannelsStore } from '@/ignite/store/channels.store';
-import GuildChannelsSidebar from '@/components/guild/GuildChannelsSidebar';
-import CreateGuildChannelModal from '@/components/modals/CreateGuildChannelModal';
-import CreateGuildCategoryModal from '@/components/modals/CreateGuildCategoryModal';
-import { Permissions } from '@/constants/Permissions';
-import { useHasPermission } from '@/hooks/useHasPermission';
-import { useModalStore } from '@/ignite/store/modal.store';
+import { useEffect, useState } from 'react';
 
-const GuildLayout = ({ children, guild }) => {
-  const [isServerSettingsOpen, setIsServerSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState('info');
-  const [editChannelId, setEditChannelId] = useState(null);
+const GuildLayout = ({ children, guild, sidebar, sidebarWidth = 'w-80' }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const canManageGuild = useHasPermission(guild?.id, null, Permissions.MANAGE_GUILD);
-  const canManageChannels = useHasPermission(guild?.id, null, Permissions.MANAGE_CHANNELS);
-
-  const openServerSettings = useCallback(
-    ({ tab = 'info', channelId = null } = {}) => {
-      if (!canManageGuild) {
-        toast.error('You do not have permission to access server settings.');
-        return;
-      }
-      setSettingsTab(tab);
-      setEditChannelId(channelId);
-      setIsServerSettingsOpen(true);
-    },
-    [canManageGuild]
-  );
-
-  const openEditChannelModal = useCallback(
-    ({ channelId = null } = {}) => {
-      if (!canManageChannels) {
-        toast.error('You do not have permission to edit channels.');
-        return;
-      }
-      const { channels } = useChannelsStore.getState();
-      const channel = channels.find((c) => String(c.channel_id) === String(channelId));
-      useModalStore.getState().push(EditGuildChannelModal, { guild, channel });
-    },
-    [canManageChannels, guild]
-  );
-
-  // Open sidebar when a new guild is selected
   useEffect(() => {
     setIsSidebarOpen(true);
   }, [guild?.id]);
 
-  const guildSidebar = (
+  return (
     <>
       {isSidebarOpen && (
         <button
@@ -62,25 +18,11 @@ const GuildLayout = ({ children, guild }) => {
         />
       )}
       <div
-        className={`fixed inset-y-0 left-0 z-40 h-full w-80 shrink-0 transition-transform duration-300 ease-out md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 h-full ${sidebarWidth} shrink-0 transition-transform duration-300 ease-out md:static md:translate-x-0 ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <GuildChannelsSidebar
-          guild={guild}
-          onOpenServerSettings={() => openServerSettings({ tab: 'info', channelId: null })}
-          onEditChannel={(channel) => {
-            openEditChannelModal({ channelId: channel.channel_id || channel.id });
-          }}
-          onCreateChannel={(categoryId) => {
-            useModalStore.getState().push(CreateGuildChannelModal, { guild, categoryId });
-          }}
-          onCreateCategory={() => {
-            useModalStore.getState().push(CreateGuildCategoryModal, { guild });
-          }}
-          canOpenServerSettings={canManageGuild}
-          canManageChannels={canManageChannels}
-        />
+        {sidebar}
       </div>
       {!isSidebarOpen && (
         <button
@@ -90,21 +32,8 @@ const GuildLayout = ({ children, guild }) => {
           aria-label="Open sidebar"
         />
       )}
+      {children}
     </>
-  );
-
-  return (
-    <DefaultLayout sidebar={guildSidebar}>
-      <main className="relative flex h-full min-w-0 flex-1 flex-col bg-gray-700">{children}</main>
-      <ServerSettings
-        isOpen={isServerSettingsOpen}
-        onClose={() => setIsServerSettingsOpen(false)}
-        guild={guild}
-        initialTab={settingsTab}
-        editChannelId={editChannelId}
-        onEditChannelChange={setEditChannelId}
-      />
-    </DefaultLayout>
   );
 };
 

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import DefaultLayout from '@/layouts/DefaultLayout';
+import SharedGuildLayout from '@/layouts/GuildLayout';
 import ServerSettings from '../components/settings/ServerSettings';
 import EditGuildChannelModal from '../components/modals/EditGuildChannelModal';
 import { useChannelsStore } from '@/ignite/store/channels.store';
@@ -15,7 +15,6 @@ const GuildLayout = ({ children, guild }) => {
   const [isServerSettingsOpen, setIsServerSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('info');
   const [editChannelId, setEditChannelId] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const canManageGuild = useHasPermission(guild?.id, null, Permissions.MANAGE_GUILD);
   const canManageChannels = useHasPermission(guild?.id, null, Permissions.MANAGE_CHANNELS);
@@ -46,65 +45,38 @@ const GuildLayout = ({ children, guild }) => {
     [canManageChannels, guild]
   );
 
-  // Open sidebar when a new guild is selected
-  useEffect(() => {
-    setIsSidebarOpen(true);
-  }, [guild?.id]);
-
-  const guildSidebar = (
-    <>
-      {isSidebarOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-30 bg-transparent md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-          aria-label="Close sidebar"
-        />
-      )}
-      <div
-        className={`fixed inset-y-0 left-0 z-40 h-full w-80 shrink-0 transition-transform duration-300 ease-out md:static md:translate-x-0 ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <GuildChannelsSidebar
-          guild={guild}
-          onOpenServerSettings={() => openServerSettings({ tab: 'info', channelId: null })}
-          onEditChannel={(channel) => {
-            openEditChannelModal({ channelId: channel.channel_id || channel.id });
-          }}
-          onCreateChannel={(categoryId) => {
-            useModalStore.getState().push(CreateGuildChannelModal, { guild, categoryId });
-          }}
-          onCreateCategory={() => {
-            useModalStore.getState().push(CreateGuildCategoryModal, { guild });
-          }}
-          canOpenServerSettings={canManageGuild}
-          canManageChannels={canManageChannels}
-        />
-      </div>
-      {!isSidebarOpen && (
-        <button
-          type="button"
-          className="border-white/5/60 fixed left-0 top-1/2 z-30 h-24 w-4 -translate-y-1/2 animate-pulse rounded-r border bg-gray-800/70 shadow-sm transition-all duration-300 hover:w-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
-          onClick={() => setIsSidebarOpen(true)}
-          aria-label="Open sidebar"
-        />
-      )}
-    </>
+  const sidebar = (
+    <GuildChannelsSidebar
+      guild={guild}
+      onOpenServerSettings={() => openServerSettings({ tab: 'info', channelId: null })}
+      onEditChannel={(channel) => {
+        openEditChannelModal({ channelId: channel.channel_id || channel.id });
+      }}
+      onCreateChannel={(categoryId) => {
+        useModalStore.getState().push(CreateGuildChannelModal, { guild, categoryId });
+      }}
+      onCreateCategory={() => {
+        useModalStore.getState().push(CreateGuildCategoryModal, { guild });
+      }}
+      canOpenServerSettings={canManageGuild}
+      canManageChannels={canManageChannels}
+    />
   );
 
   return (
-    <DefaultLayout sidebar={guildSidebar}>
-      <main className="relative flex h-full min-w-0 flex-1 flex-col bg-[#1a1a1e]">{children}</main>
-      <ServerSettings
-        isOpen={isServerSettingsOpen}
-        onClose={() => setIsServerSettingsOpen(false)}
-        guild={guild}
-        initialTab={settingsTab}
-        editChannelId={editChannelId}
-        onEditChannelChange={setEditChannelId}
-      />
-    </DefaultLayout>
+    <SharedGuildLayout guild={guild} sidebar={sidebar}>
+      <div className="flex flex-1 overflow-hidden">
+        <main className="relative flex h-full min-w-0 flex-1 flex-col bg-[#1a1a1e]">{children}</main>
+        <ServerSettings
+          isOpen={isServerSettingsOpen}
+          onClose={() => setIsServerSettingsOpen(false)}
+          guild={guild}
+          initialTab={settingsTab}
+          editChannelId={editChannelId}
+          onEditChannelChange={setEditChannelId}
+        />
+      </div>
+    </SharedGuildLayout>
   );
 };
 

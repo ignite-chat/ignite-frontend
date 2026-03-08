@@ -8,7 +8,7 @@ import { ChannelsService } from '../../services/channels.service';
 import { useChannelsStore } from '../../store/channels.store';
 import { useUnreadsStore } from '../../store/unreads.store';
 import { isChannelUnread } from '../../utils/unreads.utils';
-import GuildMenuContent from './GuildMenuContent';
+import GuildMenuContent from '../guild/GuildMenuContent';
 
 const GuildContextMenu = ({ guild, onLeave, onInvite }) => {
   const { channels } = useChannelsStore();
@@ -60,7 +60,7 @@ const GuildContextMenu = ({ guild, onLeave, onInvite }) => {
               onClick={handleMarkAsRead}
             >
               <span>Mark As Read</span>
-              <Check className="ml-2 size-4" />
+              <Check className="ml-2 size-[18px]" />
             </button>
 
             <Separator className="my-1 bg-white/5" />
@@ -71,7 +71,7 @@ const GuildContextMenu = ({ guild, onLeave, onInvite }) => {
               onClick={onInvite}
             >
               <span>Invite People</span>
-              <UserPlus className="ml-2 size-4" />
+              <UserPlus className="ml-2 size-[18px]" />
             </button>
 
             <Separator className="my-1 bg-white/5" />
@@ -87,7 +87,7 @@ const GuildContextMenu = ({ guild, onLeave, onInvite }) => {
               onClick={handleCopyId}
             >
               <span>Copy Server ID</span>
-              <Copy className="ml-2 size-4" />
+              <Copy className="ml-2 size-[18px]" />
             </button>
           </>
         }

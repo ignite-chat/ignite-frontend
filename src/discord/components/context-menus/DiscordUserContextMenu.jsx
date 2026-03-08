@@ -1,9 +1,10 @@
 import { toast } from 'sonner';
+import { User, UserMinus, Gavel } from '@phosphor-icons/react';
 import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
-import { DiscordApiService } from '../services/discord-api.service';
+import { DiscordApiService } from '../../services/discord-api.service';
 
 const DiscordUserContextMenu = ({
   author,
@@ -39,7 +40,10 @@ const DiscordUserContextMenu = ({
 
   return (
     <>
-      <ContextMenuItem onSelect={onViewProfile}>View Profile</ContextMenuItem>
+      <ContextMenuItem className="justify-between" onSelect={onViewProfile}>
+        View Profile
+        <User className="ml-auto size-[18px]" weight="fill" />
+      </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem className="justify-between" onSelect={handleCopyId}>
         Copy User ID
@@ -52,17 +56,19 @@ const DiscordUserContextMenu = ({
           {canKick && (
             <ContextMenuItem
               onSelect={handleKick}
-              className="text-[#f23f42] focus:bg-[#da373c] focus:text-white"
+              className="justify-between text-[#f23f42] focus:bg-[#da373c] focus:text-white"
             >
               Kick {displayName}
+              <UserMinus className="ml-auto size-[18px]" weight="fill" />
             </ContextMenuItem>
           )}
           {canBan && (
             <ContextMenuItem
               onSelect={handleBan}
-              className="text-[#f23f42] focus:bg-[#da373c] focus:text-white"
+              className="justify-between text-[#f23f42] focus:bg-[#da373c] focus:text-white"
             >
               Ban {displayName}
+              <Gavel className="ml-auto size-[18px]" weight="fill" />
             </ContextMenuItem>
           )}
         </>
