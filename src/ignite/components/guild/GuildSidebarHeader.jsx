@@ -25,12 +25,12 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import InviteModal from '@/ignite/components/modals/InviteModal';
+import ServerSettingsModal from '@/ignite/components/settings/ServerSettings';
 import GuildMenuContent from './GuildMenuContent';
 
 const GuildSidebarHeader = ({
   guildName = '',
   guild,
-  onOpenServerSettings,
   onCreateChannel,
   onCreateCategory,
 }) => {
@@ -112,7 +112,7 @@ const GuildSidebarHeader = ({
                         className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-100 hover:bg-white/5"
                         onClick={() => {
                           setPopoverOpen(false);
-                          onOpenServerSettings();
+                          useModalStore.getState().push(ServerSettingsModal, { guild });
                         }}
                       >
                         <span>Server Settings</span>

@@ -101,6 +101,8 @@ html,
 body {
   touch-action: pan-x pan-y;
   font-family: 'Inter';
+  -webkit-user-select: text;
+  user-select: text;
 }
 @layer utilities {
   @keyframes message-highlight {

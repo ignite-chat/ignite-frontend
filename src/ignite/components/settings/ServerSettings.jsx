@@ -9,9 +9,12 @@ import ServerBanManager from './ServerBanManager';
 import { Button } from '@/components/ui/button';
 import { Info, Shield, Users, Mail, X, Smile, StickyNote, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useModalStore } from '@/ignite/store/modal.store';
 
-const ServerSettings = ({ isOpen, onClose, guild, initialTab = 'info' }) => {
-  const [activeTab, setActiveTab] = useState('info');
+const ServerSettingsModal = ({ modalId, guild, initialTab = 'info' }) => {
+  const [activeTab, setActiveTab] = useState(initialTab || 'info');
+
+  const onClose = () => useModalStore.getState().close(modalId);
 
   const navigationSections = useMemo(
     () => [
@@ -36,30 +39,12 @@ const ServerSettings = ({ isOpen, onClose, guild, initialTab = 'info' }) => {
     [guild]
   );
 
-  useEffect(() => {
-    if (isOpen) setActiveTab(initialTab || 'info');
-  }, [initialTab, isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') onClose?.();
-    };
-    window.addEventListener('keydown', handleEscape);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = '';
-    };
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
   const allItems = navigationSections.flatMap((s) => s.items);
   const activeItem = allItems.find((item) => item.id === activeTab);
 
   return (
-    <div className="fixed inset-0 z-50 flex bg-background">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div className="flex h-[85vh] w-full max-w-[90vw] overflow-hidden rounded-lg bg-background shadow-xl" onClick={(e) => e.stopPropagation()}>
       {/* Sidebar */}
       <div className="flex w-60 shrink-0 flex-col bg-muted/30">
         <nav className="flex-1 space-y-6 overflow-y-auto px-2 py-14">
@@ -125,8 +110,9 @@ const ServerSettings = ({ isOpen, onClose, guild, initialTab = 'info' }) => {
           {activeItem?.component}
         </div>
       </div>
+      </div>
     </div>
   );
 };
 
-export default ServerSettings;
+export default ServerSettingsModal;

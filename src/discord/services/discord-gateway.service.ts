@@ -9,6 +9,8 @@ import { useDiscordMemberListStore } from '../store/discord-member-list.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useDiscordActivitiesStore } from '../store/discord-activities.store';
 import { useDiscordTypingStore } from '../store/discord-typing.store';
+import { useDiscordThreadsStore } from '../store/discord-threads.store';
+import { useDiscordVoiceStatesStore } from '../store/discord-voice-states.store';
 
 /** Sync activities to the dedicated store from a list of presences */
 function syncActivities(presences: { user_id: string; activities?: any[] }[]) {
@@ -365,8 +367,10 @@ export const DiscordGatewayService = {
         if (!channel_id || !message_id || !incomingReactions) break;
         const messages = useDiscordChannelsStore.getState().channelMessages[channel_id];
         const msg = messages?.find((m: any) => m.id === message_id);
-        if (!msg) break;
-        const existing = [...(msg.reactions || [])];
+        const threadFirstMsg = useDiscordThreadsStore.getState().findFirstMessage(channel_id);
+        const sourceMsg = msg || threadFirstMsg;
+        if (!sourceMsg) break;
+        const existing = [...(sourceMsg.reactions || [])];
         for (const r of incomingReactions) {
           const emoji = r.emoji;
           const idx = existing.findIndex((e: any) =>
@@ -394,16 +398,20 @@ export const DiscordGatewayService = {
             });
           }
         }
-        useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: existing });
+        if (msg) useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: existing });
+        if (threadFirstMsg) useDiscordThreadsStore.getState().updateFirstMessage(channel_id, { reactions: existing });
         break;
       }
       case 'MESSAGE_REACTION_ADD': {
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         const { channel_id, message_id, user_id, emoji, burst } = data;
         if (!channel_id || !message_id || !emoji) break;
         const raMessages = useDiscordChannelsStore.getState().channelMessages[channel_id];
         const raMsg = raMessages?.find((m: any) => m.id === message_id);
-        if (!raMsg) break;
-        const raExisting = [...(raMsg.reactions || [])];
+        const raThreadFirstMsg = useDiscordThreadsStore.getState().findFirstMessage(channel_id);
+        const raSourceMsg = raMsg || raThreadFirstMsg;
+        if (!raSourceMsg) break;
+        const raExisting = [...(raSourceMsg.reactions || [])];
         const raIdx = raExisting.findIndex((e: any) =>
           emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
         );
@@ -429,16 +437,20 @@ export const DiscordGatewayService = {
             me_burst: isMe && !!burst,
           });
         }
-        useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: raExisting });
+        if (raMsg) useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: raExisting });
+        if (raThreadFirstMsg) useDiscordThreadsStore.getState().updateFirstMessage(channel_id, { reactions: raExisting });
         break;
       }
       case 'MESSAGE_REACTION_REMOVE': {
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         const { channel_id, message_id, user_id, emoji, burst } = data;
         if (!channel_id || !message_id || !emoji) break;
         const rrMessages = useDiscordChannelsStore.getState().channelMessages[channel_id];
         const rrMsg = rrMessages?.find((m: any) => m.id === message_id);
-        if (!rrMsg) break;
-        let rrExisting = [...(rrMsg.reactions || [])];
+        const rrThreadFirstMsg = useDiscordThreadsStore.getState().findFirstMessage(channel_id);
+        const rrSourceMsg = rrMsg || rrThreadFirstMsg;
+        if (!rrSourceMsg) break;
+        let rrExisting = [...(rrSourceMsg.reactions || [])];
         const rrIdx = rrExisting.findIndex((e: any) =>
           emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
         );
@@ -460,9 +472,20 @@ export const DiscordGatewayService = {
         } else {
           rrExisting[rrIdx] = updated;
         }
-        useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: rrExisting });
+        if (rrMsg) useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: rrExisting });
+        if (rrThreadFirstMsg) useDiscordThreadsStore.getState().updateFirstMessage(channel_id, { reactions: rrExisting });
         break;
       }
+      case 'VOICE_STATE_UPDATE':
+        if (data.guild_id) {
+          useDiscordVoiceStatesStore.getState().updateVoiceState(data);
+        }
+        break;
+      case 'VOICE_STATE_UPDATE_BATCH':
+        if (data.voice_states?.length > 0) {
+          useDiscordVoiceStatesStore.getState().updateVoiceStateBatch(data.voice_states);
+        }
+        break;
       case 'TYPING_START': {
         const typingUserId = data.user_id;
         const currentUserId = useDiscordStore.getState().user?.id;
@@ -572,6 +595,16 @@ export const DiscordGatewayService = {
     }
     if (allGuildChannels.length > 0) {
       useDiscordChannelsStore.getState().setChannels(allGuildChannels);
+    }
+
+    // Store initial voice states from each guild
+    for (const guild of guilds) {
+      if (guild.voice_states?.length > 0) {
+        useDiscordVoiceStatesStore.getState().setGuildVoiceStates(
+          guild.id,
+          guild.voice_states.map((vs: any) => ({ ...vs, guild_id: guild.id }))
+        );
+      }
     }
 
     // Store users from READY payload
@@ -697,6 +730,14 @@ export const DiscordGatewayService = {
       }
     }
 
+    // Store voice states for the guild
+    if (data.voice_states?.length > 0) {
+      useDiscordVoiceStatesStore.getState().setGuildVoiceStates(
+        data.id,
+        data.voice_states.map((vs: any) => ({ ...vs, guild_id: data.id }))
+      );
+    }
+
     // Store the guild's channels
     if (data.channels && data.channels.length > 0) {
       const channels = data.channels.map((c: any) => ({
@@ -719,6 +760,7 @@ export const DiscordGatewayService = {
   _handleGuildDelete(data: any) {
     useDiscordGuildsStore.getState().removeGuild(data.id);
     useDiscordMembersStore.getState().removeGuild(data.id);
+    useDiscordVoiceStatesStore.getState().removeGuild(data.id);
     // Also remove channels belonging to this guild
     const { channels, setChannels } = useDiscordChannelsStore.getState();
     setChannels(channels.filter((c) => c.guild_id !== data.id));

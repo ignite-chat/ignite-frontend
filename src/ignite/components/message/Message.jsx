@@ -106,14 +106,15 @@ const Message = memo(
 
     return (
       <ContextMenu onOpenChange={(open) => { if (!open) setContextImageUrl(null); }}>
-        <ContextMenuTrigger
-          className={messageClasses}
-          onContextMenu={(e) => {
-            const img = e.target.closest('img');
-            const isEmoji = img?.classList.contains('align-text-bottom');
-            setContextImageUrl(!isEmoji ? img?.src || null : null);
-          }}
-        >
+        <ContextMenuTrigger asChild>
+          <div
+            className={messageClasses}
+            onContextMenu={(e) => {
+              const img = e.target.closest('img');
+              const isEmoji = img?.classList.contains('align-text-bottom');
+              setContextImageUrl(!isEmoji ? img?.src || null : null);
+            }}
+          >
           {hasReply && (
             <div className="flex items-start gap-2 px-4">
               <div className="mt-2 flex w-10">
@@ -155,7 +156,7 @@ const Message = memo(
               ) : (
                 <div
                   className={cn(
-                    'whitespace-pre-wrap break-words text-gray-400 [overflow-wrap:anywhere]',
+                    'select-text whitespace-pre-wrap break-words text-gray-400 [overflow-wrap:anywhere]',
                     pending && 'opacity-50'
                   )}
                 >
@@ -209,6 +210,7 @@ const Message = memo(
               onReply={() => setReplyingId(message.id)}
             />
           )}
+        </div>
         </ContextMenuTrigger>
 
         <MessageContextMenu

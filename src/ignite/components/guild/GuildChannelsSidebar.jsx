@@ -287,11 +287,9 @@ const GuildSidebarCategory = ({
 
 const GuildChannelsSidebar = ({
   guild,
-  onOpenServerSettings,
   onEditChannel,
   onCreateChannel,
   onCreateCategory,
-  canOpenServerSettings,
   canManageChannels,
 }) => {
   const { channelId } = useParams();
@@ -502,8 +500,6 @@ const GuildChannelsSidebar = ({
               <GuildSidebarHeader
                 guildName={guild?.name}
                 guild={guild}
-                onOpenServerSettings={onOpenServerSettings}
-                canOpenServerSettings={canOpenServerSettings}
                 onCreateChannel={onCreateChannel}
                 onCreateCategory={onCreateCategory}
               />

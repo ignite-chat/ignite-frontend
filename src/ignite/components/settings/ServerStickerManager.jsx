@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { Upload, Trash2 } from 'lucide-react';
 import ImageCropperModal from '@/ignite/components/modals/ImageCropperModal';
+import { useModalStore } from '@/ignite/store/modal.store';
 import api from '@/ignite/api';
 
 const STICKER_SIZE = 320;
@@ -24,8 +25,6 @@ const ServerStickerManager = ({ guild }) => {
   const [uploading, setUploading] = useState(false);
   const [stickerName, setStickerName] = useState('');
   const [croppedImage, setCroppedImage] = useState(null);
-  const [cropperOpen, setCropperOpen] = useState(false);
-  const [cropperSrc, setCropperSrc] = useState(null);
 
   const fileInputRef = useRef(null);
 
@@ -48,19 +47,15 @@ const ServerStickerManager = ({ guild }) => {
     }
 
     const dataUrl = await fileToDataUrl(file);
-    setCropperSrc(dataUrl);
-    setCropperOpen(true);
-  };
-
-  const handleCropConfirm = (croppedDataUrl) => {
-    setCroppedImage(croppedDataUrl);
-    setCropperOpen(false);
-    setCropperSrc(null);
-  };
-
-  const handleCropClose = () => {
-    setCropperOpen(false);
-    setCropperSrc(null);
+    useModalStore.getState().push(ImageCropperModal, {
+      imageSrc: dataUrl,
+      title: 'Crop Sticker',
+      aspect: 1,
+      cropShape: 'rect',
+      outputWidth: STICKER_SIZE,
+      outputHeight: STICKER_SIZE,
+      onConfirm: (croppedDataUrl) => setCroppedImage(croppedDataUrl),
+    });
   };
 
   const handleUpload = async () => {
@@ -222,17 +217,6 @@ const ServerStickerManager = ({ guild }) => {
         </div>
       </div>
 
-      <ImageCropperModal
-        open={cropperOpen}
-        onClose={handleCropClose}
-        imageSrc={cropperSrc}
-        title="Crop Sticker"
-        aspect={1}
-        cropShape="rect"
-        outputWidth={STICKER_SIZE}
-        outputHeight={STICKER_SIZE}
-        onConfirm={handleCropConfirm}
-      />
     </div>
   );
 };
