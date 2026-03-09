@@ -194,7 +194,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
   const messageRequestCount = useMemo(() => {
     if (!discordConnected) return 0;
     return discordChannels.filter(
-      (c) => (c.type === 1 || c.type === 3) && (c.is_message_request || c.is_message_request_timestamp)
+      (c) => (c.type === 1 || c.type === 3) && (c.is_message_request)
     ).length;
   }, [discordConnected, discordChannels]);
 
