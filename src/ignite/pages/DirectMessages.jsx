@@ -14,6 +14,7 @@ import { useDiscordStore } from '@/discord/store/discord.store';
 import { useDiscordUsersStore } from '@/discord/store/discord-users.store';
 import { useLastChannelStore } from '@/store/last-channel.store';
 import DiscordChannel from '@/discord/components/DiscordChannel';
+import ResizableSidebar from '@/components/ResizableSidebar';
 
 const DirectMessagesPage = () => {
   const { channelId, messageId } = useParams();
@@ -76,12 +77,12 @@ const DirectMessagesPage = () => {
 
   return (
     <>
-      <div className="shrink-0">
+      <ResizableSidebar id="dm-sidebar" defaultWidth={320} minWidth={200} maxWidth={500}>
         <DMChannelsSidebar
           activeChannelId={channelId || 'friends'}
           onNavigate={(id) => navigate(`/channels/@me/${id}`)}
         />
-      </div>
+      </ResizableSidebar>
       <div className="flex flex-1 overflow-hidden">
         {!isSpecialView && <PageTitle title={pageTitle} />}
         <main className={`relative flex h-full flex-1 flex-col overflow-hidden text-gray-100 bg-[#1a1a1e]`}>

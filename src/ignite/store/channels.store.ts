@@ -90,6 +90,7 @@ type ChannelsStore = {
   removeReaction: (channelId: string, messageId: string, emoji: string, userId: string) => void;
   setMessageReactions: (channelId: string, messageId: string, reactions: Reaction[]) => void;
   updatePendingMessageProgress: (channelId: string, nonce: string, progress: number) => void;
+  removeChannel: (channelId: string) => void;
   togglePin: (channelId: string) => void;
 };
 
@@ -229,6 +230,10 @@ export const useChannelsStore = create<ChannelsStore>((set) => ({
           [messageId]: reactions,
         },
       },
+    })),
+  removeChannel: (channelId) =>
+    set((state) => ({
+      channels: state.channels.filter((c) => String(c.channel_id || c.id) !== channelId),
     })),
   togglePin: (channelId) =>
     set((state) => {

@@ -2,7 +2,6 @@ import { useMemo, useCallback } from 'react';
 import { UserStarIcon, MailIcon } from 'lucide-react';
 import { DiscordLogo } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { useChannelsStore } from '@/ignite/store/channels.store';
@@ -15,7 +14,9 @@ import { useDiscordUsersStore } from '@/discord/store/discord-users.store';
 import { useDiscordReadStatesStore } from '@/discord/store/discord-readstates.store';
 import { useDiscordRelationshipsStore, RelationshipType } from '@/discord/store/discord-relationships.store';
 import { DiscordService } from '@/discord/services/discord.service';
+import { DiscordApiService } from '@/discord/services/discord-api.service';
 import DMChannelItem from './DMChannelItem';
+import DMRowBase from './DMRowBase';
 import NewDMModal from '@/ignite/components/modals/NewDMModal';
 import { useModalStore } from '@/ignite/store/modal.store';
 
@@ -54,7 +55,7 @@ const getDMDisplayInfo = (channel, currentUserId, usersMap) => {
   };
 };
 
-const DiscordDMChannelItem = ({ channel, isActive, currentUserId, usersMap, onClick }) => {
+const DiscordDMChannelItem = ({ channel, isActive, currentUserId, usersMap, onClick, onClose }) => {
   const readStates = useDiscordReadStatesStore((s) => s.readStates);
   const entry = readStates[channel.id];
 
@@ -70,21 +71,12 @@ const DiscordDMChannelItem = ({ channel, isActive, currentUserId, usersMap, onCl
   );
 
   return (
-    <button
+    <DMRowBase
+      isActive={isActive}
+      isUnread={isUnread}
       onClick={onClick}
-      className={cn(
-        'group relative flex w-full items-center gap-3 rounded px-2 py-1.5 text-sm transition-all',
-        isActive
-          ? 'bg-gray-700 text-white'
-          : isUnread
-            ? 'text-gray-100 hover:bg-gray-700/50 hover:text-gray-200'
-            : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
-      )}
+      onClose={onClose}
     >
-      {!isActive && isUnread && (
-        <div className="absolute left-0 top-1/2 h-2 w-1 -translate-y-1/2 rounded-r-full bg-white transition-all group-hover:h-4" />
-      )}
-
       <div className="relative shrink-0">
         {info.icon ? (
           <img src={info.icon} alt={info.name} className="size-8 rounded-full object-cover" />
@@ -123,7 +115,7 @@ const DiscordDMChannelItem = ({ channel, isActive, currentUserId, usersMap, onCl
           {mentionCount > 99 ? '99+' : mentionCount}
         </div>
       )}
-    </button>
+    </DMRowBase>
   );
 };
 
@@ -191,6 +183,17 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
     return igniteCount + discordCount;
   }, [requests, currentUser.id, discordConnected, discordRelationships]);
 
+  const handleCloseDiscordDM = useCallback((channelId) => {
+    DiscordApiService.closeDMChannel(channelId);
+    useDiscordChannelsStore.getState().removeChannel(channelId);
+    if (activeChannelId === channelId) onNavigate('friends');
+  }, [activeChannelId, onNavigate]);
+
+  const handleCloseIgniteDM = useCallback((channelId) => {
+    useChannelsStore.getState().removeChannel(channelId);
+    if (activeChannelId === channelId) onNavigate('friends');
+  }, [activeChannelId, onNavigate]);
+
   const messageRequestCount = useMemo(() => {
     if (!discordConnected) return 0;
     return discordChannels.filter(
@@ -200,45 +203,45 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
 
   return (
     <>
-    <aside className="flex min-h-0 w-80 cursor-default select-none flex-col overflow-hidden bg-[#121214]">
-      <div className="flex-1 overflow-y-auto p-2 pb-36">
+    <aside className="flex min-h-0 w-full cursor-default select-none flex-col overflow-hidden">
+      <div className="flex h-12 items-center border-b border-white/5 px-2">
         <button
-          className="mb-2 flex w-full items-center text-white justify-center rounded-md bg-[#1e1f22] px-3 py-1.5 text-sm text-gray-400 hover:bg-[#2b2d31]"
+          className="flex w-full items-center justify-center rounded-md bg-[#1e1f22] px-3 py-1.5 text-sm text-gray-400 hover:bg-[#2b2d31]"
           onClick={() => useModalStore.getState().push(NewDMModal)}
         >
           <span>Find or start a conversation</span>
         </button>
+      </div>
+      <div className="scrollbar-hover flex-1 overflow-y-auto p-2 pb-36">
 
-        <div className="mx-2 my-2 border-b border-white/5" />
-
-        <Button
-          variant={activeChannelId === 'friends' ? 'secondary' : 'ghost'}
-          className="mb-1 w-full justify-start gap-3"
+        <DMRowBase
+          isActive={activeChannelId === 'friends'}
           onClick={() => onNavigate('friends')}
+          className="mb-1"
         >
-          <UserStarIcon className="h-5 w-5" />
+          <UserStarIcon className="h-5 w-5 shrink-0" />
           <span className="font-medium">Friends</span>
           {pendingCount > 0 && (
             <Badge className="ml-auto h-4 min-w-4 bg-[#f23f42] p-1 text-[11px] font-bold hover:bg-[#f23f42]">
               {pendingCount}
             </Badge>
           )}
-        </Button>
+        </DMRowBase>
 
         {discordConnected && (
-          <Button
-            variant={activeChannelId === 'message-requests' ? 'secondary' : 'ghost'}
-            className="mb-1 w-full justify-start gap-3"
+          <DMRowBase
+            isActive={activeChannelId === 'message-requests'}
             onClick={() => onNavigate('message-requests')}
+            className="mb-1"
           >
-            <MailIcon className="h-5 w-5" />
+            <MailIcon className="h-5 w-5 shrink-0" />
             <span className="font-medium">Message Requests</span>
             {messageRequestCount > 0 && (
               <Badge className="ml-auto h-4 min-w-4 bg-[#f23f42] p-1 text-[11px] font-bold hover:bg-[#f23f42]">
                 {messageRequestCount}
               </Badge>
             )}
-          </Button>
+          </DMRowBase>
         )}
 
         <div className="mx-2 my-2 border-b border-white/5" />
@@ -256,6 +259,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                   channel={channel}
                   isActive={activeChannelId === channel.channel_id}
                   onClick={() => onNavigate(channel.channel_id)}
+                  onClose={() => handleCloseIgniteDM(channel.channel_id)}
                   channelUnreads={channelUnreads}
                   channelUnreadsLoaded={channelUnreadsLoaded}
                 />
@@ -267,7 +271,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
         {/* All DMs — merged Ignite + Discord, sorted by last message */}
         {mergedDms.length > 0 && (
           <>
-            <div className="mt-4 flex cursor-default select-none items-center px-2 text-[11px] font-bold uppercase tracking-wider text-gray-500">
+            <div className="mt-2.5 flex cursor-default select-none items-center px-2 text-[13px] font-medium text-gray-500">
               Direct Messages
             </div>
             <div className="mt-2 space-y-0.5">
@@ -280,6 +284,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                     currentUserId={discordUser?.id}
                     usersMap={discordUsersMap}
                     onClick={() => onNavigate(item._id)}
+                    onClose={() => handleCloseDiscordDM(item._id)}
                   />
                 ) : (
                   <DMChannelItem
@@ -287,6 +292,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                     channel={item.data}
                     isActive={activeChannelId === item._id}
                     onClick={() => onNavigate(item._id)}
+                    onClose={() => handleCloseIgniteDM(item._id)}
                     channelUnreads={channelUnreads}
                     channelUnreadsLoaded={channelUnreadsLoaded}
                   />

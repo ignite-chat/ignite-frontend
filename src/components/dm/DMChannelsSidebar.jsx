@@ -80,8 +80,8 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
 
   return (
     <>
-    <aside className="flex min-h-0 w-80 cursor-default select-none flex-col overflow-hidden bg-[#121214]">
-      <div className="flex-1 overflow-y-auto p-2 pb-36">
+    <aside className="flex min-h-0 w-full cursor-default select-none flex-col overflow-hidden bg-[#121214]">
+      <div className="scrollbar-hover flex-1 overflow-y-auto p-2 pb-36">
         <button
           className="mb-2 flex w-full items-center text-white justify-center rounded-md bg-[#1e1f22] px-3 py-1.5 text-sm text-gray-400 hover:bg-[#2b2d31]"
           onClick={() => useModalStore.getState().push(NewDMModal)}

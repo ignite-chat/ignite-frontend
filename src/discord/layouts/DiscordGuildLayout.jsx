@@ -28,7 +28,7 @@ const DiscordGuildLayout = ({ children, guild, channel, dmInfo }) => {
   const sidebar = <DiscordGuildChannelsSidebar guild={guild} />;
 
   return (
-    <SharedGuildLayout guild={guild} sidebar={sidebar} sidebarWidth="w-[360px]">
+    <SharedGuildLayout guild={guild} sidebar={sidebar} sidebarId="discord-guild-sidebar" defaultWidth={360}>
       <main className="relative flex min-w-0 flex-1 flex-col bg-[#1a1a1e]">
         {channel && (
           <DiscordChannelHeader

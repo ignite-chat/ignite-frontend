@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import DiscordDMChannelsSidebar from '../components/DiscordDMChannelsSidebar';
+import ResizableSidebar from '@/components/ResizableSidebar';
 
 const DiscordDMLayout = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -14,13 +15,17 @@ const DiscordDMLayout = ({ children }) => {
           aria-label="Close sidebar"
         />
       )}
-      <div
-        className={`fixed inset-y-0 left-0 z-40 w-80 shrink-0 transition-transform duration-300 ease-out md:static md:translate-x-0 ${
+      <ResizableSidebar
+        id="discord-dm-sidebar"
+        defaultWidth={320}
+        minWidth={200}
+        maxWidth={500}
+        className={`fixed inset-y-0 left-0 z-40 h-full transition-transform duration-300 ease-out md:static md:translate-x-0 ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <DiscordDMChannelsSidebar />
-      </div>
+      </ResizableSidebar>
       {!isSidebarOpen && (
         <button
           type="button"

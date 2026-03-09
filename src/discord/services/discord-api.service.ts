@@ -374,4 +374,11 @@ export const DiscordApiService = {
   async declineMessageRequest(channelId: string): Promise<void> {
     await discordApi.delete(`/channels/${channelId}/recipients/@me`);
   },
+
+  /**
+   * Close (hide) a DM channel.
+   */
+  async closeDMChannel(channelId: string): Promise<void> {
+    await discordApi.delete(`/channels/${channelId}`, { _silent: true } as any);
+  },
 };

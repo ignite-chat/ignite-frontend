@@ -392,7 +392,7 @@ const GuildsSidebar = () => {
 
   return (
     <>
-      <div className="scrollbar-none relative left-0 top-0 m-0 flex h-full min-w-min flex-col items-center overflow-y-auto border-r border-white/5 bg-[#121214] pb-36 pt-3 text-white shadow">
+      <div className="scrollbar-none relative left-0 top-0 m-0 flex h-full min-w-min flex-col items-center overflow-y-auto bg-[#121214] pb-36 pt-3 text-white shadow">
         {/* Home / Friends */}
         <Link to={lastDmChannelId ? `/channels/@me/${lastDmChannelId}` : '/channels/@me'}>
           <SidebarIcon

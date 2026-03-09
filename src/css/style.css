@@ -97,6 +97,28 @@
   display: none;
 }
 
+.scrollbar-hover {
+  overflow-y: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.scrollbar-hover::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollbar-hover::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+.scrollbar-hover::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-hover:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.scrollbar-hover:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
 html,
 body {
   touch-action: pan-x pan-y;

@@ -494,16 +494,16 @@ const GuildChannelsSidebar = ({
       modifiers={[restrictToVerticalAxis]}
     >
       <ContextMenu>
-        <ContextMenuTrigger>
-          <div className="relative top-0 flex h-full w-80 flex-col bg-[#121214] text-gray-100 select-none">
-            <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto pb-36" ref={sidebarRef} onScroll={onSidebarScroll}>
-              <GuildSidebarHeader
-                guildName={guild?.name}
-                guild={guild}
-                onCreateChannel={onCreateChannel}
-                onCreateCategory={onCreateCategory}
-              />
-              <hr className="m-0 w-full border border-t-0 border-white/5 bg-[#121214] p-0" />
+        <ContextMenuTrigger className="block w-full h-full">
+          <div className="relative top-0 flex h-full w-full flex-col bg-[#121214] text-gray-100 select-none">
+            <GuildSidebarHeader
+              guildName={guild?.name}
+              guild={guild}
+              onCreateChannel={onCreateChannel}
+              onCreateCategory={onCreateCategory}
+            />
+            <hr className="m-0 w-full border border-t-0 border-white/5 bg-[#121214] p-0" />
+            <div className="scrollbar-hover flex min-h-0 flex-1 flex-col items-center overflow-y-auto pb-36" ref={sidebarRef} onScroll={onSidebarScroll}>
 
               {/* Root Channels (No Category) */}
               <GuildSidebarCategory

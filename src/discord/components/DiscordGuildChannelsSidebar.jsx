@@ -373,25 +373,26 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
   const iconUrl = DiscordService.getGuildIconUrl(guild?.id, guild?.properties?.icon, 64);
 
   return (
-    <div className="relative top-0 flex h-full min-w-[240px] flex-col bg-[#121214] text-gray-100">
-      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto pb-24" ref={sidebarRef} onScroll={onSidebarScroll}>
-        {/* Guild Header */}
-        <div className="w-full p-2">
-          <div className="flex w-full items-center gap-2 rounded-md px-2 py-1">
-            {iconUrl && (
-              <img
-                src={iconUrl}
-                alt=""
-                className="size-6 rounded-full"
-              />
-            )}
-            <div className="flex-1 truncate text-base font-semibold">
-              {guild?.properties?.name || 'Discord Server'}
-            </div>
+    <div className="relative top-0 flex h-full w-full flex-col bg-[#121214] text-gray-100">
+      {/* Guild Header */}
+      <div className="w-full p-2">
+        <div className="flex w-full items-center gap-2 rounded-md px-2 py-1">
+          {iconUrl && (
+            <img
+              src={iconUrl}
+              alt=""
+              className="size-6 rounded-full"
+            />
+          )}
+          <div className="flex-1 truncate text-base font-semibold">
+            {guild?.properties?.name || 'Discord Server'}
           </div>
         </div>
+      </div>
 
-        <hr className="m-0 w-full border border-t-0 border-white/5 bg-[#121214] p-0" />
+      <hr className="m-0 w-full border border-t-0 border-white/5 bg-[#121214] p-0" />
+
+      <div className="scrollbar-hover flex min-h-0 flex-1 flex-col items-center overflow-y-auto pb-24" ref={sidebarRef} onScroll={onSidebarScroll}>
 
         {/* Root channels (no category) */}
         {rootChannels.length > 0 && (

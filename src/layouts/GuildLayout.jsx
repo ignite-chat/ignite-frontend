@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import ResizableSidebar from '@/components/ResizableSidebar';
 
-const GuildLayout = ({ children, guild, sidebar, sidebarWidth = 'w-80' }) => {
+const GuildLayout = ({ children, guild, sidebar, sidebarId = 'guild-sidebar', defaultWidth = 320 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -17,13 +18,17 @@ const GuildLayout = ({ children, guild, sidebar, sidebarWidth = 'w-80' }) => {
           aria-label="Close sidebar"
         />
       )}
-      <div
-        className={`fixed inset-y-0 left-0 z-40 h-full ${sidebarWidth} shrink-0 transition-transform duration-300 ease-out md:static md:translate-x-0 ${
+      <ResizableSidebar
+        id={sidebarId}
+        defaultWidth={defaultWidth}
+        minWidth={200}
+        maxWidth={500}
+        className={`fixed inset-y-0 left-0 z-40 h-full transition-transform duration-300 ease-out md:static md:translate-x-0 ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {sidebar}
-      </div>
+      </ResizableSidebar>
       {!isSidebarOpen && (
         <button
           type="button"

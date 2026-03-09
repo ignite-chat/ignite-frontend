@@ -92,7 +92,7 @@ export const getTwemojiUrl = (emoji) => {
   // Try full code with fe0f first (local files may include it), then stripped
   const url = localSvgLookup.get(fullCode)
     || localSvgLookup.get(strippedCode)
-    || `https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/${strippedCode}.svg`;
+    || null;
   twemojiUrlCache.set(emoji, url);
   return url;
 };
