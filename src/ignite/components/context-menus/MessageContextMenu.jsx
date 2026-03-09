@@ -1,7 +1,11 @@
+import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { ArrowBendUpLeft, PencilSimple, Copy, Link, Trash, ImageSquare, DownloadSimple, ArrowSquareOut } from '@phosphor-icons/react';
 import { ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu';
 import { downloadImage, copyImageToClipboard } from '@/ignite/utils/image.utils';
+import { useGuildsStore } from '@/ignite/store/guilds.store';
+import { useModalStore } from '@/store/modal.store';
+import DeleteMessageModal from '@/components/modals/DeleteMessageModal';
 
 const MessageContextMenu = ({
   message,
@@ -14,6 +18,18 @@ const MessageContextMenu = ({
   channelId,
   imageUrl,
 }) => {
+  const guildMembers = useGuildsStore((s) => s.guildMembers[guildId]);
+
+  const nameColor = useMemo(() => {
+    if (!guildId || !guildMembers) return undefined;
+    const member = guildMembers.find((m) => m.user_id === message.author.id);
+    if (!member?.roles?.length) return undefined;
+    const topRole = [...member.roles]
+      .sort((a, b) => b.position - a.position)
+      .find((r) => r.color && r.color !== 0);
+    if (!topRole) return undefined;
+    return `#${topRole.color.toString(16).padStart(6, '0')}`;
+  }, [guildId, guildMembers, message.author.id]);
   const handleCopyText = () => {
     navigator.clipboard.writeText(message.content);
     toast.success('Message text copied to clipboard.');
@@ -92,7 +108,7 @@ const MessageContextMenu = ({
       {canDelete && (
         <>
           <ContextMenuSeparator />
-          <ContextMenuItem onSelect={onDelete} className="justify-between text-[#f23f42] focus:bg-[#da373c] focus:text-white">
+          <ContextMenuItem onSelect={() => useModalStore.getState().push(DeleteMessageModal, { message, nameColor, onConfirm: onDelete })} className="justify-between text-[#f23f42] focus:bg-[#da373c] focus:text-white">
             Delete Message
             <Trash className="ml-auto size-[18px]" weight="fill" />
           </ContextMenuItem>

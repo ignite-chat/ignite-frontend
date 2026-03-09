@@ -5,7 +5,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import Avatar from '@/components/Avatar';
+import Avatar from '@/ignite/components/Avatar';
 import {
   UserCircle,
   UserPlus,
@@ -21,13 +21,13 @@ import {
 import { cn } from '@/lib/utils';
 import { useFriendsStore } from '@/ignite/store/friends.store';
 import { useUsersStore } from '@/ignite/store/users.store';
-import { FriendsService } from '@/services/friends.service';
-import { UsersService } from '@/services/users.service';
+import { FriendsService } from '@/ignite/services/friends.service';
+import { UsersService } from '@/ignite/services/users.service';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { useGuildsStore } from '@/ignite/store/guilds.store';
 import { useModalStore } from '@/ignite/store/modal.store';
-import { ChannelsService } from '@/services/channels.service';
+import { ChannelsService } from '@/ignite/services/channels.service';
 import { useNavigate } from 'react-router-dom';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;

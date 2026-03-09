@@ -136,7 +136,7 @@ const UserSettingsModal = ({ modalId }) => {
           <div className="mx-2.5 border-t border-border" />
           <div className="space-y-0.5">
             <button
-              onClick={() => logout()}
+              onClick={() => { useModalStore.getState().close(modalId); logout(); }}
               className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
             >
               <LogOut className="h-4 w-4 shrink-0" />

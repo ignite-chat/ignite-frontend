@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { GuildContextProvider } from '@/ignite/contexts/GuildContext';
 import GuildsSidebar from '@/components/GuildsSidebar';
 import UserBar from '@/ignite/components/UserBar';
+import WindowBar from '@/components/WindowBar';
 
 const AppLayout = () => {
   const location = useLocation();
@@ -11,7 +12,8 @@ const AppLayout = () => {
 
   return (
     <GuildContextProvider>
-      <div className="flex h-full flex-col overflow-hidden">
+      <div className="flex h-screen flex-col overflow-hidden">
+        <WindowBar />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <GuildsSidebar />
           <Outlet />

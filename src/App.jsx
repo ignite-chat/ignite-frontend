@@ -83,7 +83,7 @@ const AuthRoute = ({ children }) => {
 
   if (!initialized) {
     return (
-      <div className="flex h-full items-center justify-center bg-body">
+      <div className="flex h-screen flex-col items-center justify-center bg-body">
         <div className="size-16 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
       </div>
     );
@@ -150,20 +150,20 @@ function App() {
     window.scrollTo(0, 0);
   }, [pathname]);
 
-  useEffect(() => {
-    // eslint-disable-next-line no-undef
-    if (process.env.NODE_ENV === 'development') return;
+  // useEffect(() => {
+  //   // eslint-disable-next-line no-undef
+  //   if (process.env.NODE_ENV === 'development') return;
 
-    const handleContextMenu = (e) => {
-      e.preventDefault();
-    };
+  //   const handleContextMenu = (e) => {
+  //     e.preventDefault();
+  //   };
 
-    document.addEventListener('contextmenu', handleContextMenu);
+  //   document.addEventListener('contextmenu', handleContextMenu);
 
-    return () => {
-      document.removeEventListener('contextmenu', handleContextMenu);
-    };
-  }, []);
+  //   return () => {
+  //     document.removeEventListener('contextmenu', handleContextMenu);
+  //   };
+  // }, []);
 
   return (
     <>

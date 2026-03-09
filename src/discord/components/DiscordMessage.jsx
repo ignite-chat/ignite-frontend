@@ -1090,7 +1090,7 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
           </div>
           </ContextMenuTrigger>
 
-          <DiscordMessageContextMenu message={message} canDelete={canDelete} />
+          <DiscordMessageContextMenu message={message} canDelete={canDelete} guildId={guildId} />
         </ContextMenu>
 
         <PopoverContent

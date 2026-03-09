@@ -7,6 +7,8 @@ import { useFriendsStore } from '@/ignite/store/friends.store';
 import { UsersService } from '@/ignite/services/users.service';
 import { FriendsService } from '@/ignite/services/friends.service';
 import Avatar from '../Avatar';
+import UserProfileModal from '@/components/modals/UserProfileModal';
+import { useModalStore } from '@/store/modal.store';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -139,8 +141,12 @@ const DMProfilePanel = ({ channel }) => {
             <div className="relative px-4 pb-4">
               {/* Avatar */}
               <div className="absolute -top-[40px] left-4">
-                <div className="rounded-full ring-4 ring-[#111214]">
-                  <Avatar user={user} size={80} className="!cursor-default text-3xl" showStatus showOffline />
+                <div
+                  className="group relative cursor-pointer rounded-full ring-4 ring-[#111214]"
+                  onClick={() => useModalStore.getState().push(UserProfileModal, { userId: user.id })}
+                >
+                  <Avatar user={user} size={80} className="text-3xl" showStatus />
+                  <div className="absolute inset-0 rounded-full bg-black/0 transition-colors group-hover:bg-black/20" />
                 </div>
               </div>
 
@@ -183,8 +189,11 @@ const DMProfilePanel = ({ channel }) => {
               </div>
 
               {/* Name */}
-              <div className="mt-1 space-y-0.5">
-                <h2 className="text-lg font-bold text-white">{user.name || user.username}</h2>
+              <div
+                className="mt-1 cursor-pointer space-y-0.5"
+                onClick={() => useModalStore.getState().push(UserProfileModal, { userId: user.id })}
+              >
+                <h2 className="text-lg font-bold text-white hover:underline">{user.name || user.username}</h2>
                 <div className="text-xs font-medium text-gray-400">{user.username}</div>
               </div>
 

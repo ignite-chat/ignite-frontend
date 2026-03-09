@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { NotePencil, Trash, Smiley, ArrowBendUpLeft, Hash, Pencil, Link } from '@phosphor-icons/react';
+import { useModalStore } from '@/store/modal.store';
+import DeleteMessageModal from '@/components/modals/DeleteMessageModal';
 import * as Popover from '@radix-ui/react-popover';
 import {
   EmojiPicker,
@@ -35,6 +37,18 @@ const MessageActions = ({ message, channelId, canEdit, canDelete, onEdit, onDele
   const { guildId } = useGuildContext();
   const guildsStore = useGuildsStore();
   const { guildEmojis, recentEmojis, addRecentEmoji } = useEmojisStore();
+
+  const nameColor = useMemo(() => {
+    if (!guildId) return undefined;
+    const members = guildsStore.guildMembers[guildId] || [];
+    const member = members.find((m) => m.user_id === message.author.id);
+    if (!member?.roles?.length) return undefined;
+    const topRole = [...member.roles]
+      .sort((a, b) => b.position - a.position)
+      .find((r) => r.color && r.color !== 0);
+    if (!topRole) return undefined;
+    return `#${topRole.color.toString(16).padStart(6, '0')}`;
+  }, [guildId, guildsStore.guildMembers, message.author.id]);
 
   const guildEmojiGroups = useMemo(() => {
     return guildsStore.guilds
@@ -190,7 +204,7 @@ const MessageActions = ({ message, channelId, canEdit, canDelete, onEdit, onDele
       {canDelete && (
         <button
           type="button"
-          onClick={onDelete}
+          onClick={() => useModalStore.getState().push(DeleteMessageModal, { message, nameColor, onConfirm: onDelete })}
           className="rounded-md p-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300"
         >
           <Trash className="size-5" weight="fill" />
