@@ -7,6 +7,11 @@ export type DiscordChannel = {
   parent_id?: string | null;
   topic?: string | null;
   last_message_id?: string | null;
+  is_message_request?: boolean;
+  is_message_request_timestamp?: string | null;
+  is_spam?: boolean;
+  safety_warnings?: any[];
+  recipient_ids?: string[];
   [key: string]: any;
 };
 

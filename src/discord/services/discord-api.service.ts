@@ -358,4 +358,20 @@ export const DiscordApiService = {
   async sendInteraction(payload: InteractionPayload): Promise<void> {
     await discordApi.post('/interactions', payload, { _silent: true } as any);
   },
+
+  /**
+   * Accept a message request (DM from a non-friend).
+   */
+  async acceptMessageRequest(channelId: string): Promise<void> {
+    await discordApi.put(`/channels/${channelId}/recipients/@me`, {
+      consent_status: 2,
+    });
+  },
+
+  /**
+   * Decline a message request (DM from a non-friend).
+   */
+  async declineMessageRequest(channelId: string): Promise<void> {
+    await discordApi.delete(`/channels/${channelId}/recipients/@me`);
+  },
 };

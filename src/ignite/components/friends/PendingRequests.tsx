@@ -145,7 +145,7 @@ const DiscordPendingRow = ({ user, isOutgoing }: DiscordPendingRowProps) => {
   };
 
   return (
-    <div className="border-white/5/30 group flex cursor-default items-center justify-between border-t px-2 py-3 hover:rounded-lg hover:bg-gray-600/30">
+    <div className="border-white/5/30 group flex cursor-pointer items-center justify-between border-t px-2 py-3 hover:rounded-lg hover:bg-gray-600/30">
       <div className="flex items-center gap-3">
         <img
           src={avatarUrl}

@@ -4,6 +4,7 @@ import { ChannelContextProvider } from '../contexts/ChannelContext';
 import Channel from '../components/channel/Channel';
 import DMChannelsSidebar from '../components/dm/DMChannelsSidebar';
 import FriendsDashboard from '../components/friends/FriendsDashboard';
+import MessageRequests from '../components/friends/MessageRequests';
 import PageTitle from '../components/PageTitle';
 import { useChannelsStore } from '../store/channels.store';
 import { useNotificationStore } from '../store/notification.store';
@@ -24,13 +25,15 @@ const DirectMessagesPage = () => {
 
   // Determine active view
   const isFriendsView = !channelId || channelId === 'friends';
+  const isMessageRequestsView = channelId === 'message-requests';
 
   // Find active channel — check Ignite first, then Discord
-  const activeIgniteChannel = !isFriendsView
+  const isSpecialView = isFriendsView || isMessageRequestsView;
+  const activeIgniteChannel = !isSpecialView
     ? channels.find((c) => c.channel_id === channelId)
     : null;
 
-  const activeDiscordChannel = !isFriendsView && !activeIgniteChannel && discordConnected
+  const activeDiscordChannel = !isSpecialView && !activeIgniteChannel && discordConnected
     ? discordChannels.find((c) => c.id === channelId && (c.type === 1 || c.type === 3))
     : null;
 
@@ -56,7 +59,7 @@ const DirectMessagesPage = () => {
 
   // Save last visited DM channel
   useEffect(() => {
-    if (channelId && channelId !== 'friends') {
+    if (channelId && channelId !== 'friends' && channelId !== 'message-requests') {
       useLastChannelStore.getState().setLastChannel('@me', channelId);
     }
   }, [channelId]);
@@ -80,10 +83,12 @@ const DirectMessagesPage = () => {
         />
       </div>
       <div className="flex flex-1 overflow-hidden">
-        {!isFriendsView && <PageTitle title={pageTitle} />}
+        {!isSpecialView && <PageTitle title={pageTitle} />}
         <main className={`relative flex h-full flex-1 flex-col overflow-hidden text-gray-100 bg-[#1a1a1e]`}>
           {isFriendsView ? (
             <FriendsDashboard />
+          ) : isMessageRequestsView ? (
+            <MessageRequests />
           ) : isDiscordChannel ? (
             <DiscordChannel channel={activeDiscordChannel} />
           ) : activeIgniteChannel ? (

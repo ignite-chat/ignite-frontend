@@ -1,12 +1,44 @@
 import type { DiscordChannel } from './channel';
 
-export type DiscordGuild = {
-  id: string;
+export type DiscordGuildProperties = {
   name: string;
   icon: string | null;
   owner_id?: string;
-  permissions?: string;
+  discovery_splash?: string | null;
+  hub_type?: string | null;
+  nsfw_level?: number;
+  safety_alerts_channel_id?: string | null;
+  rules_channel_id?: string | null;
+  description?: string | null;
+  features?: string[];
+  roles?: any[];
+  [key: string]: any;
+};
+
+export type DiscordGuild = {
+  id: string;
+  properties: DiscordGuildProperties;
   channels?: DiscordChannel[];
+  roles?: any[];
+  emojis?: any[];
+  stickers?: any[];
+  member_count?: number;
+  premium_subscription_count?: number;
+  large?: boolean;
+  lazy?: boolean;
+  joined_at?: string;
+  data_mode?: string;
+  threads?: any[];
+  stage_instances?: any[];
+  guild_scheduled_events?: any[];
+  version?: number;
+  /** @deprecated Use properties.name */
+  name?: string;
+  /** @deprecated Use properties.icon */
+  icon?: string | null;
+  /** @deprecated Use properties.owner_id */
+  owner_id?: string;
+  permissions?: string;
   [key: string]: any;
 };
 

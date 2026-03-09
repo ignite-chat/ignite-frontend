@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { UserStarIcon } from 'lucide-react';
+import { UserStarIcon, MailIcon } from 'lucide-react';
 import { DiscordLogo } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -163,10 +163,10 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
       data: c,
     }));
 
-    // Tag Discord channels with real timestamps
+    // Tag Discord channels with real timestamps (exclude message requests)
     const discordItems = discordConnected
       ? discordChannels
-          .filter((c) => c.type === 1 || c.type === 3)
+          .filter((c) => (c.type === 1 || c.type === 3) && !c.is_message_request && !c.is_message_request_timestamp)
           .map((c) => ({
             _source: 'discord',
             _id: c.id,
@@ -190,6 +190,13 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
       : 0;
     return igniteCount + discordCount;
   }, [requests, currentUser.id, discordConnected, discordRelationships]);
+
+  const messageRequestCount = useMemo(() => {
+    if (!discordConnected) return 0;
+    return discordChannels.filter(
+      (c) => (c.type === 1 || c.type === 3) && (c.is_message_request || c.is_message_request_timestamp)
+    ).length;
+  }, [discordConnected, discordChannels]);
 
   return (
     <>
@@ -217,6 +224,22 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
             </Badge>
           )}
         </Button>
+
+        {discordConnected && (
+          <Button
+            variant={activeChannelId === 'message-requests' ? 'secondary' : 'ghost'}
+            className="mb-1 w-full justify-start gap-3"
+            onClick={() => onNavigate('message-requests')}
+          >
+            <MailIcon className="h-5 w-5" />
+            <span className="font-medium">Message Requests</span>
+            {messageRequestCount > 0 && (
+              <Badge className="ml-auto h-4 min-w-4 bg-[#f23f42] p-1 text-[11px] font-bold hover:bg-[#f23f42]">
+                {messageRequestCount}
+              </Badge>
+            )}
+          </Button>
+        )}
 
         <div className="mx-2 my-2 border-b border-white/5" />
 
