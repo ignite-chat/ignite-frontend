@@ -39,3 +39,16 @@ export type {
   PermissionOverwrite,
   Role,
 } from './misc';
+
+// API response types
+export type {
+  UserProfile,
+  DiscordApplication,
+  ForumPostData,
+  ForumThreadSearchResult,
+  MessageSearchResult,
+  AckMessageResponse,
+  InteractionPayload,
+  AckBulkEntry,
+  UserGuildSettingsResponse,
+} from './api';

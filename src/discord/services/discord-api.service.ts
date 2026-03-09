@@ -1,5 +1,21 @@
 import axios from 'axios';
 import { toast } from 'sonner';
+import type {
+  DiscordUser,
+  DiscordGuild,
+  DiscordChannel,
+  DiscordMessage,
+  DiscordMember,
+  UserProfile,
+  DiscordApplication,
+  ForumPostData,
+  ForumThreadSearchResult,
+  MessageSearchResult,
+  AckMessageResponse,
+  InteractionPayload,
+  AckBulkEntry,
+  UserGuildSettingsResponse,
+} from '../types';
 import { useDiscordStore } from '../store/discord.store';
 import { requestCaptchaSolution } from './discord-captcha-bridge';
 
@@ -73,53 +89,53 @@ export const DiscordApiService = {
   /**
    * Get the current authenticated Discord user.
    */
-  async getUser() {
-    const { data } = await discordApi.get('/users/@me');
+  async getUser(): Promise<DiscordUser> {
+    const { data } = await discordApi.get<DiscordUser>('/users/@me');
     return data;
   },
 
   /**
    * Get all guilds the user is a member of.
    */
-  async getGuilds() {
-    const { data } = await discordApi.get('/users/@me/guilds');
+  async getGuilds(): Promise<DiscordGuild[]> {
+    const { data } = await discordApi.get<DiscordGuild[]>('/users/@me/guilds');
     return data;
   },
 
   /**
    * Get messages in a channel.
    */
-  async getChannelMessages(channelId: string, before?: string, limit: number = 50) {
+  async getChannelMessages(channelId: string, before?: string, limit: number = 50): Promise<DiscordMessage[]> {
     const params: any = { limit };
     if (before) params.before = before;
-    const { data } = await discordApi.get(`/channels/${channelId}/messages`, { params });
+    const { data } = await discordApi.get<DiscordMessage[]>(`/channels/${channelId}/messages`, { params });
     return data;
   },
 
   /**
    * Send a message to a channel.
    */
-  async sendMessage(channelId: string, content: string, nonce?: string, messageReference?: { message_id: string }) {
+  async sendMessage(channelId: string, content: string, nonce?: string, messageReference?: { message_id: string }): Promise<DiscordMessage> {
     const body: any = { content, nonce };
     if (messageReference) {
       body.message_reference = messageReference;
       body.allowed_mentions = { replied_user: true };
     }
-    const { data } = await discordApi.post(`/channels/${channelId}/messages`, body);
+    const { data } = await discordApi.post<DiscordMessage>(`/channels/${channelId}/messages`, body);
     return data;
   },
 
   /**
    * Send a typing indicator to a channel.
    */
-  async sendTyping(channelId: string) {
+  async sendTyping(channelId: string): Promise<void> {
     await discordApi.post(`/channels/${channelId}/typing`, {}, { _silent: true } as any);
   },
 
   /**
    * Add a reaction to a message.
    */
-  async addReaction(channelId: string, messageId: string, emoji: string) {
+  async addReaction(channelId: string, messageId: string, emoji: string): Promise<void> {
     await discordApi.put(
       `/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`,
       {},
@@ -130,7 +146,7 @@ export const DiscordApiService = {
   /**
    * Remove own reaction from a message.
    */
-  async removeReaction(channelId: string, messageId: string, emoji: string) {
+  async removeReaction(channelId: string, messageId: string, emoji: string): Promise<void> {
     await discordApi.delete(
       `/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`,
       { _silent: true } as any
@@ -140,8 +156,8 @@ export const DiscordApiService = {
   /**
    * Get members of a guild.
    */
-  async getGuildMembers(guildId: string, limit: number = 1000) {
-    const { data } = await discordApi.get(`/guilds/${guildId}/members`, {
+  async getGuildMembers(guildId: string, limit: number = 1000): Promise<DiscordMember[]> {
+    const { data } = await discordApi.get<DiscordMember[]>(`/guilds/${guildId}/members`, {
       params: { limit },
     });
     return data;
@@ -150,51 +166,51 @@ export const DiscordApiService = {
   /**
    * Get a specific channel by ID.
    */
-  async getChannel(channelId: string) {
-    const { data } = await discordApi.get(`/channels/${channelId}`);
+  async getChannel(channelId: string): Promise<DiscordChannel> {
+    const { data } = await discordApi.get<DiscordChannel>(`/channels/${channelId}`);
     return data;
   },
 
   /**
    * Get a specific guild by ID.
    */
-  async getGuild(guildId: string) {
-    const { data } = await discordApi.get(`/guilds/${guildId}`);
+  async getGuild(guildId: string): Promise<DiscordGuild> {
+    const { data } = await discordApi.get<DiscordGuild>(`/guilds/${guildId}`);
     return data;
   },
 
   /**
    * Get a user's profile (banner, bio, etc.)
    */
-  async getUserProfile(userId: string, guildId?: string) {
+  async getUserProfile(userId: string, guildId?: string): Promise<UserProfile> {
     const params: any = {
       with_mutual_guilds: true,
       with_mutual_friends_count: true,
       with_mutual_friends: true,
     };
     if (guildId) params.guild_id = guildId;
-    const { data } = await discordApi.get(`/users/${userId}/profile`, { params });
+    const { data } = await discordApi.get<UserProfile>(`/users/${userId}/profile`, { params });
     return data;
   },
 
   /**
    * Delete a message in a channel.
    */
-  async deleteMessage(channelId: string, messageId: string) {
+  async deleteMessage(channelId: string, messageId: string): Promise<void> {
     await discordApi.delete(`/channels/${channelId}/messages/${messageId}`);
   },
 
   /**
    * Kick a member from a guild.
    */
-  async kickMember(guildId: string, userId: string) {
+  async kickMember(guildId: string, userId: string): Promise<void> {
     await discordApi.delete(`/guilds/${guildId}/members/${userId}`);
   },
 
   /**
    * Ban a member from a guild.
    */
-  async banMember(guildId: string, userId: string, deleteMessageSeconds: number = 0) {
+  async banMember(guildId: string, userId: string, deleteMessageSeconds: number = 0): Promise<void> {
     await discordApi.put(`/guilds/${guildId}/bans/${userId}`, {
       delete_message_seconds: deleteMessageSeconds,
     });
@@ -203,36 +219,36 @@ export const DiscordApiService = {
   /**
    * Accept an incoming friend request (or send one by user ID).
    */
-  async acceptFriendRequest(userId: string) {
+  async acceptFriendRequest(userId: string): Promise<void> {
     await discordApi.put(`/users/@me/relationships/${userId}`, {});
   },
 
   /**
    * Send a friend request by user ID.
    */
-  async sendFriendRequest(userId: string) {
+  async sendFriendRequest(userId: string): Promise<void> {
     await discordApi.put(`/users/@me/relationships/${userId}`, { type: 1 });
   },
 
   /**
    * Block a user.
    */
-  async blockUser(userId: string) {
+  async blockUser(userId: string): Promise<void> {
     await discordApi.put(`/users/@me/relationships/${userId}`, { type: 2 });
   },
 
   /**
    * Delete a relationship (decline request, cancel outgoing, or remove friend).
    */
-  async deleteRelationship(userId: string) {
+  async deleteRelationship(userId: string): Promise<void> {
     await discordApi.delete(`/users/@me/relationships/${userId}`);
   },
 
   /**
    * Open or create a DM channel with a user.
    */
-  async createDMChannel(recipientId: string) {
-    const { data } = await discordApi.post('/users/@me/channels', {
+  async createDMChannel(recipientId: string): Promise<DiscordChannel> {
+    const { data } = await discordApi.post<DiscordChannel>('/users/@me/channels', {
       recipients: [recipientId],
     });
     return data;
@@ -241,24 +257,24 @@ export const DiscordApiService = {
   /**
    * Modify a guild member (nickname, timeout, etc.)
    */
-  async modifyGuildMember(guildId: string, userId: string, body: Record<string, any>) {
-    const { data } = await discordApi.patch(`/guilds/${guildId}/members/${userId}`, body);
+  async modifyGuildMember(guildId: string, userId: string, body: Record<string, any>): Promise<DiscordMember> {
+    const { data } = await discordApi.patch<DiscordMember>(`/guilds/${guildId}/members/${userId}`, body);
     return data;
   },
 
   /**
    * Get application info (icon, name, etc.) by application ID.
    */
-  async getApplication(applicationId: string) {
-    const { data } = await discordApi.get(`/applications/${applicationId}/rpc`, { _silent: true } as any);
+  async getApplication(applicationId: string): Promise<DiscordApplication> {
+    const { data } = await discordApi.get<DiscordApplication>(`/applications/${applicationId}/rpc`, { _silent: true } as any);
     return data;
   },
 
   /**
    * Get post data for a forum channel (thread metadata + first messages + owners).
    */
-  async getForumPostData(channelId: string, threadIds: string[]) {
-    const { data } = await discordApi.post(`/channels/${channelId}/post-data`, {
+  async getForumPostData(channelId: string, threadIds: string[]): Promise<ForumPostData> {
+    const { data } = await discordApi.post<ForumPostData>(`/channels/${channelId}/post-data`, {
       thread_ids: threadIds,
     });
     return data;
@@ -273,8 +289,8 @@ export const DiscordApiService = {
     limit = 25,
     sortBy = 'last_message_time',
     sortOrder = 'desc'
-  ) {
-    const { data } = await discordApi.get(`/channels/${channelId}/threads/search`, {
+  ): Promise<ForumThreadSearchResult> {
+    const { data } = await discordApi.get<ForumThreadSearchResult>(`/channels/${channelId}/threads/search`, {
       params: {
         sort_by: sortBy,
         sort_order: sortOrder,
@@ -289,8 +305,8 @@ export const DiscordApiService = {
   /**
    * Acknowledge (mark as read) up to a specific message in a channel.
    */
-  async ackMessage(channelId: string, messageId: string) {
-    const { data } = await discordApi.post(
+  async ackMessage(channelId: string, messageId: string): Promise<AckMessageResponse> {
+    const { data } = await discordApi.post<AckMessageResponse>(
       `/channels/${channelId}/messages/${messageId}/ack`,
       { token: null },
       { _silent: true } as any
@@ -301,20 +317,19 @@ export const DiscordApiService = {
   /**
    * Bulk acknowledge multiple channels at once.
    */
-  async ackBulk(readStates: { channel_id: string; message_id: string; read_state_type: number }[]) {
-    const { data } = await discordApi.post(
+  async ackBulk(readStates: AckBulkEntry[]): Promise<void> {
+    await discordApi.post(
       `/read-states/ack-bulk`,
       { read_states: readStates },
       { _silent: true } as any
     );
-    return data;
   },
 
   /**
    * Update user guild settings (mute, notifications, etc.)
    */
-  async updateUserGuildSettings(guildId: string, settings: Record<string, any>) {
-    const { data } = await discordApi.patch(
+  async updateUserGuildSettings(guildId: string, settings: Record<string, any>): Promise<UserGuildSettingsResponse> {
+    const { data } = await discordApi.patch<UserGuildSettingsResponse>(
       `/users/@me/guilds/settings`,
       { guilds: { [guildId]: settings } },
       { _silent: true } as any
@@ -325,8 +340,8 @@ export const DiscordApiService = {
   /**
    * Search messages in a guild.
    */
-  async searchGuildMessages(guildId: string, content: string, offset = 0) {
-    const { data } = await discordApi.get(`/guilds/${guildId}/messages/search`, {
+  async searchGuildMessages(guildId: string, content: string, offset = 0): Promise<MessageSearchResult> {
+    const { data } = await discordApi.get<MessageSearchResult>(`/guilds/${guildId}/messages/search`, {
       params: {
         content,
         sort_by: 'timestamp',
@@ -340,17 +355,7 @@ export const DiscordApiService = {
   /**
    * Send a message component interaction (e.g. button click).
    */
-  async sendInteraction(payload: {
-    type: number;
-    application_id: string;
-    channel_id: string;
-    guild_id?: string;
-    data: any;
-    message_flags?: number;
-    message_id: string;
-    nonce: string;
-    session_id: string;
-  }) {
+  async sendInteraction(payload: InteractionPayload): Promise<void> {
     await discordApi.post('/interactions', payload, { _silent: true } as any);
   },
 };
