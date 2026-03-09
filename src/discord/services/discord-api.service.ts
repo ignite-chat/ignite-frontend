@@ -168,8 +168,9 @@ export const DiscordApiService = {
    */
   async getUserProfile(userId: string, guildId?: string) {
     const params: any = {
-      with_mutual_guilds: false,
-      with_mutual_friends_count: false,
+      with_mutual_guilds: true,
+      with_mutual_friends_count: true,
+      with_mutual_friends: true,
     };
     if (guildId) params.guild_id = guildId;
     const { data } = await discordApi.get(`/users/${userId}/profile`, { params });

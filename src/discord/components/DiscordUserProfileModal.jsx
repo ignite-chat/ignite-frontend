@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
+import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import { UserCircle, GameController, MusicNote, Broadcast, Eye, Trophy } from '@phosphor-icons/react';
+import { UserCircle, GameController, MusicNote, Broadcast, Eye, Trophy, Users, Globe } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { useModalStore } from '@/store/modal.store';
 import { DiscordService } from '../services/discord.service';
@@ -179,6 +180,7 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
   const [profile, setProfile] = useState(null);
   const [note, setNote] = useState('');
   const [rolesExpanded, setRolesExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState('activity');
 
   const userActivities = useDiscordActivitiesStore((s) => author?.id ? s.activities[author.id] : undefined);
 
@@ -283,7 +285,7 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
             </div>
 
             {/* Profile Body */}
-            <div className="mt-4 space-y-5 px-1">
+            <div className="mt-4 space-y-4 px-1">
               <div className="space-y-1">
                 <h2 className="flex items-center gap-2 text-2xl font-bold text-white">
                   {displayName}
@@ -311,10 +313,6 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
                   </div>
                 </div>
               )}
-
-              {relevantActivities.map((activity, i) => (
-                <ActivitySection key={activity.application_id || activity.name || i} activity={activity} />
-              ))}
 
               {member?.joined_at && (
                 <div className="space-y-2">
@@ -374,6 +372,123 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
                   </div>
                 </div>
               )}
+
+              {/* Tabs */}
+              <div className="border-b border-white/10">
+                <div className="flex">
+                  {[
+                    { id: 'activity', label: 'Activity', icon: GameController },
+                    { id: 'servers', label: 'Mutual Servers', icon: Globe, count: profile?.mutual_guilds?.length },
+                    { id: 'friends', label: 'Mutual Friends', icon: Users, count: profile?.mutual_friends_count },
+                  ].map(({ id, label, icon: Icon, count }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setActiveTab(id)}
+                      className={cn(
+                        'flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-semibold transition-colors',
+                        activeTab === id
+                          ? 'border-white text-white'
+                          : 'border-transparent text-gray-400 hover:border-gray-500 hover:text-gray-200'
+                      )}
+                    >
+                      <Icon size={14} weight={activeTab === id ? 'fill' : 'regular'} />
+                      {label}
+                      {count != null && count > 0 && (
+                        <span className="rounded-full bg-white/10 px-1.5 py-px text-[10px]">{count}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tab Content */}
+              <div className="min-h-[80px]">
+                {activeTab === 'activity' && (
+                  <div className="space-y-3">
+                    {relevantActivities.length > 0 ? (
+                      relevantActivities.map((activity, i) => (
+                        <ActivitySection key={activity.application_id || activity.name || i} activity={activity} />
+                      ))
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-6 text-gray-500">
+                        <GameController size={32} weight="light" />
+                        <span className="mt-2 text-sm">No current activity</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'servers' && (
+                  <div className="space-y-1.5">
+                    {profile?.mutual_guilds?.length > 0 ? (
+                      profile.mutual_guilds.map((mg) => {
+                        const mutualGuild = guilds.find((g) => g.id === mg.id);
+                        const iconUrl = mutualGuild
+                          ? DiscordService.getGuildIconUrl(mutualGuild.id, mutualGuild.properties?.icon || mutualGuild.icon, 32)
+                          : null;
+                        const name = mutualGuild?.properties?.name || mutualGuild?.name || mg.id;
+                        return (
+                          <div
+                            key={mg.id}
+                            className="flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-white/5"
+                          >
+                            {iconUrl ? (
+                              <img src={iconUrl} alt="" className="size-8 rounded-full" draggable="false" />
+                            ) : (
+                              <div className="flex size-8 items-center justify-center rounded-full bg-[#5865f2] text-xs font-bold text-white">
+                                {name.charAt(0)}
+                              </div>
+                            )}
+                            <span className="truncate text-sm font-medium text-gray-200">{name}</span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-6 text-gray-500">
+                        <Globe size={32} weight="light" />
+                        <span className="mt-2 text-sm">No mutual servers</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'friends' && (
+                  <div className="space-y-1.5">
+                    {profile?.mutual_friends?.length > 0 ? (
+                      profile.mutual_friends.map((friend) => {
+                        const friendUser = friend.user || friend;
+                        const friendAvatarUrl = DiscordService.getUserAvatarUrl(friendUser.id, friendUser.avatar, 32);
+                        const friendName = friendUser.global_name || friendUser.username;
+                        return (
+                          <div
+                            key={friendUser.id}
+                            className="flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-white/5"
+                          >
+                            <img
+                              src={friendAvatarUrl}
+                              alt={friendUser.username}
+                              className="size-8 rounded-full object-cover"
+                              draggable="false"
+                            />
+                            <div className="flex min-w-0 flex-col">
+                              <span className="truncate text-sm font-medium text-gray-200">{friendName}</span>
+                              {friendUser.global_name && friendUser.username !== friendUser.global_name && (
+                                <span className="truncate text-xs text-gray-400">{friendUser.username}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-6 text-gray-500">
+                        <Users size={32} weight="light" />
+                        <span className="mt-2 text-sm">No mutual friends</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="space-y-2">
                 <h3 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-400">
