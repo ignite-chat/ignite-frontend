@@ -208,10 +208,42 @@ export const DiscordApiService = {
   },
 
   /**
+   * Send a friend request by user ID.
+   */
+  async sendFriendRequest(userId: string) {
+    await discordApi.put(`/users/@me/relationships/${userId}`, { type: 1 });
+  },
+
+  /**
+   * Block a user.
+   */
+  async blockUser(userId: string) {
+    await discordApi.put(`/users/@me/relationships/${userId}`, { type: 2 });
+  },
+
+  /**
    * Delete a relationship (decline request, cancel outgoing, or remove friend).
    */
   async deleteRelationship(userId: string) {
     await discordApi.delete(`/users/@me/relationships/${userId}`);
+  },
+
+  /**
+   * Open or create a DM channel with a user.
+   */
+  async createDMChannel(recipientId: string) {
+    const { data } = await discordApi.post('/users/@me/channels', {
+      recipients: [recipientId],
+    });
+    return data;
+  },
+
+  /**
+   * Modify a guild member (nickname, timeout, etc.)
+   */
+  async modifyGuildMember(guildId: string, userId: string, body: Record<string, any>) {
+    const { data } = await discordApi.patch(`/guilds/${guildId}/members/${userId}`, body);
+    return data;
   },
 
   /**

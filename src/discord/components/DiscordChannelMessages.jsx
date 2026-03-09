@@ -4,13 +4,54 @@ import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { useDiscordStore } from '../store/discord.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordHasPermission } from '../hooks/useDiscordPermission';
-import { MANAGE_MESSAGES, KICK_MEMBERS, BAN_MEMBERS, READ_MESSAGE_HISTORY } from '../constants/permissions';
+import { MANAGE_MESSAGES, KICK_MEMBERS, BAN_MEMBERS, READ_MESSAGE_HISTORY, MANAGE_NICKNAMES, MODERATE_MEMBERS } from '../constants/permissions';
 import { scrollPositions } from '@/store/last-channel.store';
 import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
-import { Check } from '@phosphor-icons/react';
+import { Check, Hash, Megaphone, SpeakerHigh, MicrophoneStage, ChatsTeardrop, At } from '@phosphor-icons/react';
+import * as DiscordChannelType from '../constants/channel-types';
 import DiscordMessage from './DiscordMessage';
 import MessageSkeletonList from '@/components/message/MessageSkeleton';
+
+const WelcomeIcon = ({ type }) => {
+  const cls = 'size-10 text-white';
+  switch (type) {
+    case DiscordChannelType.GUILD_VOICE:
+      return <SpeakerHigh className={cls} weight="fill" />;
+    case DiscordChannelType.GUILD_STAGE_VOICE:
+      return <MicrophoneStage className={cls} weight="fill" />;
+    case DiscordChannelType.GUILD_ANNOUNCEMENT:
+      return <Megaphone className={`${cls} -scale-x-100`} weight="fill" />;
+    case DiscordChannelType.GUILD_FORUM:
+      return <ChatsTeardrop className={cls} weight="fill" />;
+    case DiscordChannelType.DM:
+    case DiscordChannelType.GROUP_DM:
+      return <At className={cls} weight="bold" />;
+    default:
+      return <Hash className={cls} weight="bold" />;
+  }
+};
+
+const ChannelWelcome = ({ channel }) => {
+  const isDM = channel.type === DiscordChannelType.DM || channel.type === DiscordChannelType.GROUP_DM;
+  const name = isDM ? (channel.recipients?.[0]?.username || channel.name) : channel.name;
+
+  return (
+    <div className="px-4 pb-2 pt-16">
+      <div className="mb-2 flex size-[68px] items-center justify-center rounded-full bg-white/10">
+        <WelcomeIcon type={channel.type} />
+      </div>
+      <h1 className="text-[28px] font-bold leading-tight text-white">
+        {isDM ? name : `Welcome to #${name}!`}
+      </h1>
+      <p className="mt-1 text-sm text-gray-400">
+        {isDM
+          ? `This is the beginning of your direct message history with ${name}.`
+          : `This is the start of the #${name} channel. ${channel.topic ? channel.topic : ''}`}
+      </p>
+    </div>
+  );
+};
 
 const DISCORD_EPOCH = 1420070400000;
 const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
@@ -59,6 +100,8 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const hasManageMessages = useDiscordHasPermission(guildId, channel, MANAGE_MESSAGES);
   const hasKickMembers = useDiscordHasPermission(guildId, channel, KICK_MEMBERS);
   const hasBanMembers = useDiscordHasPermission(guildId, channel, BAN_MEMBERS);
+  const hasManageNicknames = useDiscordHasPermission(guildId, channel, BAN_MEMBERS);
+  const hasModerateMembers = useDiscordHasPermission(guildId, channel, BAN_MEMBERS);
   const _hasReadMessageHistory = useDiscordHasPermission(guildId, channel, READ_MESSAGE_HISTORY);
   const hasReadMessageHistory = !guildId || _hasReadMessageHistory;
 
@@ -358,10 +401,8 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
           <MessageSkeletonList />
         ) : (
           <div className="pb-4">
-            {!hasMore && messages.length > 0 && (
-              <div className="px-4 pb-4 pt-8 text-sm text-gray-500">
-                This is the beginning of the channel.
-              </div>
+            {!hasMore && (
+              <ChannelWelcome channel={channel} />
             )}
             {messages.map((msg, i) => {
               const prevMessage = i > 0 ? messages[i - 1] : null;
@@ -387,6 +428,8 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
                     hasManageMessages={hasManageMessages}
                     hasKickMembers={hasKickMembers}
                     hasBanMembers={hasBanMembers}
+                    hasManageNicknames={true}
+                    hasModerateMembers={true}
                   />
                 </div>
               );

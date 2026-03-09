@@ -922,7 +922,7 @@ const DiscordSystemMessage = memo(({ message, prevMessage, guildId }) => {
 
 DiscordSystemMessage.displayName = 'DiscordSystemMessage';
 
-const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channelId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, pending }) => {
+const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channelId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, hasManageNicknames, hasModerateMembers, pending }) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
 
@@ -943,6 +943,8 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
   const canDelete = isOwnMessage || hasManageMessages;
   const canKick = !!guildId && !isOwnMessage && hasKickMembers;
   const canBan = !!guildId && !isOwnMessage && hasBanMembers;
+  const canManageNicknames = !!guildId && !isOwnMessage && hasManageNicknames;
+  const canTimeout = !!guildId && !isOwnMessage && hasModerateMembers;
 
   const isMentioned = useMemo(() => {
     if (message.mention_everyone) return true;
@@ -1029,6 +1031,9 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
                       guildId={guildId}
                       canKick={canKick}
                       canBan={canBan}
+                      canManageNicknames={canManageNicknames}
+                      canTimeout={canTimeout}
+                      isOwnMessage={isOwnMessage}
                       onViewProfile={openProfile}
                     />
                   </ContextMenuContent>
@@ -1037,7 +1042,25 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
 
               <div className="flex flex-1 flex-col items-start justify-start overflow-hidden">
                 {!shouldStack && (
-                  <DiscordMessageHeader message={message} guildId={guildId} onClickName={openProfile} />
+                  <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                      <div>
+                        <DiscordMessageHeader message={message} guildId={guildId} onClickName={openProfile} />
+                      </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="w-48">
+                      <DiscordUserContextMenu
+                        author={message.author}
+                        guildId={guildId}
+                        canKick={canKick}
+                        canBan={canBan}
+                        canManageNicknames={canManageNicknames}
+                        canTimeout={canTimeout}
+                        isOwnMessage={isOwnMessage}
+                        onViewProfile={openProfile}
+                      />
+                    </ContextMenuContent>
+                  </ContextMenu>
                 )}
 
                 <div className="select-text whitespace-pre-wrap break-words text-gray-400 [overflow-wrap:anywhere]">
@@ -1090,7 +1113,7 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
 
 DiscordNormalMessage.displayName = 'DiscordNormalMessage';
 
-const DiscordMessage = memo(({ message, prevMessage, currentUserId, channelId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, pending }) => {
+const DiscordMessage = memo(({ message, prevMessage, currentUserId, channelId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, hasManageNicknames, hasModerateMembers, pending }) => {
   if (!NORMAL_MESSAGE_TYPES.has(message.type)) {
     return <DiscordSystemMessage message={message} prevMessage={prevMessage} guildId={guildId} />;
   }
@@ -1104,6 +1127,8 @@ const DiscordMessage = memo(({ message, prevMessage, currentUserId, channelId, g
       hasManageMessages={hasManageMessages}
       hasKickMembers={hasKickMembers}
       hasBanMembers={hasBanMembers}
+      hasManageNicknames={hasManageNicknames}
+      hasModerateMembers={hasModerateMembers}
       pending={pending}
     />
   );
