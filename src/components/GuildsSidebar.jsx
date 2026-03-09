@@ -298,8 +298,11 @@ const GuildsSidebar = () => {
     const discordCount = discordConnected
       ? discordRelationships.filter((r) => r.type === RelationshipType.INCOMING_REQUEST).length
       : 0;
-    return igniteCount + discordCount;
-  }, [requests, user, discordConnected, discordRelationships]);
+    const discordMessageRequestCount = discordConnected
+      ? discordChannels.filter((c) => (c.type === 1 || c.type === 3) && c.is_message_request).length
+      : 0;
+    return igniteCount + discordCount + discordMessageRequestCount;
+  }, [requests, user, discordConnected, discordRelationships, discordChannels]);
 
   const unreadDmChannels = useMemo(() => {
     if (!channelUnreadsLoaded || !user) return [];
