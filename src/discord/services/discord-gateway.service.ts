@@ -675,6 +675,18 @@ export const DiscordGatewayService = {
       }
     }
 
+    // Upsert voice states from each guild
+    if (guilds) {
+      for (const guild of guilds) {
+        if (guild.voice_states?.length > 0) {
+          useDiscordVoiceStatesStore.getState().setGuildVoiceStates(
+            guild.id,
+            guild.voice_states.map((vs: any) => ({ ...vs, guild_id: guild.id }))
+          );
+        }
+      }
+    }
+
     // Guild presences from merged_presences.guilds[i] correspond to guilds[i]
     if (merged_presences?.guilds && guilds) {
       for (let i = 0; i < guilds.length; i++) {
