@@ -537,6 +537,9 @@ export const DiscordGatewayService = {
         }
         break;
       }
+      case 'PASSIVE_UPDATE_V2':
+        this._handlePassiveUpdateV2(data);
+        break;
       default:
         console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         // Forward unhandled events to the external handler if set
@@ -714,6 +717,45 @@ export const DiscordGatewayService = {
       }));
       useDiscordUsersStore.getState().setPresences(mapped);
       syncActivities(mapped);
+    }
+  },
+
+  _handlePassiveUpdateV2(data: any) {
+    const { guild_id, updated_voice_states, removed_voice_states, updated_channels, updated_members } = data;
+    if (!guild_id) return;
+
+    // Upsert updated voice states
+    if (updated_voice_states?.length > 0) {
+      useDiscordVoiceStatesStore.getState().updateVoiceStateBatch(
+        updated_voice_states.map((vs: any) => ({ ...vs, guild_id }))
+      );
+    }
+
+    // Remove voice states for users who left
+    if (removed_voice_states?.length > 0) {
+      useDiscordVoiceStatesStore.getState().updateVoiceStateBatch(
+        removed_voice_states.map((userId: string) => ({ user_id: userId, channel_id: null, guild_id } as any))
+      );
+    }
+
+    // Update channel metadata (e.g. last_message_id, last_pin_timestamp)
+    if (updated_channels?.length > 0) {
+      for (const ch of updated_channels) {
+        if (ch.id) {
+          useDiscordChannelsStore.getState().updateChannel(ch.id, ch);
+        }
+      }
+    }
+
+    // Upsert members and their user objects
+    if (updated_members?.length > 0) {
+      useDiscordGuildsStore.getState().addGuildMembers(guild_id, updated_members);
+      useDiscordMembersStore.getState().addMembers(guild_id, updated_members);
+
+      const users = updated_members.map((m: any) => m.user).filter(Boolean);
+      if (users.length > 0) {
+        useDiscordUsersStore.getState().addUsers(users);
+      }
     }
   },
 
