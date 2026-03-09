@@ -3,6 +3,30 @@ import { Check, X } from 'lucide-react';
 import { DiscordLogo } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import Avatar from '@/ignite/components/Avatar';
+
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const seconds = Math.floor((now - then) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(months / 12);
+  return `${years}y ago`;
+}
+
+function formatExactDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleString(undefined, {
+    month: 'long', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+}
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import UserProfileModal from '@/ignite/components/modals/UserProfileModal';
 import { useModalStore } from '@/ignite/store/modal.store';
@@ -94,6 +118,9 @@ type DiscordPendingRowProps = {
 
 const DiscordPendingRow = ({ user, isOutgoing }: DiscordPendingRowProps) => {
   const avatarUrl = DiscordService.getUserAvatarUrl(user.id, user.avatar, 64);
+  const relationship = useDiscordRelationshipsStore((s) => s.relationships.find((r) => r.id === user.id));
+  const sentAgo = relationship?.since ? timeAgo(relationship.since) : null;
+  const sentExact = relationship?.since ? formatExactDate(relationship.since) : null;
 
   const handleAccept = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -118,7 +145,7 @@ const DiscordPendingRow = ({ user, isOutgoing }: DiscordPendingRowProps) => {
   };
 
   return (
-    <div className="border-white/5/30 group flex items-center justify-between border-t px-2 py-3 hover:rounded-lg hover:bg-gray-600/30">
+    <div className="border-white/5/30 group flex cursor-default items-center justify-between border-t px-2 py-3 hover:rounded-lg hover:bg-gray-600/30">
       <div className="flex items-center gap-3">
         <img
           src={avatarUrl}
@@ -136,7 +163,15 @@ const DiscordPendingRow = ({ user, isOutgoing }: DiscordPendingRowProps) => {
             </Tooltip>
           </div>
           <div className="text-xs text-gray-400">
-            {isOutgoing ? 'Outgoing Friend Request' : 'Incoming Friend Request'}
+            {user.username}
+            {sentAgo && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="ml-1 cursor-default text-gray-500">· {sentAgo}</span>
+                </TooltipTrigger>
+                <TooltipContent side="top">{sentExact}</TooltipContent>
+              </Tooltip>
+            )}
           </div>
         </div>
       </div>
@@ -179,65 +214,89 @@ type PendingRequestsProps = {
   requests: FriendRequest[];
   currentUser: User;
   discordRequests: DiscordPendingRequest[];
+  searchQuery: string;
 };
 
 type MergedPending =
-  | { source: 'ignite'; data: FriendRequest; sortName: string }
-  | { source: 'discord'; data: DiscordPendingRequest; sortName: string };
+  | { source: 'ignite'; data: FriendRequest; sortName: string; isOutgoing: boolean }
+  | { source: 'discord'; data: DiscordPendingRequest; sortName: string; isOutgoing: boolean };
 
-const PendingRequests = ({ requests, currentUser, discordRequests }: PendingRequestsProps) => {
+const PendingRequests = ({ requests, currentUser, discordRequests, searchQuery }: PendingRequestsProps) => {
   const getUser = useUsersStore((s) => s.getUser);
   const openProfile = (userId: string) => {
     useModalStore.getState().push(UserProfileModal, { userId });
   };
 
-  const merged = useMemo(() => {
+  const { incoming, outgoing } = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     const items: MergedPending[] = [
       ...requests.map((req): MergedPending => {
-        const isOutgoing = req.sender_id === currentUser.id;
-        const userId = isOutgoing ? req.receiver?.id : req.sender?.id;
-        const user = (userId && getUser(userId)) || (isOutgoing ? req.receiver : req.sender);
+        const outgoing = req.sender_id === currentUser.id;
+        const userId = outgoing ? req.receiver?.id : req.sender?.id;
+        const user = (userId && getUser(userId)) || (outgoing ? req.receiver : req.sender);
         return {
           source: 'ignite',
           data: req,
           sortName: (user?.name || user?.username || '').toLowerCase(),
+          isOutgoing: outgoing,
         };
       }),
       ...discordRequests.map((r): MergedPending => ({
         source: 'discord',
         data: r,
         sortName: (r.user.global_name || r.user.username || '').toLowerCase(),
+        isOutgoing: r.isOutgoing,
       })),
     ];
-    return items.sort((a, b) => a.sortName.localeCompare(b.sortName));
-  }, [requests, currentUser, discordRequests, getUser]);
+    const filtered = query ? items.filter((i) => i.sortName.includes(query)) : items;
+    const sorted = filtered.sort((a, b) => a.sortName.localeCompare(b.sortName));
+    return {
+      incoming: sorted.filter((i) => !i.isOutgoing),
+      outgoing: sorted.filter((i) => i.isOutgoing),
+    };
+  }, [requests, currentUser, discordRequests, getUser, searchQuery]);
+
+  const total = incoming.length + outgoing.length;
+
+  const renderItem = (item: MergedPending) =>
+    item.source === 'ignite' ? (
+      <PendingRequestRow
+        key={item.data.id}
+        request={item.data}
+        currentUser={currentUser}
+        onClickUser={openProfile}
+      />
+    ) : (
+      <DiscordPendingRow
+        key={`discord-${item.data.user.id}`}
+        user={item.data.user}
+        isOutgoing={item.data.isOutgoing}
+      />
+    );
 
   return (
     <div className="space-y-1">
-      <div className="mb-4 text-[10px] font-semibold uppercase text-gray-400">
-        Pending — {merged.length}
-      </div>
-      {merged.length === 0 && (
-        <div className="flex h-64 flex-col items-center justify-center">
-          <p className="text-sm text-gray-500">There are no pending friend requests.</p>
+      {total === 0 && searchQuery.trim() && (
+        <div className="flex h-64 items-center justify-center">
+          <p className="text-sm text-gray-500">No one with that name can be found.</p>
         </div>
       )}
+      {incoming.length > 0 && (
+        <>
+          <div className="mt-4 text-[12px] font-medium text-gray-400">
+            Received — {incoming.length}
+          </div>
+          {incoming.map(renderItem)}
+        </>
+      )}
 
-      {merged.map((item) =>
-        item.source === 'ignite' ? (
-          <PendingRequestRow
-            key={item.data.id}
-            request={item.data}
-            currentUser={currentUser}
-            onClickUser={openProfile}
-          />
-        ) : (
-          <DiscordPendingRow
-            key={`discord-${item.data.user.id}`}
-            user={item.data.user}
-            isOutgoing={item.data.isOutgoing}
-          />
-        )
+      {outgoing.length > 0 && (
+        <>
+          <div className="mt-4 text-[12px] font-medium text-gray-400">
+            Outgoing — {outgoing.length}
+          </div>
+          {outgoing.map(renderItem)}
+        </>
       )}
     </div>
   );

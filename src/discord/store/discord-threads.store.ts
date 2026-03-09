@@ -1,21 +1,5 @@
 import { create } from 'zustand';
-
-type ForumThread = {
-  id: string;
-  [key: string]: any;
-};
-
-type FirstMessage = {
-  channel_id: string;
-  [key: string]: any;
-};
-
-type ChannelThreadData = {
-  threads: ForumThread[];
-  firstMessages: { [threadId: string]: FirstMessage };
-  hasMore: boolean;
-  offset: number;
-};
+import type { ForumThread, FirstMessage, ChannelThreadData } from '../types';
 
 type DiscordThreadsStore = {
   channels: { [channelId: string]: ChannelThreadData };

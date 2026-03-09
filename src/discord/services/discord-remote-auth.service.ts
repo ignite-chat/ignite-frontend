@@ -32,22 +32,9 @@ function arrayBufferToBase64url(buffer: ArrayBuffer): string {
 
 // --- Types ---
 
-export type ScannedUser = {
-  userId: string;
-  discriminator: string;
-  avatarHash: string;
-  username: string;
-};
+import type { ScannedUser, RemoteAuthState } from '../types';
 
-export type RemoteAuthState =
-  | { status: 'idle' }
-  | { status: 'connecting' }
-  | { status: 'qr_ready'; qrUrl: string; fingerprint: string }
-  | { status: 'scanned'; user: ScannedUser }
-  | { status: 'authenticated'; token: string }
-  | { status: 'cancelled' }
-  | { status: 'timeout' }
-  | { status: 'error'; message: string };
+export type { ScannedUser, RemoteAuthState } from '../types';
 
 // --- Service ---
 

@@ -1,11 +1,5 @@
 import { create } from 'zustand';
-
-type DiscordTypingUser = {
-  user_id: string;
-  username: string;
-  avatar: string | null;
-  expiresAt: number;
-};
+import type { DiscordTypingUser } from '../types';
 
 type DiscordTypingStore = {
   typing: { [channelId: string]: DiscordTypingUser[] };

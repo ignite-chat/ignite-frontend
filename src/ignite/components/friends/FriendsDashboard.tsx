@@ -100,7 +100,7 @@ const FriendsDashboard = () => {
         <div className="flex flex-1 flex-col overflow-y-auto p-6">
           {activeTab === 'add_friend' && <AddFriendForm />}
 
-          {(activeTab === 'online' || activeTab === 'all') && (
+          {activeTab !== 'add_friend' && (
             <>
               <div className="mb-4">
                 <InputGroup className="border-white/5 bg-[#17171a]">
@@ -109,35 +109,34 @@ const FriendsDashboard = () => {
                   </InputGroupAddon>
                   <InputGroupInput
                     type="text"
-                    placeholder="Search friends..."
+                    placeholder="Search..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="text-white placeholder:text-gray-500"
                   />
                   {searchQuery && (
-                    <InputGroupAddon>
-                      <Button
-                        variant="ghost"
-                        size="icon"
+                    <InputGroupAddon align="inline-end">
+                      <button
                         onClick={() => setSearchQuery('')}
-                        className="h-6 w-6 text-gray-500 hover:bg-transparent hover:text-gray-300"
+                        className="flex size-4 items-center justify-center rounded-full bg-gray-500 text-gray-900 hover:bg-gray-400"
                         type="button"
                         aria-label="Clear search"
                       >
-                        <X size={16} />
-                      </Button>
+                        <X size={10} strokeWidth={4} />
+                      </button>
                     </InputGroupAddon>
                   )}
                 </InputGroup>
               </div>
               <div className="flex-1 overflow-y-auto">
-                <FriendsList friends={filteredFriends} discordFriends={discordFriends} filter={activeTab} searchQuery={searchQuery} />
+                {(activeTab === 'online' || activeTab === 'all') && (
+                  <FriendsList friends={filteredFriends} discordFriends={discordFriends} filter={activeTab} searchQuery={searchQuery} />
+                )}
+                {activeTab === 'pending' && currentUser && (
+                  <PendingRequests requests={requests} currentUser={currentUser} discordRequests={discordPendingRequests} searchQuery={searchQuery} />
+                )}
               </div>
             </>
-          )}
-
-          {activeTab === 'pending' && currentUser && (
-            <PendingRequests requests={requests} currentUser={currentUser} discordRequests={discordPendingRequests} />
           )}
         </div>
 

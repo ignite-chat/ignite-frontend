@@ -1,18 +1,5 @@
 import { create } from 'zustand';
-
-type VoiceState = {
-  user_id: string;
-  channel_id: string | null;
-  guild_id: string;
-  session_id: string;
-  self_mute: boolean;
-  self_deaf: boolean;
-  mute: boolean;
-  deaf: boolean;
-  self_video: boolean;
-  suppress: boolean;
-  member?: any;
-};
+import type { VoiceState } from '../types';
 
 type DiscordVoiceStatesStore = {
   /** voice states keyed by guild_id -> user_id -> VoiceState */

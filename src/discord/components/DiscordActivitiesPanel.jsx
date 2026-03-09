@@ -149,6 +149,14 @@ const DiscordActivitiesPanel = () => {
         Active Now — {activeUsers.length}
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-4">
+        {activeUsers.length === 0 && (
+          <div className="rounded-lg bg-[#232428] p-4 text-center">
+            <p className="text-sm font-semibold text-gray-300">It's quiet for now...</p>
+            <p className="mt-1 text-[13px] leading-snug text-gray-500">
+              When a friend starts an activity—like playing a game or hanging out on voice—we'll show it here!
+            </p>
+          </div>
+        )}
         {activeUsers.map(([userId, acts]) => (
           <ActiveUserCard key={userId} userId={userId} activities={acts} />
         ))}

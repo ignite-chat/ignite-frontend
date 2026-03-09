@@ -1,21 +1,5 @@
 import { create } from 'zustand';
-
-type MemberListGroup = {
-  id: string; // role id, "online", or "offline"
-  count: number;
-};
-
-type MemberListItem =
-  | { group: { id: string; count: number } }
-  | { member: any };
-
-type MemberListData = {
-  id: string; // list id — unique per channel subscription
-  groups: MemberListGroup[];
-  items: MemberListItem[];
-  member_count: number;
-  online_count: number;
-};
+import type { MemberListData } from '../types';
 
 type DiscordMemberListStore = {
   /** memberLists[guildId] holds the current member list data */

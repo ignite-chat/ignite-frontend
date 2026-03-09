@@ -1,40 +1,5 @@
 import { create } from 'zustand';
-
-type DiscordGuild = {
-  id: string;
-  name: string;
-  icon: string | null;
-  owner_id?: string;
-  permissions?: string;
-  channels?: DiscordChannel[];
-  [key: string]: any;
-};
-
-type DiscordChannel = {
-  id: string;
-  type: number;
-  guild_id?: string;
-  name?: string;
-  position?: number;
-  parent_id?: string | null;
-  topic?: string | null;
-  last_message_id?: string | null;
-  [key: string]: any;
-};
-
-type DiscordMember = {
-  user?: {
-    id: string;
-    username: string;
-    discriminator: string;
-    global_name: string | null;
-    avatar: string | null;
-  };
-  nick?: string | null;
-  roles: string[];
-  joined_at: string;
-  [key: string]: any;
-};
+import type { DiscordGuild, DiscordChannel, DiscordMember } from '../types';
 
 type DiscordGuildsStore = {
   guilds: DiscordGuild[];

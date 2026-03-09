@@ -299,6 +299,30 @@ export const DiscordApiService = {
   },
 
   /**
+   * Bulk acknowledge multiple channels at once.
+   */
+  async ackBulk(readStates: { channel_id: string; message_id: string; read_state_type: number }[]) {
+    const { data } = await discordApi.post(
+      `/read-states/ack-bulk`,
+      { read_states: readStates },
+      { _silent: true } as any
+    );
+    return data;
+  },
+
+  /**
+   * Update user guild settings (mute, notifications, etc.)
+   */
+  async updateUserGuildSettings(guildId: string, settings: Record<string, any>) {
+    const { data } = await discordApi.patch(
+      `/users/@me/guilds/settings`,
+      { guilds: { [guildId]: settings } },
+      { _silent: true } as any
+    );
+    return data;
+  },
+
+  /**
    * Search messages in a guild.
    */
   async searchGuildMessages(guildId: string, content: string, offset = 0) {

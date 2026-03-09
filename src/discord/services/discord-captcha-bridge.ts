@@ -1,16 +1,6 @@
-export type CaptchaChallenge = {
-  captcha_sitekey: string;
-  captcha_service: string;
-  captcha_rqdata?: string;
-  captcha_rqtoken?: string;
-  captcha_session_id?: string;
-};
+import type { CaptchaChallenge, CaptchaSolution } from '../types';
 
-export type CaptchaSolution = {
-  captcha_key: string;
-  captcha_rqtoken?: string;
-  captcha_session_id?: string;
-};
+export type { CaptchaChallenge, CaptchaSolution } from '../types';
 
 type CaptchaRequestListener = (
   challenge: CaptchaChallenge,

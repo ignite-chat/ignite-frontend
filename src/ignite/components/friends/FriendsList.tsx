@@ -21,8 +21,33 @@ import type { Friend } from '@/ignite/store/friends.store';
 import type { DiscordUser } from '@/discord/store/discord-users.store';
 import { DiscordService } from '@/discord/services/discord.service';
 import { useDiscordChannelsStore } from '@/discord/store/discord-channels.store';
+import { useDiscordRelationshipsStore } from '@/discord/store/discord-relationships.store';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useDiscordActivitiesStore, ActivityType } from '@/discord/store/discord-activities.store';
+
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const seconds = Math.floor((now - then) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(months / 12);
+  return `${years}y ago`;
+}
+
+function formatExactDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleString(undefined, {
+    month: 'long', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+}
 
 function getDiscordStatusText(activities: any[] | undefined): string | null {
   if (!activities || activities.length === 0) return null;
@@ -132,9 +157,13 @@ const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
   const navigate = useNavigate();
   const channels = useDiscordChannelsStore((s) => s.channels);
   const storeActivities = useDiscordActivitiesStore((s) => s.activities[user.id]);
+  const relationship = useDiscordRelationshipsStore((s) => s.relationships.find((r) => r.id === user.id));
   const status = user.status || 'offline';
   const avatarUrl = DiscordService.getUserAvatarUrl(user.id, user.avatar, 64);
   const activities = storeActivities || user.activities;
+
+  const friendsSinceAgo = relationship?.since ? timeAgo(relationship.since) : null;
+  const friendsSinceExact = relationship?.since ? formatExactDate(relationship.since) : null;
 
   const statusColors: Record<string, string> = {
     online: 'bg-green-500',
@@ -182,17 +211,27 @@ const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
             </Tooltip>
           </div>
           <div className="truncate text-xs text-gray-400">
-            {status === 'offline'
-              ? 'Offline'
-              : (() => {
-                  const text = getDiscordStatusText(activities);
-                  if (!text) return 'Online';
-                  return text.split(/(\*\*.*?\*\*)/).map((part, i) =>
-                    part.startsWith('**') && part.endsWith('**')
-                      ? <span key={i} className="font-semibold text-gray-300">{part.slice(2, -2)}</span>
-                      : part
-                  );
-                })()}
+            {(() => {
+              const activityText = status !== 'offline' ? getDiscordStatusText(activities) : null;
+              if (activityText) {
+                return activityText.split(/(\*\*.*?\*\*)/).map((part, i) =>
+                  part.startsWith('**') && part.endsWith('**')
+                    ? <span key={i} className="font-semibold text-gray-300">{part.slice(2, -2)}</span>
+                    : part
+                );
+              }
+              if (friendsSinceAgo) {
+                return (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-default">Friends since {friendsSinceAgo}</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{friendsSinceExact}</TooltipContent>
+                  </Tooltip>
+                );
+              }
+              return status === 'offline' ? 'Offline' : 'Online';
+            })()}
           </div>
         </div>
       </div>
@@ -255,6 +294,11 @@ const FriendsList = ({ friends, discordFriends, filter, searchQuery }: FriendsLi
       <div className="mb-4 text-[10px] font-semibold uppercase text-gray-400">
         {filter} — {merged.length}
       </div>
+      {merged.length === 0 && searchQuery.trim() && (
+        <div className="flex h-64 items-center justify-center">
+          <p className="text-sm text-gray-500">No one with that name can be found.</p>
+        </div>
+      )}
       {merged.map((item) =>
         item.source === 'ignite' ? (
           <FriendRow key={item.data.id} friend={item.data} />

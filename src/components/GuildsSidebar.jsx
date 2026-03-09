@@ -28,6 +28,7 @@ import {
 } from '@/ignite/utils/unreads.utils';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import GuildContextMenu from '@/ignite/components/context-menus/GuildContextMenu';
+import DiscordGuildContextMenu from '@/discord/components/context-menus/DiscordGuildContextMenu';
 import InviteModal from '@/ignite/components/modals/InviteModal';
 import { useModalStore } from '@/ignite/store/modal.store';
 import {
@@ -179,16 +180,21 @@ const DiscordGuildIcon = ({ guild, isActive }) => {
   }, [channels, guild.id, readStates, joinedAtMs]);
 
   return (
-    <Link to={`/discord/${guild.id}${lastChannelId ? `/${lastChannelId}` : ''}`} draggable="false">
-      <SidebarIcon
-        iconUrl={iconUrl || ''}
-        text={guild.properties.name || guild.id}
-        isServerIcon={true}
-        isActive={isActive}
-        isUnread={unread}
-        mentionCount={mentions}
-      />
-    </Link>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <Link to={`/discord/${guild.id}${lastChannelId ? `/${lastChannelId}` : ''}`} draggable="false">
+          <SidebarIcon
+            iconUrl={iconUrl || ''}
+            text={guild.properties.name || guild.id}
+            isServerIcon={true}
+            isActive={isActive}
+            isUnread={unread}
+            mentionCount={mentions}
+          />
+        </Link>
+      </ContextMenuTrigger>
+      <DiscordGuildContextMenu guild={guild} />
+    </ContextMenu>
   );
 };
 

@@ -1,17 +1,5 @@
 import { ADMINISTRATOR } from '../constants/permissions';
-
-type PermissionOverwrite = {
-  id: string;
-  type: number; // 0 = role, 1 = member
-  allow: string;
-  deny: string;
-};
-
-type Role = {
-  id: string;
-  permissions: string;
-  [key: string]: any;
-};
+import type { PermissionOverwrite, Role } from '../types';
 
 type Channel = {
   id: string;

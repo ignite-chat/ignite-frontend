@@ -11,6 +11,7 @@ import { useDiscordActivitiesStore } from '../store/discord-activities.store';
 import { useDiscordTypingStore } from '../store/discord-typing.store';
 import { useDiscordThreadsStore } from '../store/discord-threads.store';
 import { useDiscordVoiceStatesStore } from '../store/discord-voice-states.store';
+import { useDiscordGuildSettingsStore } from '../store/discord-guild-settings.store';
 
 /** Sync activities to the dedicated store from a list of presences */
 function syncActivities(presences: { user_id: string; activities?: any[] }[]) {
@@ -63,7 +64,7 @@ const IDENTIFY_PROPERTIES = {
 
 const CAPABILITIES = 1734653;
 
-type GatewayEventHandler = (data: any) => void;
+import type { GatewayEventHandler } from '../types';
 
 export const DiscordGatewayService = {
   ws: null as WebSocket | null,
@@ -540,6 +541,9 @@ export const DiscordGatewayService = {
       case 'PASSIVE_UPDATE_V2':
         this._handlePassiveUpdateV2(data);
         break;
+      case 'USER_GUILD_SETTINGS_UPDATE':
+        this._handleUserGuildSettingsUpdate(data);
+        break;
       default:
         console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         // Forward unhandled events to the external handler if set
@@ -559,6 +563,8 @@ export const DiscordGatewayService = {
 
     console.log(`[Discord Gateway] READY as ${user.username}#${user.discriminator} (${user.id})`);
     console.log(`[Discord Gateway] ${guilds.length} guilds, ${private_channels?.length || 0} DMs, ${users?.length || 0} users`);
+
+    console.log('[Discord Gateway] READY received', data);
 
     useDiscordStore.getState().setUser(user);
     useDiscordStore.getState().setSessionId(session_id);
@@ -618,6 +624,13 @@ export const DiscordGatewayService = {
     // Store read states
     if (read_state?.entries?.length > 0) {
       useDiscordReadStatesStore.getState().setReadStates(read_state.entries);
+    }
+
+    // Store user guild settings (mute, notification preferences, etc.)
+    // READY sends { entries: [...] } or a flat array depending on gateway version
+    const guildSettingsEntries = data.user_guild_settings?.entries ?? data.user_guild_settings;
+    if (Array.isArray(guildSettingsEntries) && guildSettingsEntries.length > 0) {
+      useDiscordGuildSettingsStore.getState().setAllSettings(guildSettingsEntries);
     }
 
     // Store private channels (DMs and group DMs)
@@ -877,6 +890,15 @@ export const DiscordGatewayService = {
   _handleMessageAck(data: any) {
     if (data.channel_id && data.message_id) {
       useDiscordReadStatesStore.getState().ackChannel(data.channel_id, data.message_id);
+    }
+  },
+
+  _handleUserGuildSettingsUpdate(data: any) {
+    // The event can send a single settings object or { entries: [...] }
+    if (data.entries && Array.isArray(data.entries)) {
+      useDiscordGuildSettingsStore.getState().setAllSettings(data.entries);
+    } else if (data.guild_id) {
+      useDiscordGuildSettingsStore.getState().updateGuildSettings(data.guild_id, data);
     }
   },
 

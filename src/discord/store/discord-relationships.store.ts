@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { DiscordRelationship } from '../types';
 
 // Discord relationship types
 export const RelationshipType = {
@@ -8,12 +9,7 @@ export const RelationshipType = {
   OUTGOING_REQUEST: 4,
 } as const;
 
-export type DiscordRelationship = {
-  id: string; // user ID
-  type: number;
-  nickname: string | null;
-  since?: string | null;
-};
+export type { DiscordRelationship } from '../types';
 
 type DiscordRelationshipsStore = {
   relationships: DiscordRelationship[];

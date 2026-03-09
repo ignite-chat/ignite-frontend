@@ -1,13 +1,5 @@
 import { create } from 'zustand';
-
-type DiscordUser = {
-  id: string;
-  username: string;
-  discriminator: string;
-  global_name: string | null;
-  avatar: string | null;
-  [key: string]: any;
-};
+import type { DiscordUser } from '../types';
 
 type DiscordStore = {
   token: string | null;

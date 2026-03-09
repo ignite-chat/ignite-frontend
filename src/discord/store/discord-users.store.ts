@@ -1,31 +1,7 @@
 import { create } from 'zustand';
+import type { DiscordUser, Presence } from '../types';
 
-export type DiscordUser = {
-  id: string;
-  username: string;
-  discriminator: string;
-  global_name: string | null;
-  display_name?: string | null;
-  avatar: string | null;
-  avatar_decoration_data?: {
-    sku_id: string;
-    expires_at: string | null;
-    asset: string;
-  } | null;
-  bot?: boolean;
-  public_flags?: number;
-  status?: 'online' | 'idle' | 'dnd' | 'offline';
-  activities?: any[];
-  client_status?: { desktop?: string; mobile?: string; web?: string };
-  [key: string]: any;
-};
-
-type Presence = {
-  user_id: string;
-  status: 'online' | 'idle' | 'dnd' | 'offline';
-  activities?: any[];
-  client_status?: { desktop?: string; mobile?: string; web?: string };
-};
+export type { DiscordUser } from '../types';
 
 type DiscordUsersStore = {
   users: { [userId: string]: DiscordUser };

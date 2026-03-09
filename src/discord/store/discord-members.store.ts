@@ -1,25 +1,7 @@
 import { create } from 'zustand';
+import type { DiscordMember } from '../types';
 
-export type DiscordMember = {
-  user?: {
-    id: string;
-    username: string;
-    discriminator: string;
-    global_name: string | null;
-    avatar: string | null;
-    [key: string]: any;
-  };
-  user_id?: string;
-  nick?: string | null;
-  roles: string[];
-  joined_at?: string;
-  presence?: {
-    status: string;
-    activities?: any[];
-    client_status?: any;
-  };
-  [key: string]: any;
-};
+export type { DiscordMember } from '../types';
 
 type DiscordMembersStore = {
   /** members[guildId][userId] = DiscordMember */

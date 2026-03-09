@@ -1,45 +1,5 @@
 import { create } from 'zustand';
-
-type DiscordMessage = {
-  id: string;
-  channel_id: string;
-  author: {
-    id: string;
-    username: string;
-    discriminator: string;
-    global_name: string | null;
-    avatar: string | null;
-  };
-  content: string;
-  timestamp: string;
-  edited_timestamp: string | null;
-  attachments: any[];
-  embeds: any[];
-  mentions: any[];
-  referenced_message?: any;
-  [key: string]: any;
-};
-
-type DiscordChannel = {
-  id: string;
-  type: number;
-  guild_id?: string;
-  name?: string;
-  position?: number;
-  parent_id?: string | null;
-  topic?: string | null;
-  last_message_id?: string | null;
-  [key: string]: any;
-};
-
-type PendingMessage = {
-  nonce: string;
-  channel_id: string;
-  content: string;
-  author: DiscordMessage['author'];
-  timestamp: string;
-  type: number;
-};
+import type { DiscordMessage, PendingMessage, DiscordChannel } from '../types';
 
 type DiscordChannelsStore = {
   channels: DiscordChannel[];
