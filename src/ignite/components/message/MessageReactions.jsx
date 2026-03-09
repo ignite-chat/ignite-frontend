@@ -43,12 +43,13 @@ const MessageReactions = ({ message, channelId }) => {
           )}
         >
           {reaction.emoji.startsWith('http') ? (
-            <img src={reaction.emoji} className="size-4 object-contain" alt="reaction" />
+            <img src={reaction.emoji} className="size-4 object-contain" alt="reaction" draggable="false" />
           ) : (
             <img
               src={getTwemojiUrl(reaction.emoji)}
               className="size-4 object-contain"
               alt={reaction.emoji}
+              draggable="false"
             />
           )}
           <span className="text-xs font-medium text-gray-300">{reaction.count}</span>

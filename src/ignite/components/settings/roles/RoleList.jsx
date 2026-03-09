@@ -82,8 +82,6 @@ const RoleList = ({
             ))
           )}
 
-          <Separator className="my-1" />
-
           {/* @everyone entry — always last, not draggable */}
           <div className="group flex items-center gap-1">
             <div className="w-[22px]" />

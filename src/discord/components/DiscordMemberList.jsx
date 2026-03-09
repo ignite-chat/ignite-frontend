@@ -156,7 +156,7 @@ const DiscordMemberList = ({ guildId }) => {
               <button
                 type="button"
                 key={`group-${group.id}-${index}`}
-                className="mb-0.5 mt-4 flex w-full items-center gap-0.5 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400 first:mt-0 hover:text-gray-300"
+                className="mb-0.5 mt-4 flex w-full items-center gap-0.5 px-1 text-xs font-semibold tracking-wide text-gray-400 first:mt-0 hover:text-gray-300"
                 onClick={() => setCollapsedGroups((prev) => ({ ...prev, [group.id]: !prev[group.id] }))}
               >
                 <svg
