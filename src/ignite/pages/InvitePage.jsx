@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field, FieldLabel, FieldError } from '@/components/ui/field';
+import GuildIcon from '@/ignite/components/GuildIcon';
 
 const InvitePage = () => {
   const { code } = useParams();
@@ -181,10 +182,6 @@ const InvitePage = () => {
     );
   }
 
-  const guildIconUrl = invite?.guild.icon_file_id
-    ? `${import.meta.env.VITE_CDN_BASE_URL}/icons/${invite.guild.icon_file_id}`
-    : null;
-
   // Success state - show invite preview
   return (
     <GuestLayout>
@@ -194,17 +191,7 @@ const InvitePage = () => {
             <div className="flex flex-col items-center gap-6">
               {/* Guild Icon */}
               <div className="relative">
-                {guildIconUrl ? (
-                  <img
-                    src={guildIconUrl}
-                    alt={invite.guild.name}
-                    className="size-24 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex size-24 items-center justify-center rounded-full bg-primary/10 text-3xl font-bold text-primary">
-                    {invite.guild.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                <GuildIcon guild={invite.guild} size={24} />
                 <CheckCircle
                   className="absolute -bottom-1 -right-1 size-8 rounded-full bg-background text-green-500"
                   weight="fill"

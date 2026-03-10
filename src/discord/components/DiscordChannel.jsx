@@ -1,18 +1,40 @@
 import { useMemo, useCallback, useState } from 'react';
 import { useDiscordStore } from '../store/discord.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
+import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { DiscordService } from '../services/discord.service';
 import { GUILD_FORUM, DM, GROUP_DM } from '../constants/channel-types';
 import DiscordChannelMessages from './DiscordChannelMessages';
 import DiscordChannelInput from './DiscordChannelInput';
+import DiscordChannelHeader from './DiscordChannelHeader';
+import DiscordMemberList from './DiscordMemberList';
+import DiscordSearchPanel from './DiscordSearchPanel';
 import DiscordForumView from './DiscordForumView';
 
 const DiscordChannel = ({ channel }) => {
   const currentUser = useDiscordStore((s) => s.user);
   const usersMap = useDiscordUsersStore((s) => s.users);
+  const guilds = useDiscordGuildsStore((s) => s.guilds);
 
   const isForum = channel?.type === GUILD_FORUM;
   const isDM = channel?.type === DM || channel?.type === GROUP_DM;
+  const guildId = channel?.guild_id;
+  const guild = useMemo(() => guilds.find((g) => g.id === guildId), [guilds, guildId]);
+  const guildName = guild?.properties?.name || guild?.name;
+
+  const [memberListOpen, setMemberListOpen] = useState(true);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const toggleMemberList = useCallback(() => setMemberListOpen((v) => !v), []);
+  const handleSearch = useCallback((query) => {
+    setSearchQuery(query);
+    setSearchOpen(true);
+  }, []);
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setSearchQuery('');
+  }, []);
 
   const dmInfo = useMemo(() => {
     if (!isDM || !channel) return null;
@@ -49,11 +71,32 @@ const DiscordChannel = ({ channel }) => {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Messages */}
-      <DiscordChannelMessages channel={channel} messageSentCount={messageSentCount} />
+      <DiscordChannelHeader
+        channel={channel}
+        displayName={displayName}
+        isDM={isDM}
+        dmInfo={isDM ? { properties: dmInfo } : undefined}
+        guildName={guildName}
+        memberListOpen={memberListOpen}
+        onToggleMemberList={!isDM ? toggleMemberList : undefined}
+        searchOpen={searchOpen}
+        onSearch={!isDM ? handleSearch : undefined}
+      />
 
-      {/* Input */}
-      <DiscordChannelInput channel={channel} channelName={placeholderName} onMessageSent={onMessageSent} />
+      <div className="flex min-w-0 flex-1 overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Messages */}
+          <DiscordChannelMessages channel={channel} messageSentCount={messageSentCount} />
+
+          {/* Input */}
+          <DiscordChannelInput channel={channel} channelName={placeholderName} onMessageSent={onMessageSent} />
+        </div>
+
+        {guildId && memberListOpen && !searchOpen && !isDM && <DiscordMemberList guildId={guildId} />}
+        {guildId && searchOpen && !isDM && (
+          <DiscordSearchPanel key={searchQuery} guildId={guildId} initialQuery={searchQuery} onClose={closeSearch} />
+        )}
+      </div>
     </div>
   );
 };

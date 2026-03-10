@@ -20,6 +20,11 @@ if (window.opener === null) {
         setBadgeCount: (count) => ipcRenderer.invoke('badge:set', count),
         showNotification: (opts) => ipcRenderer.invoke('notification:show', opts),
         getDiscordLocalTokens: () => ipcRenderer.invoke('discord:getLocalTokens'),
+        onWindowOpen: (callback) => {
+            const handler = (_event, url) => callback(url);
+            ipcRenderer.on('window-open', handler);
+            return () => ipcRenderer.removeListener('window-open', handler);
+        },
     };
     contextBridge.exposeInMainWorld('IgniteNative', IgniteNative);
 }

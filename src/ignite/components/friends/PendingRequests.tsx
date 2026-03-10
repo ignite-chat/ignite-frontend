@@ -29,7 +29,9 @@ function formatExactDate(dateStr: string): string {
 }
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import UserProfileModal from '@/ignite/components/modals/UserProfileModal';
+import DiscordUserProfileModal from '@/discord/components/DiscordUserProfileModal';
 import { useModalStore } from '@/ignite/store/modal.store';
+import { useModalStore as useSharedModalStore } from '@/store/modal.store';
 import { FriendsService } from '@/ignite/services/friends.service';
 import { useUsersStore } from '@/ignite/store/users.store';
 import type { FriendRequest } from '@/ignite/store/friends.store';
@@ -114,9 +116,10 @@ const PendingRequestRow = ({ request, currentUser, onClickUser }: PendingRequest
 type DiscordPendingRowProps = {
   user: DiscordUser;
   isOutgoing: boolean;
+  onClickUser: (user: DiscordUser) => void;
 };
 
-const DiscordPendingRow = ({ user, isOutgoing }: DiscordPendingRowProps) => {
+const DiscordPendingRow = ({ user, isOutgoing, onClickUser }: DiscordPendingRowProps) => {
   const avatarUrl = DiscordService.getUserAvatarUrl(user.id, user.avatar, 64);
   const relationship = useDiscordRelationshipsStore((s) => s.relationships.find((r) => r.id === user.id));
   const sentAgo = relationship?.since ? timeAgo(relationship.since) : null;
@@ -145,7 +148,7 @@ const DiscordPendingRow = ({ user, isOutgoing }: DiscordPendingRowProps) => {
   };
 
   return (
-    <div className="border-white/5/30 group flex cursor-pointer items-center justify-between border-t px-2 py-3 hover:rounded-lg hover:bg-gray-600/30">
+    <div onClick={() => onClickUser(user)} className="border-white/5/30 group flex cursor-pointer items-center justify-between border-t px-2 py-3 hover:rounded-lg hover:bg-gray-600/30">
       <div className="flex items-center gap-3">
         <img
           src={avatarUrl}
@@ -227,6 +230,10 @@ const PendingRequests = ({ requests, currentUser, discordRequests, searchQuery }
     useModalStore.getState().push(UserProfileModal, { userId });
   };
 
+  const openDiscordProfile = (user: DiscordUser) => {
+    useSharedModalStore.getState().push(DiscordUserProfileModal, { author: user });
+  };
+
   const { incoming, outgoing } = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const items: MergedPending[] = [
@@ -271,6 +278,7 @@ const PendingRequests = ({ requests, currentUser, discordRequests, searchQuery }
         key={`discord-${item.data.user.id}`}
         user={item.data.user}
         isOutgoing={item.data.isOutgoing}
+        onClickUser={openDiscordProfile}
       />
     );
 

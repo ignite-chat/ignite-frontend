@@ -8,6 +8,7 @@ export type VoiceState = {
   mute: boolean;
   deaf: boolean;
   self_video: boolean;
+  self_stream?: boolean;
   suppress: boolean;
   member?: any;
 };

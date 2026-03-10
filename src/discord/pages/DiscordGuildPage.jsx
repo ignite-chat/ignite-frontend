@@ -102,7 +102,7 @@ const DiscordGuildPage = () => {
   const pageTitle = activeChannel ? `#${activeChannel.name} | ${guildName}` : guildName;
 
   return (
-    <DiscordGuildLayout guild={guild} channel={activeChannel}>
+    <DiscordGuildLayout guild={guild}>
       <PageTitle title={pageTitle} />
       {activeChannel ? (
         <DiscordChannel channel={activeChannel} />

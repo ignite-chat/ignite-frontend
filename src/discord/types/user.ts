@@ -14,7 +14,7 @@ export type DiscordUser = {
   public_flags?: number;
   status?: 'online' | 'idle' | 'dnd' | 'offline';
   activities?: any[];
-  client_status?: { desktop?: string; mobile?: string; web?: string };
+  client_status?: { desktop?: string; mobile?: string; web?: string; embedded?: string };
   [key: string]: any;
 };
 
@@ -22,7 +22,7 @@ export type Presence = {
   user_id: string;
   status: 'online' | 'idle' | 'dnd' | 'offline';
   activities?: any[];
-  client_status?: { desktop?: string; mobile?: string; web?: string };
+  client_status?: { desktop?: string; mobile?: string; web?: string; embedded?: string };
 };
 
 export type ScannedUser = {

@@ -5,13 +5,7 @@ import { useDiscordUsersStore } from '../store/discord-users.store';
 import { DiscordService } from '../services/discord.service';
 import DiscordUserProfileModal from './DiscordUserProfileModal';
 import { useModalStore } from '@/store/modal.store';
-
-const statusColors = {
-  online: 'bg-green-500',
-  idle: 'bg-yellow-500',
-  dnd: 'bg-red-500',
-  offline: 'bg-gray-500',
-};
+import DiscordStatusIndicator from './DiscordStatusIndicator';
 
 const RELEVANT_TYPES = new Set([
   ActivityType.PLAYING,
@@ -111,7 +105,7 @@ const ActiveUserCard = ({ userId, activities }) => {
       <div className="flex items-center gap-2.5">
         <div className="relative shrink-0">
           <img src={avatarUrl} alt="" className="size-8 rounded-full object-cover" />
-          <div className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#111214] ${statusColors[status] || statusColors.offline}`} />
+          <DiscordStatusIndicator status={status} clientStatus={user.client_status} size="xs" borderColor="#111214" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-white">

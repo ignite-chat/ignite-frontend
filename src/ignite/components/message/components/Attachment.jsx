@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { DownloadSimple, FileText } from '@phosphor-icons/react';
-import ImageLightbox from './ImageLightbox';
+import { openAttachmentViewModal } from '@/components/modals/AttachmentViewModal';
 
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'apng', 'avif'];
 
@@ -16,34 +15,40 @@ const formatFileSize = (bytes) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const ImageAttachment = ({ attachment, author, timestamp }) => {
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setLightboxOpen(true)}
-        className="block max-w-[400px] cursor-pointer"
-      >
-        <img
-          src={attachment.url}
-          alt={attachment.filename}
-          className="max-h-[300px] rounded object-contain"
-          decoding="async"
-        />
-      </button>
-      <ImageLightbox
-        src={attachment.url}
-        alt={attachment.filename}
-        open={lightboxOpen}
-        onOpenChange={setLightboxOpen}
-        author={author}
-        timestamp={timestamp}
-      />
-    </>
-  );
+const openFromThumbnail = (e, url) => {
+  const img = e.currentTarget.querySelector('img');
+  if (img?.complete && img.naturalWidth > 0) {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    canvas.toBlob((blob) => {
+      if (blob) {
+        openAttachmentViewModal(url, URL.createObjectURL(blob));
+      } else {
+        openAttachmentViewModal(url);
+      }
+    });
+  } else {
+    openAttachmentViewModal(url);
+  }
 };
+
+const ImageAttachment = ({ attachment }) => (
+  <button
+    type="button"
+    onClick={(e) => openFromThumbnail(e, attachment.url)}
+    className="block max-w-[400px] cursor-pointer"
+  >
+    <img
+      src={attachment.url}
+      alt={attachment.filename}
+      className="max-h-[300px] rounded object-contain"
+      crossOrigin="anonymous"
+      decoding="async"
+    />
+  </button>
+);
 
 const FileAttachment = ({ attachment }) => (
   <a

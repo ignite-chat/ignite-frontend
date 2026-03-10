@@ -1,6 +1,17 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { At, ChatsTeardrop, Hash, MagnifyingGlass, Users } from '@phosphor-icons/react';
 import { GUILD_FORUM } from '../constants/channel-types';
+import { parseMarkdown } from '@/components/message/markdown/parser';
+import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
+
+const TopicRenderer = ({ topic, guildId }) => {
+  const ast = useMemo(() => parseMarkdown(topic), [topic]);
+  return (
+    <span className="min-w-0 truncate text-sm text-gray-400 [&_a]:text-blue-400 [&_a]:hover:underline">
+      <DiscordMarkdownRenderer nodes={ast} guildId={guildId} />
+    </span>
+  );
+};
 
 const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, guildName, memberListOpen, onToggleMemberList, searchOpen, onSearch }) => {
   const isForum = channel?.type === GUILD_FORUM;
@@ -38,7 +49,7 @@ const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, guildName, m
       {channel?.topic && (
         <>
           <div className="mx-2 h-6 w-px shrink-0 bg-white/10" />
-          <span className="min-w-0 truncate text-sm text-gray-400">{channel.topic}</span>
+          <TopicRenderer topic={channel.topic} guildId={channel.guild_id} />
         </>
       )}
 

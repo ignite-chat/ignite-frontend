@@ -73,12 +73,22 @@ const startCore = () => {
 
   // Rewrite Origin header for Discord requests so they appear to come from the Discord app
   mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
-    { urls: ['*://*.discord.com/*', '*://*.discord.gg/*', '*://*.discordapp.com/*'] },
+    { urls: [
+      '*://*.discord.com/*', '*://*.discord.gg/*', '*://*.discordapp.com/*',
+      'wss://*.discord.com/*', 'wss://*.discord.gg/*', 'wss://*.discordapp.com/*',
+    ] },
     (details, callback) => {
       details.requestHeaders['Origin'] = 'https://discord.com';
+      details.requestHeaders['Referer'] = 'https://discord.com/';
       callback({ requestHeaders: details.requestHeaders });
     }
   );
+
+  // Intercept window.open calls and send them to the renderer for in-app handling
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    mainWindow.webContents.send('window-open', url);
+    return { action: 'deny' };
+  });
 
   if (isDev) {
   //  mainWindow.webContents.openDevTools();

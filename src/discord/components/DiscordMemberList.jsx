@@ -8,13 +8,7 @@ import { useDiscordMembersStore } from '../store/discord-members.store';
 import { DiscordService } from '../services/discord.service';
 import DiscordUserPopoverContent from './popovers/DiscordUserPopoverContent';
 import OwnerCrown from '@/components/OwnerCrown';
-
-const statusColors = {
-  online: 'bg-green-500',
-  idle: 'bg-yellow-500',
-  dnd: 'bg-red-500',
-  offline: 'bg-gray-500',
-};
+import DiscordStatusIndicator from './DiscordStatusIndicator';
 
 const MemberItem = ({ member: rawMember, guildId, ownerId, popoverOpen, setPopoverOpen }) => {
   // Resolve the user ID from whatever shape the SYNC item has
@@ -59,7 +53,7 @@ const MemberItem = ({ member: rawMember, guildId, ownerId, popoverOpen, setPopov
               alt=""
               className="size-8 rounded-full object-cover"
             />
-            <div className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#1a1a1e] ${statusColors[status] || statusColors.offline}`} />
+            <DiscordStatusIndicator status={status} clientStatus={storeUser?.client_status} size="xs" borderColor="#1a1a1e" />
           </div>
           <div className="flex min-w-0 flex-1 items-center gap-1">
             <span

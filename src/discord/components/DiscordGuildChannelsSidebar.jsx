@@ -20,6 +20,8 @@ import DiscordUserProfileModal from './DiscordUserProfileModal';
 import DiscordUserContextMenu from './context-menus/DiscordUserContextMenu';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { openAttachmentViewModal } from '@/components/modals/AttachmentViewModal';
 import AvatarStack from '@/components/ui/avatar-stack';
 import TypingDots from '@/components/ui/typing-dots';
 
@@ -64,6 +66,132 @@ const VoiceStatusIcon = ({ icon: Icon, color, label }) => (
   </Tooltip>
 );
 
+const VoiceMemberRow = ({ vs, guildId, channelId, user, memberData, displayName, avatarUrl, openProfile }) => {
+  const [hovered, setHovered] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const intervalRef = useRef(null);
+  const hoverTimerRef = useRef(null);
+
+  const fetchPreview = useCallback(() => {
+    const streamKey = encodeURIComponent(`guild:${guildId}:${channelId}:${vs.user_id}`);
+    const url = `https://discord.com/api/v9/streams/${streamKey}/preview?version=${Date.now()}`;
+    const token = useDiscordStore.getState().token;
+
+    setLoading(true);
+    fetch(url, { headers: { Authorization: token } })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+        return res.json();
+      })
+      .then((data) => {
+        if (data?.url) setPreviewUrl(data.url);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [guildId, channelId, vs.user_id]);
+
+  const leaveTimerRef = useRef(null);
+
+  const enterHover = () => {
+    clearTimeout(leaveTimerRef.current);
+    if (!vs.self_stream || hovered) return;
+    hoverTimerRef.current = setTimeout(() => {
+      setHovered(true);
+      fetchPreview();
+      intervalRef.current = setInterval(fetchPreview, 5000);
+    }, 300);
+  };
+
+  const leaveHover = () => {
+    clearTimeout(hoverTimerRef.current);
+    leaveTimerRef.current = setTimeout(() => {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      setHovered(false);
+    }, 100);
+  };
+
+  const handlePopoverEnter = () => {
+    clearTimeout(leaveTimerRef.current);
+  };
+
+  const handlePopoverLeave = () => {
+    leaveHover();
+  };
+
+  useEffect(() => () => {
+    clearTimeout(hoverTimerRef.current);
+    clearTimeout(leaveTimerRef.current);
+    clearInterval(intervalRef.current);
+  }, []);
+
+  return (
+    <Popover open={vs.self_stream && hovered}>
+      <ContextMenu>
+        <PopoverTrigger asChild>
+          <ContextMenuTrigger asChild>
+            <div
+              onClick={openProfile}
+              onMouseEnter={enterHover}
+              onMouseLeave={leaveHover}
+              className="flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-gray-500 outline-none hover:bg-white/5 hover:text-white"
+            >
+              <img src={avatarUrl} alt="" className="size-6 rounded-full" />
+              <span className="flex-1 truncate text-[13px]">{displayName}</span>
+              <span className="flex items-center gap-0.5">
+                {vs.self_stream && (
+                  <span className="rounded bg-[#ed4245] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                    LIVE
+                  </span>
+                )}
+                {vs.self_video && <VoiceStatusIcon icon={VideoCamera} color="text-gray-500" label="Video" />}
+                {vs.suppress && <VoiceStatusIcon icon={MicrophoneSlash} color="text-red-500" label="Suppressed" />}
+                {vs.self_mute && !vs.mute && <VoiceStatusIcon icon={MicrophoneSlash} color="text-gray-500" label="Muted" />}
+                {vs.mute && <VoiceStatusIcon icon={MicrophoneSlash} color="text-red-500" label="Server Muted" />}
+                {vs.self_deaf && !vs.deaf && <VoiceStatusIcon icon={SpeakerSlash} color="text-gray-500" label="Deafened" />}
+                {vs.deaf && <VoiceStatusIcon icon={SpeakerSlash} color="text-red-500" label="Server Deafened" />}
+              </span>
+            </div>
+          </ContextMenuTrigger>
+        </PopoverTrigger>
+        <ContextMenuContent className="w-48">
+          <DiscordUserContextMenu
+            author={user || { id: vs.user_id, username: displayName }}
+            guildId={guildId}
+            onViewProfile={openProfile}
+          />
+        </ContextMenuContent>
+      </ContextMenu>
+      {vs.self_stream && (
+        <PopoverContent
+          side="right"
+          align="start"
+          alignOffset={-10}
+          className="w-auto overflow-hidden rounded-lg border-none bg-[#111214] p-0 shadow-xl"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onMouseEnter={handlePopoverEnter}
+          onMouseLeave={handlePopoverLeave}
+        >
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt="Stream preview"
+              className="block h-auto w-[280px] cursor-pointer rounded-lg"
+              draggable={false}
+              onClick={() => openAttachmentViewModal(previewUrl)}
+            />
+          ) : (
+            <div className="flex h-[160px] w-[280px] items-center justify-center text-xs text-gray-500">
+              {loading ? 'Loading preview...' : 'No preview available'}
+            </div>
+          )}
+        </PopoverContent>
+      )}
+    </Popover>
+  );
+};
+
 const VoiceChannelMembers = ({ guildId, channelId }) => {
   const guildVoiceStates = useDiscordVoiceStatesStore((s) => s.voiceStates[guildId] || {});
   const users = useDiscordUsersStore((s) => s.users);
@@ -103,34 +231,17 @@ const VoiceChannelMembers = ({ guildId, channelId }) => {
         };
 
         return (
-          <ContextMenu key={vs.user_id}>
-            <ContextMenuTrigger asChild>
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={openProfile}
-                className="flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-gray-500 hover:bg-white/5 hover:text-white"
-              >
-                <img src={avatarUrl} alt="" className="size-6 rounded-full" />
-                <span className="flex-1 truncate text-[13px]">{displayName}</span>
-                <span className="flex items-center gap-0.5">
-                  {vs.self_video && <VoiceStatusIcon icon={VideoCamera} color="text-gray-500" label="Video" />}
-                  {vs.suppress && <VoiceStatusIcon icon={MicrophoneSlash} color="text-red-500" label="Suppressed" />}
-                  {vs.self_mute && !vs.mute && <VoiceStatusIcon icon={MicrophoneSlash} color="text-gray-500" label="Muted" />}
-                  {vs.mute && <VoiceStatusIcon icon={MicrophoneSlash} color="text-red-500" label="Server Muted" />}
-                  {vs.self_deaf && !vs.deaf && <VoiceStatusIcon icon={SpeakerSlash} color="text-gray-500" label="Deafened" />}
-                  {vs.deaf && <VoiceStatusIcon icon={SpeakerSlash} color="text-red-500" label="Server Deafened" />}
-                </span>
-              </div>
-            </ContextMenuTrigger>
-            <ContextMenuContent className="w-48">
-              <DiscordUserContextMenu
-                author={user || { id: vs.user_id, username: displayName }}
-                guildId={guildId}
-                onViewProfile={openProfile}
-              />
-            </ContextMenuContent>
-          </ContextMenu>
+          <VoiceMemberRow
+            key={vs.user_id}
+            vs={vs}
+            guildId={guildId}
+            channelId={channelId}
+            user={user}
+            memberData={memberData}
+            displayName={displayName}
+            avatarUrl={avatarUrl}
+            openProfile={openProfile}
+          />
         );
       })}
     </div>
@@ -195,7 +306,7 @@ const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId }) =>
         type={channel.type}
         isRules={channel.id === rulesChannelId}
         isLocked={!canView || (isVoiceChannel && !canConnect)}
-        className={`size-5 shrink-0 ${!canView ? 'text-gray-600' : isActive ? 'text-gray-200' : isUnread ? 'text-white' : 'text-gray-500'}`}
+        className={`size-5 shrink-0 ${!canView ? 'text-gray-600' : isVoiceChannel && voiceUserCount > 0 ? 'text-[#57d163]' : isActive ? 'text-gray-200' : isUnread ? 'text-white' : 'text-gray-500'}`}
       />
       <p
         className={`ml-1 select-none truncate text-base ${showTyping ? '' : 'flex-1'} ${

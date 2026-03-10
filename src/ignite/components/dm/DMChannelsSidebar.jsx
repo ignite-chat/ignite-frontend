@@ -15,6 +15,7 @@ import { useDiscordReadStatesStore } from '@/discord/store/discord-readstates.st
 import { useDiscordRelationshipsStore, RelationshipType } from '@/discord/store/discord-relationships.store';
 import { DiscordService } from '@/discord/services/discord.service';
 import { DiscordApiService } from '@/discord/services/discord-api.service';
+import DiscordStatusIndicator from '@/discord/components/DiscordStatusIndicator';
 import DMChannelItem from './DMChannelItem';
 import DMRowBase from './DMRowBase';
 import NewDMModal from '@/ignite/components/modals/NewDMModal';
@@ -86,11 +87,11 @@ const DiscordDMChannelItem = ({ channel, isActive, currentUserId, usersMap, onCl
           </div>
         )}
         {!info.isGroup && info.user && (
-          <div
-            className={cn(
-              'absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full border-2 border-[#121214]',
-              { online: 'bg-green-500', idle: 'bg-yellow-500', dnd: 'bg-red-500' }[info.user.status] || 'bg-gray-500'
-            )}
+          <DiscordStatusIndicator
+            status={info.user.status}
+            clientStatus={info.user.client_status}
+            size="xs"
+            borderColor="#121214"
           />
         )}
       </div>

@@ -2,17 +2,18 @@ import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import { UserCircle, GameController, MusicNote, Broadcast, Eye, Trophy, Users, Globe } from '@phosphor-icons/react';
+import { UserCircle, GameController, MusicNote, Broadcast, Eye, Trophy, Users, Globe, Link as LinkIcon } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { useModalStore } from '@/store/modal.store';
 import { DiscordService } from '../services/discord.service';
-import { DiscordApiService } from '../services/discord-api.service';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useDiscordActivitiesStore, ActivityType } from '../store/discord-activities.store';
+import { useDiscordProfilesStore } from '../store/discord-profiles.store';
 import { parseMarkdown } from '@/components/message/markdown/parser';
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
+import DiscordStatusIndicator from './DiscordStatusIndicator';
 
 const DISCORD_EPOCH = 1420070400000;
 
@@ -24,13 +25,6 @@ const getCreatedAt = (userId) => {
 const getRoleColor = (color) => {
   if (!color || color === 0) return '#99aab5';
   return `#${color.toString(16).padStart(6, '0')}`;
-};
-
-const statusColors = {
-  online: 'bg-green-500',
-  idle: 'bg-yellow-500',
-  dnd: 'bg-red-500',
-  offline: 'bg-gray-500',
 };
 
 const RELEVANT_ACTIVITY_TYPES = new Set([
@@ -177,7 +171,8 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
   const guilds = useDiscordGuildsStore((s) => s.guilds);
   const storeUser = useDiscordUsersStore((s) => s.users[author?.id]);
   const storeMember = useDiscordMembersStore((s) => guildId && author?.id ? s.members[guildId]?.[author.id] : undefined);
-  const [profile, setProfile] = useState(null);
+  const profile = useDiscordProfilesStore((s) => author?.id ? s.getProfile(author.id, guildId) : undefined);
+  const fetchProfile = useDiscordProfilesStore((s) => s.fetchProfile);
   const [note, setNote] = useState('');
   const [rolesExpanded, setRolesExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('activity');
@@ -226,11 +221,8 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
 
   useEffect(() => {
     if (!author?.id) return;
-    setProfile(null);
-    DiscordApiService.getUserProfile(author.id, guildId)
-      .then(setProfile)
-      .catch(() => {});
-  }, [author?.id, guildId]);
+    fetchProfile(author.id, guildId);
+  }, [author?.id, guildId, fetchProfile]);
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(user.id);
@@ -259,17 +251,15 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
                   className="size-[94px] rounded-full object-cover select-none"
                   draggable="false"
                 />
-                {user.avatar_decoration_data?.asset && (
+                {/* {user.avatar_decoration_data?.asset && (
                   <img
                     src={`https://cdn.discordapp.com/avatar-decoration-presets/${user.avatar_decoration_data.asset}.png?size=96`}
                     alt=""
                     className="pointer-events-none absolute inset-0 size-[94px]"
                     draggable="false"
                   />
-                )}
-                <div
-                  className={`absolute -bottom-0.5 -right-0.5 size-6 rounded-full border-4 border-[#111214] ${statusColors[user.status] || statusColors.offline}`}
-                />
+                )} */}
+                <DiscordStatusIndicator status={user.status} clientStatus={user.client_status} size="lg" borderColor="#111214" />
               </div>
             </div>
 
@@ -414,6 +404,36 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
                       <div className="flex flex-col items-center justify-center py-6 text-gray-500">
                         <GameController size={32} weight="light" />
                         <span className="mt-2 text-sm">No current activity</span>
+                      </div>
+                    )}
+
+                    {profile?.connected_accounts?.length > 0 && (
+                      <div className="space-y-2">
+                        <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                          Connections
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {profile.connected_accounts.map((account) => (
+                            <div
+                              key={`${account.type}-${account.id}`}
+                              className="flex items-center gap-2 rounded-md bg-[#1a1a1e] px-3 py-2"
+                            >
+                              <img
+                                src={`https://cdn.discordapp.com/assets/connections/${account.type}/icon.png`}
+                                alt={account.type}
+                                className="size-5"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'flex';
+                                }}
+                              />
+                              <div className="hidden size-5 items-center justify-center text-gray-400">
+                                <LinkIcon size={14} />
+                              </div>
+                              <span className="text-sm font-medium text-gray-200">{account.name}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>

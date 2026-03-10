@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
+import GuildIcon from '../GuildIcon';
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
@@ -9,15 +10,7 @@ const GuildCard = ({ guild, isJoined, onJoin, className }) => {
   const [joining, setJoining] = useState(false);
   const navigate = useNavigate();
 
-  const iconUrl = guild.icon_file_id ? `${CDN_BASE}/icons/${guild.icon_file_id}` : null;
   const bannerUrl = guild.banner_file_id ? `${CDN_BASE}/banners/${guild.banner_file_id}` : null;
-
-  const initials = (guild.name || '')
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
 
   const handleJoin = async (e) => {
     e.stopPropagation();
@@ -47,17 +40,7 @@ const GuildCard = ({ guild, isJoined, onJoin, className }) => {
           <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
         )}
         <div className="absolute -bottom-8 left-4">
-          {iconUrl ? (
-            <img
-              src={iconUrl}
-              alt={guild.name}
-              className="size-16 rounded-2xl border-4 border-[#1a1a1d] object-cover transition-all group-hover:border-[#1e1e22]"
-            />
-          ) : (
-            <div className="flex size-16 items-center justify-center rounded-2xl border-4 border-[#1a1a1d] bg-[#2a2a2e] text-xl font-bold text-gray-300 transition-all group-hover:border-[#1e1e22]">
-              {initials || guild.name?.charAt(0)?.toUpperCase()}
-            </div>
-          )}
+          <GuildIcon guild={guild} size={16} className="!rounded-2xl border-4 border-[#1a1a1d] transition-all group-hover:border-[#1e1e22]" />
         </div>
       </div>
 

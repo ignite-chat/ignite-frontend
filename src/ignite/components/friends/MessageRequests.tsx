@@ -12,6 +12,7 @@ import { useDiscordStore } from '@/discord/store/discord.store';
 import { useDiscordGuildsStore } from '@/discord/store/discord-guilds.store';
 import { DiscordService } from '@/discord/services/discord.service';
 import { DiscordApiService } from '@/discord/services/discord-api.service';
+import { useDiscordProfilesStore } from '@/discord/store/discord-profiles.store';
 import type { DiscordChannel, DiscordUser } from '@/discord/types';
 import DiscordActivitiesPanel from '@/discord/components/DiscordActivitiesPanel';
 
@@ -41,25 +42,25 @@ type MessageRequestRowProps = {
 
 const MessageRequestRow = ({ channel, user }: MessageRequestRowProps) => {
   const discordGuilds = useDiscordGuildsStore((s) => s.guilds);
-  const [mutualGuilds, setMutualGuilds] = useState<{ id: string; name: string; icon: string | null }[]>([]);
+  const profile = useDiscordProfilesStore((s) => s.getProfile(user.id));
+  const fetchProfile = useDiscordProfilesStore((s) => s.fetchProfile);
 
   useEffect(() => {
-    let cancelled = false;
-    DiscordApiService.getUserProfile(user.id).then((profile) => {
-      if (cancelled) return;
-      const resolved = (profile.mutual_guilds || [])
-        .map((mg) => {
-          const guild = discordGuilds.find((g) => g.id === mg.id);
-          if (!guild) return null;
-          const name = guild.properties?.name || guild.name || 'Unknown Server';
-          const icon = guild.properties?.icon ?? guild.icon ?? null;
-          return { id: guild.id, name, icon };
-        })
-        .filter((g): g is { id: string; name: string; icon: string | null } => g !== null);
-      setMutualGuilds(resolved);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [user.id, discordGuilds]);
+    fetchProfile(user.id);
+  }, [user.id, fetchProfile]);
+
+  const mutualGuilds = useMemo(() => {
+    if (!profile?.mutual_guilds) return [];
+    return profile.mutual_guilds
+      .map((mg) => {
+        const guild = discordGuilds.find((g) => g.id === mg.id);
+        if (!guild) return null;
+        const name = guild.properties?.name || guild.name || 'Unknown Server';
+        const icon = guild.properties?.icon ?? guild.icon ?? null;
+        return { id: guild.id, name, icon };
+      })
+      .filter((g): g is { id: string; name: string; icon: string | null } => g !== null);
+  }, [profile, discordGuilds]);
 
   const avatarUrl = DiscordService.getUserAvatarUrl(user.id, user.avatar, 64);
   const sentAgo = channel.is_message_request_timestamp

@@ -15,6 +15,7 @@ interface Window {
     setBadgeCount: (count: number) => Promise<void>;
     showNotification: (opts: { title: string; body: string }) => Promise<void>;
     getDiscordLocalTokens: () => Promise<Array<{ source: string; token: string }>>;
+    onWindowOpen: (callback: (url: string) => void) => () => void;
   };
   Echo: any;
 }

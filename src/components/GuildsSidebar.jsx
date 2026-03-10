@@ -50,22 +50,27 @@ import { useDiscordReadStatesStore } from '../discord/store/discord-readstates.s
 import { DiscordService } from '../discord/services/discord.service';
 import { useDiscordRelationshipsStore, RelationshipType } from '../discord/store/discord-relationships.store';
 import { useDiscordUsersStore } from '../discord/store/discord-users.store';
+import { useDiscordVoiceStatesStore } from '../discord/store/discord-voice-states.store';
 import { useLastChannelStore } from '@/store/last-channel.store';
 import { ChannelType } from '@/ignite/constants/ChannelType';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-
-const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
+import { SpeakerSimpleHigh } from '@phosphor-icons/react';
+import GuildIcon from '@/ignite/components/GuildIcon';
 
 const SidebarIcon = ({
   icon = '',
   iconUrl = '',
+  guild = null,
   isActive = false,
   isServerIcon = false,
   isDm = false,
   text = 'tooltip',
   isUnread = false,
   mentionCount = 0,
-}) => (
+  tooltipContent = null,
+}) => {
+  const hasIcon = icon || iconUrl || guild?.icon_file_id;
+  return (
   <Tooltip>
     <TooltipTrigger asChild>
       <div className="group relative mb-2 min-w-min px-3">
@@ -78,10 +83,12 @@ const SidebarIcon = ({
 
         <div className="relative mx-auto h-12 w-12">
           <div
-            className={`absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden ${isDm ? 'rounded-full' : `transition-all duration-300 ease-out ${isActive ? 'rounded-xl' : 'rounded-2xl hover:rounded-xl'} ${isServerIcon ? (iconUrl ? 'bg-[#1d1d1e] text-gray-100' : isActive ? 'bg-primary text-white' : 'bg-[#1d1d1e] text-gray-100 hover:bg-primary hover:text-white') : 'bg-[#1d1d1e] text-green-500 hover:bg-green-500 hover:text-white'}`}`}
+            className={`absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden ${isDm ? 'rounded-full' : `transition-all duration-300 ease-out ${isActive ? 'rounded-xl' : 'rounded-2xl hover:rounded-xl'} ${isServerIcon ? (hasIcon ? 'bg-[#1d1d1e] text-gray-100' : isActive ? 'bg-primary text-white' : 'bg-[#1d1d1e] text-gray-100 hover:bg-primary hover:text-white') : 'bg-[#1d1d1e] text-green-500 hover:bg-green-500 hover:text-white'}`}`}
           >
             {icon ? (
               icon
+            ) : guild ? (
+              <GuildIcon guild={guild} size={12} className="!rounded-none !bg-transparent" />
             ) : iconUrl ? (
               <img src={iconUrl} alt={text} className="size-full object-cover" />
             ) : (
@@ -98,10 +105,11 @@ const SidebarIcon = ({
       </div>
     </TooltipTrigger>
     <TooltipContent side="right" className="font-bold">
-      {text}
+      {tooltipContent || text}
     </TooltipContent>
   </Tooltip>
-);
+  );
+};
 
 const SortableGuildIcon = ({ guild, isActive, isUnread, mentionCount, isDragging: globalDragging, onLeave, onInvite }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -117,8 +125,6 @@ const SortableGuildIcon = ({ guild, isActive, isUnread, mentionCount, isDragging
     zIndex: isDragging ? 0 : 'auto',
   };
 
-  const iconUrl = guild.icon_file_id ? `${CDN_BASE}/icons/${guild.icon_file_id}` : '';
-
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <ContextMenu>
@@ -129,7 +135,7 @@ const SortableGuildIcon = ({ guild, isActive, isUnread, mentionCount, isDragging
             style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
           >
             <SidebarIcon
-              iconUrl={iconUrl}
+              guild={guild}
               text={guild.name}
               isServerIcon={true}
               isActive={isActive}
@@ -151,11 +157,48 @@ const SortableGuildIcon = ({ guild, isActive, isUnread, mentionCount, isDragging
 const DISCORD_EPOCH = 1420070400000;
 const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
 
+const VoiceAvatarStack = ({ voiceMembers }) => {
+  const usersMap = useDiscordUsersStore((s) => s.users);
+  const shown = voiceMembers.slice(0, 3);
+  const extra = voiceMembers.length - 3;
+
+  return (
+    <div className="mt-1.5 flex items-center gap-1.5">
+      <SpeakerSimpleHigh size={16} weight="fill" className="shrink-0" />
+      <div className="flex -space-x-1.5">
+        {shown.map((vs) => {
+          const user = usersMap[vs.user_id] || vs.member?.user;
+          const avatarUrl = user
+            ? DiscordService.getUserAvatarUrl(user.id, user.avatar, 32)
+            : null;
+          return (
+            <div key={vs.user_id} className="size-5 overflow-hidden rounded-full ring-1 ring-[#1a1a1e]">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="size-full object-cover" draggable="false" />
+              ) : (
+                <div className="flex size-full items-center justify-center bg-[#5865f2] text-[8px] font-bold text-white">
+                  ?
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {extra > 0 && (
+          <div className="flex size-5 items-center justify-center rounded-full bg-[#2b2d31] text-[8px] font-bold text-gray-300 ring-1 ring-[#1a1a1e]">
+            +{extra}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DiscordGuildIcon = ({ guild, isActive }) => {
   const iconUrl = DiscordService.getGuildIconUrl(guild.id, guild.properties.icon, 128);
   const channels = useDiscordChannelsStore((s) => s.channels);
   const readStates = useDiscordReadStatesStore((s) => s.readStates);
   const lastChannelId = useLastChannelStore((s) => s.lastChannels[guild.id]);
+  const guildVoiceStates = useDiscordVoiceStatesStore((s) => s.voiceStates[guild.id]);
 
   const joinedAtMs = useMemo(() => {
     return guild.joined_at ? new Date(guild.joined_at).getTime() : null;
@@ -179,18 +222,40 @@ const DiscordGuildIcon = ({ guild, isActive }) => {
     return { unread: hasUnread, mentions: totalMentions };
   }, [channels, guild.id, readStates, joinedAtMs]);
 
+  const voiceMembers = useMemo(() => {
+    if (!guildVoiceStates) return [];
+    return Object.values(guildVoiceStates).filter((vs) => vs.channel_id);
+  }, [guildVoiceStates]);
+
+  const guildName = guild.properties.name || guild.id;
+
+  const tooltipContent = voiceMembers.length > 0 ? (
+    <div>
+      <span>{guildName}</span>
+      <VoiceAvatarStack voiceMembers={voiceMembers} />
+    </div>
+  ) : null;
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <Link to={`/discord/${guild.id}${lastChannelId ? `/${lastChannelId}` : ''}`} draggable="false">
-          <SidebarIcon
-            iconUrl={iconUrl || ''}
-            text={guild.properties.name || guild.id}
-            isServerIcon={true}
-            isActive={isActive}
-            isUnread={unread}
-            mentionCount={mentions}
-          />
+          <div className="relative">
+            <SidebarIcon
+              iconUrl={iconUrl || ''}
+              text={guildName}
+              isServerIcon={true}
+              isActive={isActive}
+              isUnread={unread}
+              mentionCount={mentions}
+              tooltipContent={tooltipContent}
+            />
+            {voiceMembers.length > 0 && (
+              <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-[#248046] text-white shadow-md ring-2 ring-[#121214]">
+                <SpeakerSimpleHigh size={9} weight="fill" />
+              </div>
+            )}
+          </div>
         </Link>
       </ContextMenuTrigger>
       <DiscordGuildContextMenu guild={guild} />
@@ -465,7 +530,7 @@ const GuildsSidebar = () => {
             {activeGuild ? (
               <div style={{ pointerEvents: 'none' }}>
                 <SidebarIcon
-                  iconUrl={activeGuild.icon_file_id ? `${CDN_BASE}/icons/${activeGuild.icon_file_id}` : ''}
+                  guild={activeGuild}
                   text={activeGuild.name}
                   isServerIcon={true}
                   isActive={false}

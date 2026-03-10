@@ -3,12 +3,15 @@ import { cn } from '@/lib/utils';
 import { UserCircle } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { DiscordService } from '../../services/discord.service';
-import { DiscordApiService } from '../../services/discord-api.service';
 import { useDiscordGuildsStore } from '../../store/discord-guilds.store';
 import { useDiscordUsersStore } from '../../store/discord-users.store';
 import { useDiscordMembersStore } from '../../store/discord-members.store';
+import { useDiscordProfilesStore } from '../../store/discord-profiles.store';
 import { parseMarkdown } from '@/components/message/markdown/parser';
 import DiscordMarkdownRenderer from '../DiscordMarkdownRenderer';
+import DiscordStatusIndicator from '../DiscordStatusIndicator';
+import DiscordUserProfileModal from '../DiscordUserProfileModal';
+import { useModalStore } from '@/store/modal.store';
 
 const DISCORD_EPOCH = 1420070400000;
 
@@ -22,18 +25,12 @@ const getRoleColor = (color) => {
   return `#${color.toString(16).padStart(6, '0')}`;
 };
 
-const statusColors = {
-  online: 'bg-green-500',
-  idle: 'bg-yellow-500',
-  dnd: 'bg-red-500',
-  offline: 'bg-gray-500',
-};
-
 const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpenProfile }) => {
   const guilds = useDiscordGuildsStore((s) => s.guilds);
   const storeUser = useDiscordUsersStore((s) => s.users[author.id]);
   const storeMember = useDiscordMembersStore((s) => guildId ? s.members[guildId]?.[author.id] : undefined);
-  const [profile, setProfile] = useState(null);
+  const profile = useDiscordProfilesStore((s) => s.getProfile(author.id, guildId));
+  const fetchProfile = useDiscordProfilesStore((s) => s.fetchProfile);
   const [rolesExpanded, setRolesExpanded] = useState(false);
 
   const member = memberProp || storeMember;
@@ -72,10 +69,8 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
   }, [member, guild, guildId]);
 
   useEffect(() => {
-    DiscordApiService.getUserProfile(author.id, guildId)
-      .then(setProfile)
-      .catch(() => {});
-  }, [author.id, guildId]);
+    fetchProfile(author.id, guildId);
+  }, [author.id, guildId, fetchProfile]);
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(user.id);
@@ -90,7 +85,13 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
         <div className="absolute -bottom-8 left-4">
           <button
             type="button"
-            onClick={() => onOpenProfile?.()}
+            onClick={() => {
+              if (onOpenProfile) {
+                onOpenProfile();
+              } else {
+                useModalStore.getState().push(DiscordUserProfileModal, { author: user, member, guildId });
+              }
+            }}
             className="group relative rounded-full ring-[5px] ring-[#111214]"
           >
             <img
@@ -98,23 +99,21 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
               alt={user.username}
               className="size-[68px] rounded-full object-cover select-none"
               draggable="false"
-            />
-            {user.avatar_decoration_data?.asset && (
+            />  
+            {/* {user.avatar_decoration_data?.asset && (
               <img
                 src={`https://cdn.discordapp.com/avatar-decoration-presets/${user.avatar_decoration_data.asset}.png?size=80`}
                 alt=""
                 className="pointer-events-none absolute inset-0 size-[68px]"
                 draggable="false"
               />
-            )}
+            )} */}
             <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100">
               <span className="text-[10px] font-bold uppercase text-white drop-shadow-md">
                 View Profile
               </span>
             </div>
-            <div
-              className={`absolute -bottom-0.5 -right-0.5 size-5 rounded-full border-[3px] border-[#111214] ${statusColors[user.status] || statusColors.offline}`}
-            />
+            <DiscordStatusIndicator status={user.status} clientStatus={user.client_status} size="md" borderColor="#111214" />
           </button>
         </div>
       </div>

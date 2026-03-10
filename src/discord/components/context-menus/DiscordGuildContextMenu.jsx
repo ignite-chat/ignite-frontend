@@ -1,4 +1,4 @@
-import { Copy } from '@phosphor-icons/react';
+import { Copy, Bug } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import {
   ContextMenuContent,
@@ -7,10 +7,13 @@ import {
   ContextMenuSubContent,
 } from '@/components/ui/context-menu';
 import { Separator } from '@/components/ui/separator';
+import { useModalStore } from '@/store/modal.store';
 import { useDiscordChannelsStore } from '../../store/discord-channels.store';
 import { useDiscordReadStatesStore } from '../../store/discord-readstates.store';
 import { useDiscordGuildSettingsStore } from '../../store/discord-guild-settings.store';
+import { useDiscordGuildsStore } from '../../store/discord-guilds.store';
 import { DiscordApiService } from '../../services/discord-api.service';
+import DebugInfoModal from '../DebugInfoModal';
 
 const RadioIndicator = ({ checked }) => (
   <div className={`flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 ${checked ? 'border-[#5865f2] bg-[#5865f2]' : 'border-[#4e5058]'}`}>
@@ -253,6 +256,17 @@ const DiscordGuildContextMenu = ({ guild }) => {
       >
         <span>Copy Server ID</span>
         <Copy className="ml-2 size-[18px]" />
+      </button>
+
+      <Separator className="my-1 bg-white/5" />
+
+      <button
+        type="button"
+        className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-gray-100"
+        onClick={() => useModalStore.getState().push(DebugInfoModal, { guildId: guild.id })}
+      >
+        <span>Debug Info</span>
+        <Bug className="ml-2 size-[18px]" />
       </button>
     </ContextMenuContent>
   );

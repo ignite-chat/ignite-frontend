@@ -15,6 +15,7 @@ import { EchoService } from './ignite/services/echo.service';
 import { useGuildsStore } from './ignite/store/guilds.store';
 import VoiceAudioRenderer from './ignite/components/voice/VoiceAudioRenderer';
 import { useElectronBadge } from './ignite/hooks/useElectronBadge';
+import { useWindowOpenHandler } from './hooks/useWindowOpenHandler';
 
 const AuthRoute = ({ children }) => {
   const { userId } = useAuthStore();
@@ -25,6 +26,9 @@ const AuthRoute = ({ children }) => {
 
   // Sync taskbar badge with unread/mention state (Electron only)
   useElectronBadge();
+
+  // Intercept window.open calls from Electron and handle in-app
+  useWindowOpenHandler();
 
   // Initialize app on mount
   useEffect(() => {

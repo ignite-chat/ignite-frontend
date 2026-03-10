@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import Avatar from '@/ignite/components/Avatar';
+import GuildIcon from '@/ignite/components/GuildIcon';
 import {
   UserCircle,
   UserPlus,
@@ -29,8 +30,6 @@ import { useGuildsStore } from '@/ignite/store/guilds.store';
 import { useModalStore } from '@/ignite/store/modal.store';
 import { ChannelsService } from '@/ignite/services/channels.service';
 import { useNavigate } from 'react-router-dom';
-
-const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
 const UserProfileModal = ({ modalId, userId, guildId }) => {
   const currentUser = useUsersStore((s) => s.getCurrentUser());
@@ -372,17 +371,7 @@ const UserProfileModal = ({ modalId, userId, guildId }) => {
                           }}
                           className="flex w-full items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-white/5"
                         >
-                          {guild.icon_file_id ? (
-                            <img
-                              src={`${CDN_BASE}/icons/${guild.icon_file_id}`}
-                              alt={guild.name}
-                              className="size-8 rounded-full"
-                            />
-                          ) : (
-                            <div className="flex size-8 items-center justify-center rounded-full bg-[#2b2d31] text-xs font-semibold text-gray-300">
-                              {guild.name?.slice(0, 1).toUpperCase()}
-                            </div>
-                          )}
+                          <GuildIcon guild={guild} size={8} />
                           <div className="flex flex-col items-start truncate">
                             <span className="truncate text-sm font-medium text-gray-200">{guild.name}</span>
                             {mutual.nick && (

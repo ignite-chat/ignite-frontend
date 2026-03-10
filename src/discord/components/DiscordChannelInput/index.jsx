@@ -277,7 +277,7 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   if (!isDM && !canSend) {
     return (
       <div className="p-2">
-        <div className="flex items-center rounded-md border border-white/5 bg-[#222327] px-3 py-3">
+        <div className="flex min-h-[56px] items-center rounded-md border border-white/5 bg-[#222327] px-3 py-4">
           <span className="text-sm text-gray-500">You do not have permission to send messages in this channel</span>
         </div>
       </div>
@@ -364,13 +364,13 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
               <PlainTextPlugin
                 contentEditable={
                   <ContentEditable
-                    className={`max-h-[50vh] min-h-[44px] w-full overflow-y-auto px-3 py-3 text-sm outline-none [&_.channel-input-paragraph]:m-0 ${
+                    className={`max-h-[50vh] min-h-[54px] w-full overflow-y-auto px-3 py-4 text-sm outline-none [&_.channel-input-paragraph]:m-0 ${
                       !canSendMessages || isOnCooldown ? 'cursor-not-allowed opacity-50' : ''
                     }`}
                   />
                 }
                 placeholder={
-                  <div className="pointer-events-none absolute left-0 top-0 px-3 py-3 text-sm font-normal text-gray-500">
+                  <div className="pointer-events-none absolute left-0 top-0 px-3 py-4 text-sm font-normal text-gray-500">
                     {placeholder}
                   </div>
                 }

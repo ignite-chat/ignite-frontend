@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import Message from './Message';
 import MessageSkeletonList from '@/components/message/MessageSkeleton';
-import { CircleNotch, Hash, SpeakerHigh, UserPlus } from '@phosphor-icons/react';
+import { CircleNotch, Hash, SpeakerHigh, UserPlus, UserCheck, X } from '@phosphor-icons/react';
 import { ChannelType } from '@/ignite/constants/ChannelType';
 import { useUsersStore } from '@/ignite/store/users.store';
 import { useGuildsStore } from '@/ignite/store/guilds.store';
@@ -11,6 +10,9 @@ import { useFriendsStore } from '@/ignite/store/friends.store';
 import { UsersService } from '@/ignite/services/users.service';
 import { FriendsService } from '@/ignite/services/friends.service';
 import Avatar from '../Avatar';
+import GuildIcon from '../GuildIcon';
+import UserProfileModal from '@/components/modals/UserProfileModal';
+import { useModalStore } from '@/store/modal.store';
 import { toast } from 'sonner';
 
 const NewMessagesSeparator = () => (
@@ -35,10 +37,7 @@ const DateSeparator = ({ timestamp }) => {
   );
 };
 
-const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
-
 const DMWelcome = ({ channel }) => {
-  const navigate = useNavigate();
   const currentUser = useUsersStore((s) => s.getCurrentUser());
   const { friends, requests } = useFriendsStore();
   const guildsStore = useGuildsStore();
@@ -55,11 +54,21 @@ const DMWelcome = ({ channel }) => {
   const user = useUsersStore((state) => state.users[userId]) || otherRecipient;
 
   const isFriend = useMemo(() => friends.some((f) => f.id === userId), [friends, userId]);
-  const hasPendingRequest = useMemo(
-    () => requests.some((req) => req.sender_id === userId || req.receiver_id === userId ||
-      req.sender?.id === userId || req.receiver?.id === userId),
-    [requests, userId]
+
+  const pendingRequest = useMemo(
+    () =>
+      requests.find(
+        (req) =>
+          (req.sender_id === currentUser?.id &&
+            (req.receiver_id === userId || req.receiver?.username === user?.username)) ||
+          (req.receiver_id === currentUser?.id &&
+            (req.sender_id === userId || req.sender?.username === user?.username))
+      ),
+    [requests, currentUser?.id, userId, user?.username]
   );
+
+  const isOutgoing = pendingRequest && pendingRequest.sender_id === currentUser?.id;
+  const isIncoming = pendingRequest && pendingRequest.receiver_id === currentUser?.id;
 
   useEffect(() => {
     if (!userId) return;
@@ -69,7 +78,7 @@ const DMWelcome = ({ channel }) => {
   }, [userId]);
 
   const handleAddFriend = async () => {
-    if (isSending) return;
+    if (isSending || isFriend || pendingRequest) return;
     setIsSending(true);
     try {
       await FriendsService.sendRequest(user.username);
@@ -81,63 +90,125 @@ const DMWelcome = ({ channel }) => {
     }
   };
 
+  const handleAcceptRequest = async () => {
+    try {
+      await FriendsService.acceptRequest(pendingRequest.id);
+      toast.success(`Accepted friend request from ${user.username}`);
+    } catch {
+      toast.error('Failed to accept request');
+    }
+  };
+
+  const handleCancelRequest = async () => {
+    try {
+      if (pendingRequest) {
+        await FriendsService.cancelRequest(pendingRequest.id);
+        toast.success(isOutgoing
+          ? `Cancelled friend request to ${user.username}`
+          : `Declined friend request from ${user.username}`
+        );
+      }
+    } catch {
+      toast.error('Operation failed');
+    }
+  };
+
   if (!user) return null;
 
   return (
-    <div className="px-4 pb-4 pt-16">
-      <Avatar user={user} size={80} className="text-3xl" />
-      <h1 className="mt-2 text-[28px] font-bold leading-tight text-white">
-        {user.name || user.username}
-      </h1>
-      <p className="text-sm text-gray-400">{user.username}</p>
-      <p className="mt-2 text-sm text-gray-400">
-        This is the beginning of your direct message history with{' '}
-        <span className="font-semibold text-white">{user.username}</span>.
-      </p>
-      {(mutualGuilds.length > 0 || (!isFriend && !hasPendingRequest)) && (
-        <div className="mt-3 flex items-center gap-3">
-          {mutualGuilds.length > 0 && (
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-2">
-                {mutualGuilds.slice(0, 5).map((mutual) => {
-                  const guild = guildsStore.guilds.find((g) => g.id === mutual.id);
-                  if (!guild) return null;
-                  const initials = (guild.name || '').slice(0, 2);
-                  return guild.icon_file_id ? (
-                    <img
-                      key={mutual.id}
-                      src={`${CDN_BASE}/icons/${guild.icon_file_id}`}
-                      alt={guild.name}
-                      title={guild.name}
-                      className="size-6 rounded-full"
-                    />
-                  ) : (
-                    <div
-                      key={mutual.id}
-                      title={guild.name}
-                      className="flex size-6 items-center justify-center rounded-full bg-[#2b2d31] text-[8px] font-semibold text-gray-300"
-                    >
-                      {initials}
-                    </div>
-                  );
-                })}
-              </div>
-              <span className="text-xs text-gray-400">
-                {mutualGuilds.length} Mutual Server{mutualGuilds.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-          )}
-          {!isFriend && !hasPendingRequest && (
+    <div className="px-4 pb-4 pt-8">
+      {/* Banner */}
+      <div
+        className={cn('h-28 w-full rounded-t-lg', !user.banner_color && 'bg-primary')}
+        style={{
+          backgroundColor: user.banner_color,
+          backgroundImage: user.banner_url ? `url(${user.banner_url})` : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      />
+
+      {/* Avatar overlapping banner */}
+      <div className="relative px-4">
+        <div className="absolute -top-[40px]">
+          <div
+            className="group relative cursor-pointer rounded-full ring-[5px] ring-[#313338]"
+            onClick={() => useModalStore.getState().push(UserProfileModal, { userId: user.id })}
+          >
+            <Avatar user={user} size={80} className="text-3xl" showStatus />
+            <div className="absolute inset-0 rounded-full bg-black/0 transition-colors group-hover:bg-black/20" />
+          </div>
+        </div>
+
+        {/* Friend action buttons */}
+        <div className="flex h-12 justify-end pt-2">
+          {isFriend ? (
+            <span className="flex items-center gap-1 text-xs text-gray-400">
+              <UserCheck size={14} weight="bold" className="text-green-400" />
+              Friends
+            </span>
+          ) : isOutgoing ? (
+            <button
+              onClick={handleCancelRequest}
+              title="Cancel Request"
+              className="flex items-center gap-1.5 rounded bg-red-400/10 px-2.5 py-1 text-xs font-medium text-red-400 transition hover:bg-red-500/20"
+            >
+              <X size={14} weight="bold" />
+              Cancel Request
+            </button>
+          ) : isIncoming ? (
+            <button
+              onClick={handleAcceptRequest}
+              title="Accept Request"
+              className="flex items-center gap-1.5 rounded bg-[#23a559] px-2.5 py-1 text-xs font-medium text-white transition hover:bg-[#1a7a42]"
+            >
+              <UserCheck size={14} weight="bold" />
+              Accept Request
+            </button>
+          ) : (
             <button
               onClick={handleAddFriend}
               disabled={isSending}
-              className="flex shrink-0 items-center gap-1.5 rounded bg-[#23a559] px-3 py-1.5 text-sm font-medium text-white transition hover:bg-[#1a7a42] disabled:opacity-50"
+              title="Add Friend"
+              className="flex items-center gap-1.5 rounded bg-[#23a559] px-2.5 py-1 text-xs font-medium text-white transition hover:bg-[#1a7a42] disabled:opacity-50"
             >
+              <UserPlus size={14} weight="bold" />
               Add Friend
             </button>
           )}
         </div>
-      )}
+
+        {/* Name */}
+        <div
+          className="mt-1 cursor-pointer"
+          onClick={() => useModalStore.getState().push(UserProfileModal, { userId: user.id })}
+        >
+          <h1 className="text-[28px] font-bold leading-tight text-white hover:underline">
+            {user.name || user.username}
+          </h1>
+          <p className="text-sm font-medium text-gray-400">{user.username}</p>
+        </div>
+
+        <p className="mt-2 text-sm text-gray-400">
+          This is the beginning of your direct message history with{' '}
+          <span className="font-semibold text-white">{user.username}</span>.
+        </p>
+
+        {mutualGuilds.length > 0 && (
+          <div className="mt-3 flex items-center gap-2">
+            <div className="flex -space-x-2">
+              {mutualGuilds.slice(0, 5).map((mutual) => {
+                const guild = guildsStore.guilds.find((g) => g.id === mutual.id);
+                if (!guild) return null;
+                return <GuildIcon key={mutual.id} guild={guild} size={6} />;
+              })}
+            </div>
+            <span className="text-xs text-gray-400">
+              {mutualGuilds.length} Mutual Server{mutualGuilds.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

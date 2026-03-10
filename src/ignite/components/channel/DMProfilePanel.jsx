@@ -7,6 +7,7 @@ import { useFriendsStore } from '@/ignite/store/friends.store';
 import { UsersService } from '@/ignite/services/users.service';
 import { FriendsService } from '@/ignite/services/friends.service';
 import Avatar from '../Avatar';
+import GuildIcon from '../GuildIcon';
 import UserProfileModal from '@/components/modals/UserProfileModal';
 import { useModalStore } from '@/store/modal.store';
 import { cn } from '@/lib/utils';
@@ -17,8 +18,6 @@ import {
   UserCheck,
   X,
 } from '@phosphor-icons/react';
-
-const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
 const DMProfilePanel = ({ channel }) => {
   const { memberListOpen } = useChannelContext();
@@ -279,17 +278,7 @@ const DMProfilePanel = ({ channel }) => {
                             onClick={() => navigate(`/channels/${mutual.id}`)}
                             className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-white/5"
                           >
-                            {guild.icon_file_id ? (
-                              <img
-                                src={`${CDN_BASE}/icons/${guild.icon_file_id}`}
-                                alt={guild.name}
-                                className="size-7 rounded-full"
-                              />
-                            ) : (
-                              <div className="flex size-7 items-center justify-center rounded-full bg-[#2b2d31] text-[10px] font-semibold text-gray-300">
-                                {guild.name?.slice(0, 1).toUpperCase()}
-                              </div>
-                            )}
+                            <GuildIcon guild={guild} size={7} />
                             <div className="flex flex-col items-start truncate">
                               <span className="truncate text-xs font-medium text-gray-200">{guild.name}</span>
                               {mutual.nick && (

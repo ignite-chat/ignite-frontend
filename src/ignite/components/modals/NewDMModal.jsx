@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import Avatar from '@/ignite/components/Avatar';
+import GuildIcon from '@/ignite/components/GuildIcon';
 import { useUsersStore } from '@/ignite/store/users.store';
 import { useFriendsStore } from '@/ignite/store/friends.store';
 import { useChannelsStore } from '@/ignite/store/channels.store';
@@ -15,8 +16,6 @@ import { useGuildsStore } from '@/ignite/store/guilds.store';
 import { ChannelsService } from '@/ignite/services/channels.service';
 import { ChannelType } from '@/ignite/constants/ChannelType';
 import { useModalStore } from '@/ignite/store/modal.store';
-
-const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
 const PREFIXES = {
   '@': 'users',
@@ -229,10 +228,6 @@ const NewDMModal = ({ modalId }) => {
     setSelectedIndex(0);
   };
 
-  const getGuildIconUrl = (guild) => {
-    if (!guild?.icon_file_id) return null;
-    return `${CDN_BASE}/icons/${guild.icon_file_id}`;
-  };
 
   return (
     <Dialog
@@ -285,7 +280,7 @@ const NewDMModal = ({ modalId }) => {
                 onClick={() => handleItemSelect(item)}
                 onMouseEnter={() => setSelectedIndex(idx)}
                 friendIds={friendIds}
-                getGuildIconUrl={getGuildIconUrl}
+                
                 loading={loading}
               />
             ))
@@ -309,7 +304,7 @@ const NewDMModal = ({ modalId }) => {
   );
 };
 
-const ResultItem = ({ item, isSelected, onClick, onMouseEnter, friendIds, getGuildIconUrl, loading }) => {
+const ResultItem = ({ item, isSelected, onClick, onMouseEnter, friendIds, loading }) => {
   const baseClass = `flex w-full items-center gap-3 rounded-[4px] px-2.5 py-[6px] text-left transition-colors cursor-pointer ${
     isSelected ? 'bg-[#36373d]' : 'hover:bg-[#36373d]/50'
   }`;
@@ -366,7 +361,7 @@ const ResultItem = ({ item, isSelected, onClick, onMouseEnter, friendIds, getGui
           <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-5 text-[#dbdee1]">
             {item.data.name}
           </span>
-          <GuildBadge guild={item.data.guild} getGuildIconUrl={getGuildIconUrl} />
+          <GuildBadge guild={item.data.guild} />
         </button>
       );
 
@@ -384,7 +379,7 @@ const ResultItem = ({ item, isSelected, onClick, onMouseEnter, friendIds, getGui
           <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-5 text-[#dbdee1]">
             {item.data.name}
           </span>
-          <GuildBadge guild={item.data.guild} getGuildIconUrl={getGuildIconUrl} />
+          <GuildBadge guild={item.data.guild} />
         </button>
       );
 
@@ -396,7 +391,7 @@ const ResultItem = ({ item, isSelected, onClick, onMouseEnter, friendIds, getGui
           onMouseEnter={onMouseEnter}
           className={baseClass}
         >
-          <ServerIcon guild={item.data} getGuildIconUrl={getGuildIconUrl} />
+          <ServerIcon guild={item.data} />
           <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-5 text-[#dbdee1]">
             {item.data.name}
           </span>
@@ -408,33 +403,18 @@ const ResultItem = ({ item, isSelected, onClick, onMouseEnter, friendIds, getGui
   }
 };
 
-const GuildBadge = ({ guild, getGuildIconUrl }) => {
+const GuildBadge = ({ guild }) => {
   if (!guild) return null;
-  const iconUrl = getGuildIconUrl(guild);
   return (
     <span className="flex shrink-0 items-center gap-1.5 text-[12px] text-[#949ba4]">
-      {iconUrl ? (
-        <img src={iconUrl} className="size-4 rounded-full" alt="" />
-      ) : (
-        <span className="flex size-4 items-center justify-center rounded-full bg-[#36373d] text-[8px] font-semibold text-[#dbdee1]">
-          {guild.name?.charAt(0)?.toUpperCase()}
-        </span>
-      )}
+      <GuildIcon guild={guild} size={4} />
       {guild.name}
     </span>
   );
 };
 
-const ServerIcon = ({ guild, getGuildIconUrl }) => {
-  const iconUrl = getGuildIconUrl(guild);
-  if (iconUrl) {
-    return <img src={iconUrl} className="size-8 shrink-0 rounded-2xl" alt="" />;
-  }
-  return (
-    <span className="flex size-8 shrink-0 items-center justify-center rounded-2xl bg-[#36373d] text-[11px] font-semibold text-[#dbdee1]">
-      {guild.name?.charAt(0)?.toUpperCase()}
-    </span>
-  );
+const ServerIcon = ({ guild }) => {
+  return <GuildIcon guild={guild} size={8} className="shrink-0 !rounded-2xl" />;
 };
 
 export default NewDMModal;
