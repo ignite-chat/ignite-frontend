@@ -280,6 +280,7 @@ const ChannelMessages = ({ channel, messageId }) => {
     <div className="min-h-0 flex-1 overflow-y-auto" ref={messagesRef} onScroll={onScroll}>
       <div ref={contentRef} className="flex min-h-full flex-col justify-end">
         <MessageList
+          channel={channel}
           messages={messages}
           pendingMessages={pendingMessages}
           editingId={editingId}

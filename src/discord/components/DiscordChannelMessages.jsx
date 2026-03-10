@@ -412,7 +412,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
 
               const msgTs = snowflakeToTimestamp(msg.id);
               const prevTs = prevMessage ? snowflakeToTimestamp(prevMessage.id) : null;
-              const showDateSeparator = prevTs !== null &&
+              const showDateSeparator = prevTs == null ||
                 new Date(msgTs).toDateString() !== new Date(prevTs).toDateString();
 
               return (
