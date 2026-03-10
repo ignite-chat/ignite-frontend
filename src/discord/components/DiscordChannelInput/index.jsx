@@ -8,7 +8,7 @@ import {
   EmojiPickerSidebar,
 } from '@/components/ui/emoji-picker';
 import { cn } from '@/lib/utils';
-import { X, Smiley, Timer } from '@phosphor-icons/react';
+import { X, Smiley, Timer, Keyboard } from '@phosphor-icons/react';
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -78,6 +78,7 @@ function formatSlowmodeDuration(seconds) {
 
 const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   const [inputMessage, setInputMessage] = useState('');
+  const [silentTyping, setSilentTyping] = useState(() => localStorage.getItem('silentTyping') === 'true');
   const editorRef = useRef(null);
   const menuContainerRef = useRef(null);
 
@@ -405,17 +406,52 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
                 resolveUser={resolveUser}
                 channels={guildChannels}
               />
-              <DiscordTypingIndicatorPlugin channelId={channelId} />
+              <DiscordTypingIndicatorPlugin channelId={channelId} silentTyping={silentTyping} />
               <FocusPlugin channelId={channelId} replyingMessageId={replyingMessageId} />
             </div>
           </LexicalComposer>
 
           <div className="mr-2 mt-2.5 flex items-center gap-0.5 self-start">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setSilentTyping((prev) => {
+                      const next = !prev;
+                      localStorage.setItem('silentTyping', String(next));
+                      return next;
+                    });
+                  }}
+                  className={cn(
+                    'size-8 p-0',
+                    '[&_svg]:size-5',
+                    silentTyping
+                      ? 'text-[#dbdee1]'
+                      : 'text-[#949ba4] hover:text-[#dbdee1]'
+                  )}
+                >
+                  <div className="relative">
+                    <Keyboard className="size-5" weight="fill" />
+                    {silentTyping && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="h-[22px] w-[2px] rotate-45 rounded-full bg-red-500" />
+                      </div>
+                    )}
+                  </div>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {silentTyping ? 'Silent typing enabled' : 'Silent typing disabled'}
+              </TooltipContent>
+            </Tooltip>
             <Popover.Root open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen} modal={false}>
               <Popover.Trigger asChild>
                 <Button
                   variant="ghost"
-                  className="size-8 text-[#949ba4] hover:text-[#dbdee1] [&_svg]:size-5"
+                  size="icon"
+                  className="size-8 p-0 text-[#949ba4] hover:text-[#dbdee1] [&_svg]:size-5"
                 >
                   <Smiley weight="fill" />
                 </Button>

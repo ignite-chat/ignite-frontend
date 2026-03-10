@@ -3,14 +3,14 @@ import { useEffect, useRef } from 'react';
 import { $getRoot } from 'lexical';
 import { DiscordApiService } from '@/discord/services/discord-api.service';
 
-export default function DiscordTypingIndicatorPlugin({ channelId }) {
+export default function DiscordTypingIndicatorPlugin({ channelId, silentTyping }) {
   const [editor] = useLexicalComposerContext();
   const prevTextRef = useRef('');
   const lastSentRef = useRef(0);
 
   useEffect(() => {
     const unregister = editor.registerUpdateListener(({ editorState }) => {
-      if (!channelId) return;
+      if (silentTyping || !channelId) return;
 
       editorState.read(() => {
         const text = $getRoot().getTextContent();
@@ -27,7 +27,7 @@ export default function DiscordTypingIndicatorPlugin({ channelId }) {
     });
 
     return unregister;
-  }, [editor, channelId]);
+  }, [editor, channelId, silentTyping]);
 
   return null;
 }

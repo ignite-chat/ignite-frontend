@@ -77,7 +77,7 @@ const DirectMessagesPage = () => {
 
   return (
     <>
-      <ResizableSidebar id="dm-sidebar" defaultWidth={320} minWidth={200} maxWidth={500}>
+      <ResizableSidebar id="dm-sidebar" defaultWidth={320}>
         <DMChannelsSidebar
           activeChannelId={channelId || 'friends'}
           onNavigate={(id) => navigate(`/channels/@me/${id}`)}

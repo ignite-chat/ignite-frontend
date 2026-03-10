@@ -21,8 +21,6 @@ const GuildLayout = ({ children, guild, sidebar, sidebarId = 'guild-sidebar', de
       <ResizableSidebar
         id={sidebarId}
         defaultWidth={defaultWidth}
-        minWidth={200}
-        maxWidth={500}
         className={`fixed inset-y-0 left-0 z-40 h-full transition-transform duration-300 ease-out md:static md:translate-x-0 ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}

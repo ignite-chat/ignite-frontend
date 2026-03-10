@@ -316,7 +316,7 @@ const UserBar = () => {
       <div className="flex items-center rounded-lg bg-[#1a1a1d] px-2.5 py-2.5">
         <Popover>
           <PopoverTrigger asChild>
-            <button type="button" className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-0.5 py-0.5 transition-colors hover:bg-white/5">
+            <button type="button" className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-0.5 py-0.5 transition-colors hover:bg-white/5 mr-2">
               <div className="shrink-0">
                 {showDiscord ? (
                   <DiscordAvatarWithStatus

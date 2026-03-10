@@ -6,8 +6,8 @@ const ResizableSidebar = ({
   id,
   children,
   defaultWidth = 320,
-  minWidth = 200,
-  maxWidth = 500,
+  minWidth = 190,
+  maxWidth = 360,
   className,
 }) => {
   const width = useSidebarWidthStore((s) => s.widths[id] ?? defaultWidth);

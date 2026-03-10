@@ -375,8 +375,8 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
   return (
     <div className="relative top-0 flex h-full w-full flex-col bg-[#121214] text-gray-100">
       {/* Guild Header */}
-      <div className="w-full p-2">
-        <div className="flex w-full items-center gap-2 rounded-md px-2 py-1">
+      <div className="flex h-12 shrink-0 items-center border-b border-white/5 px-4">
+        <div className="flex w-full items-center gap-2">
           {iconUrl && (
             <img
               src={iconUrl}
@@ -389,8 +389,6 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
           </div>
         </div>
       </div>
-
-      <hr className="m-0 w-full border border-t-0 border-white/5 bg-[#121214] p-0" />
 
       <div className="scrollbar-hover flex min-h-0 flex-1 flex-col items-center overflow-y-auto pb-24" ref={sidebarRef} onScroll={onSidebarScroll}>
 
