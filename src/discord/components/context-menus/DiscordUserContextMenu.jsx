@@ -58,7 +58,7 @@ const DiscordUserContextMenu = ({
   const handleMessage = async () => {
     try {
       const channel = await DiscordApiService.createDMChannel(author.id);
-      navigate(`/discord/dm/${channel.id}`);
+      navigate(`/channels/@me/${channel.id}`);
     } catch {
       toast.error('Failed to open DM');
     }

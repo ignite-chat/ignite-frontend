@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChannelContextProvider } from '../contexts/ChannelContext';
 import Channel from '../components/channel/Channel';
-import DMChannelsSidebar from '../components/dm/DMChannelsSidebar';
+import DMChannelsSidebar from '@/components/dm/DMChannelsSidebar'
 import FriendsDashboard from '../components/friends/FriendsDashboard';
 import MessageRequests from '../components/friends/MessageRequests';
 import PageTitle from '../components/PageTitle';

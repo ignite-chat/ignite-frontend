@@ -869,10 +869,63 @@ export const DiscordGatewayService = {
       });
     }
 
-    // Update last_message_id on the channel
+    // Update last_message_id on the channel and ack if it's our own message
+    const currentUser = useDiscordStore.getState().user;
+    const isOwnMessage = currentUser && data.author?.id === currentUser.id;
+
     useDiscordChannelsStore.getState().updateChannel(data.channel_id, {
       last_message_id: data.id,
     });
+
+    if (isOwnMessage) {
+      useDiscordReadStatesStore.getState().ackChannel(data.channel_id, data.id);
+      return;
+    }
+
+    if (!currentUser) return;
+
+    const guildId = data.guild_id;
+    const channelId = data.channel_id;
+
+    if (guildId) {
+      const guildSettings = useDiscordGuildSettingsStore.getState().getGuildSettings(guildId);
+      const channelOverride = guildSettings?.channel_overrides?.find(
+        (o: any) => o.channel_id === channelId,
+      );
+
+      // Check if channel or guild is muted
+      const channelMuted = channelOverride?.muted;
+      const guildMuted = guildSettings?.muted;
+      if (channelMuted || guildMuted) return;
+
+      // Determine effective notification level (channel override takes priority)
+      // 0 = All Messages, 1 = Only @mentions, 2 = Nothing, 3 = use guild default
+      let notifLevel = channelOverride?.message_notifications ?? 3;
+      if (notifLevel === 3) notifLevel = guildSettings?.message_notifications ?? 1;
+      if (notifLevel === 2) return;
+
+      // Check if the current user is mentioned
+      const isDirectMention = data.mentions?.some((m: any) => m.id === currentUser.id);
+      const isEveryoneMention =
+        data.mention_everyone && !guildSettings?.suppress_everyone;
+      const isRoleMention =
+        !guildSettings?.suppress_roles &&
+        data.mention_roles?.length > 0 &&
+        (() => {
+          const memberData = useDiscordMembersStore.getState().members[guildId]?.[currentUser.id];
+          const roles: string[] = memberData?.roles || [];
+          return data.mention_roles.some((r: string) => roles.includes(r));
+        })();
+
+      const isMentioned = isDirectMention || isEveryoneMention || isRoleMention;
+
+      // For "All Messages" (0), always count. For "Only @mentions" (1), only count if mentioned.
+      if (notifLevel === 1 && !isMentioned) return;
+
+      const readStates = useDiscordReadStatesStore.getState();
+      const current = readStates.readStates[channelId]?.mention_count ?? 0;
+      readStates.updateReadState(channelId, { mention_count: current + 1 });
+    }
   },
 
   _handleMessageUpdate(data: any) {
@@ -883,7 +936,19 @@ export const DiscordGatewayService = {
 
   _handleMessageDelete(data: any) {
     if (data.id && data.channel_id) {
-      useDiscordChannelsStore.getState().removeMessage(data.channel_id, data.id);
+      const store = useDiscordChannelsStore.getState();
+      const channel = store.channels.find((c) => c.id === data.channel_id);
+
+      store.removeMessage(data.channel_id, data.id);
+
+      // If the deleted message was the channel's last_message_id, roll back to the previous message
+      if (channel && channel.last_message_id === data.id) {
+        const messages = useDiscordChannelsStore.getState().channelMessages[data.channel_id] || [];
+        const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+        store.updateChannel(data.channel_id, {
+          last_message_id: lastMsg?.id || null,
+        });
+      }
     }
   },
 

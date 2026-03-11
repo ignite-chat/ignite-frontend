@@ -54,7 +54,7 @@ import { useDiscordVoiceStatesStore } from '../discord/store/discord-voice-state
 import { useLastChannelStore } from '@/store/last-channel.store';
 import { ChannelType } from '@/ignite/constants/ChannelType';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { SpeakerSimpleHigh } from '@phosphor-icons/react';
+import { SpeakerSimpleHigh, Monitor } from '@phosphor-icons/react';
 import GuildIcon from '@/ignite/components/GuildIcon';
 
 const SidebarIcon = ({
@@ -222,10 +222,21 @@ const DiscordGuildIcon = ({ guild, isActive }) => {
     return { unread: hasUnread, mentions: totalMentions };
   }, [channels, guild.id, readStates, joinedAtMs]);
 
+  const currentDiscordUserId = useDiscordStore((s) => s.user?.id);
+
   const voiceMembers = useMemo(() => {
     if (!guildVoiceStates) return [];
     return Object.values(guildVoiceStates).filter((vs) => vs.channel_id);
   }, [guildVoiceStates]);
+
+  const voiceBadge = useMemo(() => {
+    if (voiceMembers.length === 0) return null;
+    const selfInVoice = voiceMembers.some((vs) => vs.user_id === currentDiscordUserId);
+    const hasScreenshare = voiceMembers.some((vs) => vs.self_stream);
+    if (selfInVoice) return 'active';
+    if (hasScreenshare) return 'screenshare';
+    return 'idle';
+  }, [voiceMembers, currentDiscordUserId]);
 
   const guildName = guild.properties.name || guild.id;
 
@@ -250,8 +261,18 @@ const DiscordGuildIcon = ({ guild, isActive }) => {
               mentionCount={mentions}
               tooltipContent={tooltipContent}
             />
-            {voiceMembers.length > 0 && (
+            {voiceBadge === 'active' && (
               <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-[#248046] text-white shadow-md ring-2 ring-[#121214]">
+                <SpeakerSimpleHigh size={9} weight="fill" />
+              </div>
+            )}
+            {voiceBadge === 'screenshare' && (
+              <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-[#4e5058] text-white shadow-md ring-2 ring-[#121214]">
+                <Monitor size={9} weight="fill" />
+              </div>
+            )}
+            {voiceBadge === 'idle' && (
+              <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-[#4e5058] text-white shadow-md ring-2 ring-[#121214]">
                 <SpeakerSimpleHigh size={9} weight="fill" />
               </div>
             )}

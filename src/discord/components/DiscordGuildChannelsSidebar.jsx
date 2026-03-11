@@ -135,7 +135,7 @@ const VoiceMemberRow = ({ vs, guildId, channelId, user, memberData, displayName,
               onClick={openProfile}
               onMouseEnter={enterHover}
               onMouseLeave={leaveHover}
-              className="flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-gray-500 outline-none hover:bg-white/5 hover:text-white"
+              className="flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-gray-500 font-medium outline-none hover:bg-white/5 hover:text-white"
             >
               <img src={avatarUrl} alt="" className="size-6 rounded-full" />
               <span className="flex-1 truncate text-[13px]">{displayName}</span>
