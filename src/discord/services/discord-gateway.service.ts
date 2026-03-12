@@ -12,6 +12,7 @@ import { useDiscordTypingStore } from '../store/discord-typing.store';
 import { useDiscordThreadsStore } from '../store/discord-threads.store';
 import { useDiscordVoiceStatesStore } from '../store/discord-voice-states.store';
 import { useDiscordGuildSettingsStore } from '../store/discord-guild-settings.store';
+import { DiscordVoiceService } from './discord-voice.service';
 
 /** Sync activities to the dedicated store from a list of presences */
 function syncActivities(presences: { user_id: string; activities?: any[] }[]) {
@@ -481,11 +482,16 @@ export const DiscordGatewayService = {
         if (data.guild_id) {
           useDiscordVoiceStatesStore.getState().updateVoiceState(data);
         }
+        // Forward our own voice state to the voice service for connection handshake
+        DiscordVoiceService.handleVoiceStateUpdate(data);
         break;
       case 'VOICE_STATE_UPDATE_BATCH':
         if (data.voice_states?.length > 0) {
           useDiscordVoiceStatesStore.getState().updateVoiceStateBatch(data.voice_states);
         }
+        break;
+      case 'VOICE_SERVER_UPDATE':
+        DiscordVoiceService.handleVoiceServerUpdate(data);
         break;
       case 'TYPING_START': {
         const typingUserId = data.user_id;
@@ -920,7 +926,7 @@ export const DiscordGatewayService = {
       const isMentioned = isDirectMention || isEveryoneMention || isRoleMention;
 
       // For "All Messages" (0), always count. For "Only @mentions" (1), only count if mentioned.
-      if (notifLevel === 1 && !isMentioned) return;
+      if (!isMentioned) return;
 
       const readStates = useDiscordReadStatesStore.getState();
       const current = readStates.readStates[channelId]?.mention_count ?? 0;

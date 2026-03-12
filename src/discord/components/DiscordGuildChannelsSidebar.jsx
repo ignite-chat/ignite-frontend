@@ -13,6 +13,8 @@ import { useDiscordHasPermission } from '../hooks/useDiscordPermission';
 import { scrollPositions } from '@/store/last-channel.store';
 import { useDiscordTypingStore } from '../store/discord-typing.store';
 import { useDiscordVoiceStatesStore } from '../store/discord-voice-states.store';
+import { useDiscordVoiceStore } from '../store/discord-voice.store';
+import { DiscordVoiceService } from '../services/discord-voice.service';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useModalStore } from '@/store/modal.store';
@@ -248,7 +250,7 @@ const VoiceChannelMembers = ({ guildId, channelId }) => {
   );
 };
 
-const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId }) => {
+const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId, guildName }) => {
   const canView = channel._canView !== false;
   const readStates = useDiscordReadStatesStore((s) => s.readStates);
   const entry = readStates[channel.id];
@@ -256,6 +258,8 @@ const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId }) =>
   const canConnect = useDiscordHasPermission(channel.guild_id, isVoiceChannel ? channel : undefined, CONNECT);
   const typingUsers = useDiscordTypingStore((s) => s.typing[channel.id] || []);
   const guildVoiceStates = useDiscordVoiceStatesStore((s) => isVoiceChannel ? (s.voiceStates[channel.guild_id] || {}) : {});
+  const voiceConnectedChannelId = useDiscordVoiceStore((s) => s.channelId);
+  const isVoiceConnected = isVoiceChannel && voiceConnectedChannelId === channel.id;
   const voiceUserCount = useMemo(() => {
     if (!isVoiceChannel) return 0;
     return Object.values(guildVoiceStates).filter((vs) => vs.channel_id === channel.id).length;
@@ -280,22 +284,38 @@ const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId }) =>
   const mentionCount = canView ? (entry?.mention_count ?? 0) : 0;
   const showTyping = canView && !isVoiceChannel && typingUsers.length > 0 && !mentionCount;
 
-  const Wrapper = canView ? Link : 'div';
-  const wrapperProps = canView
-    ? { to: `/discord/${channel.guild_id}/${channel.id}`, draggable: 'false' }
-    : {};
+  // Voice channels use a button to join; text channels use Link to navigate
+  const handleVoiceClick = () => {
+    if (!canConnect || !canView) return;
+    DiscordVoiceService.joinVoiceChannel(
+      channel.guild_id,
+      channel.id,
+      channel.name,
+      guildName || '',
+    );
+  };
+
+  const isClickable = canView && (!isVoiceChannel || canConnect);
+  const Wrapper = isVoiceChannel ? 'div' : canView ? Link : 'div';
+  const wrapperProps = isVoiceChannel
+    ? { onClick: handleVoiceClick, role: 'button' }
+    : canView
+      ? { to: `/discord/${channel.guild_id}/${channel.id}`, draggable: 'false' }
+      : {};
 
   return (
     <Wrapper
       {...wrapperProps}
       className={`group relative mx-2 my-0.5 flex items-center rounded-sm px-2 py-1 transition-colors ${
-        !canView
+        !isClickable
           ? 'cursor-not-allowed text-gray-600 opacity-50'
-          : isActive
+          : isVoiceConnected
             ? 'bg-white/[0.11] text-gray-100'
-            : isUnread
-              ? 'text-white hover:bg-white/5'
-              : 'text-gray-500 hover:bg-white/5 hover:text-gray-100'
+            : isActive
+              ? 'bg-white/[0.11] text-gray-100'
+              : isUnread
+                ? 'text-white hover:bg-white/5'
+                : 'cursor-pointer text-gray-500 hover:bg-white/5 hover:text-gray-100'
       }`}
     >
       {/* Unread pill on the left edge */}
@@ -347,7 +367,7 @@ const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId }) =>
   );
 };
 
-const DiscordCategory = ({ category, channels, activeChannelId, joinedAtMs, rulesChannelId }) => {
+const DiscordCategory = ({ category, channels, activeChannelId, joinedAtMs, rulesChannelId, guildName }) => {
   const [expanded, setExpanded] = useState(true);
 
   const sortedChannels = useMemo(() => {
@@ -401,6 +421,7 @@ const DiscordCategory = ({ category, channels, activeChannelId, joinedAtMs, rule
               isActive={channel.id === activeChannelId}
               joinedAtMs={joinedAtMs}
               rulesChannelId={rulesChannelId}
+              guildName={guildName}
             />
             {isVoice && <VoiceChannelMembers guildId={channel.guild_id} channelId={channel.id} />}
           </div>
@@ -481,6 +502,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
   }, [guildId]);
 
   const rulesChannelId = guild?.rules_channel_id || guild?.properties?.rules_channel_id;
+  const guildName = guild?.properties?.name || 'Discord Server';
   const iconUrl = DiscordService.getGuildIconUrl(guild?.id, guild?.properties?.icon, 64);
 
   return (
@@ -522,6 +544,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
                       isActive={channel.id === channelId}
                       joinedAtMs={joinedAtMs}
                       rulesChannelId={rulesChannelId}
+                      guildName={guildName}
                     />
                     {isVoice && <VoiceChannelMembers guildId={channel.guild_id} channelId={channel.id} />}
                   </div>
@@ -539,6 +562,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
             activeChannelId={channelId}
             joinedAtMs={joinedAtMs}
             rulesChannelId={rulesChannelId}
+            guildName={guildName}
           />
         ))}
       </div>

@@ -37,6 +37,8 @@ import { DiscordService } from '@/discord/services/discord.service';
 import DiscordUserProfileModal from '@/discord/components/DiscordUserProfileModal';
 import VoiceSettingsModal from '@/ignite/components/modals/VoiceSettingsModal';
 import ScreenShareModal from '@/ignite/components/modals/ScreenShareModal';
+import { useDiscordVoiceStore } from '@/discord/store/discord-voice.store';
+import { DiscordVoiceService } from '@/discord/services/discord-voice.service';
 
 function getPingInfo(ping) {
   if (ping === null || ping == 0) return { Icon: WifiHigh, color: 'text-gray-400', label: 'Measuring...' };
@@ -209,6 +211,14 @@ const UserBar = () => {
 
   const isConnected = connectionState !== 'disconnected';
 
+  // Discord voice state
+  const discordVoiceState = useDiscordVoiceStore((s) => s.connectionState);
+  const discordVoiceChannelName = useDiscordVoiceStore((s) => s.channelName);
+  const discordVoiceGuildName = useDiscordVoiceStore((s) => s.guildName);
+  const discordVoiceMuted = useDiscordVoiceStore((s) => s.isMuted);
+  const discordVoiceDeafened = useDiscordVoiceStore((s) => s.isDeafened);
+  const isDiscordVoiceConnected = discordVoiceState !== 'disconnected';
+
   // Poll RTT from LiveKit room
   useEffect(() => {
     if (!room || connectionState !== 'connected') return;
@@ -312,6 +322,76 @@ const UserBar = () => {
         </div>
       )}
 
+      {/* Discord Voice Channel Panel */}
+      {isDiscordVoiceConnected && (
+        <div className="rounded-lg bg-[#1a1a1d] px-3 py-2.5">
+          <div className="mb-2 flex items-center gap-2">
+            <div className="shrink-0">
+              <DiscordLogo className="size-4 text-[#5865f2]" weight="fill" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className={`truncate text-xs font-semibold ${
+                discordVoiceState === 'connecting' ? 'text-yellow-500' :
+                discordVoiceState === 'force_disconnected' ? 'text-red-500' :
+                'text-green-500'
+              }`}>
+                {discordVoiceState === 'connecting' ? 'Connecting...' :
+                 discordVoiceState === 'force_disconnected' ? 'Disconnected' :
+                 'Voice Connected'}
+              </p>
+              <p className="truncate text-[11px] text-gray-400">
+                {discordVoiceChannelName}{discordVoiceGuildName ? ` / ${discordVoiceGuildName}` : ''}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => DiscordVoiceService.toggleMute()}
+              className={`flex flex-1 items-center justify-center gap-2 rounded py-2 px-3 text-sm font-medium transition-colors ${
+                discordVoiceMuted
+                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                  : 'bg-[#2a2a2d] text-gray-300 hover:bg-[#35353a]'
+              }`}
+              title={discordVoiceMuted ? 'Unmute' : 'Mute'}
+            >
+              {discordVoiceMuted ? (
+                <MicrophoneSlash className="size-5" weight="fill" />
+              ) : (
+                <Microphone className="size-5" weight="fill" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => DiscordVoiceService.toggleDeafen()}
+              className={`flex flex-1 items-center justify-center gap-2 rounded py-2 px-3 text-sm font-medium transition-colors ${
+                discordVoiceDeafened
+                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                  : 'bg-[#2a2a2d] text-gray-300 hover:bg-[#35353a]'
+              }`}
+              title={discordVoiceDeafened ? 'Undeafen' : 'Deafen'}
+            >
+              {discordVoiceDeafened ? (
+                <SpeakerSlash className="size-5" weight="fill" />
+              ) : (
+                <SpeakerHigh className="size-5" weight="fill" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => DiscordVoiceService.leaveVoiceChannel()}
+              className="flex size-9 shrink-0 items-center justify-center rounded bg-[#2a2a2d] text-gray-300 transition-colors hover:bg-red-500/20 hover:text-red-400"
+              title="Disconnect"
+            >
+              <PhoneDisconnect className="size-5" weight="fill" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* User Info Bar */}
       <div className="flex items-center rounded-lg bg-[#1a1a1d] px-2.5 py-2.5">
         <Popover>
@@ -351,14 +431,21 @@ const UserBar = () => {
         <div className="flex shrink-0 items-center gap-0.5">
           <button
             type="button"
-            onClick={() => VoiceService.toggleMute()}
-            className={`flex size-9 items-center justify-center rounded transition-colors ${isMuted
+            onClick={() => {
+              if (isDiscordVoiceConnected) {
+                DiscordVoiceService.toggleMute();
+              } else {
+                VoiceService.toggleMute();
+              }
+            }}
+            className={`flex size-9 items-center justify-center rounded transition-colors ${
+              (isDiscordVoiceConnected ? discordVoiceMuted : isMuted)
                 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                 : 'hover:bg-white/5'
               }`}
-            title={isMuted ? 'Unmute' : 'Mute'}
+            title={(isDiscordVoiceConnected ? discordVoiceMuted : isMuted) ? 'Unmute' : 'Mute'}
           >
-            {isMuted ? (
+            {(isDiscordVoiceConnected ? discordVoiceMuted : isMuted) ? (
               <MicrophoneSlash className="size-5 text-red-400" weight="fill" />
             ) : (
               <Microphone className="size-5 text-gray-400 hover:text-gray-200" weight="fill" />
@@ -367,14 +454,21 @@ const UserBar = () => {
 
           <button
             type="button"
-            onClick={() => VoiceService.toggleDeafen()}
-            className={`flex size-9 items-center justify-center rounded transition-colors ${isDeafened
+            onClick={() => {
+              if (isDiscordVoiceConnected) {
+                DiscordVoiceService.toggleDeafen();
+              } else {
+                VoiceService.toggleDeafen();
+              }
+            }}
+            className={`flex size-9 items-center justify-center rounded transition-colors ${
+              (isDiscordVoiceConnected ? discordVoiceDeafened : isDeafened)
                 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                 : 'hover:bg-white/5'
               }`}
-            title={isDeafened ? 'Undeafen' : 'Deafen'}
+            title={(isDiscordVoiceConnected ? discordVoiceDeafened : isDeafened) ? 'Undeafen' : 'Deafen'}
           >
-            {isDeafened ? (
+            {(isDiscordVoiceConnected ? discordVoiceDeafened : isDeafened) ? (
               <SpeakerSlash className="size-5 text-red-400" weight="fill" />
             ) : (
               <SpeakerHigh className="size-5 text-gray-400 hover:text-gray-200" weight="fill" />
