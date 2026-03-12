@@ -116,23 +116,12 @@ const DMWelcome = ({ channel }) => {
   if (!user) return null;
 
   return (
-    <div className="px-4 pb-4 pt-8">
-      {/* Banner */}
-      <div
-        className={cn('h-28 w-full rounded-t-lg', !user.banner_color && 'bg-primary')}
-        style={{
-          backgroundColor: user.banner_color,
-          backgroundImage: user.banner_url ? `url(${user.banner_url})` : 'none',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
-
+    <div className="pb-4 pt-14">
       {/* Avatar overlapping banner */}
       <div className="relative px-4">
         <div className="absolute -top-[40px]">
           <div
-            className="group relative cursor-pointer rounded-full ring-[5px] ring-[#313338]"
+            className="group relative cursor-pointer rounded-full"
             onClick={() => useModalStore.getState().push(UserProfileModal, { userId: user.id })}
           >
             <Avatar user={user} size={80} className="text-3xl" showStatus />
