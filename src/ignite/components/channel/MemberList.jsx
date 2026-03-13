@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, act } from 'react';
 import { useChannelContext } from '../../contexts/ChannelContext.jsx';
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useContextMenuStore } from '@/store/context-menu.store';
 import GuildMemberContextMenu from '../context-menus/GuildMemberContextMenu.jsx';
 import GuildMemberPopoverContent from '../popovers/GuildMemberPopoverContent.jsx';
 import UserProfileModal from '@/ignite/components/modals/UserProfileModal.jsx';
@@ -17,53 +17,45 @@ import OwnerCrown from '@/components/OwnerCrown';
 const MemberListItem = ({ member, guildId, isOwner, popoverOpen, setPopoverOpen }) => {
   const userFromStore = useUsersStore((state) => state.users[member.user.id]);
   const status = userFromStore?.status ?? member.user.status;
+  const openContextMenu = useContextMenuStore((s) => s.open);
 
   const topColor = useMemo(() => {
     if (!member.roles || member.roles.length === 0) return 'inherit';
 
-    // Sort by position descending (highest position first)
     const sorted = [...member.roles].sort((a, b) => b.position - a.position);
-
-    // Find the first role that has a non-zero color
     const topRole = sorted.find((r) => r.color && r.color !== 0);
 
     if (!topRole) return 'inherit';
 
-    // Convert integer color to Hex (e.g., 16711680 -> #ff0000)
     return `#${topRole.color.toString(16).padStart(6, '0')}`;
   }, [member.roles]);
 
+  const handleViewProfile = () => {
+    setPopoverOpen(false);
+    useModalStore.getState().push(UserProfileModal, { userId: member.user.id, guildId });
+  };
+
   return (
     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-      <ContextMenu>
-        <PopoverTrigger className="w-full text-left">
-          <ContextMenuTrigger>
-            <div className={`flex items-center gap-3 rounded-md p-2 transition hover:bg-gray-700/50 ${status === 'offline' ? 'opacity-40' : ''}`}>
-              <div className="shrink-0">
-                <Avatar user={member.user} size={32} showStatus />
-              </div>
-              <div className="flex min-w-0 flex-1 items-center gap-1">
-                <p
-                  className="truncate text-sm font-medium"
-                  style={{ color: topColor }}
-                >
-                  {member.user.name ?? member.user.username}
-                </p>
-                {isOwner && <OwnerCrown />}
-              </div>
-            </div>
-          </ContextMenuTrigger>
-        </PopoverTrigger>
-        <ContextMenuContent>
-          <GuildMemberContextMenu
-            user={member.user}
-            onViewProfile={() => {
-              setPopoverOpen(false);
-              useModalStore.getState().push(UserProfileModal, { userId: member.user.id, guildId });
-            }}
-          />
-        </ContextMenuContent>
-      </ContextMenu>
+      <PopoverTrigger
+        className="w-full text-left"
+        onContextMenu={(e) => openContextMenu(GuildMemberContextMenu, { user: member.user, onViewProfile: handleViewProfile }, e)}
+      >
+        <div className={`flex items-center gap-3 rounded-md p-2 transition hover:bg-gray-700/50 ${status === 'offline' ? 'opacity-40' : ''}`}>
+          <div className="shrink-0">
+            <Avatar user={member.user} size={32} showStatus />
+          </div>
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            <p
+              className="truncate text-sm font-medium"
+              style={{ color: topColor }}
+            >
+              {member.user.name ?? member.user.username}
+            </p>
+            {isOwner && <OwnerCrown />}
+          </div>
+        </div>
+      </PopoverTrigger>
       <PopoverContent
         className="w-auto border-none bg-transparent p-0 shadow-none"
         align="start"
@@ -72,10 +64,7 @@ const MemberListItem = ({ member, guildId, isOwner, popoverOpen, setPopoverOpen 
         <GuildMemberPopoverContent
           userId={member.user.id}
           guild={null}
-          onOpenProfile={() => {
-            setPopoverOpen(false);
-            useModalStore.getState().push(UserProfileModal, { userId: member.user.id, guildId });
-          }}
+          onOpenProfile={handleViewProfile}
         />
       </PopoverContent>
     </Popover>

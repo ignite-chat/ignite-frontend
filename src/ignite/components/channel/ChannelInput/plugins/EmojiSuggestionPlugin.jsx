@@ -9,11 +9,10 @@ import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { emojiMap, getTwemojiUrl } from '@/utils/emoji.utils';
 import {
-  ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuTrigger,
 } from '@/components/ui/context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
 import { toast } from 'sonner';
 
 const SUGGESTIONS_LIMIT = 10;
@@ -150,46 +149,50 @@ export default function EmojiSuggestionPlugin({ guildEmojis, guildId, menuContai
                   onClick={() => selectOptionAndCleanUp(option)}
                   onMouseDown={(e) => e.preventDefault()}
                 >
-                  <div className="flex-1 truncate font-medium text-gray-200">
-                    <ContextMenu>
-                      <ContextMenuTrigger asChild>
-                        <div className="flex w-full cursor-default items-center gap-3">
-                          {option.custom ? (
-                            <img
-                              src={option.imageUrl}
-                              alt={option.shortcode}
-                              className="size-6 shrink-0 object-contain"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <img
-                              src={getTwemojiUrl(option.emoji)}
-                              alt={option.emoji}
-                              className="size-6 shrink-0 object-contain"
-                              loading="lazy"
-                            />
-                          )}
-                          <div className="flex-1 truncate font-medium text-gray-200">
-                            {option.displayName}
-                          </div>
-                        </div>
-                      </ContextMenuTrigger>
-                      {option.custom && (
-                        <ContextMenuContent className="w-48">
-                          <ContextMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (option.id) {
-                                navigator.clipboard.writeText(option.id);
-                                toast.success('Emoji ID copied to clipboard');
-                              }
-                            }}
-                          >
-                            Copy Emoji ID
-                          </ContextMenuItem>
-                        </ContextMenuContent>
-                      )}
-                    </ContextMenu>
+                  <div
+                    className="flex w-full cursor-default items-center gap-3"
+                    onContextMenu={(e) => {
+                      if (option.custom) {
+                        useContextMenuStore.getState().open(
+                          () => (
+                            <ContextMenuContent className="w-48">
+                              <ContextMenuItem
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  if (option.id) {
+                                    navigator.clipboard.writeText(option.id);
+                                    toast.success('Emoji ID copied to clipboard');
+                                  }
+                                }}
+                              >
+                                Copy Emoji ID
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          ),
+                          {},
+                          e
+                        );
+                      }
+                    }}
+                  >
+                    {option.custom ? (
+                      <img
+                        src={option.imageUrl}
+                        alt={option.shortcode}
+                        className="size-6 shrink-0 object-contain"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <img
+                        src={getTwemojiUrl(option.emoji)}
+                        alt={option.emoji}
+                        className="size-6 shrink-0 object-contain"
+                        loading="lazy"
+                      />
+                    )}
+                    <div className="flex-1 truncate font-medium text-gray-200">
+                      {option.displayName}
+                    </div>
                   </div>
                 </button>
               ))}

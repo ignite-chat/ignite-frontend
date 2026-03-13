@@ -1,10 +1,10 @@
-import { useState, useCallback, useMemo, memo } from 'react';
+import { useCallback, useMemo, memo } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import api from '@/ignite/api';
 import { useUsersStore } from '../../store/users.store';
 import { useChannelsStore } from '../../store/channels.store';
-import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
 import MessageAvatar from './MessageAvatar';
 import MessageContent from './MessageContent.jsx';
 import MessageHeader from './MessageHeader';
@@ -29,9 +29,9 @@ const Message = memo(
     guildId,
   }) => {
     const currentUser = useUsersStore((s) => s.getCurrentUser());
-    const [contextImageUrl, setContextImageUrl] = useState(null);
     const { setReplyingId, replyingId } = useChannelContext();
     const channelId = message.channel_id;
+    const openContextMenu = useContextMenuStore((s) => s.open);
 
     const hasReply = message.message_references?.length > 0;
     const replyMessageId = hasReply ? message.message_references[0].message_id : null;
@@ -104,127 +104,128 @@ const Message = memo(
       !isEditing && !isReplyingTo && !isMentioned && 'hover:bg-gray-800/40'
     );
 
+    const handleContextMenu = useCallback((e) => {
+      const img = e.target.closest('img');
+      const isEmoji = img?.classList.contains('align-text-bottom');
+      const imageUrl = !isEmoji ? img?.src || null : null;
+      openContextMenu(
+        MessageContextMenu,
+        {
+          message,
+          canEdit,
+          canDelete,
+          onEdit: () => setEditingId(message.id),
+          onDelete: handleDelete,
+          onReply: () => setReplyingId(message.id),
+          guildId,
+          channelId,
+          imageUrl,
+        },
+        e
+      );
+    }, [openContextMenu, message, canEdit, canDelete, setEditingId, handleDelete, setReplyingId, guildId, channelId]);
+
     return (
-      <ContextMenu onOpenChange={(open) => { if (!open) setContextImageUrl(null); }}>
-        <ContextMenuTrigger asChild>
-          <div
-            className={messageClasses}
-            onContextMenu={(e) => {
-              const img = e.target.closest('img');
-              const isEmoji = img?.classList.contains('align-text-bottom');
-              setContextImageUrl(!isEmoji ? img?.src || null : null);
-            }}
-          >
-          {hasReply && (
-            <div className="flex items-start gap-2 px-4">
-              <div className="mt-2 flex w-10">
-                <svg
-                  width="33"
-                  height="20"
-                  viewBox="0 0 33 20"
+      <div
+        className={messageClasses}
+        onContextMenu={handleContextMenu}
+      >
+        {hasReply && (
+          <div className="flex items-start gap-2 px-4">
+            <div className="mt-2 flex w-10">
+              <svg
+                width="33"
+                height="20"
+                viewBox="0 0 33 20"
+                fill="none"
+                className="text-gray-500"
+              >
+                <path
+                  d="M17 15V10C17 5.58172 20.5817 2 25 2H33"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
                   fill="none"
-                  className="text-gray-500"
-                >
-                  <path
-                    d="M17 15V10C17 5.58172 20.5817 2 25 2H33"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                </svg>
-              </div>
-              <MessageReplyBar referenceMessageId={replyMessageId} messages={allMessages} />
+                />
+              </svg>
             </div>
+            <MessageReplyBar referenceMessageId={replyMessageId} messages={allMessages} />
+          </div>
+        )}
+        <div className="flex items-start gap-4 px-4">
+          {shouldStack ? (
+            <div className="w-10" />
+          ) : (
+            <MessageAvatar user={message.author} guildId={guildId} />
           )}
-          <div className="flex items-start gap-4 px-4">
-            {shouldStack ? (
-              <div className="w-10" />
+
+          <div className="flex flex-1 flex-col items-start justify-start">
+            {!shouldStack && <MessageHeader message={message} />}
+
+            {isEditing ? (
+              <MessageEditor
+                initialContent={message.content}
+                onSave={handleSaveEdit}
+                onCancel={() => setEditingId(null)}
+              />
             ) : (
-              <MessageAvatar user={message.author} guildId={guildId} />
+              <div
+                className={cn(
+                  'select-text whitespace-pre-wrap break-words text-gray-400 [overflow-wrap:anywhere]',
+                  pending && 'opacity-50'
+                )}
+              >
+                <MessageContent content={message.content} stickers={message.stickers} attachments={message.attachments} author={message.author} timestamp={message.created_at} />
+                {message.updated_at && message.created_at !== message.updated_at && (
+                  <span className="ml-1 text-[0.65rem] text-gray-500">(edited)</span>
+                )}
+              </div>
             )}
 
-            <div className="flex flex-1 flex-col items-start justify-start">
-              {!shouldStack && <MessageHeader message={message} />}
-
-              {isEditing ? (
-                <MessageEditor
-                  initialContent={message.content}
-                  onSave={handleSaveEdit}
-                  onCancel={() => setEditingId(null)}
-                />
-              ) : (
-                <div
-                  className={cn(
-                    'select-text whitespace-pre-wrap break-words text-gray-400 [overflow-wrap:anywhere]',
-                    pending && 'opacity-50'
-                  )}
-                >
-                  <MessageContent content={message.content} stickers={message.stickers} attachments={message.attachments} author={message.author} timestamp={message.created_at} />
-                  {message.updated_at && message.created_at !== message.updated_at && (
-                    <span className="ml-1 text-[0.65rem] text-gray-500">(edited)</span>
-                  )}
-                </div>
-              )}
-
-              {pending && message.attachments?.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {message.attachments.map((att) => (
-                    <span
-                      key={att.id}
-                      className="inline-flex items-center gap-1 rounded bg-[#2b2d31] px-2 py-0.5 text-xs text-[#949ba4]"
-                    >
-                      <Paperclip className="size-3" />
-                      {att.filename}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {pending && message.uploadProgress !== undefined && (
-                <div className="mt-1.5 flex items-center gap-2">
-                  <div className="h-1 flex-1 overflow-hidden rounded-full bg-[#1e1f22]">
-                    <div
-                      className="h-full rounded-full bg-[#5865f2] transition-[width] duration-200"
-                      style={{ width: `${message.uploadProgress}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] tabular-nums text-[#949ba4]">
-                    {message.uploadProgress}%
+            {pending && message.attachments?.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {message.attachments.map((att) => (
+                  <span
+                    key={att.id}
+                    className="inline-flex items-center gap-1 rounded bg-[#2b2d31] px-2 py-0.5 text-xs text-[#949ba4]"
+                  >
+                    <Paperclip className="size-3" />
+                    {att.filename}
                   </span>
+                ))}
+              </div>
+            )}
+
+            {pending && message.uploadProgress !== undefined && (
+              <div className="mt-1.5 flex items-center gap-2">
+                <div className="h-1 flex-1 overflow-hidden rounded-full bg-[#1e1f22]">
+                  <div
+                    className="h-full rounded-full bg-[#5865f2] transition-[width] duration-200"
+                    style={{ width: `${message.uploadProgress}%` }}
+                  />
                 </div>
-              )}
+                <span className="text-[10px] tabular-nums text-[#949ba4]">
+                  {message.uploadProgress}%
+                </span>
+              </div>
+            )}
 
-              <MessageReactions message={message} channelId={channelId} />
-            </div>
+            <MessageReactions message={message} channelId={channelId} />
           </div>
-
-          {!isEditing && !pending && (
-            <MessageActions
-              message={message}
-              channelId={channelId}
-              canEdit={canEdit}
-              canDelete={canDelete}
-              onEdit={() => setEditingId(message.id)}
-              onDelete={handleDelete}
-              onReply={() => setReplyingId(message.id)}
-            />
-          )}
         </div>
-        </ContextMenuTrigger>
 
-        <MessageContextMenu
-          message={message}
-          canEdit={canEdit}
-          canDelete={canDelete}
-          onEdit={() => setEditingId(message.id)}
-          onDelete={handleDelete}
-          onReply={() => setReplyingId(message.id)}
-          guildId={guildId}
-          channelId={channelId}
-          imageUrl={contextImageUrl}
-        />
-      </ContextMenu>
+        {!isEditing && !pending && (
+          <MessageActions
+            message={message}
+            channelId={channelId}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onEdit={() => setEditingId(message.id)}
+            onDelete={handleDelete}
+            onReply={() => setReplyingId(message.id)}
+          />
+        )}
+      </div>
     );
   }
 );

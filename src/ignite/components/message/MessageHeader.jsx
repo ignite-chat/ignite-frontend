@@ -3,7 +3,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useGuildContext } from '../../contexts/GuildContext';
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
 import GuildMemberContextMenu from '../context-menus/GuildMemberContextMenu';
 import GuildMemberPopoverContent from '../popovers/GuildMemberPopoverContent';
 import UserProfileModal from '@/ignite/components/modals/UserProfileModal';
@@ -13,6 +13,7 @@ const MessageHeader = ({ message }) => {
   const { guildId } = useGuildContext();
   const guildsStore = useGuildsStore();
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const openContextMenu = useContextMenuStore((s) => s.open);
 
   const authorColor = useMemo(() => {
     const members = guildsStore.guildMembers[guildId] || [];
@@ -53,19 +54,17 @@ const MessageHeader = ({ message }) => {
   return (
     <div className="relative mb-1 flex justify-start leading-none">
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-        <ContextMenu>
-          <ContextMenuTrigger>
-            <PopoverTrigger asChild>
-              <button type="button" className="font-semibold leading-none" style={{ color: authorColor }}>
-                {message?.author.name} {message?.author.is_webhook && <Badge>Webhook</Badge>}{' '}
-                {message?.author.is_bot && <Badge>Bot</Badge>}
-              </button>
-            </PopoverTrigger>
-          </ContextMenuTrigger>
-          <ContextMenuContent>
-            <GuildMemberContextMenu user={message.author} onViewProfile={handleViewProfile} />
-          </ContextMenuContent>
-        </ContextMenu>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="font-semibold leading-none"
+            style={{ color: authorColor }}
+            onContextMenu={(e) => openContextMenu(GuildMemberContextMenu, { user: message.author, onViewProfile: handleViewProfile }, e)}
+          >
+            {message?.author.name} {message?.author.is_webhook && <Badge>Webhook</Badge>}{' '}
+            {message?.author.is_bot && <Badge>Bot</Badge>}
+          </button>
+        </PopoverTrigger>
         <PopoverContent
           className="w-auto border-none bg-transparent p-0 shadow-none"
           align="start"

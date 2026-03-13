@@ -7,12 +7,13 @@ import api from '@/ignite/api';
 import { FriendsService } from '../../services/friends.service';
 import { useFriendsStore } from '../../store/friends.store';
 import {
+  ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuSub,
   ContextMenuSubTrigger,
   ContextMenuSubContent,
-  ContextMenuCheckboxItem, // Using CheckboxItem is standard for toggling roles
+  ContextMenuCheckboxItem,
 } from '@/components/ui/context-menu';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useRolesStore } from '../../store/roles.store';
@@ -106,7 +107,7 @@ const GuildMemberContextMenu = ({ user, onViewProfile }) => {
   };
 
   return (
-    <>
+    <ContextMenuContent className="w-52">
       <ContextMenuItem
         className="justify-between"
         onSelect={() =>
@@ -247,7 +248,7 @@ const GuildMemberContextMenu = ({ user, onViewProfile }) => {
         Debug Info
         <Bug className="ml-auto size-[18px]" weight="fill" />
       </ContextMenuItem>
-    </>
+    </ContextMenuContent>
   );
 };
 

@@ -1,8 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { MailIcon, Search, X } from 'lucide-react';
-import { DiscordLogo } from '@phosphor-icons/react';
+import { Search, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { InputGroup, InputGroupInput, InputGroupAddon } from '@/components/ui/input-group';
@@ -14,7 +12,6 @@ import { DiscordService } from '@/discord/services/discord.service';
 import { DiscordApiService } from '@/discord/services/discord-api.service';
 import { useDiscordProfilesStore } from '@/discord/store/discord-profiles.store';
 import type { DiscordChannel, DiscordUser } from '@/discord/types';
-import DiscordActivitiesPanel from '@/discord/components/DiscordActivitiesPanel';
 
 type Tab = 'requests' | 'spam';
 
@@ -226,99 +223,84 @@ const MessageRequests = () => {
   const totalSpam = spamChannels.length;
 
   return (
-    <div className="flex h-full flex-col select-none truncate">
-      {/* Header */}
-      <header className="flex h-12 items-center justify-between border-b border-white/5 px-4 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 font-semibold text-[#f2f3f5]">
-            <MailIcon size={20} className="text-[#80848e]" />
-            Message Requests
-          </div>
-          <Separator orientation="vertical" className="h-6 bg-[#4e5058]" />
-          <nav className="flex items-center gap-2">
-            <Button
-              variant={activeTab === 'requests' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 px-3 text-sm font-medium"
-              onClick={() => setActiveTab('requests')}
-            >
-              Requests
-            </Button>
-            <Button
-              variant={activeTab === 'spam' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 px-3 text-sm font-medium"
-              onClick={() => setActiveTab('spam')}
-            >
-              Spam
-            </Button>
-          </nav>
+    <div className="flex min-h-0 flex-1">
+      <div className="flex flex-1 flex-col overflow-y-auto p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <Button
+            variant={activeTab === 'requests' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-7 px-3 text-sm font-medium"
+            onClick={() => setActiveTab('requests')}
+          >
+            Requests
+          </Button>
+          <Button
+            variant={activeTab === 'spam' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-7 px-3 text-sm font-medium"
+            onClick={() => setActiveTab('spam')}
+          >
+            Spam
+          </Button>
         </div>
-      </header>
 
-      {/* Content + Activities sidebar */}
-      <div className="flex min-h-0 flex-1">
-        <div className="flex flex-1 flex-col overflow-y-auto p-6">
-          <div className="mb-4">
-            <InputGroup className="border-white/5 bg-[#17171a]">
-              <InputGroupAddon>
-                <Search size={16} className="text-white" />
+        <div className="mb-4">
+          <InputGroup className="border-white/5 bg-[#17171a]">
+            <InputGroupAddon>
+              <Search size={16} className="text-white" />
+            </InputGroupAddon>
+            <InputGroupInput
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="text-white placeholder:text-gray-500"
+            />
+            {searchQuery && (
+              <InputGroupAddon align="inline-end">
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="flex size-4 items-center justify-center rounded-full bg-gray-500 text-gray-900 hover:bg-gray-400"
+                  type="button"
+                  aria-label="Clear search"
+                >
+                  <X size={10} strokeWidth={4} />
+                </button>
               </InputGroupAddon>
-              <InputGroupInput
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="text-white placeholder:text-gray-500"
-              />
-              {searchQuery && (
-                <InputGroupAddon align="inline-end">
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="flex size-4 items-center justify-center rounded-full bg-gray-500 text-gray-900 hover:bg-gray-400"
-                    type="button"
-                    aria-label="Clear search"
-                  >
-                    <X size={10} strokeWidth={4} />
-                  </button>
-                </InputGroupAddon>
-              )}
-            </InputGroup>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {activeTab === 'requests' && (
-              <div className="text-[12px] font-medium text-gray-400">
-                Pending Requests — {totalRequests}
-              </div>
             )}
-            {activeTab === 'spam' && (
-              <div className="text-[12px] font-medium text-gray-400">
-                Spam — {totalSpam}
-              </div>
-            )}
-
-            {filteredItems.length === 0 ? (
-              <div className="flex h-64 items-center justify-center">
-                <p className="text-sm text-gray-500">
-                  {searchQuery.trim()
-                    ? 'No matching message requests found.'
-                    : activeTab === 'requests'
-                      ? 'No pending message requests.'
-                      : 'No spam message requests.'}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-0">
-                {filteredItems.map(({ channel, user }) => (
-                  <MessageRequestRow key={channel.id} channel={channel} user={user} />
-                ))}
-              </div>
-            )}
-          </div>
+          </InputGroup>
         </div>
 
-        {discordConnected && <DiscordActivitiesPanel />}
+        <div className="flex-1 overflow-y-auto">
+          {activeTab === 'requests' && (
+            <div className="text-[12px] font-medium text-gray-400">
+              Pending Requests — {totalRequests}
+            </div>
+          )}
+          {activeTab === 'spam' && (
+            <div className="text-[12px] font-medium text-gray-400">
+              Spam — {totalSpam}
+            </div>
+          )}
+
+          {filteredItems.length === 0 ? (
+            <div className="flex h-64 items-center justify-center">
+              <p className="text-sm text-gray-500">
+                {searchQuery.trim()
+                  ? 'No matching message requests found.'
+                  : activeTab === 'requests'
+                    ? 'No pending message requests.'
+                    : 'No spam message requests.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-0">
+              {filteredItems.map(({ channel, user }) => (
+                <MessageRequestRow key={channel.id} channel={channel} user={user} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

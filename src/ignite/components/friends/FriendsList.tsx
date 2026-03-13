@@ -8,12 +8,11 @@ import { ChannelsService } from '@/ignite/services/channels.service';
 import RemoveFriendModal from '@/ignite/components/modals/RemoveFriendModal';
 import { useChannelsStore } from '@/ignite/store/channels.store';
 import {
-  ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-  ContextMenuTrigger,
 } from '@/components/ui/context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
 import UserProfileModal from '@/ignite/components/modals/UserProfileModal';
 import { useModalStore } from '@/ignite/store/modal.store';
 import { useUsersStore } from '@/ignite/store/users.store';
@@ -90,62 +89,64 @@ const FriendRow = ({ friend }: FriendRowProps) => {
     toast.success('User ID copied to clipboard.');
   };
 
+  const openContextMenu = useContextMenuStore((s) => s.open);
+
+  const FriendRowMenu = () => (
+    <ContextMenuContent className="w-52">
+      <ContextMenuItem onSelect={() => useModalStore.getState().push(UserProfileModal, { userId: friend.id })}>
+        View Profile
+      </ContextMenuItem>
+      <ContextMenuItem onSelect={messageUser}>
+        Message
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuItem className="justify-between" onSelect={handleCopyUserId}>
+        Copy User ID
+        <span className="ml-auto flex h-[18px] items-center rounded-[3px] bg-[#b5bac1] px-1 text-[10px] font-bold leading-none text-[#111214]">ID</span>
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuItem
+        onSelect={deleteFriend}
+        className="text-red-500 hover:bg-red-600/20"
+      >
+        Remove Friend
+      </ContextMenuItem>
+    </ContextMenuContent>
+  );
+
   return (
-    <ContextMenu>
-      <ContextMenuTrigger>
-        <div
-          onClick={messageUser}
-          className="border-white/5/30 group flex cursor-pointer items-center justify-between border-t px-2 py-3 hover:rounded-lg hover:bg-gray-600/30"
-        >
-          <div className="flex items-center gap-3">
-            <Avatar user={user} size={32} showStatus showOffline />
-            <div>
-              <div className="text-sm font-bold text-white">
-                {user.name}
-                <span className="ml-1 hidden text-xs text-gray-400 group-hover:inline">
-                  {user.username}
-                </span>
-              </div>
-              <div className="text-xs text-gray-400">{friend.status}</div>
-            </div>
+    <div
+      onClick={messageUser}
+      onContextMenu={(e) => openContextMenu(FriendRowMenu, {}, e)}
+      className="group flex cursor-pointer items-center justify-between px-2 py-3 hover:rounded-lg hover:bg-gray-600/30"
+    >
+      <div className="flex items-center gap-3">
+        <Avatar user={user} size={32} showStatus showOffline />
+        <div>
+          <div className="text-sm font-bold text-white">
+            {user.name}
+            <span className="ml-1 hidden text-xs text-gray-400 group-hover:inline">
+              {user.username}
+            </span>
           </div>
-          <div className="flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-            <button
-              onClick={(e) => { e.stopPropagation(); messageUser(); }}
-              className="flex size-9 items-center justify-center rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
-            >
-              <ChatCircle size={18} weight="fill" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); deleteFriend(); }}
-              className="flex size-9 items-center justify-center rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-red-400"
-            >
-              <UserMinus size={18} />
-            </button>
-          </div>
+          <div className="text-xs text-gray-400">{friend.status}</div>
         </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent className="w-52">
-        <ContextMenuItem onSelect={() => useModalStore.getState().push(UserProfileModal, { userId: friend.id })}>
-          View Profile
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={messageUser}>
-          Message
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem className="justify-between" onSelect={handleCopyUserId}>
-          Copy User ID
-          <span className="ml-auto flex h-[18px] items-center rounded-[3px] bg-[#b5bac1] px-1 text-[10px] font-bold leading-none text-[#111214]">ID</span>
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          onSelect={deleteFriend}
-          className="text-red-500 hover:bg-red-600/20"
+      </div>
+      <div className="flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+        <button
+          onClick={(e) => { e.stopPropagation(); messageUser(); }}
+          className="flex size-9 items-center justify-center rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
         >
-          Remove Friend
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+          <ChatCircle size={18} weight="fill" />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); deleteFriend(); }}
+          className="flex size-9 items-center justify-center rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-red-400"
+        >
+          <UserMinus size={18} />
+        </button>
+      </div>
+    </div>
   );
 };
 
@@ -299,13 +300,15 @@ const FriendsList = ({ friends, discordFriends, filter, searchQuery }: FriendsLi
           <p className="text-sm text-gray-500">No one with that name can be found.</p>
         </div>
       )}
-      {merged.map((item) =>
-        item.source === 'ignite' ? (
-          <FriendRow key={item.data.id} friend={item.data} />
-        ) : (
-          <DiscordFriendRow key={`discord-${item.data.id}`} user={item.data} />
-        )
-      )}
+      <div className="[&>*+*]:border-t [&>*+*]:border-white/5/30">
+        {merged.map((item) =>
+          item.source === 'ignite' ? (
+            <FriendRow key={item.data.id} friend={item.data} />
+          ) : (
+            <DiscordFriendRow key={`discord-${item.data.id}`} user={item.data} />
+          )
+        )}
+      </div>
     </div>
   );
 };

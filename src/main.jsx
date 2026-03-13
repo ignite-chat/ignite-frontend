@@ -24,6 +24,7 @@ import { useSoundStore } from './ignite/store/sound.store';
 import { useInvitesStore } from './ignite/store/invites.store';
 import { Toaster } from './components/ui/sonner';
 import { ModalRoot, useModalStore } from './store/modal.store';
+import { ContextMenuRoot } from './store/context-menu.store';
 import DiscordCaptchaProvider from './discord/components/DiscordCaptchaProvider';
 
 import { useEffect } from 'react';
@@ -96,6 +97,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <App />
       <ModalRoot />
+      <ContextMenuRoot />
       <DiscordCaptchaProvider />
       <Toaster />
       <RouteLogger />

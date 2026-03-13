@@ -1,8 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Users, X, Search } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { X, Search } from 'lucide-react';
 import { InputGroup, InputGroupInput, InputGroupAddon } from '@/components/ui/input-group';
 import { useFriendsStore } from '@/ignite/store/friends.store';
 import { useUsersStore } from '@/ignite/store/users.store';
@@ -14,10 +11,13 @@ import FriendsList from './FriendsList';
 import PendingRequests from './PendingRequests';
 import DiscordActivitiesPanel from '@/discord/components/DiscordActivitiesPanel';
 
-type Tab = 'online' | 'all' | 'pending' | 'add_friend';
+export type FriendsSubTab = 'online' | 'all' | 'pending' | 'add_friend';
 
-const FriendsDashboard = () => {
-  const [activeTab, setActiveTab] = useState<Tab>('online');
+type FriendsDashboardProps = {
+  activeSubTab: FriendsSubTab;
+};
+
+const FriendsDashboard = ({ activeSubTab }: FriendsDashboardProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const { friends, requests } = useFriendsStore();
   const currentUser = useUsersStore((s) => s.getCurrentUser());
@@ -46,10 +46,6 @@ const FriendsDashboard = () => {
       .filter((r): r is typeof r & { user: NonNullable<typeof r.user> } => !!r.user);
   }, [discordConnected, discordRelationships, discordUsersMap]);
 
-  const ignitePendingCount = requests.filter((req) => req.sender_id != currentUser?.id).length;
-  const discordPendingCount = discordPendingRequests.filter((r) => !r.isOutgoing).length;
-  const pendingCount = ignitePendingCount + discordPendingCount;
-
   const filteredFriends = useMemo(() => {
     if (!searchQuery.trim()) return friends;
     const query = searchQuery.toLowerCase();
@@ -60,114 +56,63 @@ const FriendsDashboard = () => {
   }, [friends, searchQuery]);
 
   return (
-    <div className="flex h-full flex-col select-none">
-      {/* Header */}
-      <header className="flex h-12 items-center justify-between border-b border-white/5 px-4 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 font-semibold text-[#f2f3f5]">
-            <Users size={20} className="text-[#80848e]" />
-            Friends
-          </div>
-          <Separator orientation="vertical" className="h-6 bg-[#4e5058]" />
-          <nav className="flex items-center gap-2">
-            <TabButton id="online" label="Online" active={activeTab} onClick={setActiveTab} />
-            <TabButton id="all" label="All" active={activeTab} onClick={setActiveTab} />
-            <TabButton
-              id="pending"
-              label="Pending"
-              active={activeTab}
-              onClick={setActiveTab}
-              count={pendingCount}
-            />
-            <Button
-              variant={activeTab === 'add_friend' ? 'ghost' : 'default'}
-              size="sm"
-              className={`h-7 px-2 text-sm font-medium ${
-                activeTab === 'add_friend'
-                  ? 'text-[#23a559]'
-                  : 'bg-[#248046] text-white hover:bg-[#1a6334]'
-              }`}
-              onClick={() => setActiveTab('add_friend')}
-            >
-              Add Friend
-            </Button>
-          </nav>
-        </div>
-      </header>
+    <div className="flex min-h-0 flex-1">
+      <div className="flex flex-1 flex-col overflow-y-auto p-6">
+        {activeSubTab === 'add_friend' && <AddFriendForm />}
 
-      {/* Content + Activities sidebar */}
-      <div className="flex min-h-0 flex-1">
-        <div className="flex flex-1 flex-col overflow-y-auto p-6">
-          {activeTab === 'add_friend' && <AddFriendForm />}
-
-          {activeTab !== 'add_friend' && (
-            <>
-              <div className="mb-4">
-                <InputGroup className="border-white/5 bg-[#17171a]">
-                  <InputGroupAddon>
-                    <Search size={16} className="text-white" />
+        {activeSubTab !== 'add_friend' && (
+          <>
+            <div className="mb-4">
+              <InputGroup className="border-white/5 bg-[#17171a]">
+                <InputGroupAddon>
+                  <Search size={16} className="text-white" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="text-white placeholder:text-gray-500"
+                />
+                {searchQuery && (
+                  <InputGroupAddon align="inline-end">
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="flex size-4 items-center justify-center rounded-full bg-gray-500 text-gray-900 hover:bg-gray-400"
+                      type="button"
+                      aria-label="Clear search"
+                    >
+                      <X size={10} strokeWidth={4} />
+                    </button>
                   </InputGroupAddon>
-                  <InputGroupInput
-                    type="text"
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="text-white placeholder:text-gray-500"
-                  />
-                  {searchQuery && (
-                    <InputGroupAddon align="inline-end">
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="flex size-4 items-center justify-center rounded-full bg-gray-500 text-gray-900 hover:bg-gray-400"
-                        type="button"
-                        aria-label="Clear search"
-                      >
-                        <X size={10} strokeWidth={4} />
-                      </button>
-                    </InputGroupAddon>
-                  )}
-                </InputGroup>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {(activeTab === 'online' || activeTab === 'all') && (
-                  <FriendsList friends={filteredFriends} discordFriends={discordFriends} filter={activeTab} searchQuery={searchQuery} />
                 )}
-                {activeTab === 'pending' && currentUser && (
-                  <PendingRequests requests={requests} currentUser={currentUser} discordRequests={discordPendingRequests} searchQuery={searchQuery} />
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
-        {discordConnected && <DiscordActivitiesPanel />}
+              </InputGroup>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {(activeSubTab === 'online' || activeSubTab === 'all') && (
+                <FriendsList
+                  friends={filteredFriends}
+                  discordFriends={discordFriends}
+                  filter={activeSubTab}
+                  searchQuery={searchQuery}
+                />
+              )}
+              {activeSubTab === 'pending' && currentUser && (
+                <PendingRequests
+                  requests={requests}
+                  currentUser={currentUser}
+                  discordRequests={discordPendingRequests}
+                  searchQuery={searchQuery}
+                />
+              )}
+            </div>
+          </>
+        )}
       </div>
+
+      {discordConnected && activeSubTab !== 'add_friend' && <DiscordActivitiesPanel />}
     </div>
   );
 };
-
-type TabButtonProps = {
-  id: Tab;
-  label: string;
-  active: Tab;
-  onClick: (id: Tab) => void;
-  count?: number;
-};
-
-const TabButton = ({ id, label, active, onClick, count }: TabButtonProps) => (
-  <Button
-    variant={active === id ? 'secondary' : 'ghost'}
-    size="sm"
-    className="h-7 px-3 text-sm font-medium"
-    onClick={() => onClick(id)}
-  >
-    {label}
-    {count != null && count > 0 && (
-      <Badge className="ml-2 h-4 min-w-4 bg-[#f23f42] p-1 text-[11px] font-bold hover:bg-[#f23f42]">
-        {count}
-      </Badge>
-    )}
-  </Button>
-);
 
 export default FriendsDashboard;

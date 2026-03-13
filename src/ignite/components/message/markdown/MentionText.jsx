@@ -3,7 +3,7 @@ import { useUsersStore } from '@/ignite/store/users.store';
 import { useGuildsStore } from '@/ignite/store/guilds.store';
 import { useGuildContext } from '../../../contexts/GuildContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
 import GuildMemberPopoverContent from '../../popovers/GuildMemberPopoverContent';
 import GuildMemberContextMenu from '../../context-menus/GuildMemberContextMenu';
 
@@ -12,6 +12,7 @@ const MentionText = ({ userId, isReply = false }) => {
   const user = useMemo(() => getUser(userId), [userId, getUser]);
   const { guildId } = useGuildContext();
   const { guildMembers } = useGuildsStore();
+  const openContextMenu = useContextMenuStore((s) => s.open);
 
   const roleColor = useMemo(() => {
     const members = guildMembers[guildId] || [];
@@ -40,27 +41,21 @@ const MentionText = ({ userId, isReply = false }) => {
   }
 
   return (
-    <ContextMenu>
-      <Popover>
-        <ContextMenuTrigger asChild>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className={`inline cursor-pointer rounded px-1 font-medium transition-colors ${roleColor ? 'hover:brightness-110' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 hover:text-blue-300'}`}
-              style={mentionStyle}
-            >
-              @{user.name}
-            </button>
-          </PopoverTrigger>
-        </ContextMenuTrigger>
-        <PopoverContent className="w-auto p-2" align="start" alignOffset={0}>
-          <GuildMemberPopoverContent userId={user.id} guild={null} />
-        </PopoverContent>
-      </Popover>
-      <ContextMenuContent>
-        <GuildMemberContextMenu user={user} />
-      </ContextMenuContent>
-    </ContextMenu>
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={`inline cursor-pointer rounded px-1 font-medium transition-colors ${roleColor ? 'hover:brightness-110' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 hover:text-blue-300'}`}
+          style={mentionStyle}
+          onContextMenu={(e) => openContextMenu(GuildMemberContextMenu, { user }, e)}
+        >
+          @{user.name}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-2" align="start" alignOffset={0}>
+        <GuildMemberPopoverContent userId={user.id} guild={null} />
+      </PopoverContent>
+    </Popover>
   );
 };
 
