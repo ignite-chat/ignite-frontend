@@ -122,26 +122,6 @@ const DirectMessagesPage = () => {
                     <Users size={20} className="text-[#80848e]" />
                     Friends
                   </div>
-                  <Separator orientation="vertical" className="h-6 bg-[#4e5058]" />
-                  {/* Top-level tabs */}
-                  <nav className="flex items-center gap-2">
-                    <TabButton
-                      label="Friends"
-                      isActive={activeTopTab === 'friends'}
-                      onClick={() => {
-                        setActiveTopTab('friends');
-                        navigate('/channels/@me/friends');
-                      }}
-                    />
-                    <TabButton
-                      label="Message Requests"
-                      isActive={activeTopTab === 'message_requests'}
-                      onClick={() => {
-                        setActiveTopTab('message_requests');
-                        navigate('/channels/@me/message-requests');
-                      }}
-                    />
-                  </nav>
                   {/* Subtabs — only when Friends top tab is active */}
                   {activeTopTab === 'friends' && (
                     <>

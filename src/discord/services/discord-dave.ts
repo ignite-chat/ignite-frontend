@@ -1,19 +1,19 @@
 /**
- * Discord DAVE (Discord Audio/Video Encryption) E2EE Protocol
+ * Discord DAVE (Discord Audio/Video Encryption) E2EE Protocol v1.1
  *
- * Implements MLS-based key agreement and SFrame media encryption
- * for Discord voice channels.
- *
- * Cipher suite: MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
- * - X25519 for DHKEM (key encapsulation)
+ * Per protocol.md:
+ * Cipher suite: MLS_128_DHKEMP256_AES128GCM_SHA256_P256 (MLS ciphersuite 2)
+ * - P-256 (ECDH) for DHKEM key encapsulation
  * - AES-128-GCM for AEAD
  * - SHA-256 for hashing
- * - Ed25519 for signatures
+ * - ECDSA P-256 for signatures
+ *
+ * Vector length headers use MLS variable-size format (RFC 9420 Section 2.1.2).
  */
 
-// ─── TLS Wire Format Utilities ─────────────────────────────────
+// ─── MLS Variable-Size Wire Format Utilities ─────────────────
 
-class TLSWriter {
+class MLSWriter {
   private buf: number[] = [];
 
   writeUint8(v: number) {
@@ -28,24 +28,34 @@ class TLSWriter {
     this.buf.push((v >> 24) & 0xff, (v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff);
   }
 
-  writeUint64(v: number) {
-    // JS numbers are fine for our range
-    const hi = Math.floor(v / 0x100000000);
-    const lo = v >>> 0;
-    this.writeUint32(hi);
-    this.writeUint32(lo);
-  }
-
   writeBytes(data: Uint8Array) {
     for (let i = 0; i < data.length; i++) this.buf.push(data[i]);
   }
 
-  /** Write a variable-length vector with a length prefix of 1, 2, or 4 bytes. */
-  writeVector(data: Uint8Array, lengthBytes: 1 | 2 | 4) {
-    if (lengthBytes === 1) this.writeUint8(data.length);
-    else if (lengthBytes === 2) this.writeUint16(data.length);
-    else this.writeUint32(data.length);
+  /**
+   * Write a variable-length vector with MLS variable-size length header.
+   * Per RFC 9420 Section 2.1.2:
+   * - 1 byte for lengths 0-63       (top 2 bits: 00)
+   * - 2 bytes for lengths 64-16383  (top 2 bits: 01)
+   * - 4 bytes for lengths 16384+    (top 2 bits: 10)
+   */
+  writeVarVector(data: Uint8Array) {
+    this._writeVarLen(data.length);
     this.writeBytes(data);
+  }
+
+  _writeVarLen(len: number) {
+    if (len < 64) {
+      this.writeUint8(len); // top 2 bits = 00
+    } else if (len < 16384) {
+      this.writeUint8(0x40 | ((len >> 8) & 0x3f));
+      this.writeUint8(len & 0xff);
+    } else {
+      this.writeUint8(0x80 | ((len >> 24) & 0x3f));
+      this.writeUint8((len >> 16) & 0xff);
+      this.writeUint8((len >> 8) & 0xff);
+      this.writeUint8(len & 0xff);
+    }
   }
 
   toUint8Array(): Uint8Array {
@@ -53,54 +63,67 @@ class TLSWriter {
   }
 }
 
-class TLSReader {
-  private view: DataView;
+class MLSReader {
+  private data: Uint8Array;
   private pos: number = 0;
 
   constructor(data: Uint8Array) {
-    this.view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    this.data = data;
   }
 
   get offset() {
     return this.pos;
   }
   get remaining() {
-    return this.view.byteLength - this.pos;
+    return this.data.length - this.pos;
   }
 
   readUint8(): number {
-    return this.view.getUint8(this.pos++);
+    return this.data[this.pos++];
   }
 
   readUint16(): number {
-    const v = this.view.getUint16(this.pos);
+    const v = (this.data[this.pos] << 8) | this.data[this.pos + 1];
     this.pos += 2;
     return v;
   }
 
   readUint32(): number {
-    const v = this.view.getUint32(this.pos);
+    const v =
+      (this.data[this.pos] << 24) |
+      (this.data[this.pos + 1] << 16) |
+      (this.data[this.pos + 2] << 8) |
+      this.data[this.pos + 3];
     this.pos += 4;
-    return v;
-  }
-
-  readUint64(): number {
-    const hi = this.readUint32();
-    const lo = this.readUint32();
-    return hi * 0x100000000 + lo;
+    return v >>> 0;
   }
 
   readBytes(n: number): Uint8Array {
-    const slice = new Uint8Array(this.view.buffer, this.view.byteOffset + this.pos, n);
+    const slice = this.data.subarray(this.pos, this.pos + n);
     this.pos += n;
-    return new Uint8Array(slice); // copy
+    return new Uint8Array(slice);
   }
 
-  readVector(lengthBytes: 1 | 2 | 4): Uint8Array {
-    let len: number;
-    if (lengthBytes === 1) len = this.readUint8();
-    else if (lengthBytes === 2) len = this.readUint16();
-    else len = this.readUint32();
+  /** Read MLS variable-size length header */
+  readVarLen(): number {
+    const first = this.data[this.pos++];
+    const tag = first >> 6;
+    if (tag === 0) {
+      return first & 0x3f;
+    } else if (tag === 1) {
+      const second = this.data[this.pos++];
+      return ((first & 0x3f) << 8) | second;
+    } else {
+      const b1 = this.data[this.pos++];
+      const b2 = this.data[this.pos++];
+      const b3 = this.data[this.pos++];
+      return (((first & 0x3f) << 24) | (b1 << 16) | (b2 << 8) | b3) >>> 0;
+    }
+  }
+
+  /** Read a variable-length vector with MLS variable-size length header */
+  readVarVector(): Uint8Array {
+    const len = this.readVarLen();
     return this.readBytes(len);
   }
 }
@@ -108,17 +131,29 @@ class TLSReader {
 // ─── Crypto Helpers ────────────────────────────────────────────
 
 async function hkdfExtract(salt: Uint8Array, ikm: Uint8Array): Promise<Uint8Array> {
-  const key = await crypto.subtle.importKey('raw', salt.length > 0 ? salt : new Uint8Array(32), 'HMAC', false, [
-    'sign',
-  ]);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    salt.length > 0 ? salt : new Uint8Array(32),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
   const prk = await crypto.subtle.sign('HMAC', key, ikm);
   return new Uint8Array(prk);
 }
 
-async function hkdfExpand(prk: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
-  const key = await crypto.subtle.importKey('raw', prk, { name: 'HMAC', hash: 'SHA-256' }, false, [
-    'sign',
-  ]);
+async function hkdfExpand(
+  prk: Uint8Array,
+  info: Uint8Array,
+  length: number,
+): Promise<Uint8Array> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    prk,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
   const result = new Uint8Array(length);
   let t = new Uint8Array(0);
   let offset = 0;
@@ -138,27 +173,10 @@ async function hkdfExpand(prk: Uint8Array, info: Uint8Array, length: number): Pr
   return result.subarray(0, length);
 }
 
-/** HKDF-Expand-Label as defined in MLS (similar to TLS 1.3) */
-async function hkdfExpandLabel(
-  secret: Uint8Array,
-  label: string,
-  context: Uint8Array,
-  length: number,
-): Promise<Uint8Array> {
-  const labelBytes = new TextEncoder().encode(`mls10 ${label}`);
-  const w = new TLSWriter();
-  w.writeUint16(length);
-  w.writeVector(labelBytes, 1);
-  w.writeVector(context, 1);
-  return hkdfExpand(secret, w.toUint8Array(), length);
-}
-
-/** Derive a secret from a parent secret */
-async function deriveSecret(
-  secret: Uint8Array,
-  label: string,
-): Promise<Uint8Array> {
-  return hkdfExpandLabel(secret, label, new Uint8Array(0), 32);
+function hex(d: Uint8Array): string {
+  return Array.from(d)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 function concatBytes(...arrays: Uint8Array[]): Uint8Array {
@@ -172,24 +190,260 @@ function concatBytes(...arrays: Uint8Array[]): Uint8Array {
   return result;
 }
 
-function xorBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
-  const result = new Uint8Array(a.length);
-  for (let i = 0; i < a.length; i++) {
-    result[i] = a[i] ^ (b[i] || 0);
-  }
-  return result;
+/**
+ * Convert ECDSA P1363 signature (raw r||s, 64 bytes) to DER format.
+ * MLS uses IEEE 1363 format (raw r||s), but some implementations use DER.
+ * We produce P1363 from WebCrypto and keep it as-is for MLS.
+ */
+function ecdsaP1363ToDer(sig: Uint8Array): Uint8Array {
+  let r = sig.slice(0, 32);
+  let s = sig.slice(32, 64);
+
+  // Strip leading zeros, keep at least 1 byte
+  let rStart = 0;
+  while (rStart < r.length - 1 && r[rStart] === 0) rStart++;
+  r = r.slice(rStart);
+  if (r[0] & 0x80) r = concatBytes(new Uint8Array([0]), r);
+
+  let sStart = 0;
+  while (sStart < s.length - 1 && s[sStart] === 0) sStart++;
+  s = s.slice(sStart);
+  if (s[0] & 0x80) s = concatBytes(new Uint8Array([0]), s);
+
+  const totalLen = 2 + r.length + 2 + s.length;
+  const der = new Uint8Array(2 + totalLen);
+  let offset = 0;
+  der[offset++] = 0x30; // SEQUENCE
+  der[offset++] = totalLen;
+  der[offset++] = 0x02; // INTEGER
+  der[offset++] = r.length;
+  der.set(r, offset);
+  offset += r.length;
+  der[offset++] = 0x02; // INTEGER
+  der[offset++] = s.length;
+  der.set(s, offset);
+
+  return der;
+}
+
+// ─── HPKE (RFC 9180) Helpers for DHKEM(P-256, HKDF-SHA256) + AES-128-GCM ───
+
+// KEM suite_id = "KEM" || I2OSP(0x0010, 2) — DHKEM(P-256, HKDF-SHA256)
+const KEM_SUITE_ID = concatBytes(
+  new TextEncoder().encode('KEM'),
+  new Uint8Array([0x00, 0x10]),
+);
+
+// HPKE suite_id = "HPKE" || I2OSP(kem_id, 2) || I2OSP(kdf_id, 2) || I2OSP(aead_id, 2)
+const HPKE_SUITE_ID = concatBytes(
+  new TextEncoder().encode('HPKE'),
+  new Uint8Array([0x00, 0x10]), // KEM: DHKEM(P-256)
+  new Uint8Array([0x00, 0x01]), // KDF: HKDF-SHA256
+  new Uint8Array([0x00, 0x01]), // AEAD: AES-128-GCM
+);
+
+async function hpkeLabeledExtract(
+  salt: Uint8Array,
+  label: string,
+  ikm: Uint8Array,
+  suiteId: Uint8Array,
+): Promise<Uint8Array> {
+  const labeledIkm = concatBytes(
+    new TextEncoder().encode('HPKE-v1'),
+    suiteId,
+    new TextEncoder().encode(label),
+    ikm,
+  );
+  return hkdfExtract(salt, labeledIkm);
+}
+
+async function hpkeLabeledExpand(
+  prk: Uint8Array,
+  label: string,
+  info: Uint8Array,
+  L: number,
+  suiteId: Uint8Array,
+): Promise<Uint8Array> {
+  const labeledInfo = concatBytes(
+    new Uint8Array([(L >> 8) & 0xff, L & 0xff]), // I2OSP(L, 2)
+    new TextEncoder().encode('HPKE-v1'),
+    suiteId,
+    new TextEncoder().encode(label),
+    info,
+  );
+  return hkdfExpand(prk, labeledInfo, L);
+}
+
+/** DHKEM(P-256) Decap: derive shared secret from kem_output + our private key */
+async function dhkemDecap(
+  kemOutput: Uint8Array,
+  privateKey: CryptoKey,
+  publicKeyRaw: Uint8Array,
+): Promise<Uint8Array> {
+  const senderPub = await crypto.subtle.importKey(
+    'raw',
+    kemOutput,
+    { name: 'ECDH', namedCurve: 'P-256' },
+    false,
+    [],
+  );
+  const dh = new Uint8Array(
+    await crypto.subtle.deriveBits({ name: 'ECDH', public: senderPub }, privateKey, 256),
+  );
+
+  const kemContext = concatBytes(kemOutput, publicKeyRaw);
+
+  // RFC 9180 Section 4.1: ExtractAndExpand(dh, kem_context)
+  // prk = LabeledExtract("", "eae_prk", dh)
+  // shared_secret = LabeledExpand(prk, "shared_secret", kem_context, Nsecret)
+  const prk = await hpkeLabeledExtract(new Uint8Array(0), 'eae_prk', dh, KEM_SUITE_ID);
+  return hpkeLabeledExpand(prk, 'shared_secret', kemContext, 32, KEM_SUITE_ID);
+}
+
+/** HPKE Base mode decrypt: SetupBaseR + Open */
+async function hpkeBaseOpen(
+  kemOutput: Uint8Array,
+  privateKey: CryptoKey,
+  publicKeyRaw: Uint8Array,
+  info: Uint8Array,
+  aad: Uint8Array,
+  ciphertext: Uint8Array,
+): Promise<Uint8Array> {
+  // Decap → shared_secret
+  const sharedSecret = await dhkemDecap(kemOutput, privateKey, publicKeyRaw);
+
+  // Key Schedule (Base mode = 0)
+  const pskIdHash = await hpkeLabeledExtract(
+    new Uint8Array(0),
+    'psk_id_hash',
+    new Uint8Array(0),
+    HPKE_SUITE_ID,
+  );
+  const infoHash = await hpkeLabeledExtract(new Uint8Array(0), 'info_hash', info, HPKE_SUITE_ID);
+  const ksContext = concatBytes(new Uint8Array([0x00]), pskIdHash, infoHash); // mode=0
+
+  const secret = await hpkeLabeledExtract(
+    sharedSecret,
+    'secret',
+    new Uint8Array(0),
+    HPKE_SUITE_ID,
+  );
+  const key = await hpkeLabeledExpand(secret, 'key', ksContext, 16, HPKE_SUITE_ID); // Nk=16
+  const nonce = await hpkeLabeledExpand(secret, 'base_nonce', ksContext, 12, HPKE_SUITE_ID); // Nn=12
+
+  // AEAD Open (AES-128-GCM)
+  const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']);
+  const plaintext = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: nonce, additionalData: aad, tagLength: 128 },
+    cryptoKey,
+    ciphertext,
+  );
+  return new Uint8Array(plaintext);
+}
+
+// ─── MLS Key Schedule Helpers ──────────────────────────────────
+
+/**
+ * MLS ExpandWithLabel (RFC 9420 Section 8):
+ * HKDF-Expand(Secret, HkdfLabel, Length)
+ * where HkdfLabel = { uint16 length, opaque label<V> = "MLS 1.0 " + Label, opaque context<V> }
+ */
+async function mlsExpandWithLabel(
+  secret: Uint8Array,
+  label: string,
+  context: Uint8Array,
+  length: number,
+): Promise<Uint8Array> {
+  const w = new MLSWriter();
+  w.writeUint16(length);
+  w.writeVarVector(new TextEncoder().encode(`MLS 1.0 ${label}`));
+  w.writeVarVector(context);
+  return hkdfExpand(secret, w.toUint8Array(), length);
 }
 
 // ─── MLS Constants ─────────────────────────────────────────────
 
 const MLS_VERSION = 1; // mls10
-const CIPHER_SUITE_ID = 1; // MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
+// Per protocol.md: "MLS ciphersuite is DHKEMP256_AES128GCM_SHA256_P256 (MLS ciphersuite 2)"
+const CIPHER_SUITE_ID = 2;
 
 // LeafNodeSource enum
 const LEAF_NODE_SOURCE_KEY_PACKAGE = 1;
 
 // CredentialType enum
 const CREDENTIAL_TYPE_BASIC = 1;
+
+// ─── Key Ratchet (per RFC 9420 Section 9.1) ───────────────────
+
+/**
+ * Per-sender key ratchet derived from sender_base_secret.
+ *
+ * Discord's libdave wraps mlspp's HashRatchet which uses DeriveTreeSecret:
+ *   DeriveTreeSecret(Secret, Label, Generation, Length) =
+ *     ExpandWithLabel(Secret, Label, tls::marshal(Generation), Length)
+ *
+ * where tls::marshal(generation) is uint32 big-endian.
+ *
+ * ratchet_secret[0] = base_secret
+ * ratchet_key[n] = ExpandWithLabel(ratchet_secret[n], "key", BE32(n), 16)
+ * ratchet_nonce[n] = ExpandWithLabel(ratchet_secret[n], "nonce", BE32(n), 12)  [DISCARDED]
+ * ratchet_secret[n+1] = ExpandWithLabel(ratchet_secret[n], "secret", BE32(n), 32)
+ *
+ * The generation is the MSB of the 32-bit truncated nonce.
+ * AES-GCM key = ratchet_key[generation]
+ * AES-GCM IV = expanded frame nonce (NO XOR — Discord discards ratchet nonce)
+ *
+ * Nonce expansion: memcpy from uint32 on x86/ARM-LE → little-endian byte order.
+ */
+class KeyRatchet {
+  private baseSecret: Uint8Array;
+  private cache: Map<number, CryptoKey> = new Map();
+  private currentSecret: Uint8Array;
+  private currentGeneration: number = 0;
+
+  constructor(baseSecret: Uint8Array) {
+    this.baseSecret = baseSecret;
+    this.currentSecret = baseSecret;
+  }
+
+  async getKey(generation: number): Promise<CryptoKey> {
+    const cached = this.cache.get(generation);
+    if (cached) return cached;
+
+    // Ratchet forward from current generation to requested generation
+    // mlspp DeriveTreeSecret uses generation as uint32 big-endian context
+    while (this.currentGeneration <= generation) {
+      const secret =
+        this.currentGeneration === 0
+          ? this.baseSecret
+          : this.currentSecret;
+
+      // tls::marshal(generation) = uint32 big-endian
+      const genCtx = new Uint8Array(4);
+      genCtx[0] = (this.currentGeneration >>> 24) & 0xff;
+      genCtx[1] = (this.currentGeneration >>> 16) & 0xff;
+      genCtx[2] = (this.currentGeneration >>> 8) & 0xff;
+      genCtx[3] = this.currentGeneration & 0xff;
+
+      const keyBytes = await mlsExpandWithLabel(secret, 'key', genCtx, 16);
+      // nonce is derived but discarded (Discord doesn't use ratchet nonce)
+      // const nonce = await mlsExpandWithLabel(secret, 'nonce', genCtx, 12);
+      const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, [
+        'encrypt',
+        'decrypt',
+      ]);
+
+      this.cache.set(this.currentGeneration, key);
+
+      if (this.currentGeneration < generation) {
+        this.currentSecret = await mlsExpandWithLabel(secret, 'secret', genCtx, 32);
+      }
+      this.currentGeneration++;
+    }
+
+    return this.cache.get(generation)!;
+  }
+}
 
 // ─── DAVE Session ──────────────────────────────────────────────
 
@@ -198,19 +452,19 @@ export type DaveState = 'idle' | 'initialized' | 'awaiting_welcome' | 'ready';
 export class DaveSession {
   state: DaveState = 'idle';
 
-  // Ed25519 key pair for signing
+  // ECDSA P-256 key pair for signing
   signingKeyPair: CryptoKeyPair | null = null;
-  signingPublicRaw: Uint8Array | null = null;
+  signingPublicRaw: Uint8Array | null = null; // 65 bytes uncompressed
 
-  // X25519 key pair for HPKE init
+  // ECDH P-256 key pair for HPKE init key
   hpkeKeyPair: CryptoKeyPair | null = null;
-  hpkePublicRaw: Uint8Array | null = null;
+  hpkePublicRaw: Uint8Array | null = null; // 65 bytes uncompressed
 
-  // A separate X25519 key pair for the leaf node encryption key
+  // ECDH P-256 key pair for leaf node encryption key
   encryptionKeyPair: CryptoKeyPair | null = null;
-  encryptionPublicRaw: Uint8Array | null = null;
+  encryptionPublicRaw: Uint8Array | null = null; // 65 bytes uncompressed
 
-  // External sender key from the server
+  // External sender credential from the server (Op 25)
   externalSenderKey: Uint8Array | null = null;
 
   // User identity
@@ -219,368 +473,116 @@ export class DaveSession {
   // Group state
   epoch: number = 0;
   epochSecret: Uint8Array | null = null;
+  exporterSecret: Uint8Array | null = null;
   sframeKeyMaterial: { key: CryptoKey; baseSalt: Uint8Array } | null = null;
   sendCounter: bigint = 0n;
 
-  // Passthrough key (for unencrypted frames when transitioning)
+  // Per-user receiver key ratchets: userId → KeyRatchet
+  receiverRatchets: Map<string, KeyRatchet> = new Map();
+  // Our own sender ratchet
+  senderRatchet: KeyRatchet | null = null;
+  // SSRC → userId mapping (from SPEAKING messages)
+  ssrcToUserId: Map<number, string> = new Map();
+
+  // Debug counter for decryptFrame logging
+  _decryptLogCount: number = 0;
+
+  // Transition state
   transitioning: boolean = false;
   pendingEpochSecret: Uint8Array | null = null;
 
   /**
-   * Initialize the DAVE session — generate key pairs.
+   * Initialize the DAVE session — generate P-256 key pairs.
    */
   async initialize(userId: string) {
     this.userId = userId;
 
-    // Generate Ed25519 signing key pair
-    this.signingKeyPair = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+    // Generate ECDSA P-256 signing key pair
+    this.signingKeyPair = await crypto.subtle.generateKey(
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      true,
+      ['sign', 'verify'],
+    );
     this.signingPublicRaw = new Uint8Array(
       await crypto.subtle.exportKey('raw', this.signingKeyPair.publicKey),
     );
 
-    // Generate X25519 key pair for HPKE init key
-    this.hpkeKeyPair = await crypto.subtle.generateKey('X25519', true, ['deriveBits']);
+    // Generate ECDH P-256 key pair for HPKE init key
+    this.hpkeKeyPair = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      ['deriveBits'],
+    );
     this.hpkePublicRaw = new Uint8Array(
       await crypto.subtle.exportKey('raw', this.hpkeKeyPair.publicKey),
     );
 
-    // Generate X25519 key pair for leaf node encryption key
-    this.encryptionKeyPair = await crypto.subtle.generateKey('X25519', true, ['deriveBits']);
+    // Generate ECDH P-256 key pair for leaf node encryption key
+    this.encryptionKeyPair = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      ['deriveBits'],
+    );
     this.encryptionPublicRaw = new Uint8Array(
       await crypto.subtle.exportKey('raw', this.encryptionKeyPair.publicKey),
     );
 
     this.state = 'initialized';
-    console.log('[DAVE] Session initialized with key pairs');
+    console.log(
+      '[DAVE] Session initialized with P-256 key pairs, sig:',
+      this.signingPublicRaw.length,
+      'hpke:',
+      this.hpkePublicRaw.length,
+      'enc:',
+      this.encryptionPublicRaw.length,
+    );
   }
 
   /**
-   * Handle the external sender credential from the server (Op 20).
-   * Returns the key package to send back (Op 21).
+   * Handle the external sender package from the server (Op 25).
+   * Returns the MLSMessage-wrapped key package to send back (Op 26).
    */
   async handleExternalSender(data: Uint8Array): Promise<Uint8Array> {
     this.externalSenderKey = data;
-    console.log('[DAVE] Received external sender key, generating key package');
+    console.log(
+      '[DAVE] Received external sender:',
+      data.length,
+      'bytes, first 16:',
+      Array.from(data.slice(0, 16))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join(' '),
+    );
 
+    // Send raw KeyPackage directly (no MLSMessage wrapper — Discord sends raw KP on Op 26)
     const keyPackage = await this._createKeyPackage();
+
+    console.log(
+      '[DAVE] Key package:',
+      keyPackage.length,
+      'bytes, first 16:',
+      Array.from(keyPackage.slice(0, 16))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join(' '),
+    );
+
     this.state = 'awaiting_welcome';
     return keyPackage;
   }
 
   /**
-   * Handle MLS proposals from the server (Op 22).
-   * These notify about pending group changes.
+   * Handle MLS proposals from the server (Op 27).
    */
   handleProposals(data: Uint8Array) {
     console.log('[DAVE] Received MLS proposals:', data.length, 'bytes');
-    // Proposals are informational — actual key changes happen in commit/welcome
+    // Proposals are cached — actual processing happens when we commit or receive a commit
   }
 
   /**
-   * Handle MLS commit + welcome from the server (Op 23).
-   * This updates the group state and derives new encryption keys.
+   * Handle MLS commit from announce_commit_transition (Op 29).
+   * For existing group members receiving a commit.
    */
-  async handleCommitWelcome(data: Uint8Array): Promise<void> {
-    console.log('[DAVE] Received commit/welcome:', data.length, 'bytes');
-
-    try {
-      // The commit/welcome message contains the encrypted group secrets
-      // We need to decrypt them using our HPKE private key
-
-      // Parse the welcome message structure
-      const reader = new TLSReader(data);
-
-      // The data format from Discord: [transition_id: u32] [commit_or_welcome_data...]
-      // The first byte often indicates whether it's a commit (for existing members)
-      // or a welcome (for new members joining)
-
-      if (data.length < 4) {
-        console.warn('[DAVE] Commit/welcome data too short');
-        return;
-      }
-
-      const transitionId = reader.readUint32();
-      console.log('[DAVE] Transition ID:', transitionId);
-
-      // Process the remaining data as the MLS commit/welcome
-      const mlsData = reader.readBytes(reader.remaining);
-
-      if (this.state === 'awaiting_welcome') {
-        // We're a new joiner — process as welcome
-        await this._processWelcome(mlsData);
-      } else {
-        // We're an existing member — process as commit
-        await this._processCommit(mlsData);
-      }
-    } catch (err) {
-      console.error('[DAVE] Failed to process commit/welcome:', err);
-    }
-  }
-
-  /**
-   * Handle prepare transition (Op 24).
-   * The server is about to rotate keys — prepare for the new epoch.
-   */
-  handlePrepareTransition(data: any): { epoch: number } {
-    const transitionId = typeof data === 'object' ? data.transition_id : 0;
-    console.log('[DAVE] Prepare transition:', transitionId);
-    this.transitioning = true;
-
-    return { epoch: this.epoch };
-  }
-
-  /**
-   * Handle execute transition (Op 25).
-   * Switch to the new epoch's encryption keys.
-   */
-  async handleExecuteTransition(data: any) {
-    console.log('[DAVE] Execute transition');
-
-    if (this.pendingEpochSecret) {
-      this.epochSecret = this.pendingEpochSecret;
-      this.pendingEpochSecret = null;
-      this.epoch++;
-      this.sendCounter = 0n;
-
-      // Derive new SFrame keys
-      await this._deriveSFrameKeys();
-    }
-
-    this.transitioning = false;
-  }
-
-  // ─── Key Package Creation ──────────────────────────────────────
-
-  /**
-   * Create an MLS KeyPackage in wire format.
-   */
-  private async _createKeyPackage(): Promise<Uint8Array> {
-    // Build credential
-    const credential = this._buildCredential();
-
-    // Build leaf node
-    const leafNodeTBS = this._buildLeafNodeTBS(credential);
-
-    // Sign the leaf node
-    const leafNodeSig = new Uint8Array(
-      await crypto.subtle.sign('Ed25519', this.signingKeyPair!.privateKey, leafNodeTBS),
-    );
-
-    // Full leaf node = TBS content + signature
-    const leafNode = this._buildLeafNode(credential, leafNodeSig);
-
-    // Build key package TBS
-    const kpTBS = this._buildKeyPackageTBS(leafNode);
-
-    // Sign the key package
-    const kpSig = new Uint8Array(
-      await crypto.subtle.sign('Ed25519', this.signingKeyPair!.privateKey, kpTBS),
-    );
-
-    // Full key package
-    const w = new TLSWriter();
-    w.writeUint16(MLS_VERSION);
-    w.writeUint16(CIPHER_SUITE_ID);
-    w.writeVector(this.hpkePublicRaw!, 2); // init_key
-    w.writeBytes(leafNode);
-    w.writeVector(new Uint8Array(0), 4); // extensions (empty)
-    w.writeVector(kpSig, 2); // signature
-
-    return w.toUint8Array();
-  }
-
-  private _buildCredential(): Uint8Array {
-    const identity = new TextEncoder().encode(this.userId);
-    const w = new TLSWriter();
-    w.writeUint16(CREDENTIAL_TYPE_BASIC);
-    w.writeVector(identity, 2);
-    return w.toUint8Array();
-  }
-
-  private _buildLeafNodeTBS(credential: Uint8Array): Uint8Array {
-    const w = new TLSWriter();
-
-    // encryption_key
-    w.writeVector(this.encryptionPublicRaw!, 2);
-
-    // signature_key
-    w.writeVector(this.signingPublicRaw!, 2);
-
-    // credential
-    w.writeBytes(credential);
-
-    // capabilities
-    w.writeVector(new Uint8Array([0, MLS_VERSION >> 8, MLS_VERSION & 0xff]), 2); // versions
-    w.writeVector(new Uint8Array([0, CIPHER_SUITE_ID >> 8, CIPHER_SUITE_ID & 0xff]), 2); // cipher_suites
-    w.writeVector(new Uint8Array(0), 2); // extensions
-    w.writeVector(new Uint8Array(0), 2); // proposals
-    w.writeVector(new Uint8Array([CREDENTIAL_TYPE_BASIC >> 8, CREDENTIAL_TYPE_BASIC & 0xff]), 2); // credential_types
-
-    // leaf_node_source: key_package
-    w.writeUint8(LEAF_NODE_SOURCE_KEY_PACKAGE);
-
-    // lifetime (not_before, not_after as uint64)
-    w.writeUint64(0);
-    w.writeUint64(0xffffffffffffffff);
-
-    // extensions (empty)
-    w.writeVector(new Uint8Array(0), 4);
-
-    return w.toUint8Array();
-  }
-
-  private _buildLeafNode(credential: Uint8Array, signature: Uint8Array): Uint8Array {
-    const w = new TLSWriter();
-
-    // encryption_key
-    w.writeVector(this.encryptionPublicRaw!, 2);
-
-    // signature_key
-    w.writeVector(this.signingPublicRaw!, 2);
-
-    // credential
-    w.writeBytes(credential);
-
-    // capabilities
-    w.writeVector(new Uint8Array([0, MLS_VERSION >> 8, MLS_VERSION & 0xff]), 2);
-    w.writeVector(new Uint8Array([0, CIPHER_SUITE_ID >> 8, CIPHER_SUITE_ID & 0xff]), 2);
-    w.writeVector(new Uint8Array(0), 2);
-    w.writeVector(new Uint8Array(0), 2);
-    w.writeVector(new Uint8Array([CREDENTIAL_TYPE_BASIC >> 8, CREDENTIAL_TYPE_BASIC & 0xff]), 2);
-
-    // leaf_node_source: key_package
-    w.writeUint8(LEAF_NODE_SOURCE_KEY_PACKAGE);
-
-    // lifetime
-    w.writeUint64(0);
-    w.writeUint64(0xffffffffffffffff);
-
-    // extensions (empty)
-    w.writeVector(new Uint8Array(0), 4);
-
-    // signature
-    w.writeVector(signature, 2);
-
-    return w.toUint8Array();
-  }
-
-  private _buildKeyPackageTBS(leafNode: Uint8Array): Uint8Array {
-    const w = new TLSWriter();
-    w.writeUint16(MLS_VERSION);
-    w.writeUint16(CIPHER_SUITE_ID);
-    w.writeVector(this.hpkePublicRaw!, 2); // init_key
-    w.writeBytes(leafNode);
-    w.writeVector(new Uint8Array(0), 4); // extensions
-
-    // Wrap in SignContent structure for SignWithLabel
-    const content = w.toUint8Array();
-    const label = new TextEncoder().encode('KeyPackageTBS');
-    const sw = new TLSWriter();
-    sw.writeVector(label, 2);
-    sw.writeVector(content, 4);
-    return sw.toUint8Array();
-  }
-
-  // ─── Welcome / Commit Processing ──────────────────────────────
-
-  /**
-   * Process an MLS Welcome message to join the group.
-   * Extract encrypted group secrets, decrypt with our HPKE private key,
-   * and derive the epoch secret.
-   */
-  private async _processWelcome(data: Uint8Array) {
-    console.log('[DAVE] Processing welcome message:', data.length, 'bytes');
-
-    try {
-      // The welcome message contains:
-      // 1. cipher_suite
-      // 2. encrypted_group_secrets (for each new member)
-      // 3. encrypted_group_info
-
-      // For our simplified implementation, we extract the key schedule
-      // from the welcome message using HPKE decapsulation
-
-      // The encrypted group secret for us contains:
-      // - kem_output (32 bytes for X25519)
-      // - ciphertext (AES-128-GCM encrypted joiner secret)
-
-      // Derive the epoch secret from the joiner secret
-      // For now, use a simplified derivation
-      const reader = new TLSReader(data);
-
-      if (data.length < 2) {
-        console.warn('[DAVE] Welcome data too short');
-        return;
-      }
-
-      // Read cipher suite
-      const cs = reader.readUint16();
-      console.log('[DAVE] Welcome cipher suite:', cs);
-
-      // Read encrypted group secrets vector
-      const secretsData = reader.readVector(4);
-      const secretsReader = new TLSReader(secretsData);
-
-      // Find our encrypted group secret
-      let joinerSecret: Uint8Array | null = null;
-      while (secretsReader.remaining > 0) {
-        // Each EncryptedGroupSecrets has:
-        // - new_member (KeyPackageRef, opaque<V>)
-        // - encrypted_group_secrets (HPKECiphertext)
-        const keyPackageRef = secretsReader.readVector(1);
-        const kemOutput = secretsReader.readVector(2);
-        const ciphertext = secretsReader.readVector(4);
-
-        // Try to decrypt with our HPKE private key
-        try {
-          joinerSecret = await this._hpkeDecrypt(kemOutput, ciphertext);
-          if (joinerSecret) {
-            console.log('[DAVE] Successfully decrypted our group secret');
-            break;
-          }
-        } catch {
-          // Not our secret, try next
-          continue;
-        }
-      }
-
-      if (!joinerSecret) {
-        // Fallback: use the raw data as a seed for key derivation
-        // This happens when we can't parse the welcome format exactly
-        console.log('[DAVE] Using fallback key derivation from welcome data');
-        const hash = await crypto.subtle.digest('SHA-256', data);
-        joinerSecret = new Uint8Array(hash);
-      }
-
-      // Derive epoch secret from joiner secret
-      this.epochSecret = await deriveSecret(joinerSecret, 'epoch');
-      this.epoch = 1;
-      this.sendCounter = 0n;
-
-      // Derive SFrame keys
-      await this._deriveSFrameKeys();
-
-      this.state = 'ready';
-      console.log('[DAVE] Welcome processed, epoch:', this.epoch, 'state: ready');
-    } catch (err) {
-      console.error('[DAVE] Welcome processing failed:', err);
-
-      // Fallback: derive keys from the raw welcome data
-      const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
-      this.epochSecret = hash;
-      this.epoch = 1;
-      this.sendCounter = 0n;
-      await this._deriveSFrameKeys();
-      this.state = 'ready';
-      console.log('[DAVE] Welcome processed (fallback), state: ready');
-    }
-  }
-
-  /**
-   * Process an MLS Commit message to update the group state.
-   */
-  private async _processCommit(data: Uint8Array) {
-    console.log('[DAVE] Processing commit message:', data.length, 'bytes');
+  async handleCommit(data: Uint8Array): Promise<void> {
+    console.log('[DAVE] Received commit:', data.length, 'bytes');
 
     try {
       if (!this.epochSecret) {
@@ -591,7 +593,8 @@ export class DaveSession {
       // Derive next epoch secret from current epoch secret and commit data
       const commitHash = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
       const combined = concatBytes(this.epochSecret, commitHash);
-      this.pendingEpochSecret = await deriveSecret(combined, 'epoch');
+      const prk = await hkdfExtract(new Uint8Array(32), combined);
+      this.pendingEpochSecret = prk;
 
       console.log('[DAVE] Commit processed, pending epoch secret derived');
     } catch (err) {
@@ -600,269 +603,643 @@ export class DaveSession {
   }
 
   /**
-   * HPKE Decapsulate + Decrypt using our X25519 private key.
+   * Handle MLS Welcome from the server (Op 30).
+   * For new joiners being welcomed to the group.
    */
-  private async _hpkeDecrypt(
-    kemOutput: Uint8Array,
-    ciphertext: Uint8Array,
-  ): Promise<Uint8Array | null> {
+  async handleWelcome(data: Uint8Array): Promise<void> {
+    console.log('[DAVE] Received welcome:', data.length, 'bytes');
+
     try {
-      // Import the KEM output as a public key
-      const senderPub = await crypto.subtle.importKey('raw', kemOutput, 'X25519', false, []);
-
-      // Derive shared secret via X25519
-      const sharedBits = await crypto.subtle.deriveBits(
-        { name: 'X25519', public: senderPub },
-        this.hpkeKeyPair!.privateKey,
-        256,
-      );
-      const sharedSecret = new Uint8Array(sharedBits);
-
-      // HPKE KEM: extract and expand to get the AEAD key + nonce
-      // kem_context = kem_output || pk_R
-      const kemContext = concatBytes(kemOutput, this.hpkePublicRaw!);
-      const suiteId = new TextEncoder().encode('KEM0020'); // DHKEM(X25519, SHA-256)
-      const extractedSecret = await hkdfExtract(new Uint8Array(0), sharedSecret);
-      const kemSharedSecret = await hkdfExpand(
-        extractedSecret,
-        concatBytes(suiteId, new TextEncoder().encode('shared_secret'), kemContext),
-        32,
-      );
-
-      // Derive AEAD key and nonce
-      const aeadKey = await hkdfExpand(
-        kemSharedSecret,
-        new TextEncoder().encode('key'),
-        16, // AES-128
-      );
-      const aeadNonce = await hkdfExpand(
-        kemSharedSecret,
-        new TextEncoder().encode('base_nonce'),
-        12,
-      );
-
-      // Decrypt with AES-128-GCM
-      const key = await crypto.subtle.importKey('raw', aeadKey, 'AES-GCM', false, ['decrypt']);
-
-      const plaintext = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: aeadNonce, tagLength: 128 },
-        key,
-        ciphertext,
-      );
-
-      return new Uint8Array(plaintext);
-    } catch {
-      return null;
+      await this._processWelcome(data);
+    } catch (err) {
+      console.error('[DAVE] Welcome processing failed:', err);
+      // No fallback — wrong keys would only cause silent failures
     }
   }
 
-  // ─── SFrame Key Derivation ────────────────────────────────────
+  /**
+   * Handle prepare transition (Op 21).
+   */
+  handlePrepareTransition(data: any): { epoch: number } {
+    const transitionId = typeof data === 'object' ? data.transition_id : 0;
+    console.log('[DAVE] Prepare transition:', transitionId);
+    this.transitioning = true;
+    return { epoch: this.epoch };
+  }
 
   /**
-   * Derive SFrame encryption key and base salt from the epoch secret.
+   * Handle execute transition (Op 22).
+   * Switch to the new epoch's encryption keys.
    */
-  private async _deriveSFrameKeys() {
-    if (!this.epochSecret) return;
+  async handleExecuteTransition(data: any) {
+    console.log('[DAVE] Execute transition');
 
-    // Discord DAVE SFrame key derivation:
-    // sframe_key = HKDF-Expand(epoch_secret, "SFrame 10 Key", 16)
-    // sframe_salt = HKDF-Expand(epoch_secret, "SFrame 10 Salt", 12)
-    const keyBytes = await hkdfExpand(
-      this.epochSecret,
-      new TextEncoder().encode('SFrame 10 Key'),
-      16,
+    if (this.pendingEpochSecret) {
+      this.epochSecret = this.pendingEpochSecret;
+      this.pendingEpochSecret = null;
+      this.epoch++;
+      this.sendCounter = 0n;
+      await this._deriveSenderKeys();
+    }
+
+    this.transitioning = false;
+  }
+
+  /** Reset group state (for epoch=1 re-creation) */
+  resetGroupState() {
+    this.epoch = 0;
+    this.epochSecret = null;
+    this.exporterSecret = null;
+    this.pendingEpochSecret = null;
+    this.sframeKeyMaterial = null;
+    this.sendCounter = 0n;
+    this.transitioning = false;
+    this.state = 'initialized';
+    console.log('[DAVE] Group state reset');
+  }
+
+  // ─── Key Package Creation ──────────────────────────────────────
+
+  /**
+   * Create an MLS KeyPackage in wire format.
+   * Per protocol.md: "The KeyPackage and its associated members are
+   * un-modified from the MLS Protocol definition (RFC 9420 Section 10)."
+   */
+  private async _createKeyPackage(): Promise<Uint8Array> {
+    const credential = this._buildCredential();
+    const leafNodeTBS = this._buildLeafNodeTBS(credential);
+
+    // Sign leaf node with SignWithLabel("LeafNodeTBS", leafNodeTBS)
+    const leafNodeSig = await this._signWithLabel('LeafNodeTBS', leafNodeTBS);
+    const leafNode = this._buildLeafNode(credential, leafNodeSig);
+
+    // Build KeyPackageTBS content
+    const kpTBSContent = this._buildKeyPackageTBSContent(leafNode);
+
+    // Sign key package with SignWithLabel("KeyPackageTBS", kpTBSContent)
+    const kpSig = await this._signWithLabel('KeyPackageTBS', kpTBSContent);
+
+    // Full KeyPackage
+    const w = new MLSWriter();
+    w.writeUint16(MLS_VERSION);
+    w.writeUint16(CIPHER_SUITE_ID);
+    w.writeVarVector(this.hpkePublicRaw!); // init_key: HPKEPublicKey<V>
+    w.writeBytes(leafNode); // leaf_node (inline)
+    w.writeVarVector(new Uint8Array(0)); // extensions<V> (empty)
+    w.writeVarVector(kpSig); // signature<V>
+
+    return w.toUint8Array();
+  }
+
+  /**
+   * MLS SignWithLabel: sign content with the "MLS 1.0 " + label prefix.
+   * Returns the raw P1363 signature (64 bytes for P-256).
+   */
+  private async _signWithLabel(label: string, content: Uint8Array): Promise<Uint8Array> {
+    const labelBytes = new TextEncoder().encode(`MLS 1.0 ${label}`);
+    const w = new MLSWriter();
+    w.writeVarVector(labelBytes); // opaque label<V>
+    w.writeVarVector(content); // opaque content<V>
+    const signContent = w.toUint8Array();
+
+    // ECDSA P-256 with SHA-256 — WebCrypto produces P1363 (raw r||s, 64 bytes)
+    // MLS/TLS 1.3 requires DER-encoded ECDSA signatures, so convert.
+    const p1363Sig = new Uint8Array(
+      await crypto.subtle.sign(
+        { name: 'ECDSA', hash: 'SHA-256' },
+        this.signingKeyPair!.privateKey,
+        signContent,
+      ),
     );
-    const baseSalt = await hkdfExpand(
-      this.epochSecret,
-      new TextEncoder().encode('SFrame 10 Salt'),
-      12,
+    const derSig = ecdsaP1363ToDer(p1363Sig);
+    console.log(
+      `[DAVE] SignWithLabel("${label}"): P1363=${p1363Sig.length}B → DER=${derSig.length}B`,
+    );
+    return derSig;
+  }
+
+  private _buildCredential(): Uint8Array {
+    // Per protocol.md: "The basic credential identity for a given member is
+    // the big-endian 64-bit unsigned integer representation of their snowflake Discord user ID."
+    const userId = BigInt(this.userId);
+    const identity = new Uint8Array(8);
+    for (let i = 0; i < 8; i++) {
+      identity[7 - i] = Number((userId >> BigInt(i * 8)) & 0xffn);
+    }
+    const w = new MLSWriter();
+    w.writeUint16(CREDENTIAL_TYPE_BASIC);
+    w.writeVarVector(identity); // opaque identity<V>
+    return w.toUint8Array();
+  }
+
+  private _buildLeafNodeTBS(credential: Uint8Array): Uint8Array {
+    const w = new MLSWriter();
+
+    // encryption_key: HPKEPublicKey<V> (65 bytes P-256 uncompressed)
+    w.writeVarVector(this.encryptionPublicRaw!);
+
+    // signature_key: SignaturePublicKey<V> (65 bytes P-256 uncompressed)
+    w.writeVarVector(this.signingPublicRaw!);
+
+    // credential (serialized inline)
+    w.writeBytes(credential);
+
+    // capabilities
+    // versions<V>: [mls10 = 0x0001]
+    w.writeVarVector(new Uint8Array([(MLS_VERSION >> 8) & 0xff, MLS_VERSION & 0xff]));
+    // cipher_suites<V>: [0x0002]
+    w.writeVarVector(new Uint8Array([(CIPHER_SUITE_ID >> 8) & 0xff, CIPHER_SUITE_ID & 0xff]));
+    // extensions<V>: empty
+    w.writeVarVector(new Uint8Array(0));
+    // proposals<V>: empty
+    w.writeVarVector(new Uint8Array(0));
+    // credential_types<V>: [basic = 0x0001]
+    w.writeVarVector(
+      new Uint8Array([(CREDENTIAL_TYPE_BASIC >> 8) & 0xff, CREDENTIAL_TYPE_BASIC & 0xff]),
     );
 
-    const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, [
-      'encrypt',
+    // leaf_node_source: key_package (uint8)
+    w.writeUint8(LEAF_NODE_SOURCE_KEY_PACKAGE);
+
+    // lifetime: not_before (uint64 = 0), not_after (uint64 = UINT64_MAX)
+    // Per protocol.md: "not_before = 0, not_after = 2^64 - 1"
+    w.writeUint32(0);
+    w.writeUint32(0);
+    w.writeUint32(0xffffffff);
+    w.writeUint32(0xffffffff);
+
+    // leaf_node extensions<V> (empty — "No leaf node extensions")
+    w.writeVarVector(new Uint8Array(0));
+
+    // Note: for key_package source, no group_id or leaf_index context
+
+    return w.toUint8Array();
+  }
+
+  private _buildLeafNode(credential: Uint8Array, signature: Uint8Array): Uint8Array {
+    const w = new MLSWriter();
+
+    w.writeVarVector(this.encryptionPublicRaw!); // encryption_key
+    w.writeVarVector(this.signingPublicRaw!); // signature_key
+    w.writeBytes(credential); // credential
+
+    // capabilities (same as TBS)
+    w.writeVarVector(new Uint8Array([(MLS_VERSION >> 8) & 0xff, MLS_VERSION & 0xff]));
+    w.writeVarVector(new Uint8Array([(CIPHER_SUITE_ID >> 8) & 0xff, CIPHER_SUITE_ID & 0xff]));
+    w.writeVarVector(new Uint8Array(0));
+    w.writeVarVector(new Uint8Array(0));
+    w.writeVarVector(
+      new Uint8Array([(CREDENTIAL_TYPE_BASIC >> 8) & 0xff, CREDENTIAL_TYPE_BASIC & 0xff]),
+    );
+
+    w.writeUint8(LEAF_NODE_SOURCE_KEY_PACKAGE); // leaf_node_source
+    w.writeUint32(0);
+    w.writeUint32(0); // not_before
+    w.writeUint32(0xffffffff);
+    w.writeUint32(0xffffffff); // not_after
+    w.writeVarVector(new Uint8Array(0)); // extensions
+
+    w.writeVarVector(signature); // signature<V>
+
+    return w.toUint8Array();
+  }
+
+  private _buildKeyPackageTBSContent(leafNode: Uint8Array): Uint8Array {
+    const w = new MLSWriter();
+    w.writeUint16(MLS_VERSION);
+    w.writeUint16(CIPHER_SUITE_ID);
+    w.writeVarVector(this.hpkePublicRaw!); // init_key
+    w.writeBytes(leafNode);
+    w.writeVarVector(new Uint8Array(0)); // extensions
+    return w.toUint8Array();
+  }
+
+  // ─── Welcome Processing ─────────────────────────────────────
+
+  /**
+   * Process an MLS Welcome message (received via Op 30).
+   * Full HPKE decryption + MLS key schedule per RFC 9420.
+   */
+  private async _processWelcome(data: Uint8Array) {
+    console.log('[DAVE] Processing welcome message:', data.length, 'bytes');
+    if (data.length < 4) throw new Error('Welcome too short');
+
+    const reader = new MLSReader(data);
+
+    // Welcome: { CipherSuite, EncryptedGroupSecrets secrets<V>, opaque encrypted_group_info<V> }
+    const cs = reader.readUint16();
+    const secretsData = reader.readVarVector();
+    const encryptedGroupInfo = reader.readVarVector();
+    console.log(
+      '[DAVE] Welcome: cs=',
+      cs,
+      'secrets=',
+      secretsData.length,
+      'B, encGroupInfo=',
+      encryptedGroupInfo.length,
+      'B',
+    );
+
+    // Build HPKE info = EncryptContext("MLS 1.0 Welcome", encrypted_group_info)
+    // Per RFC 9420 Section 5.1.2: EncryptWithLabel uses this as the HPKE info
+    const infoWriter = new MLSWriter();
+    infoWriter.writeVarVector(new TextEncoder().encode('MLS 1.0 Welcome'));
+    infoWriter.writeVarVector(encryptedGroupInfo);
+    const hpkeInfo = infoWriter.toUint8Array();
+
+    // Try each EncryptedGroupSecrets entry
+    const secretsReader = new MLSReader(secretsData);
+    let groupSecretsBytes: Uint8Array | null = null;
+
+    while (secretsReader.remaining > 0) {
+      // EncryptedGroupSecrets: { KeyPackageRef new_member<V>, HPKECiphertext { kem_output<V>, ciphertext<V> } }
+      secretsReader.readVarVector(); // key_package_ref (skip)
+      const kemOutput = secretsReader.readVarVector();
+      const ciphertext = secretsReader.readVarVector();
+
+      console.log(
+        '[DAVE] Trying HPKE decrypt: kem=',
+        kemOutput.length,
+        'B, ct=',
+        ciphertext.length,
+        'B',
+      );
+
+      try {
+        groupSecretsBytes = await hpkeBaseOpen(
+          kemOutput,
+          this.hpkeKeyPair!.privateKey,
+          this.hpkePublicRaw!,
+          hpkeInfo,
+          new Uint8Array(0), // empty AAD
+          ciphertext,
+        );
+        console.log('[DAVE] HPKE decrypted group secrets:', groupSecretsBytes.length, 'B');
+        break;
+      } catch (err) {
+        console.log('[DAVE] HPKE decrypt failed for this entry:', err);
+        continue;
+      }
+    }
+
+    if (!groupSecretsBytes) {
+      throw new Error('Could not decrypt any group secret entry');
+    }
+
+    // Parse GroupSecrets: { opaque joiner_secret<V>, optional<PathSecret>, PreSharedKeyID psks<V> }
+    const gsReader = new MLSReader(groupSecretsBytes);
+    const joinerSecret = gsReader.readVarVector();
+
+    // Check for optional path_secret and psks
+    let pathSecret: Uint8Array | null = null;
+    if (gsReader.remaining > 0) {
+      const hasPathSecret = gsReader.readUint8();
+      if (hasPathSecret === 1) {
+        pathSecret = gsReader.readVarVector();
+      }
+    }
+
+    console.log('[DAVE] Joiner secret:', joinerSecret.length, 'B');
+
+    // RFC 9420 Section 8 Key Schedule:
+    // pre1 = KDF.Extract(salt=joiner_secret, ikm=psk_secret)
+    // welcome_secret = DeriveSecret(pre1, "welcome") = ExpandWithLabel(pre1, "welcome", "", Nh)
+    // member_secret = ExpandWithLabel(pre1, "member", GroupContext, Nh)
+    const pskSecret = new Uint8Array(32); // no PSKs → zeros
+    const pre1 = await hkdfExtract(joinerSecret, pskSecret);
+
+    // Derive welcome_secret → welcome_key + welcome_nonce to decrypt GroupInfo
+    const welcomeSecret = await mlsExpandWithLabel(pre1, 'welcome', new Uint8Array(0), 32);
+    const welcomeKey = await mlsExpandWithLabel(welcomeSecret, 'key', new Uint8Array(0), 16);
+    const welcomeNonce = await mlsExpandWithLabel(welcomeSecret, 'nonce', new Uint8Array(0), 12);
+
+    // Decrypt GroupInfo
+    const giCryptoKey = await crypto.subtle.importKey('raw', welcomeKey, 'AES-GCM', false, [
       'decrypt',
     ]);
+    const groupInfoBytes = new Uint8Array(
+      await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: welcomeNonce, tagLength: 128 },
+        giCryptoKey,
+        encryptedGroupInfo,
+      ),
+    );
+    console.log('[DAVE] Decrypted GroupInfo:', groupInfoBytes.length, 'B');
 
-    this.sframeKeyMaterial = { key, baseSalt };
-    console.log('[DAVE] SFrame keys derived for epoch', this.epoch);
-  }
+    // Parse GroupContext from GroupInfo
+    // GroupInfo: { GroupContext, Extension extensions<V>, opaque confirmation_tag<V>, uint32 signer, opaque signature<V> }
+    // GroupContext: { uint16 version, uint16 cipher_suite, opaque group_id<V>, uint64 epoch,
+    //                opaque tree_hash<V>, opaque confirmed_transcript_hash<V>, Extension extensions<V> }
+    const giReader = new MLSReader(groupInfoBytes);
+    const gcStart = giReader.offset;
+    giReader.readUint16(); // version
+    giReader.readUint16(); // cipher_suite
+    giReader.readVarVector(); // group_id
+    giReader.readUint32(); // epoch hi
+    const epochLo = giReader.readUint32(); // epoch lo
+    giReader.readVarVector(); // tree_hash
+    giReader.readVarVector(); // confirmed_transcript_hash
+    giReader.readVarVector(); // extensions
+    const gcEnd = giReader.offset;
+    const groupContextBytes = groupInfoBytes.subarray(gcStart, gcEnd);
+    this.epoch = epochLo;
+    console.log(
+      '[DAVE] GroupContext parsed, epoch:',
+      this.epoch,
+      'gc:',
+      groupContextBytes.length,
+      'B',
+    );
 
-  // ─── SFrame Encryption / Decryption ───────────────────────────
+    // Key schedule per mlspp's make_epoch_secret (Welcome path):
+    //   member_secret = KDF.Extract(joiner_secret, psk_secret) = pre1
+    //   epoch_secret = ExpandWithLabel(member_secret, "epoch", GroupContext, Nh)
+    //   exporter_secret = DeriveSecret(epoch_secret, "exporter")
+    // Note: mlspp names Extract(joiner, psk) as "member_secret" — there is NO separate
+    // ExpandWithLabel("member",...) step or second Extract with init_secret for Welcome joins.
+    this.epochSecret = await mlsExpandWithLabel(pre1, 'epoch', groupContextBytes, 32);
 
-  /**
-   * Encrypt a media frame using SFrame.
-   *
-   * SFrame format:
-   *   Header: config_byte [key_id] [counter]
-   *   Payload: AES-128-GCM(plaintext)
-   *
-   * Config byte: X KKKK LLL
-   *   X: extension flag (0)
-   *   KKKK: key ID length (0 = 0 bytes inline)
-   *   LLL: counter length - 1 (0-7 → 1-8 bytes)
-   */
-  async encryptFrame(plaintext: Uint8Array, keyId: number = 0): Promise<Uint8Array> {
-    if (!this.sframeKeyMaterial) {
-      // No encryption keys yet — return plaintext unmodified
-      return plaintext;
+    // DeriveSecret(S, L) = ExpandWithLabel(S, L, "", Nh)
+    this.exporterSecret = await mlsExpandWithLabel(
+      this.epochSecret,
+      'exporter',
+      new Uint8Array(0),
+      32,
+    );
+
+    this.sendCounter = 0n;
+    await this._deriveSenderKeys();
+
+    // Derive receiver keys for all users we already know about (from SPEAKING messages
+    // that arrived before the Welcome was processed)
+    for (const [, userId] of this.ssrcToUserId) {
+      if (userId !== this.userId && !this.receiverRatchets.has(userId)) {
+        await this.deriveReceiverKeyForUser(userId);
+      }
     }
 
-    const counter = this.sendCounter++;
-    const { key, baseSalt } = this.sframeKeyMaterial;
+    this.state = 'ready';
+    console.log('[DAVE] Welcome fully processed, epoch:', this.epoch, 'state: ready, receiverRatchets:', this.receiverRatchets.size);
+  }
 
-    // Build SFrame header
-    const header = this._buildSFrameHeader(keyId, counter);
+  // ─── Sender Key Derivation ─────────────────────────────────
 
-    // Compute nonce = baseSalt XOR padded_counter
-    const nonce = this._computeNonce(baseSalt, counter);
+  /**
+   * Derive per-sender media encryption key using MLS-Exporter.
+   * Per protocol.md:
+   * - Label: "Discord Secure Frames v0"
+   * - Context: little-endian 64-bit user ID of the sender
+   * - Length: 16 bytes
+   *
+   * MLS-Exporter(label, context, length):
+   *   secret = DeriveSecret(exporter_secret, label) = ExpandWithLabel(exporter_secret, label, "", 32)
+   *   return ExpandWithLabel(secret, "exported", Hash(context), length)
+   */
+  private async _deriveSenderKeys() {
+    if (!this.exporterSecret) return;
 
-    // AAD = header
-    const aad = header;
+    // Build sender context: little-endian 64-bit user ID
+    const userId = BigInt(this.userId);
+    const senderContext = new Uint8Array(8);
+    for (let i = 0; i < 8; i++) {
+      senderContext[i] = Number((userId >> BigInt(i * 8)) & 0xffn);
+    }
 
-    // Encrypt
-    const ciphertext = new Uint8Array(
+    // MLS-Exporter("Discord Secure Frames v0", littleEndianSenderID, 16)
+    const secret = await mlsExpandWithLabel(
+      this.exporterSecret,
+      'Discord Secure Frames v0',
+      new Uint8Array(0),
+      32,
+    );
+    const contextHash = new Uint8Array(await crypto.subtle.digest('SHA-256', senderContext));
+    const senderBaseSecret = await mlsExpandWithLabel(secret, 'exported', contextHash, 16);
+
+    console.log('[DAVE] Our sender base secret (16B):', hex(senderBaseSecret), 'userId:', this.userId);
+
+    // Create key ratchet from base secret
+    this.senderRatchet = new KeyRatchet(senderBaseSecret);
+    console.log('[DAVE] Sender key ratchet created for epoch', this.epoch);
+  }
+
+  /**
+   * Derive receiver key for another user and store it.
+   * Uses same MLS-Exporter logic as _deriveSenderKeys but with the other user's ID.
+   */
+  async deriveReceiverKeyForUser(userId: string) {
+    if (!this.exporterSecret) return;
+
+    const uid = BigInt(userId);
+    const senderContext = new Uint8Array(8);
+    for (let i = 0; i < 8; i++) {
+      senderContext[i] = Number((uid >> BigInt(i * 8)) & 0xffn);
+    }
+
+    const secret = await mlsExpandWithLabel(
+      this.exporterSecret,
+      'Discord Secure Frames v0',
+      new Uint8Array(0),
+      32,
+    );
+    const contextHash = new Uint8Array(await crypto.subtle.digest('SHA-256', senderContext));
+    const receiverBaseSecret = await mlsExpandWithLabel(secret, 'exported', contextHash, 16);
+
+    console.log('[DAVE] Receiver base secret for user', userId, '(16B):', hex(receiverBaseSecret));
+
+    this.receiverRatchets.set(userId, new KeyRatchet(receiverBaseSecret));
+  }
+
+  /**
+   * Register an SSRC → userId mapping (from SPEAKING messages).
+   * Derives the receiver key if we have an exporter secret and don't have it yet.
+   */
+  async registerSpeakingSsrc(ssrc: number, userId: string) {
+    this.ssrcToUserId.set(ssrc, userId);
+    console.log('[DAVE] SSRC', ssrc, '→ user', userId, '(total mappings:', this.ssrcToUserId.size, ')');
+
+    if (this.exporterSecret && !this.receiverRatchets.has(userId) && userId !== this.userId) {
+      await this.deriveReceiverKeyForUser(userId);
+    }
+  }
+
+  // ─── Frame Encryption / Decryption ─────────────────────────
+
+  /**
+   * Encrypt a media frame per protocol.md "Payload Format".
+   * For OPUS audio: entire frame is encrypted.
+   * Output: [encrypted_data][8-byte truncated auth tag][ULEB128 nonce][0 suppl_size][0xFAFA]
+   */
+  async encryptFrame(plaintext: Uint8Array): Promise<Uint8Array> {
+    if (!this.senderRatchet) return plaintext;
+
+    const nonce32 = Number(this.sendCounter++ & 0xffffffffn);
+    const generation = (nonce32 >>> 24) & 0xff;
+
+    // Get ratcheted key for this generation
+    const key = await this.senderRatchet.getKey(generation);
+
+    // Build expanded frame nonce: 8 zero bytes + 4-byte little-endian truncated nonce
+    // (matches x86/ARM-LE memcpy behavior in Discord's native client)
+    // Discord does NOT XOR with ratchet nonce — expanded nonce is used directly as IV
+    const iv = new Uint8Array(12);
+    iv[8] = nonce32 & 0xff;
+    iv[9] = (nonce32 >>> 8) & 0xff;
+    iv[10] = (nonce32 >>> 16) & 0xff;
+    iv[11] = (nonce32 >>> 24) & 0xff;
+
+    // For OPUS: no unencrypted ranges, no AAD — encrypt with 64-bit tag
+    const encrypted = new Uint8Array(
       await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv: nonce, additionalData: aad, tagLength: 128 },
+        { name: 'AES-GCM', iv, tagLength: 64 },
         key,
         plaintext,
       ),
     );
 
-    // Output: header || ciphertext
-    return concatBytes(header, ciphertext);
+    // AES-GCM with tagLength: 64 outputs ciphertext + 8-byte tag
+    const ciphertext = encrypted.subarray(0, encrypted.length - 8);
+    const truncatedTag = encrypted.subarray(encrypted.length - 8);
+
+    // ULEB128 encode the nonce
+    const nonceBytes = uleb128Encode(nonce32);
+
+    // Supplemental data size: tag(8) + nonce(var) + unencrypted_ranges(0) + suppl_size(1) + marker(2)
+    const supplSize = 8 + nonceBytes.length + 0 + 1 + 2;
+
+    // Build output: [ciphertext][truncated_tag][uleb128_nonce][suppl_size][0xFAFA]
+    return concatBytes(
+      ciphertext,
+      truncatedTag,
+      nonceBytes,
+      new Uint8Array([supplSize]),
+      new Uint8Array([0xfa, 0xfa]),
+    );
   }
 
   /**
-   * Decrypt an SFrame-encrypted media frame.
+   * Decrypt a DAVE protocol frame.
    */
-  async decryptFrame(frame: Uint8Array): Promise<Uint8Array> {
-    if (!this.sframeKeyMaterial) {
-      // No decryption keys yet — return frame as-is
+  async decryptFrame(frame: Uint8Array, ssrc?: number): Promise<Uint8Array> {
+    // Look up the correct ratchet: use receiver ratchet for the SSRC's user, fallback to sender
+    let ratchet: KeyRatchet | null = null;
+    if (ssrc !== undefined) {
+      const userId = this.ssrcToUserId.get(ssrc);
+      if (userId) {
+        ratchet = this.receiverRatchets.get(userId) || null;
+      }
+    }
+    if (!ratchet) {
+      ratchet = this.senderRatchet;
+    }
+    if (!ratchet) return frame;
+
+    // Check for magic marker 0xFAFA at the end
+    if (
+      frame.length < 13 ||
+      frame[frame.length - 1] !== 0xfa ||
+      frame[frame.length - 2] !== 0xfa
+    ) {
+      // Not a protocol frame — passthrough
+      if (this._decryptLogCount < 10) {
+        this._decryptLogCount++;
+        const tail = frame.slice(Math.max(0, frame.length - 10));
+        console.log(
+          `[DAVE] decryptFrame: NO 0xFAFA marker. len=${frame.length}, last10=[${Array.from(tail).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`,
+        );
+      }
       return frame;
     }
 
-    const { key, baseSalt } = this.sframeKeyMaterial;
+    // Parse supplemental data from the end
+    const supplSize = frame[frame.length - 3];
+    const supplStart = frame.length - supplSize;
+    if (supplStart < 0) return frame;
 
-    // Parse SFrame header
-    const { keyId, counter, headerLength } = this._parseSFrameHeader(frame);
+    // Supplemental region: [truncated_tag(8)][uleb128_nonce][unencrypted_ranges...][suppl_size(1)][marker(2)]
+    const supplData = frame.subarray(supplStart);
 
-    // Extract header and ciphertext
-    const header = frame.subarray(0, headerLength);
-    const ciphertext = frame.subarray(headerLength);
+    // Extract truncated tag (first 8 bytes of supplemental)
+    const truncatedTag = supplData.subarray(0, 8);
 
-    // Compute nonce
-    const nonce = this._computeNonce(baseSalt, counter);
+    // Decode ULEB128 nonce (after tag, before suppl_size + marker)
+    const nonceArea = supplData.subarray(8, supplData.length - 3);
+    const { value: nonce32 } = uleb128Decode(nonceArea);
 
-    // Decrypt
+    // Generation = MSB of the 32-bit truncated nonce
+    const generation = (nonce32 >>> 24) & 0xff;
+
+    // Get ratcheted key for this generation
+    const key = await ratchet.getKey(generation);
+
+    // Build expanded frame nonce: 8 zero bytes + 4-byte little-endian truncated nonce
+    // (matches x86/ARM-LE memcpy behavior in Discord's native client)
+    // Discord does NOT XOR with ratchet nonce — expanded nonce is used directly as IV
+    const iv = new Uint8Array(12);
+    iv[8] = nonce32 & 0xff;
+    iv[9] = (nonce32 >>> 8) & 0xff;
+    iv[10] = (nonce32 >>> 16) & 0xff;
+    iv[11] = (nonce32 >>> 24) & 0xff;
+
+    // Ciphertext is everything before supplemental data
+    const ciphertext = frame.subarray(0, supplStart);
+
+    // Combine ciphertext + truncated 8-byte tag for AES-GCM decrypt with tagLength: 64
+    const combined = concatBytes(ciphertext, truncatedTag);
+
     try {
       const plaintext = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: nonce, additionalData: header, tagLength: 128 },
+        { name: 'AES-GCM', iv, tagLength: 64 },
         key,
-        ciphertext,
+        combined,
       );
       return new Uint8Array(plaintext);
-    } catch {
-      // Decryption failed — might be a different epoch or unencrypted
+    } catch (err) {
+      // Log first few failures to debug
+      if (this._decryptLogCount < 10) {
+        this._decryptLogCount++;
+        console.error(
+          `[DAVE] AES-GCM decrypt failed: nonce=${nonce32}, gen=${generation}, ctLen=${ciphertext.length}, supplSize=${supplSize}`,
+          err,
+        );
+      }
       return frame;
     }
-  }
-
-  private _buildSFrameHeader(keyId: number, counter: bigint): Uint8Array {
-    // Determine key ID bytes needed
-    const keyIdBytes = keyId === 0 ? 0 : Math.ceil(Math.log2(keyId + 1) / 8) || 1;
-
-    // Determine counter bytes needed (minimum 1)
-    let counterBytes = 1;
-    let temp = counter >> 8n;
-    while (temp > 0n) {
-      counterBytes++;
-      temp >>= 8n;
-    }
-
-    // Config byte: 0 KKKK LLL
-    const configByte = ((keyIdBytes & 0xf) << 3) | ((counterBytes - 1) & 0x7);
-
-    const header = new Uint8Array(1 + keyIdBytes + counterBytes);
-    header[0] = configByte;
-
-    // Write key ID (big-endian)
-    let offset = 1;
-    for (let i = keyIdBytes - 1; i >= 0; i--) {
-      header[offset++] = (keyId >> (i * 8)) & 0xff;
-    }
-
-    // Write counter (big-endian)
-    for (let i = counterBytes - 1; i >= 0; i--) {
-      header[offset++] = Number((counter >> BigInt(i * 8)) & 0xffn);
-    }
-
-    return header;
-  }
-
-  private _parseSFrameHeader(frame: Uint8Array): {
-    keyId: number;
-    counter: bigint;
-    headerLength: number;
-  } {
-    const configByte = frame[0];
-    const keyIdLen = (configByte >> 3) & 0xf;
-    const counterLen = (configByte & 0x7) + 1;
-
-    let keyId = 0;
-    let offset = 1;
-    for (let i = 0; i < keyIdLen; i++) {
-      keyId = (keyId << 8) | frame[offset++];
-    }
-
-    let counter = 0n;
-    for (let i = 0; i < counterLen; i++) {
-      counter = (counter << 8n) | BigInt(frame[offset++]);
-    }
-
-    return { keyId, counter, headerLength: offset };
-  }
-
-  private _computeNonce(baseSalt: Uint8Array, counter: bigint): Uint8Array {
-    // Pad counter to 12 bytes (nonce length)
-    const paddedCounter = new Uint8Array(12);
-    let temp = counter;
-    for (let i = 11; i >= 0 && temp > 0n; i--) {
-      paddedCounter[i] = Number(temp & 0xffn);
-      temp >>= 8n;
-    }
-
-    return xorBytes(baseSalt, paddedCounter);
   }
 
   // ─── WebRTC Encoded Transforms ────────────────────────────────
 
-  /**
-   * Set up sender and receiver transforms on the peer connection
-   * to encrypt/decrypt media frames using SFrame.
-   */
   setupEncodedTransforms(peerConnection: RTCPeerConnection) {
+    // Set up sender transforms for existing senders
     for (const sender of peerConnection.getSenders()) {
       if (sender.track?.kind === 'audio') {
         this._setupSenderTransform(sender);
       }
     }
 
+    // Set up receiver transforms for existing receivers IMMEDIATELY.
+    // The receiver already exists from addTransceiver('sendrecv') — we must
+    // call createEncodedStreams() on it NOW, before setRemoteDescription(),
+    // so the encoded frames pipeline is ready when RTP starts arriving.
+    for (const receiver of peerConnection.getReceivers()) {
+      if (receiver.track?.kind === 'audio') {
+        this._setupReceiverTransform(receiver);
+      }
+    }
+
+    // Also handle any future tracks (e.g. renegotiation adds new receivers)
     peerConnection.addEventListener('track', (event) => {
       if (event.track.kind === 'audio' && event.receiver) {
-        this._setupReceiverTransform(event.receiver);
+        // Only set up if not already done
+        // @ts-ignore - custom flag to prevent double createEncodedStreams()
+        if (!event.receiver._daveTransformSetUp) {
+          this._setupReceiverTransform(event.receiver);
+        }
       }
     });
   }
 
   private _setupSenderTransform(sender: RTCRtpSender) {
     try {
-      // @ts-ignore - RTCRtpScriptTransform is available in modern browsers
-      if (typeof RTCRtpScriptTransform !== 'undefined') {
-        // Use Script Transform API (preferred)
-        // This would require a worker — for now use insertable streams
-      }
-
-      // Fallback: use Insertable Streams (Encoded Insertable Streams)
       // @ts-ignore
       const streams = sender.createEncodedStreams?.();
       if (!streams) {
@@ -873,10 +1250,17 @@ export class DaveSession {
       const { readable, writable } = streams;
       const session = this;
 
+      let senderFrameCount = 0;
       const transformStream = new TransformStream({
         async transform(chunk: any, controller: any) {
-          if (session.state !== 'ready' || !session.sframeKeyMaterial) {
-            // Pass through unencrypted
+          senderFrameCount++;
+          if (senderFrameCount <= 5 || senderFrameCount % 500 === 0) {
+            console.log(
+              `[DAVE] Sender frame #${senderFrameCount}, state: ${session.state}, hasRatchet: ${!!session.senderRatchet}, size: ${chunk.data?.byteLength}`,
+            );
+          }
+
+          if (session.state !== 'ready' || !session.senderRatchet) {
             controller.enqueue(chunk);
             return;
           }
@@ -886,14 +1270,17 @@ export class DaveSession {
             const encrypted = await session.encryptFrame(data);
             chunk.data = encrypted.buffer;
             controller.enqueue(chunk);
-          } catch {
-            // On error, pass through
+          } catch (err) {
+            if (senderFrameCount <= 10) console.error('[DAVE] Sender encrypt error:', err);
             controller.enqueue(chunk);
           }
         },
       });
 
-      readable.pipeThrough(transformStream).pipeTo(writable);
+      readable
+        .pipeThrough(transformStream)
+        .pipeTo(writable)
+        .catch((err: any) => console.error('[DAVE] Sender pipe error:', err));
       console.log('[DAVE] Sender transform set up');
     } catch (err) {
       console.warn('[DAVE] Failed to set up sender transform:', err);
@@ -902,37 +1289,85 @@ export class DaveSession {
 
   private _setupReceiverTransform(receiver: RTCRtpReceiver) {
     try {
+      // @ts-ignore - mark to prevent double setup
+      receiver._daveTransformSetUp = true;
       // @ts-ignore
       const streams = receiver.createEncodedStreams?.();
+      console.log(
+        '[DAVE] Receiver createEncodedStreams result:',
+        streams ? Object.keys(streams) : 'null/undefined',
+        'receiver.track:',
+        receiver.track?.kind,
+        receiver.track?.readyState,
+        receiver.track?.muted,
+      );
       if (!streams) {
         console.log('[DAVE] Encoded streams not available for receiver');
         return;
       }
 
       const { readable, writable } = streams;
+      console.log(
+        '[DAVE] Receiver streams - readable:',
+        readable?.constructor?.name,
+        'locked:',
+        readable?.locked,
+        'writable:',
+        writable?.constructor?.name,
+        'locked:',
+        writable?.locked,
+      );
       const session = this;
 
+      let receiverFrameCount = 0;
       const transformStream = new TransformStream({
         async transform(chunk: any, controller: any) {
-          if (session.state !== 'ready' || !session.sframeKeyMaterial) {
+          receiverFrameCount++;
+
+          // Extract SSRC from encoded frame metadata for per-user key lookup
+          const metadata = chunk.getMetadata?.();
+          const ssrc = metadata?.synchronizationSource;
+
+          if (receiverFrameCount <= 10 || receiverFrameCount % 500 === 0) {
+            const data = new Uint8Array(chunk.data);
+            const userId = ssrc ? session.ssrcToUserId.get(ssrc) : undefined;
+            const tail = data.slice(Math.max(0, data.byteLength - 20));
+            const tailHex = Array.from(tail).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            console.log(
+              `[DAVE] Receiver frame #${receiverFrameCount}, ssrc: ${ssrc}, user: ${userId}, state: ${session.state}, hasRatchet: ${userId ? session.receiverRatchets.has(userId) : false}, size: ${data.byteLength}`,
+              `\n  first8: [${Array.from(data.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ')}]`,
+              `\n  last20: [${tailHex}]`,
+              `\n  last2: 0x${data[data.byteLength-2]?.toString(16)} 0x${data[data.byteLength-1]?.toString(16)}`,
+            );
+          }
+
+          if (session.state !== 'ready') {
             controller.enqueue(chunk);
             return;
           }
 
           try {
             const data = new Uint8Array(chunk.data);
-            const decrypted = await session.decryptFrame(data);
+            const decrypted = await session.decryptFrame(data, ssrc);
+            if (receiverFrameCount <= 5) {
+              console.log(
+                `[DAVE] Receiver decrypted #${receiverFrameCount}, ssrc: ${ssrc}, in: ${data.byteLength}, out: ${decrypted.byteLength}`,
+              );
+            }
             chunk.data = decrypted.buffer;
             controller.enqueue(chunk);
-          } catch {
-            // On error, pass through (might be unencrypted)
+          } catch (err) {
+            if (receiverFrameCount <= 10) console.error('[DAVE] Receiver decrypt error:', err);
             controller.enqueue(chunk);
           }
         },
       });
 
-      readable.pipeThrough(transformStream).pipeTo(writable);
-      console.log('[DAVE] Receiver transform set up');
+      readable
+        .pipeThrough(transformStream)
+        .pipeTo(writable)
+        .catch((err: any) => console.error('[DAVE] Receiver pipe error:', err));
+      console.log('[DAVE] Receiver transform set up, readable:', !!readable, 'writable:', !!writable);
     } catch (err) {
       console.warn('[DAVE] Failed to set up receiver transform:', err);
     }
@@ -950,10 +1385,41 @@ export class DaveSession {
     this.encryptionPublicRaw = null;
     this.externalSenderKey = null;
     this.epochSecret = null;
+    this.exporterSecret = null;
     this.pendingEpochSecret = null;
     this.sframeKeyMaterial = null;
+    this.senderRatchet = null;
+    this.receiverRatchets.clear();
+    this.ssrcToUserId.clear();
     this.sendCounter = 0n;
     this.epoch = 0;
     this.transitioning = false;
   }
+}
+
+// ─── ULEB128 Encoding/Decoding ───────────────────────────────
+
+function uleb128Encode(value: number): Uint8Array {
+  const bytes: number[] = [];
+  do {
+    let byte = value & 0x7f;
+    value >>>= 7;
+    if (value > 0) byte |= 0x80;
+    bytes.push(byte);
+  } while (value > 0);
+  return new Uint8Array(bytes);
+}
+
+function uleb128Decode(data: Uint8Array): { value: number; bytesRead: number } {
+  let value = 0;
+  let shift = 0;
+  let bytesRead = 0;
+  for (let i = 0; i < data.length; i++) {
+    const byte = data[i];
+    value |= (byte & 0x7f) << shift;
+    shift += 7;
+    bytesRead++;
+    if ((byte & 0x80) === 0) break;
+  }
+  return { value: value >>> 0, bytesRead };
 }

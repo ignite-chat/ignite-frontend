@@ -39,5 +39,7 @@ export const useDiscordVoiceStore = create<DiscordVoiceStore>((set) => ({
       channelId: null,
       channelName: null,
       guildName: null,
+      isMuted: false,
+      isDeafened: false,
     }),
 }));

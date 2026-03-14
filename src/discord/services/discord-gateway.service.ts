@@ -353,15 +353,12 @@ export const DiscordGatewayService = {
         useDiscordRelationshipsStore.getState().updateRelationship(data.id, { type: data.type, nickname: data.nickname });
         break;
       case 'GUILD_MEMBERS_CHUNK':
-        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleGuildMembersChunk(data);
         break;
       case 'GUILD_MEMBER_UPDATE':
-        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleGuildMemberUpdate(data);
         break;
       case 'GUILD_MEMBER_LIST_UPDATE':
-        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleGuildMemberListUpdate(data);
         break;
       case 'MESSAGE_REACTION_ADD_MANY': {
@@ -405,7 +402,6 @@ export const DiscordGatewayService = {
         break;
       }
       case 'MESSAGE_REACTION_ADD': {
-        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         const { channel_id, message_id, user_id, emoji, burst } = data;
         if (!channel_id || !message_id || !emoji) break;
         const raMessages = useDiscordChannelsStore.getState().channelMessages[channel_id];
@@ -444,7 +440,6 @@ export const DiscordGatewayService = {
         break;
       }
       case 'MESSAGE_REACTION_REMOVE': {
-        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         const { channel_id, message_id, user_id, emoji, burst } = data;
         if (!channel_id || !message_id || !emoji) break;
         const rrMessages = useDiscordChannelsStore.getState().channelMessages[channel_id];

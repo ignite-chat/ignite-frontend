@@ -3,7 +3,7 @@ import { useDiscordVoiceStore } from '../store/discord-voice.store';
 import { DiscordGatewayService } from './discord-gateway.service';
 import { DaveSession } from './discord-dave';
 
-// Voice Gateway Opcodes
+// Voice Gateway Opcodes (per protocol.md)
 const VoiceOp = {
   IDENTIFY: 0,
   SELECT_PROTOCOL: 1,
@@ -15,18 +15,24 @@ const VoiceOp = {
   RESUME: 7,
   HELLO: 8,
   RESUMED: 9,
+  CLIENTS_CONNECT: 11,
   CLIENT_DISCONNECT: 13,
   MEDIA_SINK_WANTS: 15,
   CLIENT_FLAGS: 16,
-  // DAVE E2EE opcodes
-  DAVE_MLS_EXTERNAL_SENDER: 20,
-  DAVE_MLS_KEY_PACKAGE: 21,
-  DAVE_MLS_PROPOSALS: 22,
-  DAVE_MLS_COMMIT_WELCOME: 23,
-  DAVE_PREPARE_TRANSITION: 24,
-  DAVE_EXECUTE_TRANSITION: 25,
-  DAVE_PREPARE_EPOCH: 26,
-  DAVE_MLS_INVALID_COMMIT_WELCOME: 27,
+  CLIENT_PLATFORM: 18,        // server→client: { user_id, platform, flags }
+  VOICE_BACKEND_VERSION: 20,  // server→client: { user_id, platform }
+  // DAVE E2EE opcodes (per protocol.md section "Voice Gateway Opcodes")
+  DAVE_PROTOCOL_PREPARE_TRANSITION: 21,  // JSON, server→client
+  DAVE_PROTOCOL_EXECUTE_TRANSITION: 22,  // JSON, server→client
+  DAVE_PROTOCOL_READY_FOR_TRANSITION: 23, // JSON, client→server
+  DAVE_PROTOCOL_PREPARE_EPOCH: 24,       // JSON, server→client
+  DAVE_MLS_EXTERNAL_SENDER_PACKAGE: 25,  // Binary, server→client
+  DAVE_MLS_KEY_PACKAGE: 26,              // Binary, client→server
+  DAVE_MLS_PROPOSALS: 27,               // Binary, server→client
+  DAVE_MLS_COMMIT_WELCOME: 28,          // Binary, client→server
+  DAVE_MLS_ANNOUNCE_COMMIT_TRANSITION: 29, // Binary, server→client
+  DAVE_MLS_WELCOME: 30,                 // Binary, server→client
+  DAVE_MLS_INVALID_COMMIT_WELCOME: 31,  // JSON, client→server
 } as const;
 
 export const DiscordVoiceService = {
@@ -50,6 +56,26 @@ export const DiscordVoiceService = {
   // Remote audio elements for playback
   remoteAudioElements: new Map<string, HTMLAudioElement>(),
 
+  // SSRC → userId mappings from SPEAKING messages (needed for SDP construction)
+  remoteSsrcs: new Map<number, string>(),
+
+  // Number of recvonly audio transceivers created (for SDP renegotiation)
+  numAudioReceivers: 10,
+  numVideoReceivers: 10,
+
+  // Cached server ICE/DTLS info from SESSION_DESCRIPTION
+  serverSdpInfo: null as {
+    iceUfrag: string;
+    icePwd: string;
+    fingerprint: string;
+    candidates: string[];
+    connectionLine: string;
+    port: string;
+  } | null,
+
+  // Stats monitor interval
+  statsMonitorInterval: null as ReturnType<typeof setInterval> | null,
+
   // DAVE E2EE session
   daveSession: null as DaveSession | null,
 
@@ -65,12 +91,12 @@ export const DiscordVoiceService = {
   ) {
     const store = useDiscordVoiceStore.getState();
 
-    // Already in this channel
-    if (store.channelId === channelId && store.connectionState !== 'disconnected') {
+    // Already actively connected to this channel — nothing to do
+    if (store.channelId === channelId && store.connectionState === 'connected') {
       return;
     }
 
-    // Leave current channel first
+    // Leave/cleanup current channel first
     if (store.connectionState !== 'disconnected') {
       await this.leaveVoiceChannel();
     }
@@ -274,31 +300,33 @@ export const DiscordVoiceService = {
 
         let parsed;
         if (data instanceof ArrayBuffer) {
+          // Binary DAVE messages from server: [seq_hi, seq_lo, opcode, ...data]
+          // Per protocol.md: uint16 sequence_number + uint8 opcode + payload
           const buffer: ArrayBuffer = data;
-          if (buffer.byteLength < 1) return;
+          if (buffer.byteLength < 3) return;
 
           const view = new Uint8Array(buffer);
-          const relativeOp = view[0];
-          const op = VoiceOp.DAVE_MLS_EXTERNAL_SENDER + relativeOp;
-          const d = new Uint8Array(buffer, 1);
+          const seqNum = (view[0] << 8) | view[1];
+          const op = view[2];
+          const d = new Uint8Array(buffer, 3);
 
-          console.log(`[Discord Voice] Binary DAVE message: relative op ${relativeOp}, absolute op ${op}, ${d.byteLength} bytes, first bytes: [${view.slice(0, 8).join(', ')}]`);
-          parsed = { op, d };
+          console.log(`[Discord Voice] Binary DAVE message: seq=${seqNum}, op=${op}, ${d.byteLength} bytes, first bytes: [${view.slice(0, 8).join(', ')}]`);
+          parsed = { op, d, seq: seqNum };
         } else if (typeof data === 'string') {
           parsed = JSON.parse(data);
         } else {
           // Unknown type — log details and try to handle
           console.warn('[Discord Voice] Unknown message data type:', Object.prototype.toString.call(data), data);
-          // Try treating as ArrayBuffer-like (e.g., Buffer in Node/Electron)
           if (data?.buffer instanceof ArrayBuffer) {
             const buffer = data.buffer;
             const offset = data.byteOffset || 0;
             const view = new Uint8Array(buffer, offset, data.byteLength);
-            const relativeOp = view[0];
-            const op = VoiceOp.DAVE_MLS_EXTERNAL_SENDER + relativeOp;
-            const d = new Uint8Array(buffer, offset + 1, data.byteLength - 1);
-            console.log(`[Discord Voice] Buffer-like DAVE message: relative op ${relativeOp}, absolute op ${op}, ${d.byteLength} bytes`);
-            parsed = { op, d };
+            if (data.byteLength < 3) return;
+            const seqNum = (view[0] << 8) | view[1];
+            const op = view[2];
+            const d = new Uint8Array(buffer, offset + 3, data.byteLength - 3);
+            console.log(`[Discord Voice] Buffer-like DAVE message: seq=${seqNum}, op=${op}, ${d.byteLength} bytes`);
+            parsed = { op, d, seq: seqNum };
           } else {
             return;
           }
@@ -315,9 +343,9 @@ export const DiscordVoiceService = {
 
       const store = useDiscordVoiceStore.getState();
       if (store.connectionState === 'connected' || store.connectionState === 'connecting') {
-        // Unexpected / forced disconnect — clean up resources but keep channel info
+        // Unexpected / forced disconnect — clean up resources and reset state
         this._cleanupConnection();
-        store.setConnectionState('force_disconnected');
+        store.reset();
       }
     };
 
@@ -356,7 +384,7 @@ export const DiscordVoiceService = {
           session_id: sessionId,
           channel_id: channelId,
           token,
-          video: false,
+          video: true,
           streams: [{ type: 'video', rid: '100', quality: 100 }],
           max_dave_protocol_version: 1,
         });
@@ -371,10 +399,8 @@ export const DiscordVoiceService = {
         console.log('[Discord Voice] READY received, ssrc:', d.ssrc, 'full READY data:', JSON.stringify(d));
         this.ssrc = d.ssrc;
 
-        // Initialize DAVE session if the server supports it
-        console.log('[Discord Voice] dave_protocol_version:', d.dave_protocol_version, typeof d.dave_protocol_version);
-        // Always create DAVE session — it's required by Discord
-        console.log('[Discord Voice] Creating DAVE session...');
+        // Always create DAVE session — Discord requires E2EE (4017 if missing)
+        console.log('[Discord Voice] dave_protocol_version:', d.dave_protocol_version);
         this.daveSession = new DaveSession();
         try {
           await this.daveSession.initialize(userId);
@@ -398,46 +424,105 @@ export const DiscordVoiceService = {
         break;
 
       case VoiceOp.SPEAKING:
-        // Other user speaking state change — no action needed
+        console.log('[Discord Voice] SPEAKING:', JSON.stringify(d));
+        if (d?.ssrc && d?.user_id) {
+          const isNew = !this.remoteSsrcs.has(d.ssrc);
+          this.remoteSsrcs.set(d.ssrc, d.user_id);
+          if (this.daveSession) {
+            this.daveSession.registerSpeakingSsrc(d.ssrc, d.user_id);
+          }
+          // Renegotiate SDP when a new SSRC appears so Chrome knows about it
+          if (isNew && this.serverSdpInfo) {
+            this._renegotiateSdp();
+          }
+        }
         break;
 
       case VoiceOp.RESUMED:
         console.log('[Discord Voice] Voice session resumed');
         break;
 
+      case VoiceOp.CLIENTS_CONNECT:
+        console.log('[Discord Voice] CLIENTS_CONNECT: users in call:', d?.user_ids);
+        break;
+
+      case VoiceOp.CLIENT_DISCONNECT:
+        console.log('[Discord Voice] CLIENT_DISCONNECT:', d?.user_id);
+        break;
+
       case VoiceOp.CLIENT_FLAGS:
         // Server acknowledges client flags — no action needed
         break;
 
+      case VoiceOp.CLIENT_PLATFORM:
+        console.log('[Discord Voice] CLIENT_PLATFORM: user:', d?.user_id, 'platform:', d?.platform, 'flags:', d?.flags);
+        break;
+
       case VoiceOp.MEDIA_SINK_WANTS:
-        // Server indicates which media SSRCs it wants — no action needed for audio-only
+        console.log('[Discord Voice] MEDIA_SINK_WANTS:', JSON.stringify(d));
         break;
 
-      // ─── DAVE E2EE Opcodes ──────────────────────────────────────
-
-      case VoiceOp.DAVE_MLS_EXTERNAL_SENDER:
-        this._handleDaveExternalSender(d);
+      case VoiceOp.VOICE_BACKEND_VERSION:
+        console.log('[Discord Voice] VOICE_BACKEND_VERSION: user:', d?.user_id, 'platform:', d?.platform);
         break;
 
-      case VoiceOp.DAVE_MLS_PROPOSALS:
-        if (this.daveSession) {
-          this.daveSession.handleProposals(d);
-        }
-        break;
+      // ─── DAVE E2EE Opcodes (per protocol.md) ─────────────────────
 
-      case VoiceOp.DAVE_MLS_COMMIT_WELCOME:
-        this._handleDaveCommitWelcome(d);
-        break;
-
-      case VoiceOp.DAVE_PREPARE_TRANSITION:
+      case VoiceOp.DAVE_PROTOCOL_PREPARE_TRANSITION:
+        // JSON: { protocol_version, transition_id }
+        console.log('[Discord Voice] DAVE prepare transition:', JSON.stringify(d));
         this._handleDavePrepareTransition(d);
         break;
 
-      case VoiceOp.DAVE_EXECUTE_TRANSITION:
+      case VoiceOp.DAVE_PROTOCOL_EXECUTE_TRANSITION:
+        // JSON: { transition_id }
+        console.log('[Discord Voice] DAVE execute transition:', JSON.stringify(d));
         if (this.daveSession) {
           this.daveSession.handleExecuteTransition(d);
         }
         break;
+
+      case VoiceOp.DAVE_PROTOCOL_PREPARE_EPOCH:
+        // JSON: { protocol_version, epoch }
+        console.log('[Discord Voice] DAVE prepare epoch:', JSON.stringify(d));
+        this._handleDavePrepareEpoch(d);
+        break;
+
+      case VoiceOp.DAVE_MLS_EXTERNAL_SENDER_PACKAGE: {
+        // Binary (op 25): ExternalSender credential from server
+        console.log('[Discord Voice] DAVE Op 25 external sender package:', d instanceof Uint8Array ? d.length + ' bytes' : JSON.stringify(d));
+        if (d instanceof Uint8Array) {
+          this._handleDaveExternalSender(d);
+        }
+        break;
+      }
+
+      case VoiceOp.DAVE_MLS_PROPOSALS: {
+        // Binary (op 27): MLS proposals from server
+        console.log('[Discord Voice] DAVE Op 27 proposals:', d instanceof Uint8Array ? d.length + ' bytes' : JSON.stringify(d)?.substring(0, 200));
+        if (d instanceof Uint8Array && this.daveSession) {
+          this.daveSession.handleProposals(d);
+        }
+        break;
+      }
+
+      case VoiceOp.DAVE_MLS_ANNOUNCE_COMMIT_TRANSITION: {
+        // Binary (op 29): commit broadcast + transition_id from server
+        console.log('[Discord Voice] DAVE Op 29 announce commit transition:', d instanceof Uint8Array ? d.length + ' bytes' : JSON.stringify(d));
+        if (d instanceof Uint8Array) {
+          this._handleDaveAnnounceCommitTransition(d);
+        }
+        break;
+      }
+
+      case VoiceOp.DAVE_MLS_WELCOME: {
+        // Binary (op 30): Welcome message for us (new joiner)
+        console.log('[Discord Voice] DAVE Op 30 welcome:', d instanceof Uint8Array ? d.length + ' bytes' : JSON.stringify(d));
+        if (d instanceof Uint8Array) {
+          this._handleDaveWelcome(d);
+        }
+        break;
+      }
 
       case VoiceOp.DAVE_MLS_INVALID_COMMIT_WELCOME:
         console.warn('[Discord Voice] DAVE invalid commit/welcome:', d);
@@ -451,73 +536,99 @@ export const DiscordVoiceService = {
   // ─── DAVE Handlers ──────────────────────────────────────────────
 
   async _handleDaveExternalSender(d: Uint8Array) {
+    console.log('[Discord Voice] DAVE external sender received, daveSession:', !!this.daveSession, 'data length:', d?.length);
     if (!this.daveSession) return;
 
     try {
-      const keyPackage = await this.daveSession.handleExternalSender(d);
+      // d is the ExternalSender struct (after seq+opcode were stripped by parser)
+      const keyPackageMsg = await this.daveSession.handleExternalSender(d);
+      console.log('[Discord Voice] DAVE key package MLSMessage created, length:', keyPackageMsg.length);
 
-      // Send our key package back as binary (Op 21)
-      this._sendDaveBinary(VoiceOp.DAVE_MLS_KEY_PACKAGE, keyPackage);
+      // Send our key package as binary Op 26: [opcode(26), MLSMessage]
+      this._sendDaveBinary(VoiceOp.DAVE_MLS_KEY_PACKAGE, keyPackageMsg);
+      console.log('[Discord Voice] DAVE key package sent (Op 26)');
     } catch (err) {
       console.error('[Discord Voice] DAVE external sender handling failed:', err);
     }
   },
 
-  async _handleDaveCommitWelcome(d: Uint8Array) {
+  /** Handle Op 29: announce_commit_transition — commit broadcast from another member */
+  async _handleDaveAnnounceCommitTransition(d: Uint8Array) {
     if (!this.daveSession) return;
 
     try {
-      await this.daveSession.handleCommitWelcome(d);
+      // Binary format: [transition_id(2 bytes), MLSMessage commit...]
+      if (d.length < 2) return;
+      const transitionId = (d[0] << 8) | d[1];
+      const commitData = d.subarray(2);
+      console.log('[Discord Voice] DAVE announce commit transition: transitionId=', transitionId, 'commitSize=', commitData.length);
 
-      // Set up encoded transforms now that we have keys
-      if (this.daveSession.state === 'ready' && this.peerConnection) {
-        this.daveSession.setupEncodedTransforms(this.peerConnection);
-      }
+      await this.daveSession.handleCommit(commitData);
+      console.log('[Discord Voice] DAVE commit processed, state:', this.daveSession.state);
+
+      // Tell server we're ready for this transition
+      this._sendVoice(VoiceOp.DAVE_PROTOCOL_READY_FOR_TRANSITION, {
+        transition_id: transitionId,
+      });
+      console.log('[Discord Voice] Sent ready_for_transition, transitionId:', transitionId);
     } catch (err) {
-      console.error('[Discord Voice] DAVE commit/welcome handling failed:', err);
+      console.error('[Discord Voice] DAVE announce commit transition failed:', err);
+    }
+  },
+
+  /** Handle Op 30: welcome — Welcome message for us as a new joiner */
+  async _handleDaveWelcome(d: Uint8Array) {
+    if (!this.daveSession) return;
+
+    try {
+      // Binary format: [transition_id(2 bytes), Welcome message...]
+      if (d.length < 2) return;
+      const transitionId = (d[0] << 8) | d[1];
+      const welcomeData = d.subarray(2);
+      console.log('[Discord Voice] DAVE welcome: transitionId=', transitionId, 'welcomeSize=', welcomeData.length);
+
+      await this.daveSession.handleWelcome(welcomeData);
+      console.log('[Discord Voice] DAVE welcome processed, state:', this.daveSession.state, 'epoch:', this.daveSession.epoch, 'hasKeys:', !!this.daveSession.sframeKeyMaterial);
+
+      // Tell server we're ready for this transition
+      this._sendVoice(VoiceOp.DAVE_PROTOCOL_READY_FOR_TRANSITION, {
+        transition_id: transitionId,
+      });
+      console.log('[Discord Voice] Sent ready_for_transition after welcome, transitionId:', transitionId);
+    } catch (err) {
+      console.error('[Discord Voice] DAVE welcome handling failed:', err);
     }
   },
 
   _handleDavePrepareTransition(d: any) {
+    console.log('[Discord Voice] DAVE prepare transition, daveSession:', !!this.daveSession, 'd:', JSON.stringify(d));
     if (!this.daveSession) return;
 
-    try {
-      const result = this.daveSession.handlePrepareTransition(d);
+    const transitionId = d?.transition_id ?? 0;
 
-      // Acknowledge the prepare (Op 26)
-      this._sendVoice(VoiceOp.DAVE_PREPARE_EPOCH, {
-        epoch: result.epoch,
-      });
-    } catch (err) {
-      console.error('[Discord Voice] DAVE prepare transition failed:', err);
+    // transition_id = 0 means immediate execute (re-initialization)
+    if (transitionId === 0) {
+      console.log('[Discord Voice] DAVE immediate transition (re-init)');
+      this.daveSession.handleExecuteTransition(d);
+      return;
     }
+
+    this.daveSession.handlePrepareTransition(d);
   },
 
-  /** Decode DAVE binary data from voice gateway JSON payload. */
-  _decodeDAVEBinary(d: any): Uint8Array {
-    if (d instanceof Uint8Array) return d;
-    if (d?.data && Array.isArray(d.data)) return new Uint8Array(d.data);
-    if (typeof d === 'string') {
-      // Base64 encoded
-      const binary = atob(d);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      return bytes;
-    }
-    if (Array.isArray(d)) return new Uint8Array(d);
-    // If it's an object with specific fields, extract the relevant binary data
-    if (d?.key_package) return this._decodeDAVEBinary(d.key_package);
-    if (d?.commit) return this._decodeDAVEBinary(d.commit);
-    if (d?.welcome) return this._decodeDAVEBinary(d.welcome);
-    return new Uint8Array(0);
-  },
+  /** Handle Op 24: prepare_epoch — server announces upcoming epoch/protocol change */
+  _handleDavePrepareEpoch(d: any) {
+    console.log('[Discord Voice] DAVE prepare epoch, d:', JSON.stringify(d));
+    const epoch = d?.epoch ?? 0;
 
-  /** Encode binary data for DAVE voice gateway payloads. */
-  _encodeDAVEBinary(data: Uint8Array): string {
-    // Base64 encode for JSON transport
-    let binary = '';
-    for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]);
-    return btoa(binary);
+    if (epoch === 1) {
+      // Group is being (re)created — generate and send a new key package
+      console.log('[Discord Voice] DAVE group (re)creation, generating new key package');
+      if (this.daveSession) {
+        this.daveSession.resetGroupState();
+        // Re-send key package after external sender is received
+      }
+    }
   },
 
   // ─── WebRTC ──────────────────────────────────────────────────────
@@ -545,16 +656,16 @@ export const DiscordVoiceService = {
         }
       }
 
-      // Create peer connection (enable encoded insertable streams for DAVE E2EE)
+      // Create peer connection with encoded insertable streams for DAVE E2EE
       this.peerConnection = new RTCPeerConnection({
         bundlePolicy: 'max-bundle',
         // @ts-ignore - encodedInsertableStreams is a Chrome/Electron API
-        encodedInsertableStreams: !!this.daveSession,
+        encodedInsertableStreams: true,
       });
 
       // Handle remote tracks (incoming audio from other users)
       this.peerConnection.ontrack = (event) => {
-        console.log('[Discord Voice] Remote track received:', event.track.kind);
+        console.log('[Discord Voice] Remote track received:', event.track.kind, 'id:', event.track.id, 'readyState:', event.track.readyState, 'mid:', event.transceiver?.mid, 'streams:', event.streams.length, 'streamIds:', event.streams.map((s) => s.id));
         if (event.track.kind === 'audio') {
           const audio = new Audio();
           audio.srcObject = event.streams[0] || new MediaStream([event.track]);
@@ -562,39 +673,96 @@ export const DiscordVoiceService = {
           audio.muted = store.isDeafened;
           this.remoteAudioElements.set(event.track.id, audio);
 
+          audio.play().then(() => {
+            console.log('[Discord Voice] Remote audio playing, trackId:', event.track.id, 'mid:', event.transceiver?.mid);
+          }).catch((err) => {
+            console.error('[Discord Voice] Remote audio play() rejected:', err);
+          });
+
           event.track.onended = () => {
             const el = this.remoteAudioElements.get(event.track.id);
-            if (el) {
-              el.pause();
-              el.srcObject = null;
-            }
+            if (el) { el.pause(); el.srcObject = null; }
             this.remoteAudioElements.delete(event.track.id);
           };
+          event.track.onunmute = () => console.log('[Discord Voice] Remote track unmuted:', event.track.id, 'mid:', event.transceiver?.mid);
         }
       };
 
-      // Add local audio track as sendrecv transceiver
+      // ─── Create transceivers matching Discord's architecture ───
+      // mid 0: audio sendonly (our mic audio to server)
       const audioTrack = this.localStream.getAudioTracks()[0];
       if (audioTrack) {
-        this.peerConnection.addTransceiver(audioTrack, { direction: 'sendrecv' });
+        this.peerConnection.addTransceiver(audioTrack, { direction: 'sendonly' });
+      } else {
+        this.peerConnection.addTransceiver('audio', { direction: 'sendonly' });
       }
+
+      // mid 1: video recvonly (our video slot)
+      this.peerConnection.addTransceiver('video', { direction: 'recvonly' });
+
+      // mids 2..11: 10 audio recvonly transceivers (for remote users)
+      for (let i = 0; i < this.numAudioReceivers; i++) {
+        this.peerConnection.addTransceiver('audio', { direction: 'recvonly' });
+      }
+
+      // mids 12..21: 10 video recvonly transceivers (for remote users)
+      for (let i = 0; i < this.numVideoReceivers; i++) {
+        this.peerConnection.addTransceiver('video', { direction: 'recvonly' });
+      }
+
+      console.log('[Discord Voice] Created transceivers:', this.peerConnection.getTransceivers().length);
+
+      // Debug: monitor ICE and connection state
+      this.peerConnection.onicecandidate = (event) => {
+        if (event.candidate) console.log('[Discord Voice] ICE candidate:', event.candidate.candidate.substring(0, 80));
+      };
+      this.peerConnection.oniceconnectionstatechange = () => {
+        console.log('[Discord Voice] ICE connection state:', this.peerConnection?.iceConnectionState);
+      };
+      this.peerConnection.onconnectionstatechange = () => {
+        console.log('[Discord Voice] Connection state:', this.peerConnection?.connectionState);
+      };
 
       // Create offer
       const offer = await this.peerConnection.createOffer();
-
-      // Modify SDP to use Discord's assigned SSRC
       let sdp = offer.sdp || '';
+
+      // Replace auto-generated SSRC in the first audio m-section with Discord's assigned SSRC
       sdp = this._modifySdpSsrc(sdp, this.ssrc);
 
-      const modifiedOffer = new RTCSessionDescription({ type: 'offer', sdp });
-      await this.peerConnection.setLocalDescription(modifiedOffer);
+      console.log('[Discord Voice] SDP offer mids:', sdp.match(/a=mid:\d+/g)?.join(', '));
+      await this.peerConnection.setLocalDescription(new RTCSessionDescription({ type: 'offer', sdp }));
+
+      // Extract UNIQUE a= attribute lines for SELECT_PROTOCOL.
+      // Discord expects ONE set of ice/extmap/rtpmap lines, not duplicated per m-section.
+      const seen = new Set<string>();
+      const selectLines: string[] = [];
+      for (const line of sdp.split('\r\n')) {
+        if (!line.startsWith('a=')) continue;
+        // Skip per-transceiver lines (mid, ssrc, msid, direction, rtcp lines)
+        if (line.startsWith('a=mid:') || line.startsWith('a=ssrc:') || line.startsWith('a=msid:') ||
+            line.startsWith('a=ssrc-group:') || line.startsWith('a=rtcp:') || line.startsWith('a=rtcp-mux') ||
+            line.startsWith('a=rtcp-rsize') || line === 'a=sendonly' || line === 'a=recvonly' ||
+            line === 'a=sendrecv' || line === 'a=inactive') continue;
+        // Deduplicate
+        if (!seen.has(line)) {
+          seen.add(line);
+          selectLines.push(line);
+        }
+      }
+      const selectSdp = selectLines.join('\n');
 
       // Send Select Protocol with WebRTC SDP
       this._sendVoice(VoiceOp.SELECT_PROTOCOL, {
         protocol: 'webrtc',
-        data: sdp,
-        sdp,
-        codecs: [{ name: 'opus', type: 'audio', priority: 1000, payload_type: 111 }],
+        data: selectSdp,
+        sdp: selectSdp,
+        codecs: [
+          { name: 'opus', type: 'audio', priority: 1000, payload_type: 111, rtx_payload_type: null },
+          { name: 'H264', type: 'video', priority: 1000, payload_type: 103, rtx_payload_type: 104 },
+          { name: 'VP8', type: 'video', priority: 2000, payload_type: 96, rtx_payload_type: 97 },
+          { name: 'VP9', type: 'video', priority: 3000, payload_type: 98, rtx_payload_type: 99 },
+        ],
         rtc_connection_id: this.rtcConnectionId,
       });
     } catch (err) {
@@ -642,7 +810,6 @@ export const DiscordVoiceService = {
 
     try {
       const rawSdp: string = data.sdp || '';
-      const localSdp = this.peerConnection.localDescription?.sdp || '';
 
       // Extract server-provided ICE/DTLS info from Discord's non-standard SDP
       const iceUfrag = rawSdp.match(/a=ice-ufrag:(\S+)/)?.[1] || '';
@@ -650,74 +817,207 @@ export const DiscordVoiceService = {
       const fingerprint = rawSdp.match(/a=fingerprint:(\S+ \S+)/)?.[1] || '';
       const candidates = [...rawSdp.matchAll(/a=candidate:(.+)/g)].map((m) => m[1]);
       const connectionLine = rawSdp.match(/c=IN IP4 (\S+)/)?.[0] || 'c=IN IP4 0.0.0.0';
-
-      // Extract port from m=audio line
       const port = rawSdp.match(/m=audio (\d+)/)?.[1] || '9';
 
-      // Extract codec info from our local offer to mirror in the answer.
-      // We need the payload types, rtpmap, and fmtp lines.
-      const localPayloadTypes: string[] = [];
-      const localCodecLines: string[] = [];
-      for (const line of localSdp.split('\r\n')) {
-        if (line.startsWith('a=rtpmap:') || line.startsWith('a=fmtp:') || line.startsWith('a=rtcp-fb:')) {
-          localCodecLines.push(line);
-          const pt = line.match(/^a=rtpmap:(\d+)/)?.[1];
-          if (pt && !localPayloadTypes.includes(pt)) localPayloadTypes.push(pt);
-        }
-      }
+      // Cache server info for SDP renegotiation
+      this.serverSdpInfo = { iceUfrag, icePwd, fingerprint, candidates, connectionLine, port };
 
-      // If no codec lines found, default to opus
-      if (localPayloadTypes.length === 0) {
-        localPayloadTypes.push('111');
-        localCodecLines.push('a=rtpmap:111 opus/48000/2');
-        localCodecLines.push('a=fmtp:111 minptime=10;useinbandfec=1');
-      }
+      // Build initial multi-mid SDP answer with all sections inactive
+      // (matching Discord's architecture — sections activate via renegotiation)
+      const sdp = this._buildSdpAnswer();
+      console.log('[Discord Voice] Initial SDP answer (first 600 chars):', sdp.substring(0, 600));
 
-      const fmtList = localPayloadTypes.join(' ');
+      await this.peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }));
+      console.log('[Discord Voice] Remote description set, transceivers:', this.peerConnection.getTransceivers().map((t) => ({ mid: t.mid, dir: t.currentDirection })));
 
-      // Build a proper SDP answer
-      const answerLines = [
-        'v=0',
-        'o=- 0 0 IN IP4 0.0.0.0',
-        's=-',
-        't=0 0',
-        'a=group:BUNDLE 0',
-        'a=msid-semantic: WMS *',
-        `m=audio ${port} UDP/TLS/RTP/SAVPF ${fmtList}`,
-        connectionLine,
-        `a=rtcp:${port}`,
-        `a=ice-ufrag:${iceUfrag}`,
-        `a=ice-pwd:${icePwd}`,
-        `a=fingerprint:${fingerprint}`,
-        'a=setup:active',
-        'a=mid:0',
-        'a=sendrecv',
-        'a=rtcp-mux',
-        ...localCodecLines,
-        ...candidates.map((c) => `a=candidate:${c}`),
-        '',
-      ];
-
-      const sdp = answerLines.join('\r\n');
-      console.log('[Discord Voice] Setting constructed SDP answer');
-
-      const answer = new RTCSessionDescription({ type: 'answer', sdp });
-      await this.peerConnection.setRemoteDescription(answer);
-
-      console.log('[Discord Voice] WebRTC connection established');
       useDiscordVoiceStore.getState().setConnectionState('connected');
 
+      // Set up DAVE E2EE transforms for sender and receivers
+      if (this.daveSession) {
+        console.log('[Discord Voice] Setting up DAVE encoded transforms');
+        this.daveSession.setupEncodedTransforms(this.peerConnection);
+      }
+
       // Announce that we're speaking (microphone source)
-      this._sendVoice(VoiceOp.SPEAKING, {
-        speaking: 1,
-        delay: 0,
-        ssrc: this.ssrc,
-      });
+      this._sendVoice(VoiceOp.SPEAKING, { speaking: 1, delay: 0, ssrc: this.ssrc });
+
+      // Start periodic WebRTC stats monitoring for debugging
+      this._startStatsMonitor();
+
+      // If we already have SSRC mappings from SPEAKING events, renegotiate now
+      if (this.remoteSsrcs.size > 0) {
+        console.log('[Discord Voice] Have pending SSRCs, renegotiating...');
+        await this._renegotiateSdp();
+      }
     } catch (err) {
       console.error('[Discord Voice] Failed to set remote description:', err);
       console.error('[Discord Voice] Raw SDP from server:', data.sdp);
       this._cleanup();
       useDiscordVoiceStore.getState().reset();
+    }
+  },
+
+  /**
+   * Build a multi-mid SDP answer matching Discord's architecture.
+   * Each transceiver gets its own m-section. Active speakers get sendonly + SSRC.
+   */
+  _buildSdpAnswer(): string {
+    if (!this.serverSdpInfo || !this.peerConnection) return '';
+    const { iceUfrag, icePwd, fingerprint, candidates, connectionLine, port } = this.serverSdpInfo;
+    const transceivers = this.peerConnection.getTransceivers();
+
+    // Build BUNDLE group with all mids
+    const mids = transceivers.map((_, i) => i).join(' ');
+
+    // Map SSRC → mid assignment: assign each known SSRC to the first available
+    // recvonly audio transceiver (mids 2+)
+    const ssrcToMid = new Map<number, number>();
+    const assignedMids = new Set<number>();
+    let nextAudioMid = 2; // mids 2..11 are audio receivers
+    for (const [ssrc] of this.remoteSsrcs) {
+      while (nextAudioMid < 2 + this.numAudioReceivers && assignedMids.has(nextAudioMid)) {
+        nextAudioMid++;
+      }
+      if (nextAudioMid < 2 + this.numAudioReceivers) {
+        ssrcToMid.set(ssrc, nextAudioMid);
+        assignedMids.add(nextAudioMid);
+        nextAudioMid++;
+      }
+    }
+    if (ssrcToMid.size > 0) {
+      console.log('[Discord Voice] SSRC→mid mapping:', Object.fromEntries(ssrcToMid));
+    }
+
+    const lines: string[] = [
+      'v=0',
+      'o=- 1420070400000 0 IN IP4 127.0.0.1',
+      's=-',
+      't=0 0',
+      `a=msid-semantic: WMS *`,
+      `a=group:BUNDLE ${mids}`,
+    ];
+
+    // Common ICE/DTLS block for each m-section
+    const iceBlock = [
+      `a=ice-ufrag:${iceUfrag}`,
+      `a=ice-pwd:${icePwd}`,
+      `a=fingerprint:${fingerprint}`,
+      ...candidates.map((c) => `a=candidate:${c}`),
+    ];
+
+    // Audio extmaps (matching Discord's server answer: only ssrc-audio-level + transport-cc)
+    const audioExtmaps = [
+      'a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level',
+      'a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01',
+    ];
+
+    // Video extmaps
+    const videoExtmaps = [
+      'a=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time',
+      'a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01',
+      'a=extmap:14 urn:ietf:params:rtp-hdrext:toffset',
+      'a=extmap:13 urn:3gpp:video-orientation',
+      'a=extmap:5 http://www.webrtc.org/experiments/rtp-hdrext/playout-delay',
+    ];
+
+    for (let i = 0; i < transceivers.length; i++) {
+      const t = transceivers[i];
+      const kind = t.receiver.track.kind;
+      const isAudio = kind === 'audio';
+
+      if (isAudio) {
+        // Check if this mid has an assigned SSRC (active speaker)
+        let activeSsrc: number | undefined;
+        let activeUserId: string | undefined;
+        for (const [ssrc, mid] of ssrcToMid) {
+          if (mid === i) {
+            activeSsrc = ssrc;
+            activeUserId = this.remoteSsrcs.get(ssrc);
+            break;
+          }
+        }
+
+        // mid 0 is our sending slot — answer says recvonly (server receives our audio)
+        // Other mids: sendonly if active speaker, inactive otherwise
+        const direction = i === 0 ? 'recvonly' : activeSsrc ? 'sendonly' : 'inactive';
+        lines.push(
+          `m=audio ${port} UDP/TLS/RTP/SAVPF 111`,
+          connectionLine,
+          `a=rtpmap:111 opus/48000/2`,
+          `a=fmtp:111 minptime=10;useinbandfec=1;usedtx=1`,
+          `a=rtcp:${port}`,
+          'a=rtcp-fb:111 transport-cc',
+          'a=rtcp-fb:111 nack',
+          ...audioExtmaps,
+          'a=setup:passive',
+          `a=mid:${i}`,
+          'a=maxptime:60',
+          `a=${direction}`,
+          ...iceBlock,
+        );
+        // Add SSRC for active speakers
+        if (activeSsrc && activeUserId) {
+          lines.push(
+            `a=msid:${activeUserId}-${activeSsrc} a${activeUserId}-${activeSsrc}`,
+            `a=ssrc:${activeSsrc} cname:${activeUserId}-${activeSsrc}`,
+          );
+        }
+        lines.push('a=rtcp-mux');
+      } else {
+        // Video section — always inactive for now
+        lines.push(
+          `m=video ${port} UDP/TLS/RTP/SAVPF 103 104`,
+          connectionLine,
+          'a=rtpmap:103 H264/90000',
+          'a=rtpmap:104 rtx/90000',
+          'a=fmtp:103 x-google-max-bitrate=2500;level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f',
+          'a=fmtp:104 apt=103',
+          `a=rtcp:${port}`,
+          'a=rtcp-fb:103 ccm fir',
+          'a=rtcp-fb:103 nack',
+          'a=rtcp-fb:103 nack pli',
+          'a=rtcp-fb:103 goog-remb',
+          'a=rtcp-fb:103 transport-cc',
+          ...videoExtmaps,
+          'a=setup:passive',
+          `a=mid:${i}`,
+          'a=inactive',
+          ...iceBlock,
+          'a=rtcp-mux',
+        );
+      }
+    }
+
+    lines.push('');
+    return lines.join('\r\n');
+  },
+
+  /**
+   * SDP renegotiation — called when SPEAKING events provide new SSRC→userId mappings.
+   * Re-creates the offer and answer to activate specific mids with remote SSRCs.
+   */
+  async _renegotiateSdp() {
+    if (!this.peerConnection || !this.serverSdpInfo) return;
+    if (this.peerConnection.signalingState !== 'stable') {
+      console.log('[Discord Voice] Skipping renegotiation, signaling state:', this.peerConnection.signalingState);
+      return;
+    }
+
+    try {
+      // Create new offer (transceivers already exist)
+      const offer = await this.peerConnection.createOffer();
+      let sdp = offer.sdp || '';
+      sdp = this._modifySdpSsrc(sdp, this.ssrc);
+      await this.peerConnection.setLocalDescription(new RTCSessionDescription({ type: 'offer', sdp }));
+
+      // Build answer with SSRC mappings
+      const answerSdp = this._buildSdpAnswer();
+      console.log('[Discord Voice] Renegotiation answer SSRCs:', [...this.remoteSsrcs.entries()].map(([s, u]) => `${s}→${u}`).join(', '));
+
+      await this.peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
+      console.log('[Discord Voice] Renegotiation complete, transceivers:', this.peerConnection.getTransceivers().map((t) => ({ mid: t.mid, dir: t.currentDirection })));
+    } catch (err) {
+      console.error('[Discord Voice] SDP renegotiation failed:', err);
     }
   },
 
@@ -729,13 +1029,13 @@ export const DiscordVoiceService = {
     }
   },
 
-  /** Send a DAVE binary frame: 1 byte relative opcode + raw payload */
-  _sendDaveBinary(absoluteOp: number, payload: Uint8Array) {
+  /** Send a DAVE binary frame: uint8 opcode + payload (client→server format per protocol.md) */
+  _sendDaveBinary(op: number, payload: Uint8Array) {
     if (!this.voiceWs || this.voiceWs.readyState !== WebSocket.OPEN) return;
-    const relativeOp = absoluteOp - VoiceOp.DAVE_MLS_EXTERNAL_SENDER;
     const frame = new Uint8Array(1 + payload.length);
-    frame[0] = relativeOp;
+    frame[0] = op; // Absolute opcode (e.g. 26 for key_package)
     frame.set(payload, 1);
+    console.log(`[Discord Voice] Sending DAVE binary: op=${op}, payload=${payload.length} bytes, total=${frame.length} bytes`);
     this.voiceWs.send(frame.buffer);
   },
 
@@ -779,8 +1079,93 @@ export const DiscordVoiceService = {
   _disconnectVoiceGateway() {
     this._stopVoiceHeartbeat();
     if (this.voiceWs) {
+      // Remove onclose before closing to prevent the old WS's async onclose
+      // from corrupting state during a reconnect
+      this.voiceWs.onclose = null;
+      this.voiceWs.onerror = null;
       this.voiceWs.close(1000, 'Intentional disconnect');
       this.voiceWs = null;
+    }
+  },
+
+  // ─── Stats Monitor ──────────────────────────────────────────────
+
+  _startStatsMonitor() {
+    this._stopStatsMonitor();
+    let checkCount = 0;
+    this.statsMonitorInterval = setInterval(async () => {
+      if (!this.peerConnection) return;
+      checkCount++;
+      try {
+        const stats = await this.peerConnection.getStats();
+        // On first check, log ALL report types to see what's available
+        if (checkCount === 1) {
+          const types: string[] = [];
+          stats.forEach((report) => types.push(`${report.type}(${report.kind || ''})`));
+          console.log(`[Discord Voice] Stats #${checkCount} all report types:`, types.join(', '));
+        }
+        stats.forEach((report) => {
+          if (report.type === 'inbound-rtp') {
+            console.log(`[Discord Voice] Stats #${checkCount} inbound-rtp:`, {
+              kind: report.kind,
+              ssrc: report.ssrc,
+              packetsReceived: report.packetsReceived,
+              bytesReceived: report.bytesReceived,
+              packetsLost: report.packetsLost,
+              jitter: report.jitter,
+              codecId: report.codecId,
+            });
+          }
+          if (report.type === 'outbound-rtp' && report.kind === 'audio') {
+            console.log(`[Discord Voice] Stats #${checkCount} outbound-rtp:`, {
+              packetsSent: report.packetsSent,
+              bytesSent: report.bytesSent,
+            });
+          }
+          if (report.type === 'candidate-pair' && (report.state === 'succeeded' || (checkCount === 1 && report.bytesReceived > 0))) {
+            console.log(`[Discord Voice] Stats #${checkCount} candidate-pair:`, {
+              state: report.state,
+              bytesReceived: report.bytesReceived,
+              bytesSent: report.bytesSent,
+              currentRoundTripTime: report.currentRoundTripTime,
+            });
+          }
+          if (report.type === 'transport') {
+            console.log(`[Discord Voice] Stats #${checkCount} transport:`, {
+              dtlsState: report.dtlsState,
+              dtlsCipher: report.dtlsCipher,
+              srtpCipher: report.srtpCipher,
+              tlsVersion: report.tlsVersion,
+              iceState: report.iceState,
+              selectedCandidatePairId: report.selectedCandidatePairId,
+              bytesReceived: report.bytesReceived,
+              bytesSent: report.bytesSent,
+              packetsReceived: report.packetsReceived,
+              packetsSent: report.packetsSent,
+            });
+          }
+          if (report.type === 'remote-inbound-rtp') {
+            console.log(`[Discord Voice] Stats #${checkCount} remote-inbound-rtp:`, {
+              kind: report.kind,
+              ssrc: report.ssrc,
+              packetsReceived: report.packetsReceived,
+              roundTripTime: report.roundTripTime,
+              fractionLost: report.fractionLost,
+            });
+          }
+        });
+      } catch (err) {
+        console.warn('[Discord Voice] Stats error:', err);
+      }
+      // Stop after 10 checks (30 seconds) to reduce noise
+      if (checkCount >= 10) this._stopStatsMonitor();
+    }, 3000);
+  },
+
+  _stopStatsMonitor() {
+    if (this.statsMonitorInterval) {
+      clearInterval(this.statsMonitorInterval);
+      this.statsMonitorInterval = null;
     }
   },
 
@@ -788,6 +1173,7 @@ export const DiscordVoiceService = {
 
   /** Clean up connection resources (WebRTC, audio, DAVE) but keep store state */
   _cleanupConnection() {
+    this._stopStatsMonitor();
     // Close peer connection
     if (this.peerConnection) {
       this.peerConnection.close();
@@ -812,6 +1198,10 @@ export const DiscordVoiceService = {
     this.pendingVoiceServer = null;
     this.ssrc = 0;
     this.voiceSeqAck = -1;
+
+    // Clear SSRC mappings and cached server info
+    this.remoteSsrcs.clear();
+    this.serverSdpInfo = null;
 
     // Destroy DAVE session
     if (this.daveSession) {
