@@ -69,6 +69,7 @@ const VoiceStatusIcon = ({ icon: Icon, color, label }) => (
 );
 
 const VoiceMemberRow = ({ vs, guildId, channelId, user, memberData, displayName, avatarUrl, openProfile }) => {
+  const isSpeaking = useDiscordVoiceStore((s) => s.speakingUsers.has(vs.user_id));
   const [hovered, setHovered] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -139,7 +140,7 @@ const VoiceMemberRow = ({ vs, guildId, channelId, user, memberData, displayName,
               onMouseLeave={leaveHover}
               className="flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-gray-500 font-medium outline-none hover:bg-white/5 hover:text-white"
             >
-              <img src={avatarUrl} alt="" className="size-6 rounded-full" />
+              <img src={avatarUrl} alt="" className={`size-6 rounded-full ${isSpeaking ? 'ring-2 ring-green-500' : ''}`} />
               <span className="flex-1 truncate text-[13px]">{displayName}</span>
               <span className="flex items-center gap-0.5">
                 {vs.self_stream && (

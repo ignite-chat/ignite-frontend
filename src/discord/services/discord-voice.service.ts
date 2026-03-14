@@ -56,6 +56,12 @@ export const DiscordVoiceService = {
   // Remote audio elements for playback
   remoteAudioElements: new Map<string, HTMLAudioElement>(),
 
+  // Audio level monitoring for speaking indicators
+  audioContext: null as AudioContext | null,
+  audioAnalysers: new Map<string, { analyser: AnalyserNode; source: MediaStreamAudioSourceNode; userId: string | null }>(),
+  speakingMonitorInterval: null as ReturnType<typeof setInterval> | null,
+  midToUserId: new Map<number, string>(),
+
   // SSRC → userId mappings from SPEAKING messages (needed for SDP construction)
   remoteSsrcs: new Map<number, string>(),
 
@@ -206,16 +212,60 @@ export const DiscordVoiceService = {
     }
 
     // Mute/unmute local audio
-    if (this.localStream) {
-      for (const track of this.localStream.getAudioTracks()) {
-        track.enabled = !newDeafened && !store.isMuted;
-      }
-    }
+    // if (this.localStream) {
+    //   for (const track of this.localStream.getAudioTracks()) {
+    //     track.enabled = !newDeafened && !store.isMuted;
+    //   }
+    // }
 
-    // Mute/unmute remote audio
-    this.remoteAudioElements.forEach((el) => {
-      el.muted = newDeafened;
-    });
+    // // Mute/unmute remote audio
+    // this.remoteAudioElements.forEach((el) => {
+    //   el.muted = newDeafened;
+    // });
+  },
+
+  /**
+   * Toggle fake mute — tells Discord you're muted but keeps mic active locally.
+   */
+  toggleFakeMute() {
+    const store = useDiscordVoiceStore.getState();
+    const newFakeMuted = !store.isFakeMuted;
+    store.setFakeMuted(newFakeMuted);
+
+    // Send mute state to gateway without touching local tracks
+    if (store.guildId && store.channelId) {
+      DiscordGatewayService.send({
+        op: 4,
+        d: {
+          guild_id: store.guildId,
+          channel_id: store.channelId,
+          self_mute: newFakeMuted || store.isMuted,
+          self_deaf: store.isFakeDeafened || store.isDeafened,
+        },
+      });
+    }
+  },
+
+  /**
+   * Toggle fake deafen — tells Discord you're deafened but keeps hearing audio locally.
+   */
+  toggleFakeDeafen() {
+    const store = useDiscordVoiceStore.getState();
+    const newFakeDeafened = !store.isFakeDeafened;
+    store.setFakeDeafened(newFakeDeafened);
+
+    // Send deafen state to gateway without touching local tracks
+    if (store.guildId && store.channelId) {
+      DiscordGatewayService.send({
+        op: 4,
+        d: {
+          guild_id: store.guildId,
+          channel_id: store.channelId,
+          self_mute: store.isFakeMuted || store.isMuted,
+          self_deaf: newFakeDeafened || store.isDeafened,
+        },
+      });
+    }
   },
 
   // ─── Gateway Event Handlers ──────────────────────────────────────
@@ -435,6 +485,8 @@ export const DiscordVoiceService = {
           if (isNew && this.serverSdpInfo) {
             this._renegotiateSdp();
           }
+          // Update track→userId mapping for audio level monitoring
+          this._updateTrackUserMappings();
         }
         break;
 
@@ -667,8 +719,9 @@ export const DiscordVoiceService = {
       this.peerConnection.ontrack = (event) => {
         console.log('[Discord Voice] Remote track received:', event.track.kind, 'id:', event.track.id, 'readyState:', event.track.readyState, 'mid:', event.transceiver?.mid, 'streams:', event.streams.length, 'streamIds:', event.streams.map((s) => s.id));
         if (event.track.kind === 'audio') {
+          const stream = event.streams[0] || new MediaStream([event.track]);
           const audio = new Audio();
-          audio.srcObject = event.streams[0] || new MediaStream([event.track]);
+          audio.srcObject = stream;
           audio.autoplay = true;
           audio.muted = store.isDeafened;
           this.remoteAudioElements.set(event.track.id, audio);
@@ -679,10 +732,14 @@ export const DiscordVoiceService = {
             console.error('[Discord Voice] Remote audio play() rejected:', err);
           });
 
+          // Set up audio level analyser for speaking detection
+          this._setupAudioAnalyser(event.track.id, stream, event.transceiver?.mid);
+
           event.track.onended = () => {
             const el = this.remoteAudioElements.get(event.track.id);
             if (el) { el.pause(); el.srcObject = null; }
             this.remoteAudioElements.delete(event.track.id);
+            this._removeAudioAnalyser(event.track.id);
           };
           event.track.onunmute = () => console.log('[Discord Voice] Remote track unmuted:', event.track.id, 'mid:', event.transceiver?.mid);
         }
@@ -887,6 +944,12 @@ export const DiscordVoiceService = {
     if (ssrcToMid.size > 0) {
       console.log('[Discord Voice] SSRC→mid mapping:', Object.fromEntries(ssrcToMid));
     }
+    // Update mid→userId mapping for audio level monitoring
+    this.midToUserId.clear();
+    for (const [ssrc, mid] of ssrcToMid) {
+      const userId = this.remoteSsrcs.get(ssrc);
+      if (userId) this.midToUserId.set(mid, userId);
+    }
 
     const lines: string[] = [
       'v=0',
@@ -1016,8 +1079,97 @@ export const DiscordVoiceService = {
 
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
       console.log('[Discord Voice] Renegotiation complete, transceivers:', this.peerConnection.getTransceivers().map((t) => ({ mid: t.mid, dir: t.currentDirection })));
+      // Update track→userId mappings now that mid→SSRC assignments are finalized
+      this._updateTrackUserMappings();
     } catch (err) {
       console.error('[Discord Voice] SDP renegotiation failed:', err);
+    }
+  },
+
+  // ─── Audio Level Monitoring for Speaking Indicators ──────────────
+
+  _setupAudioAnalyser(trackId: string, stream: MediaStream, mid: string | null | undefined) {
+    if (!this.audioContext) {
+      this.audioContext = new AudioContext();
+    }
+    try {
+      const source = this.audioContext.createMediaStreamSource(stream);
+      const analyser = this.audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.3;
+      source.connect(analyser);
+
+      const userId = mid != null ? this.midToUserId.get(parseInt(mid, 10)) || null : null;
+      this.audioAnalysers.set(trackId, { analyser, source, userId });
+
+      if (!this.speakingMonitorInterval) {
+        this._startSpeakingMonitor();
+      }
+    } catch (err) {
+      console.error('[Discord Voice] Failed to setup audio analyser:', err);
+    }
+  },
+
+  _removeAudioAnalyser(trackId: string) {
+    const entry = this.audioAnalysers.get(trackId);
+    if (entry) {
+      entry.source.disconnect();
+      this.audioAnalysers.delete(trackId);
+    }
+  },
+
+  _updateTrackUserMappings() {
+    if (!this.peerConnection) return;
+    const transceivers = this.peerConnection.getTransceivers();
+    for (const [trackId, entry] of this.audioAnalysers) {
+      if (entry.userId) continue;
+      const t = transceivers.find((tr) => tr.receiver.track.id === trackId);
+      if (t?.mid != null) {
+        const userId = this.midToUserId.get(parseInt(t.mid, 10));
+        if (userId) entry.userId = userId;
+      }
+    }
+  },
+
+  _startSpeakingMonitor() {
+    const THRESHOLD = 1;
+    const dataArray = new Uint8Array(128);
+
+    this.speakingMonitorInterval = setInterval(() => {
+      const store = useDiscordVoiceStore.getState();
+      const currentSpeaking = new Set<string>();
+
+      for (const [, entry] of this.audioAnalysers) {
+        if (!entry.userId) continue;
+        entry.analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        const avg = sum / dataArray.length;
+        if (avg > THRESHOLD) {
+          currentSpeaking.add(entry.userId);
+        }
+      }
+
+      const prev = store.speakingUsers;
+      const changed = currentSpeaking.size !== prev.size || [...currentSpeaking].some((u) => !prev.has(u));
+      if (changed) {
+        useDiscordVoiceStore.setState({ speakingUsers: currentSpeaking });
+      }
+    }, 100);
+  },
+
+  _stopSpeakingMonitor() {
+    if (this.speakingMonitorInterval) {
+      clearInterval(this.speakingMonitorInterval);
+      this.speakingMonitorInterval = null;
+    }
+    for (const [, entry] of this.audioAnalysers) {
+      entry.source.disconnect();
+    }
+    this.audioAnalysers.clear();
+    if (this.audioContext) {
+      this.audioContext.close().catch(() => {});
+      this.audioContext = null;
     }
   },
 
@@ -1186,6 +1338,9 @@ export const DiscordVoiceService = {
       this.localStream = null;
     }
 
+    // Clean up audio level monitoring
+    this._stopSpeakingMonitor();
+
     // Clean up remote audio elements
     this.remoteAudioElements.forEach((el) => {
       el.pause();
@@ -1201,6 +1356,7 @@ export const DiscordVoiceService = {
 
     // Clear SSRC mappings and cached server info
     this.remoteSsrcs.clear();
+    this.midToUserId.clear();
     this.serverSdpInfo = null;
 
     // Destroy DAVE session

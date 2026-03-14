@@ -10,11 +10,17 @@ type DiscordVoiceStore = {
   guildName: string | null;
   isMuted: boolean;
   isDeafened: boolean;
+  isFakeMuted: boolean;
+  isFakeDeafened: boolean;
+  speakingUsers: Set<string>;
 
   setConnectionState: (state: DiscordVoiceConnectionState) => void;
   setChannel: (guildId: string, channelId: string, channelName: string, guildName: string) => void;
   setMuted: (muted: boolean) => void;
   setDeafened: (deafened: boolean) => void;
+  setFakeMuted: (fakeMuted: boolean) => void;
+  setFakeDeafened: (fakeDeafened: boolean) => void;
+  setSpeaking: (userId: string, speaking: boolean) => void;
   reset: () => void;
 };
 
@@ -26,12 +32,24 @@ export const useDiscordVoiceStore = create<DiscordVoiceStore>((set) => ({
   guildName: null,
   isMuted: false,
   isDeafened: false,
+  isFakeMuted: false,
+  isFakeDeafened: false,
+  speakingUsers: new Set<string>(),
 
   setConnectionState: (connectionState) => set({ connectionState }),
   setChannel: (guildId, channelId, channelName, guildName) =>
     set({ guildId, channelId, channelName, guildName }),
   setMuted: (isMuted) => set({ isMuted }),
   setDeafened: (isDeafened) => set({ isDeafened }),
+  setFakeMuted: (isFakeMuted) => set({ isFakeMuted }),
+  setFakeDeafened: (isFakeDeafened) => set({ isFakeDeafened }),
+  setSpeaking: (userId, speaking) =>
+    set((state) => {
+      const next = new Set(state.speakingUsers);
+      if (speaking) next.add(userId);
+      else next.delete(userId);
+      return { speakingUsers: next };
+    }),
   reset: () =>
     set({
       connectionState: 'disconnected',
@@ -41,5 +59,8 @@ export const useDiscordVoiceStore = create<DiscordVoiceStore>((set) => ({
       guildName: null,
       isMuted: false,
       isDeafened: false,
+      isFakeMuted: false,
+      isFakeDeafened: false,
+      speakingUsers: new Set<string>(),
     }),
 }));

@@ -217,6 +217,8 @@ const UserBar = () => {
   const discordVoiceGuildName = useDiscordVoiceStore((s) => s.guildName);
   const discordVoiceMuted = useDiscordVoiceStore((s) => s.isMuted);
   const discordVoiceDeafened = useDiscordVoiceStore((s) => s.isDeafened);
+  const discordFakeMuted = useDiscordVoiceStore((s) => s.isFakeMuted);
+  const discordFakeDeafened = useDiscordVoiceStore((s) => s.isFakeDeafened);
   const isDiscordVoiceConnected = discordVoiceState !== 'disconnected';
 
   // Poll RTT from LiveKit room
@@ -387,6 +389,36 @@ const UserBar = () => {
               title="Disconnect"
             >
               <PhoneDisconnect className="size-5" weight="fill" />
+            </button>
+          </div>
+
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => DiscordVoiceService.toggleFakeMute()}
+              className={`flex flex-1 items-center justify-center gap-1 rounded py-1.5 px-2 text-xs font-medium transition-colors ${
+                discordFakeMuted
+                  ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+                  : 'bg-[#2a2a2d] text-gray-500 hover:bg-[#35353a] hover:text-gray-300'
+              }`}
+              title={discordFakeMuted ? 'Unfake Mute' : 'Fake Mute'}
+            >
+              <MicrophoneSlash className="size-3.5" weight="fill" />
+              <span>Fake</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => DiscordVoiceService.toggleFakeDeafen()}
+              className={`flex flex-1 items-center justify-center gap-1 rounded py-1.5 px-2 text-xs font-medium transition-colors ${
+                discordFakeDeafened
+                  ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+                  : 'bg-[#2a2a2d] text-gray-500 hover:bg-[#35353a] hover:text-gray-300'
+              }`}
+              title={discordFakeDeafened ? 'Unfake Deafen' : 'Fake Deafen'}
+            >
+              <SpeakerSlash className="size-3.5" weight="fill" />
+              <span>Fake</span>
             </button>
           </div>
         </div>
