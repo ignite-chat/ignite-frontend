@@ -655,16 +655,6 @@ export const DiscordVoiceService = {
   _handleDavePrepareTransition(d: any) {
     console.log('[Discord Voice] DAVE prepare transition, daveSession:', !!this.daveSession, 'd:', JSON.stringify(d));
     if (!this.daveSession) return;
-
-    const transitionId = d?.transition_id ?? 0;
-
-    // transition_id = 0 means immediate execute (re-initialization)
-    if (transitionId === 0) {
-      console.log('[Discord Voice] DAVE immediate transition (re-init)');
-      this.daveSession.handleExecuteTransition(d);
-      return;
-    }
-
     this.daveSession.handlePrepareTransition(d);
   },
 

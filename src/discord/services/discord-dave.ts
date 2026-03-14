@@ -64,7 +64,7 @@ class MLSWriter {
 }
 
 class MLSReader {
-  private data: Uint8Array;
+  readonly data: Uint8Array;
   private pos: number = 0;
 
   constructor(data: Uint8Array) {
@@ -445,6 +445,252 @@ class KeyRatchet {
   }
 }
 
+// ─── MLS Tree Math (RFC 9420 Appendix C) ────────────────────────
+
+function treeLevel(x: number): number {
+  if ((x & 1) === 0) return 0;
+  let k = 0;
+  while (((x >> k) & 1) === 1) k++;
+  return k;
+}
+
+function treeLeft(x: number): number {
+  const k = treeLevel(x);
+  if (k === 0) throw new Error('Leaf has no children');
+  return x ^ (1 << (k - 1));
+}
+
+function treeRight(x: number, n: number): number {
+  const k = treeLevel(x);
+  if (k === 0) throw new Error('Leaf has no children');
+  let r = x ^ (3 << (k - 1));
+  while (r >= nodeWidth(n)) r = treeLeft(r);
+  return r;
+}
+
+function nodeWidth(n: number): number {
+  return n === 0 ? 0 : 2 * (n - 1) + 1;
+}
+
+function treeRoot(n: number): number {
+  const w = nodeWidth(n);
+  return (1 << Math.floor(Math.log2(w))) - 1;
+}
+
+function treeParent(x: number, n: number): number {
+  if (x === treeRoot(n)) throw new Error('Root has no parent');
+  const k = treeLevel(x);
+  const b = (x >> (k + 1)) & 1;
+  let p = (x | (1 << k)) ^ (b << (k + 1));
+  // Clamp for non-power-of-2 trees
+  while (p >= nodeWidth(n)) {
+    const pk = treeLevel(p);
+    const pb = (p >> (pk + 1)) & 1;
+    p = (p | (1 << pk)) ^ (pb << (pk + 1));
+  }
+  return p;
+}
+
+function treeSibling(x: number, n: number): number {
+  const p = treeParent(x, n);
+  if (x < p) return treeRight(p, n);
+  return treeLeft(p);
+}
+
+function treeDirectPath(x: number, n: number): number[] {
+  const r = treeRoot(n);
+  const path: number[] = [];
+  let current = x;
+  while (current !== r) {
+    current = treeParent(current, n);
+    path.push(current);
+  }
+  return path;
+}
+
+function treeCopath(x: number, n: number): number[] {
+  const dp = treeDirectPath(x, n);
+  if (dp.length === 0) return [];
+  const fullPath = [x, ...dp.slice(0, -1)];
+  return fullPath.map((node) => treeSibling(node, n));
+}
+
+/** Resolution of a node: the set of non-blank leaves/nodes that represent it */
+function treeResolution(tree: (MlsTreeNode | null)[], x: number, n: number): number[] {
+  if (treeLevel(x) === 0) {
+    // Leaf: resolution is itself if non-blank, else empty
+    return tree[x] ? [x] : [];
+  }
+  const node = tree[x];
+  if (node) {
+    // Non-blank parent: itself + all unmerged leaves
+    const result = [x];
+    if (node.type === 'parent' && node.unmergedLeaves) {
+      for (const li of node.unmergedLeaves) result.push(2 * li);
+    }
+    return result;
+  }
+  // Blank parent: resolution of left + resolution of right
+  return [...treeResolution(tree, treeLeft(x), n), ...treeResolution(tree, treeRight(x, n), n)];
+}
+
+// ─── MLS Tree Node Types ─────────────────────────────────────
+
+type MlsLeafNode = {
+  type: 'leaf';
+  encryptionKey: Uint8Array;
+  signatureKey: Uint8Array;
+  credential: Uint8Array;
+  rawBytes: Uint8Array; // full serialized form for tree hash
+};
+
+type MlsParentNode = {
+  type: 'parent';
+  publicKey: Uint8Array;
+  parentHash: Uint8Array;
+  unmergedLeaves: number[];
+  rawBytes: Uint8Array;
+};
+
+type MlsTreeNode = MlsLeafNode | MlsParentNode;
+
+/** Parse a LeafNode from MLS wire format */
+function parseLeafNode(reader: MLSReader): MlsLeafNode {
+  const start = reader.offset;
+  const encryptionKey = reader.readVarVector();
+  const signatureKey = reader.readVarVector();
+  // Credential: { uint16 credential_type, opaque identity<V> }
+  const credStart = reader.offset;
+  const credType = reader.readUint16();
+  const identity = reader.readVarVector();
+  const credential = reader.data.subarray(credStart, reader.offset);
+  // Capabilities: { versions<V>, cipher_suites<V>, extensions<V>, proposals<V>, credential_types<V> }
+  reader.readVarVector(); // versions
+  reader.readVarVector(); // cipher_suites
+  reader.readVarVector(); // extensions
+  reader.readVarVector(); // proposals
+  reader.readVarVector(); // credential_types
+  // LeafNodeSource
+  const source = reader.readUint8();
+  if (source === 1) {
+    // key_package: lifetime { uint64 not_before, uint64 not_after }
+    reader.readUint32(); reader.readUint32(); // not_before
+    reader.readUint32(); reader.readUint32(); // not_after
+  }
+  // extensions<V>
+  reader.readVarVector();
+  // signature<V>
+  reader.readVarVector();
+  const rawBytes = reader.data.subarray(start, reader.offset);
+  return { type: 'leaf', encryptionKey, signatureKey, credential, rawBytes: new Uint8Array(rawBytes) };
+}
+
+/** Parse a ParentNode from MLS wire format */
+function parseParentNode(reader: MLSReader): MlsParentNode {
+  const start = reader.offset;
+  const publicKey = reader.readVarVector();
+  const parentHash = reader.readVarVector();
+  // unmerged_leaves<V> = vector of uint32
+  const ulData = reader.readVarVector();
+  const unmergedLeaves: number[] = [];
+  for (let i = 0; i + 3 < ulData.length; i += 4) {
+    unmergedLeaves.push((ulData[i] << 24) | (ulData[i + 1] << 16) | (ulData[i + 2] << 8) | ulData[i + 3]);
+  }
+  const rawBytes = reader.data.subarray(start, reader.offset);
+  return { type: 'parent', publicKey, parentHash, unmergedLeaves, rawBytes: new Uint8Array(rawBytes) };
+}
+
+/** Parse ratchet_tree extension: optional<Node> nodes<V> */
+function parseRatchetTree(data: Uint8Array): (MlsTreeNode | null)[] {
+  const reader = new MLSReader(data);
+  const nodes: (MlsTreeNode | null)[] = [];
+  let idx = 0;
+  while (reader.remaining > 0) {
+    const present = reader.readUint8();
+    if (present === 0) {
+      nodes.push(null);
+    } else {
+      const isLeaf = (idx & 1) === 0;
+      if (isLeaf) {
+        nodes.push(parseLeafNode(reader));
+      } else {
+        nodes.push(parseParentNode(reader));
+      }
+    }
+    idx++;
+  }
+  return nodes;
+}
+
+/** Compute tree hash for a node (RFC 9420 Section 7.8) */
+async function computeTreeHash(
+  tree: (MlsTreeNode | null)[],
+  x: number,
+  n: number,
+): Promise<Uint8Array> {
+  const w = new MLSWriter();
+  if (treeLevel(x) === 0) {
+    // Leaf: TreeHashInput = uint8(1=leaf) || uint32 leaf_index || optional<LeafNode>
+    w.writeUint8(1); // node_type = leaf
+    w.writeUint32(x / 2); // leaf_index
+    const node = tree[x];
+    if (node && node.type === 'leaf') {
+      w.writeUint8(1); // present
+      w.writeBytes(node.rawBytes);
+    } else {
+      w.writeUint8(0); // absent
+    }
+  } else {
+    // Parent: TreeHashInput = uint8(2=parent) || optional<ParentNode> || left_hash<V> || right_hash<V>
+    w.writeUint8(2); // node_type = parent
+    const node = tree[x];
+    if (node && node.type === 'parent') {
+      w.writeUint8(1); // present
+      w.writeBytes(node.rawBytes);
+    } else {
+      w.writeUint8(0); // absent
+    }
+    const leftHash = await computeTreeHash(tree, treeLeft(x), n);
+    const rightHash = await computeTreeHash(tree, treeRight(x, n), n);
+    w.writeVarVector(leftHash);
+    w.writeVarVector(rightHash);
+  }
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', w.toUint8Array()));
+}
+
+/** Build GroupContext wire format */
+function buildGroupContext(
+  groupId: Uint8Array,
+  epoch: number,
+  treeHash: Uint8Array,
+  confirmedTranscriptHash: Uint8Array,
+  extensions: Uint8Array,
+): Uint8Array {
+  const w = new MLSWriter();
+  w.writeUint16(MLS_VERSION);
+  w.writeUint16(CIPHER_SUITE_ID);
+  w.writeVarVector(groupId);
+  w.writeUint32(0); // epoch hi (always 0 for Discord)
+  w.writeUint32(epoch);
+  w.writeVarVector(treeHash);
+  w.writeVarVector(confirmedTranscriptHash);
+  w.writeVarVector(extensions);
+  return w.toUint8Array();
+}
+
+/** Extract userId from an MLS BasicCredential */
+function credentialToUserId(credential: Uint8Array): string {
+  // Credential: { uint16 type, opaque identity<V> }
+  const cr = new MLSReader(credential);
+  cr.readUint16(); // credential_type (basic = 1)
+  const identity = cr.readVarVector(); // 8-byte big-endian user ID
+  let uid = 0n;
+  for (let i = 0; i < identity.length; i++) {
+    uid = (uid << 8n) | BigInt(identity[i]);
+  }
+  return uid.toString();
+}
+
 // ─── DAVE Session ──────────────────────────────────────────────
 
 export type DaveState = 'idle' | 'initialized' | 'awaiting_welcome' | 'ready';
@@ -474,8 +720,18 @@ export class DaveSession {
   epoch: number = 0;
   epochSecret: Uint8Array | null = null;
   exporterSecret: Uint8Array | null = null;
+  initSecret: Uint8Array | null = null;
   sframeKeyMaterial: { key: CryptoKey; baseSalt: Uint8Array } | null = null;
   sendCounter: bigint = 0n;
+
+  // MLS group state for commit processing
+  groupId: Uint8Array | null = null;
+  groupExtensions: Uint8Array = new Uint8Array(0);
+  confirmedTranscriptHash: Uint8Array | null = null;
+  interimTranscriptHash: Uint8Array | null = null;
+  tree: (MlsTreeNode | null)[] = [];
+  leafIndex: number = -1; // our position in the tree
+  pendingProposals: Uint8Array[] = []; // cached proposals for commit generation
 
   // Per-user receiver key ratchets: userId → KeyRatchet
   receiverRatchets: Map<string, KeyRatchet> = new Map();
@@ -489,7 +745,12 @@ export class DaveSession {
 
   // Transition state
   transitioning: boolean = false;
+  pendingTransitionId: number = 0;
   pendingEpochSecret: Uint8Array | null = null;
+
+  // Old epoch ratchets for graceful epoch transitions (newest first, like libdave's CryptorManager deque)
+  oldReceiverRatchets: Map<string, KeyRatchet>[] = [];
+  static readonly MAX_OLD_EPOCHS = 2;
 
   /**
    * Initialize the DAVE session — generate P-256 key pairs.
@@ -571,35 +832,374 @@ export class DaveSession {
 
   /**
    * Handle MLS proposals from the server (Op 27).
+   * Caches proposals for later processing when a commit arrives.
+   * Per libdave: the client should also generate a commit+welcome and send Op 28,
+   * but that requires full tree manipulation. We cache and rely on another client
+   * to commit, or handle it if we can.
    */
   handleProposals(data: Uint8Array) {
-    console.log('[DAVE] Received MLS proposals:', data.length, 'bytes');
-    // Proposals are cached — actual processing happens when we commit or receive a commit
+    // Proposals arrive as concatenated MLSMessage(PublicMessage(Proposal)) entries
+    console.log('[DAVE] Received MLS proposals:', data.length, 'bytes, caching');
+    this.pendingProposals.push(new Uint8Array(data));
   }
 
   /**
    * Handle MLS commit from announce_commit_transition (Op 29).
-   * For existing group members receiving a commit.
+   * Parses the PublicMessage/Commit, applies proposals to the tree,
+   * decrypts the UpdatePath if present, and derives the new epoch secret.
    */
   async handleCommit(data: Uint8Array): Promise<void> {
-    console.log('[DAVE] Received commit:', data.length, 'bytes');
+    console.log('[DAVE] Processing commit:', data.length, 'bytes');
+
+    if (!this.epochSecret || !this.initSecret || !this.groupId) {
+      console.warn('[DAVE] No group state for commit processing');
+      return;
+    }
 
     try {
-      if (!this.epochSecret) {
-        console.warn('[DAVE] No epoch secret, cannot process commit');
+      // Parse the commit MLSMessage → PublicMessage → FramedContent → Commit
+      const parsed = this._parsePublicMessage(data);
+      if (!parsed) {
+        console.warn('[DAVE] Could not parse commit PublicMessage');
         return;
       }
 
-      // Derive next epoch secret from current epoch secret and commit data
-      const commitHash = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
-      const combined = concatBytes(this.epochSecret, commitHash);
-      const prk = await hkdfExtract(new Uint8Array(32), combined);
-      this.pendingEpochSecret = prk;
+      const { commit, framedContentTBS } = parsed;
+      if (!commit) {
+        console.warn('[DAVE] No Commit in PublicMessage');
+        return;
+      }
 
-      console.log('[DAVE] Commit processed, pending epoch secret derived');
+      // Apply proposals to tree (add/remove members)
+      this._applyProposals(commit.proposals);
+      this.pendingProposals = [];
+
+      // Derive commit_secret from UpdatePath or zeros
+      let commitSecret = new Uint8Array(32); // zeros if no UpdatePath
+      if (commit.updatePath && this.leafIndex >= 0) {
+        try {
+          const ps = await this._decryptPathSecret(commit.updatePath, parsed.senderLeafIndex);
+          if (ps) {
+            commitSecret = await mlsExpandWithLabel(ps, 'path', new Uint8Array(0), 32);
+          }
+        } catch (err) {
+          console.error('[DAVE] Path secret decryption failed:', err);
+        }
+      }
+
+      // Compute new GroupContext
+      const newEpoch = this.epoch + 1;
+      const numLeaves = Math.ceil((this.tree.length + 1) / 2);
+      const newTreeHash = numLeaves > 0
+        ? await computeTreeHash(this.tree, treeRoot(numLeaves), numLeaves)
+        : new Uint8Array(32);
+
+      // Compute confirmed_transcript_hash = Hash(interim_transcript_hash || FramedContentTBS)
+      const newConfirmedTranscriptHash = new Uint8Array(
+        await crypto.subtle.digest('SHA-256',
+          concatBytes(this.interimTranscriptHash || new Uint8Array(32), framedContentTBS),
+        ),
+      );
+
+      const newGroupContext = buildGroupContext(
+        this.groupId, newEpoch, newTreeHash, newConfirmedTranscriptHash, this.groupExtensions,
+      );
+
+      // Key schedule for commit (RFC 9420 Section 8):
+      // joiner_secret = ExpandWithLabel(commit_secret, "joiner", GroupContext_new, 32)
+      // member_secret = Extract(joiner_secret, psk_secret)
+      // epoch_secret = ExpandWithLabel(member_secret, "epoch", GroupContext_new, 32)
+      const joinerSecret = await mlsExpandWithLabel(commitSecret, 'joiner', newGroupContext, 32);
+      const pskSecret = new Uint8Array(32);
+      const memberSecret = await hkdfExtract(joinerSecret, pskSecret);
+      const newEpochSecret = await mlsExpandWithLabel(memberSecret, 'epoch', newGroupContext, 32);
+
+      // Store as pending — applied on execute_transition
+      this.pendingEpochSecret = newEpochSecret;
+
+      // Pre-compute values we'll need after transition
+      this._pendingExporterSecret = await mlsExpandWithLabel(newEpochSecret, 'exporter', new Uint8Array(0), 32);
+      this._pendingInitSecret = await mlsExpandWithLabel(newEpochSecret, 'init', new Uint8Array(0), 32);
+      this._pendingConfirmedTranscriptHash = newConfirmedTranscriptHash;
+
+      console.log('[DAVE] Commit processed, pending epoch:', newEpoch, 'treeHash:', hex(newTreeHash));
     } catch (err) {
       console.error('[DAVE] Commit processing failed:', err);
     }
+  }
+
+  // Pending state from commit processing, applied on execute_transition
+  private _pendingExporterSecret: Uint8Array | null = null;
+  private _pendingInitSecret: Uint8Array | null = null;
+  private _pendingConfirmedTranscriptHash: Uint8Array | null = null;
+
+  // ─── Commit Parsing and Processing Helpers ──────────────────
+
+  /**
+   * Parse an MLS PublicMessage containing a Commit.
+   * Returns the parsed commit, sender leaf index, and FramedContentTBS for transcript hashing.
+   */
+  private _parsePublicMessage(data: Uint8Array): {
+    commit: { proposals: { type: number; data: Uint8Array }[]; updatePath: { leafNode: Uint8Array; nodes: { encryptionKey: Uint8Array; encryptedPathSecrets: { kemOutput: Uint8Array; ciphertext: Uint8Array }[] }[] } | null } | null;
+    senderLeafIndex: number;
+    framedContentTBS: Uint8Array;
+  } | null {
+    try {
+      const reader = new MLSReader(data);
+      const contentStart = reader.offset;
+
+      // FramedContent: { group_id<V>, uint64 epoch, Sender, authenticated_data<V>, ContentType, content }
+      reader.readVarVector(); // group_id
+      reader.readUint32(); reader.readUint32(); // epoch (uint64)
+
+      // Sender: { uint8 sender_type, ... }
+      const senderType = reader.readUint8();
+      let senderLeafIndex = 0;
+      if (senderType === 1) { // member
+        senderLeafIndex = reader.readUint32();
+      } else if (senderType === 2) { // external
+        reader.readUint32(); // sender_index
+      }
+      // new_member_proposal (3) and new_member_commit (4) have no extra data
+
+      reader.readVarVector(); // authenticated_data
+      const contentType = reader.readUint8(); // 1=application, 2=proposal, 3=commit
+
+      if (contentType !== 3) {
+        console.log('[DAVE] PublicMessage content_type is not commit:', contentType);
+        return null;
+      }
+
+      // Commit: { ProposalOrRef proposals<V>, optional<UpdatePath> path }
+      const proposalsData = reader.readVarVector();
+      const proposals = this._parseProposalOrRefs(proposalsData);
+
+      // optional<UpdatePath>
+      let updatePath = null;
+      const hasPath = reader.readUint8();
+      if (hasPath === 1) {
+        updatePath = this._parseUpdatePath(reader);
+      }
+
+      const contentEnd = reader.offset;
+
+      // FramedContentTBS = the content we just parsed (for transcript hash)
+      // Per RFC 9420, FramedContentTBS includes wire_format + content + context
+      // For simplicity, we use the raw content bytes
+      const framedContentTBS = data.subarray(contentStart, contentEnd);
+
+      return { commit: { proposals, updatePath }, senderLeafIndex, framedContentTBS: new Uint8Array(framedContentTBS) };
+    } catch (err) {
+      console.error('[DAVE] Failed to parse PublicMessage:', err);
+      return null;
+    }
+  }
+
+  /** Parse ProposalOrRef entries from a vector */
+  private _parseProposalOrRefs(data: Uint8Array): { type: number; data: Uint8Array }[] {
+    const results: { type: number; data: Uint8Array }[] = [];
+    const reader = new MLSReader(data);
+    while (reader.remaining > 0) {
+      const porType = reader.readUint8(); // 1=proposal inline, 2=reference
+      if (porType === 1) {
+        // Inline Proposal: { uint16 proposal_type, ... }
+        const propType = reader.readUint16();
+        if (propType === 1) {
+          // Add: { KeyPackage }
+          const kpData = this._readKeyPackage(reader);
+          results.push({ type: 1, data: kpData });
+        } else if (propType === 3) {
+          // Remove: { uint32 removed }
+          const removed = reader.readUint32();
+          const buf = new Uint8Array(4);
+          buf[0] = (removed >>> 24) & 0xff; buf[1] = (removed >>> 16) & 0xff;
+          buf[2] = (removed >>> 8) & 0xff; buf[3] = removed & 0xff;
+          results.push({ type: 3, data: buf });
+        } else {
+          // Skip other proposal types — we can't parse their variable-length content
+          console.log('[DAVE] Skipping unknown inline proposal type:', propType);
+          break;
+        }
+      } else if (porType === 2) {
+        // Reference: opaque<V> (hash of the proposal)
+        const ref = reader.readVarVector();
+        results.push({ type: 0, data: ref }); // type 0 = reference (we skip these)
+      }
+    }
+    return results;
+  }
+
+  /** Read a KeyPackage from the reader, returning the raw bytes */
+  private _readKeyPackage(reader: MLSReader): Uint8Array {
+    const start = reader.offset;
+    reader.readUint16(); // version
+    reader.readUint16(); // cipher_suite
+    reader.readVarVector(); // init_key
+    // LeafNode (inline — parse to skip over it)
+    parseLeafNode(reader);
+    reader.readVarVector(); // extensions
+    reader.readVarVector(); // signature
+    return new Uint8Array(reader.data.subarray(start, reader.offset));
+  }
+
+  /** Parse an UpdatePath from the reader */
+  private _parseUpdatePath(reader: MLSReader): {
+    leafNode: Uint8Array;
+    nodes: { encryptionKey: Uint8Array; encryptedPathSecrets: { kemOutput: Uint8Array; ciphertext: Uint8Array }[] }[];
+  } {
+    // UpdatePath: { LeafNode leaf_node, UpdatePathNode nodes<V> }
+    const lnStart = reader.offset;
+    parseLeafNode(reader);
+    const leafNode = new Uint8Array(reader.data.subarray(lnStart, reader.offset));
+
+    const nodesData = reader.readVarVector();
+    const nodesReader = new MLSReader(nodesData);
+    const nodes: { encryptionKey: Uint8Array; encryptedPathSecrets: { kemOutput: Uint8Array; ciphertext: Uint8Array }[] }[] = [];
+
+    while (nodesReader.remaining > 0) {
+      const encryptionKey = nodesReader.readVarVector();
+      const epsData = nodesReader.readVarVector();
+      const epsReader = new MLSReader(epsData);
+      const encryptedPathSecrets: { kemOutput: Uint8Array; ciphertext: Uint8Array }[] = [];
+      while (epsReader.remaining > 0) {
+        const kemOutput = epsReader.readVarVector();
+        const ciphertext = epsReader.readVarVector();
+        encryptedPathSecrets.push({ kemOutput, ciphertext });
+      }
+      nodes.push({ encryptionKey, encryptedPathSecrets });
+    }
+
+    return { leafNode, nodes };
+  }
+
+  /**
+   * Apply proposals to the ratchet tree (add/remove members).
+   */
+  private _applyProposals(proposals: { type: number; data: Uint8Array }[]) {
+    for (const prop of proposals) {
+      if (prop.type === 1) {
+        // Add: append new leaf to tree
+        const kpReader = new MLSReader(prop.data);
+        kpReader.readUint16(); // version
+        kpReader.readUint16(); // cipher_suite
+        kpReader.readVarVector(); // init_key
+        const leaf = parseLeafNode(kpReader);
+        // Find first blank leaf or append
+        let placed = false;
+        for (let i = 0; i < this.tree.length; i += 2) {
+          if (!this.tree[i]) {
+            this.tree[i] = leaf;
+            placed = true;
+            console.log('[DAVE] Added member at leaf', i / 2);
+            break;
+          }
+        }
+        if (!placed) {
+          // Extend tree: add a parent node + new leaf
+          this.tree.push(null); // parent
+          this.tree.push(leaf); // new leaf
+          console.log('[DAVE] Added member at leaf', (this.tree.length - 1) / 2);
+        }
+      } else if (prop.type === 3) {
+        // Remove: blank out the leaf at the given index
+        const removed = (prop.data[0] << 24) | (prop.data[1] << 16) | (prop.data[2] << 8) | prop.data[3];
+        const nodeIdx = removed * 2;
+        if (nodeIdx < this.tree.length) {
+          this.tree[nodeIdx] = null;
+          console.log('[DAVE] Removed member at leaf', removed);
+          // Also blank parent nodes on the direct path
+          const numLeaves = Math.ceil((this.tree.length + 1) / 2);
+          try {
+            const dp = treeDirectPath(nodeIdx, numLeaves);
+            for (const p of dp) {
+              if (p < this.tree.length) this.tree[p] = null;
+            }
+          } catch { /* tree too small */ }
+        }
+      }
+      // type 0 = reference — we can't resolve these without proposal cache matching
+    }
+  }
+
+  /**
+   * Decrypt the path secret from an UpdatePath for our position in the tree.
+   * Returns the path_secret or null if we can't decrypt.
+   */
+  private async _decryptPathSecret(
+    updatePath: {
+      leafNode: Uint8Array;
+      nodes: { encryptionKey: Uint8Array; encryptedPathSecrets: { kemOutput: Uint8Array; ciphertext: Uint8Array }[] }[];
+    },
+    senderLeafIndex: number,
+  ): Promise<Uint8Array | null> {
+    if (this.leafIndex < 0 || !this.encryptionKeyPair) return null;
+
+    const numLeaves = Math.ceil((this.tree.length + 1) / 2);
+    const senderNodeIdx = senderLeafIndex * 2;
+    const myNodeIdx = this.leafIndex * 2;
+
+    // The sender's direct path (from their leaf to root)
+    const senderDP = treeDirectPath(senderNodeIdx, numLeaves);
+    // My copath — the siblings of nodes on my direct path
+    const myCopath = treeCopath(myNodeIdx, numLeaves);
+
+    // Find the overlap: the lowest node in the sender's direct path that
+    // is an ancestor of our leaf. The corresponding UpdatePath node's
+    // encrypted_path_secret is encrypted to our resolution node.
+    for (let i = 0; i < senderDP.length && i < updatePath.nodes.length; i++) {
+      const dpNode = senderDP[i];
+      // Check if this node is one of our ancestors
+      const myAncestors = [myNodeIdx, ...treeDirectPath(myNodeIdx, numLeaves)];
+      const copathIdx = myAncestors.indexOf(dpNode) - 1;
+      if (copathIdx < 0) continue;
+
+      // The copath node at this level gives us the resolution
+      // to determine which encrypted_path_secret entry is for us
+      const copathNode = myCopath[copathIdx];
+      if (copathNode === undefined) continue;
+
+      const resolution = treeResolution(this.tree, copathNode, numLeaves);
+      if (resolution.length === 0) continue;
+
+      // Find our position in the resolution
+      const myResPos = resolution.indexOf(myNodeIdx);
+      if (myResPos < 0) continue;
+
+      // The encrypted_path_secret at index myResPos in this UpdatePath node is for us
+      const upNode = updatePath.nodes[i];
+      if (myResPos >= upNode.encryptedPathSecrets.length) continue;
+
+      const eps = upNode.encryptedPathSecrets[myResPos];
+
+      // HPKE decrypt: info = "MLS 1.0 UpdatePathNode" context
+      const infoWriter = new MLSWriter();
+      infoWriter.writeVarVector(new TextEncoder().encode('MLS 1.0 UpdatePathNode'));
+      // Context for UpdatePathNode is the GroupContext + leaf index of sender
+      const groupContext = buildGroupContext(
+        this.groupId!, this.epoch, new Uint8Array(32), this.confirmedTranscriptHash || new Uint8Array(32), this.groupExtensions,
+      );
+      infoWriter.writeVarVector(groupContext);
+      const hpkeInfo = infoWriter.toUint8Array();
+
+      try {
+        const pathSecret = await hpkeBaseOpen(
+          eps.kemOutput,
+          this.encryptionKeyPair.privateKey,
+          this.encryptionPublicRaw!,
+          hpkeInfo,
+          new Uint8Array(0),
+          eps.ciphertext,
+        );
+        console.log('[DAVE] Decrypted path secret at UpdatePath node', i, ':', pathSecret.length, 'B');
+        return pathSecret;
+      } catch (err) {
+        console.log('[DAVE] HPKE decrypt failed at UpdatePath node', i, ':', err);
+        continue;
+      }
+    }
+
+    console.warn('[DAVE] Could not decrypt any path secret from UpdatePath');
+    return null;
   }
 
   /**
@@ -619,30 +1219,63 @@ export class DaveSession {
 
   /**
    * Handle prepare transition (Op 21).
+   * Per libdave: stores transition_id for matching with execute_transition.
    */
   handlePrepareTransition(data: any): { epoch: number } {
     const transitionId = typeof data === 'object' ? data.transition_id : 0;
     console.log('[DAVE] Prepare transition:', transitionId);
+    this.pendingTransitionId = transitionId;
     this.transitioning = true;
     return { epoch: this.epoch };
   }
 
   /**
    * Handle execute transition (Op 22).
-   * Switch to the new epoch's encryption keys.
+   * Applies the pending epoch secret and related state from commit processing.
    */
   async handleExecuteTransition(data: any) {
-    console.log('[DAVE] Execute transition');
+    const transitionId = typeof data === 'object' ? data.transition_id : 0;
+    console.log('[DAVE] Execute transition, id:', transitionId);
 
     if (this.pendingEpochSecret) {
+      // Move current ratchets to old epoch stack before switching
+      this._retireCurrentEpoch();
+
       this.epochSecret = this.pendingEpochSecret;
       this.pendingEpochSecret = null;
       this.epoch++;
       this.sendCounter = 0n;
+
+      // Apply pending commit state if available
+      if (this._pendingExporterSecret) {
+        this.exporterSecret = this._pendingExporterSecret;
+        this._pendingExporterSecret = null;
+      } else {
+        this.exporterSecret = await mlsExpandWithLabel(this.epochSecret, 'exporter', new Uint8Array(0), 32);
+      }
+      if (this._pendingInitSecret) {
+        this.initSecret = this._pendingInitSecret;
+        this._pendingInitSecret = null;
+      } else {
+        this.initSecret = await mlsExpandWithLabel(this.epochSecret, 'init', new Uint8Array(0), 32);
+      }
+      if (this._pendingConfirmedTranscriptHash) {
+        this.confirmedTranscriptHash = this._pendingConfirmedTranscriptHash;
+        this._pendingConfirmedTranscriptHash = null;
+      }
+
       await this._deriveSenderKeys();
+
+      // Re-derive receiver keys for known users
+      for (const [, userId] of this.ssrcToUserId) {
+        if (userId !== this.userId) {
+          await this.deriveReceiverKeyForUser(userId);
+        }
+      }
     }
 
     this.transitioning = false;
+    this.pendingTransitionId = 0;
   }
 
   /** Reset group state (for epoch=1 re-creation) */
@@ -654,8 +1287,37 @@ export class DaveSession {
     this.sframeKeyMaterial = null;
     this.sendCounter = 0n;
     this.transitioning = false;
+    this.pendingTransitionId = 0;
+    this.oldReceiverRatchets = [];
+    this.initSecret = null;
+    this.groupId = null;
+    this.groupExtensions = new Uint8Array(0);
+    this.confirmedTranscriptHash = null;
+    this.interimTranscriptHash = null;
+    this.tree = [];
+    this.leafIndex = -1;
+    this.pendingProposals = [];
+    this._pendingExporterSecret = null;
+    this._pendingInitSecret = null;
+    this._pendingConfirmedTranscriptHash = null;
     this.state = 'initialized';
     console.log('[DAVE] Group state reset');
+  }
+
+  /**
+   * Move current receiver ratchets to the old epoch stack.
+   * Per libdave: maintains a deque of CryptorManagers (one per epoch)
+   * to allow decrypting frames from previous epochs during transitions.
+   */
+  private _retireCurrentEpoch() {
+    if (this.receiverRatchets.size > 0) {
+      this.oldReceiverRatchets.unshift(new Map(this.receiverRatchets));
+      // Keep only the most recent old epochs
+      while (this.oldReceiverRatchets.length > DaveSession.MAX_OLD_EPOCHS) {
+        this.oldReceiverRatchets.pop();
+      }
+      this.receiverRatchets.clear();
+    }
   }
 
   // ─── Key Package Creation ──────────────────────────────────────
@@ -926,52 +1588,86 @@ export class DaveSession {
     );
     console.log('[DAVE] Decrypted GroupInfo:', groupInfoBytes.length, 'B');
 
-    // Parse GroupContext from GroupInfo
-    // GroupInfo: { GroupContext, Extension extensions<V>, opaque confirmation_tag<V>, uint32 signer, opaque signature<V> }
+    // Parse GroupInfo: { GroupContext, Extension extensions<V>, opaque confirmation_tag<V>, uint32 signer, opaque signature<V> }
     // GroupContext: { uint16 version, uint16 cipher_suite, opaque group_id<V>, uint64 epoch,
     //                opaque tree_hash<V>, opaque confirmed_transcript_hash<V>, Extension extensions<V> }
     const giReader = new MLSReader(groupInfoBytes);
     const gcStart = giReader.offset;
     giReader.readUint16(); // version
     giReader.readUint16(); // cipher_suite
-    giReader.readVarVector(); // group_id
+    const groupId = giReader.readVarVector();
     giReader.readUint32(); // epoch hi
     const epochLo = giReader.readUint32(); // epoch lo
-    giReader.readVarVector(); // tree_hash
-    giReader.readVarVector(); // confirmed_transcript_hash
-    giReader.readVarVector(); // extensions
+    const treeHash = giReader.readVarVector();
+    const confirmedTranscriptHash = giReader.readVarVector();
+    const gcExtensions = giReader.readVarVector();
     const gcEnd = giReader.offset;
     const groupContextBytes = groupInfoBytes.subarray(gcStart, gcEnd);
+
+    // Parse GroupInfo-level extensions (may contain ratchet_tree)
+    const giExtensions = giReader.readVarVector();
+    const confirmationTag = giReader.readVarVector();
+    const signer = giReader.readUint32();
+    // signature follows but we don't need it
+
     this.epoch = epochLo;
+    this.groupId = new Uint8Array(groupId);
+    this.groupExtensions = new Uint8Array(gcExtensions);
+    this.confirmedTranscriptHash = new Uint8Array(confirmedTranscriptHash);
+
+    // Compute interim_transcript_hash = Hash(confirmed_transcript_hash || confirmation_tag)
+    const ithInput = concatBytes(
+      this.confirmedTranscriptHash,
+      (() => { const w = new MLSWriter(); w.writeVarVector(confirmationTag); return w.toUint8Array(); })(),
+    );
+    this.interimTranscriptHash = new Uint8Array(await crypto.subtle.digest('SHA-256', ithInput));
+
+    // Parse ratchet_tree from GroupInfo extensions (extension type 0x0002)
+    const extReader = new MLSReader(giExtensions);
+    while (extReader.remaining > 0) {
+      const extType = extReader.readUint16();
+      const extData = extReader.readVarVector();
+      if (extType === 2) { // ratchet_tree
+        this.tree = parseRatchetTree(extData);
+        console.log('[DAVE] Parsed ratchet tree:', this.tree.length, 'nodes');
+      }
+    }
+
+    // Find our leaf_index by matching our encryption public key
+    if (this.tree.length > 0) {
+      for (let i = 0; i < this.tree.length; i += 2) {
+        const leaf = this.tree[i];
+        if (leaf && leaf.type === 'leaf' && this.encryptionPublicRaw) {
+          if (leaf.encryptionKey.length === this.encryptionPublicRaw.length &&
+              leaf.encryptionKey.every((b, j) => b === this.encryptionPublicRaw![j])) {
+            this.leafIndex = i / 2;
+            console.log('[DAVE] Found our leaf_index:', this.leafIndex);
+            break;
+          }
+        }
+      }
+    }
+
     console.log(
-      '[DAVE] GroupContext parsed, epoch:',
-      this.epoch,
-      'gc:',
-      groupContextBytes.length,
-      'B',
+      '[DAVE] GroupContext parsed, epoch:', this.epoch, 'groupId:', hex(this.groupId),
+      'treeHash:', hex(treeHash), 'leafIndex:', this.leafIndex,
+      'treeNodes:', this.tree.length, 'gc:', groupContextBytes.length, 'B',
     );
 
-    // Key schedule per mlspp's make_epoch_secret (Welcome path):
+    // Key schedule (Welcome path):
     //   member_secret = KDF.Extract(joiner_secret, psk_secret) = pre1
     //   epoch_secret = ExpandWithLabel(member_secret, "epoch", GroupContext, Nh)
     //   exporter_secret = DeriveSecret(epoch_secret, "exporter")
-    // Note: mlspp names Extract(joiner, psk) as "member_secret" — there is NO separate
-    // ExpandWithLabel("member",...) step or second Extract with init_secret for Welcome joins.
+    //   init_secret = DeriveSecret(epoch_secret, "init")
     this.epochSecret = await mlsExpandWithLabel(pre1, 'epoch', groupContextBytes, 32);
-
-    // DeriveSecret(S, L) = ExpandWithLabel(S, L, "", Nh)
-    this.exporterSecret = await mlsExpandWithLabel(
-      this.epochSecret,
-      'exporter',
-      new Uint8Array(0),
-      32,
-    );
+    this.exporterSecret = await mlsExpandWithLabel(this.epochSecret, 'exporter', new Uint8Array(0), 32);
+    this.initSecret = await mlsExpandWithLabel(this.epochSecret, 'init', new Uint8Array(0), 32);
 
     this.sendCounter = 0n;
+    this.pendingProposals = [];
     await this._deriveSenderKeys();
 
-    // Derive receiver keys for all users we already know about (from SPEAKING messages
-    // that arrived before the Welcome was processed)
+    // Derive receiver keys for all users we already know about
     for (const [, userId] of this.ssrcToUserId) {
       if (userId !== this.userId && !this.receiverRatchets.has(userId)) {
         await this.deriveReceiverKeyForUser(userId);
@@ -1118,20 +1814,14 @@ export class DaveSession {
 
   /**
    * Decrypt a DAVE protocol frame.
+   * Per libdave: tries current epoch ratchets first, then falls back to
+   * old epoch ratchets (newest-first) for graceful epoch transitions.
    */
   async decryptFrame(frame: Uint8Array, ssrc?: number): Promise<Uint8Array> {
-    // Look up the correct ratchet: use receiver ratchet for the SSRC's user, fallback to sender
-    let ratchet: KeyRatchet | null = null;
-    if (ssrc !== undefined) {
-      const userId = this.ssrcToUserId.get(ssrc);
-      if (userId) {
-        ratchet = this.receiverRatchets.get(userId) || null;
-      }
+    // Check for Opus silence packet — passthrough (per libdave common.h kOpusSilencePacket)
+    if (frame.length === 3 && frame[0] === 0xf8 && frame[1] === 0xff && frame[2] === 0xfe) {
+      return frame;
     }
-    if (!ratchet) {
-      ratchet = this.senderRatchet;
-    }
-    if (!ratchet) return frame;
 
     // Check for magic marker 0xFAFA at the end
     if (
@@ -1155,55 +1845,61 @@ export class DaveSession {
     const supplStart = frame.length - supplSize;
     if (supplStart < 0) return frame;
 
-    // Supplemental region: [truncated_tag(8)][uleb128_nonce][unencrypted_ranges...][suppl_size(1)][marker(2)]
     const supplData = frame.subarray(supplStart);
-
-    // Extract truncated tag (first 8 bytes of supplemental)
     const truncatedTag = supplData.subarray(0, 8);
-
-    // Decode ULEB128 nonce (after tag, before suppl_size + marker)
     const nonceArea = supplData.subarray(8, supplData.length - 3);
     const { value: nonce32 } = uleb128Decode(nonceArea);
-
-    // Generation = MSB of the 32-bit truncated nonce
     const generation = (nonce32 >>> 24) & 0xff;
 
-    // Get ratcheted key for this generation
-    const key = await ratchet.getKey(generation);
-
-    // Build expanded frame nonce: 8 zero bytes + 4-byte little-endian truncated nonce
-    // (matches x86/ARM-LE memcpy behavior in Discord's native client)
-    // Discord does NOT XOR with ratchet nonce — expanded nonce is used directly as IV
+    // Build expanded frame nonce: 8 zero bytes + 4-byte LE truncated nonce
     const iv = new Uint8Array(12);
     iv[8] = nonce32 & 0xff;
     iv[9] = (nonce32 >>> 8) & 0xff;
     iv[10] = (nonce32 >>> 16) & 0xff;
     iv[11] = (nonce32 >>> 24) & 0xff;
 
-    // Ciphertext is everything before supplemental data
     const ciphertext = frame.subarray(0, supplStart);
-
-    // Combine ciphertext + truncated 8-byte tag for AES-GCM decrypt with tagLength: 64
     const combined = concatBytes(ciphertext, truncatedTag);
 
-    try {
-      const plaintext = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv, tagLength: 64 },
-        key,
-        combined,
-      );
-      return new Uint8Array(plaintext);
-    } catch (err) {
-      // Log first few failures to debug
-      if (this._decryptLogCount < 10) {
-        this._decryptLogCount++;
-        console.error(
-          `[DAVE] AES-GCM decrypt failed: nonce=${nonce32}, gen=${generation}, ctLen=${ciphertext.length}, supplSize=${supplSize}`,
-          err,
-        );
+    // Resolve userId for this SSRC
+    const userId = ssrc !== undefined ? this.ssrcToUserId.get(ssrc) : undefined;
+
+    // Try current epoch ratchets first, then old epochs (newest-first, like libdave)
+    const ratchetSets: Map<string, KeyRatchet>[] = [this.receiverRatchets, ...this.oldReceiverRatchets];
+
+    for (const ratchetMap of ratchetSets) {
+      let ratchet: KeyRatchet | null = null;
+      if (userId) {
+        ratchet = ratchetMap.get(userId) || null;
       }
-      return frame;
+      // For current epoch, fall back to sender ratchet
+      if (!ratchet && ratchetMap === this.receiverRatchets) {
+        ratchet = this.senderRatchet;
+      }
+      if (!ratchet) continue;
+
+      try {
+        const key = await ratchet.getKey(generation);
+        const plaintext = await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv, tagLength: 64 },
+          key,
+          combined,
+        );
+        return new Uint8Array(plaintext);
+      } catch {
+        // Try next epoch's ratchets
+        continue;
+      }
     }
+
+    // All epochs failed
+    if (this._decryptLogCount < 10) {
+      this._decryptLogCount++;
+      console.error(
+        `[DAVE] AES-GCM decrypt failed (all epochs): nonce=${nonce32}, gen=${generation}, ctLen=${ciphertext.length}, supplSize=${supplSize}, user=${userId}`,
+      );
+    }
+    return frame;
   }
 
   // ─── WebRTC Encoded Transforms ────────────────────────────────
@@ -1390,10 +2086,23 @@ export class DaveSession {
     this.sframeKeyMaterial = null;
     this.senderRatchet = null;
     this.receiverRatchets.clear();
+    this.oldReceiverRatchets = [];
     this.ssrcToUserId.clear();
     this.sendCounter = 0n;
     this.epoch = 0;
     this.transitioning = false;
+    this.pendingTransitionId = 0;
+    this.initSecret = null;
+    this.groupId = null;
+    this.groupExtensions = new Uint8Array(0);
+    this.confirmedTranscriptHash = null;
+    this.interimTranscriptHash = null;
+    this.tree = [];
+    this.leafIndex = -1;
+    this.pendingProposals = [];
+    this._pendingExporterSecret = null;
+    this._pendingInitSecret = null;
+    this._pendingConfirmedTranscriptHash = null;
   }
 }
 
