@@ -534,10 +534,15 @@ function treeResolution(tree: (MlsTreeNode | null)[], x: number, n: number): num
   }
   const node = tree[x];
   if (node) {
-    // Non-blank parent: itself + all unmerged leaves
+    // Non-blank parent: itself + non-blank unmerged leaves (RFC 9420 Section 7.8)
     const result = [x];
     if (node.type === 'parent' && node.unmergedLeaves) {
-      for (const li of node.unmergedLeaves) result.push(2 * li);
+      for (const li of node.unmergedLeaves) {
+        const leafNodeIdx = 2 * li;
+        if (leafNodeIdx < tree.length && tree[leafNodeIdx]) {
+          result.push(leafNodeIdx);
+        }
+      }
     }
     return result;
   }
@@ -792,6 +797,15 @@ export class DaveSession {
   pendingTransitionId: number = 0;
   pendingEpochSecret: Uint8Array | null = null;
 
+  // Queue for pending commit states when multiple commits arrive before their execute_transitions.
+  // Each entry holds the derived secrets from a processed commit, applied in order by handleExecuteTransition.
+  private _pendingCommitQueue: Array<{
+    epochSecret: Uint8Array;
+    exporterSecret: Uint8Array;
+    initSecret: Uint8Array;
+    confirmedTranscriptHash: Uint8Array;
+  }> = [];
+
   // Old epoch ratchets for graceful epoch transitions (newest first, like libdave's CryptorManager deque)
   oldReceiverRatchets: Map<string, KeyRatchet>[] = [];
   static readonly MAX_OLD_EPOCHS = 2;
@@ -833,6 +847,29 @@ export class DaveSession {
     );
 
     this.state = 'initialized';
+
+    // Export all key material as base64 for test fixture generation
+    const toB64 = (buf: ArrayBuffer | Uint8Array) => {
+      const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    };
+
+    const sigPrivJwk = await crypto.subtle.exportKey('jwk', this.signingKeyPair.privateKey);
+    const hpkePrivJwk = await crypto.subtle.exportKey('jwk', this.hpkeKeyPair.privateKey);
+    const encPrivJwk = await crypto.subtle.exportKey('jwk', this.encryptionKeyPair.privateKey);
+
+    console.log('[DAVE][TEST-FIXTURE] initialize output:', JSON.stringify({
+      userId: this.userId,
+      signingPublicRaw: toB64(this.signingPublicRaw),
+      signingPrivateJwk: sigPrivJwk,
+      hpkePublicRaw: toB64(this.hpkePublicRaw),
+      hpkePrivateJwk: hpkePrivJwk,
+      encryptionPublicRaw: toB64(this.encryptionPublicRaw),
+      encryptionPrivateJwk: encPrivJwk,
+    }));
+
     console.log(
       '[DAVE] Session initialized with P-256 key pairs, sig:',
       this.signingPublicRaw.length,
@@ -844,11 +881,172 @@ export class DaveSession {
   }
 
   /**
+   * Initialize session from pre-exported key material (for testing).
+   * Accepts JWK private keys + raw public keys from a TEST-FIXTURE log.
+   */
+  async initializeFromFixture(fixture: {
+    userId: string;
+    signingPublicRaw: Uint8Array;
+    signingPrivateJwk: JsonWebKey;
+    hpkePublicRaw: Uint8Array;
+    hpkePrivateJwk: JsonWebKey;
+    encryptionPublicRaw: Uint8Array;
+    encryptionPrivateJwk: JsonWebKey;
+  }) {
+    this.userId = fixture.userId;
+
+    // Import signing key pair
+    const sigPriv = await crypto.subtle.importKey(
+      'jwk', fixture.signingPrivateJwk,
+      { name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign'],
+    );
+    const sigPub = await crypto.subtle.importKey(
+      'raw', fixture.signingPublicRaw as any,
+      { name: 'ECDSA', namedCurve: 'P-256' }, true, ['verify'],
+    );
+    this.signingKeyPair = { privateKey: sigPriv, publicKey: sigPub };
+    this.signingPublicRaw = fixture.signingPublicRaw;
+
+    // Import HPKE key pair
+    const hpkePriv = await crypto.subtle.importKey(
+      'jwk', fixture.hpkePrivateJwk,
+      { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits'],
+    );
+    const hpkePub = await crypto.subtle.importKey(
+      'raw', fixture.hpkePublicRaw as any,
+      { name: 'ECDH', namedCurve: 'P-256' }, true, [],
+    );
+    this.hpkeKeyPair = { privateKey: hpkePriv, publicKey: hpkePub };
+    this.hpkePublicRaw = fixture.hpkePublicRaw;
+
+    // Import encryption key pair
+    const encPriv = await crypto.subtle.importKey(
+      'jwk', fixture.encryptionPrivateJwk,
+      { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits'],
+    );
+    const encPub = await crypto.subtle.importKey(
+      'raw', fixture.encryptionPublicRaw as any,
+      { name: 'ECDH', namedCurve: 'P-256' }, true, [],
+    );
+    this.encryptionKeyPair = { privateKey: encPriv, publicKey: encPub };
+    this.encryptionPublicRaw = fixture.encryptionPublicRaw;
+
+    this.state = 'initialized';
+  }
+
+  /**
+   * Restore post-Welcome group state directly (for testing when HPKE isn't available).
+   * Call after initializeFromFixture.
+   * Accepts the full state dump from [DAVE][TEST-FIXTURE] postWelcomeState.
+   */
+  async restoreWelcomeStateForTest(
+    state: {
+      epoch: number;
+      epochSecret: Uint8Array;
+      exporterSecret: Uint8Array;
+      initSecret: Uint8Array;
+      groupId: Uint8Array;
+      groupExtensions: Uint8Array;
+      confirmedTranscriptHash: Uint8Array;
+      interimTranscriptHash: Uint8Array;
+      leafIndex: number;
+      tree: ({ t: 'l' | 'p'; rawBytes: Uint8Array } | null)[];
+    },
+  ) {
+    this.epoch = state.epoch;
+    this.epochSecret = state.epochSecret;
+    this.exporterSecret = state.exporterSecret;
+    this.initSecret = state.initSecret;
+    this.groupId = state.groupId;
+    this.groupExtensions = state.groupExtensions;
+    this.confirmedTranscriptHash = state.confirmedTranscriptHash;
+    this.interimTranscriptHash = state.interimTranscriptHash;
+    this.leafIndex = state.leafIndex;
+
+    // Rebuild tree from serialized nodes
+    this.tree = state.tree.map((entry, idx) => {
+      if (!entry) return null;
+      const reader = new MLSReader(entry.rawBytes);
+      const node = entry.t === 'l' ? parseLeafNode(reader) : parseParentNode(reader);
+      if (reader.remaining > 0) {
+        console.warn('[DAVE][RESTORE-DEBUG] Node', idx, 'has', reader.remaining, 'unconsumed bytes!');
+      }
+      return node;
+    });
+
+    this.sendCounter = 0n;
+    this.pendingProposals = [];
+    await this._deriveSenderKeys();
+    this.state = 'ready';
+
+    // DEBUG: verify fixture internal consistency
+    const verifyInit = await mlsExpandWithLabel(this.epochSecret!, 'init', new Uint8Array(0), 32);
+    const initMatch = verifyInit.length === this.initSecret!.length && verifyInit.every((b, i) => b === this.initSecret![i]);
+    console.log('[DAVE][RESTORE-DEBUG] initSecret consistency:', initMatch ? 'MATCH ✓' : 'MISMATCH ✗');
+    if (!initMatch) {
+      console.log('[DAVE][RESTORE-DEBUG]   fixture initSecret:', hex(this.initSecret!));
+      console.log('[DAVE][RESTORE-DEBUG]   derived initSecret:', hex(verifyInit));
+    }
+
+    const verifyExporter = await mlsExpandWithLabel(this.epochSecret!, 'exporter', new Uint8Array(0), 32);
+    const expMatch = verifyExporter.length === this.exporterSecret!.length && verifyExporter.every((b, i) => b === this.exporterSecret![i]);
+    console.log('[DAVE][RESTORE-DEBUG] exporterSecret consistency:', expMatch ? 'MATCH ✓' : 'MISMATCH ✗');
+
+    // Verify the Welcome's confirmation tag by reconstructing it from epochSecret + confirmedTranscriptHash
+    // Then check that SHA256(confirmedTranscriptHash || VarVector(confirmationTag)) == interimTranscriptHash
+    const welcomeConfirmKey = await mlsExpandWithLabel(this.epochSecret!, 'confirm', new Uint8Array(0), 32);
+    const wcMacKey = await crypto.subtle.importKey('raw', welcomeConfirmKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const welcomeConfirmTag = new Uint8Array(await crypto.subtle.sign('HMAC', wcMacKey, this.confirmedTranscriptHash!));
+    const ctw = new MLSWriter();
+    ctw.writeVarVector(welcomeConfirmTag);
+    const expectedITH = new Uint8Array(await crypto.subtle.digest('SHA-256',
+      concatBytes(this.confirmedTranscriptHash!, ctw.toUint8Array())));
+    const ithMatch = expectedITH.every((b, i) => b === this.interimTranscriptHash![i]);
+    console.log('[DAVE][RESTORE-DEBUG] interimTranscriptHash consistency:', ithMatch ? 'MATCH ✓' : 'MISMATCH ✗');
+    if (!ithMatch) {
+      console.log('[DAVE][RESTORE-DEBUG]   fixture ITH:', hex(this.interimTranscriptHash!));
+      console.log('[DAVE][RESTORE-DEBUG]   derived ITH:', hex(expectedITH));
+      console.log('[DAVE][RESTORE-DEBUG]   welcomeConfirmTag:', hex(welcomeConfirmTag));
+    }
+
+    const numLeaves = Math.ceil((this.tree.length + 1) / 2);
+    const restoredTreeHash = await computeTreeHash(this.tree, treeRoot(numLeaves));
+    console.log('[DAVE][RESTORE-DEBUG] Tree: nodes=' + this.tree.length + ', leaves=' + numLeaves + ', treeHash=' + hex(restoredTreeHash));
+
+    // Verify each tree node's rawBytes round-trips
+    for (let i = 0; i < this.tree.length; i++) {
+      const node = this.tree[i];
+      if (node) {
+        const origRaw = state.tree[i]?.rawBytes;
+        if (origRaw) {
+          const match = node.rawBytes.length === origRaw.length && node.rawBytes.every((b, j) => b === origRaw[j]);
+          if (!match) {
+            console.warn('[DAVE][RESTORE-DEBUG] Node', i, 'rawBytes MISMATCH! orig=' + origRaw.length + 'B, restored=' + node.rawBytes.length + 'B');
+            console.warn('[DAVE][RESTORE-DEBUG]   orig first 16:', hex(origRaw.subarray(0, 16)));
+            console.warn('[DAVE][RESTORE-DEBUG]   rest first 16:', hex(node.rawBytes.subarray(0, 16)));
+          }
+        }
+        // Log per-node hash contribution
+        const nodeHash = new Uint8Array(await crypto.subtle.digest('SHA-256', node.rawBytes));
+        const extra = node.type === 'parent' ? ' unmerged=[' + (node as any).unmergedLeaves.join(',') + ']' : '';
+        console.log('[DAVE][RESTORE-DEBUG] Node', i, node.type, 'rawBytes=' + node.rawBytes.length + 'B hash=' + hex(nodeHash.subarray(0, 8)) + extra);
+      } else {
+        console.log('[DAVE][RESTORE-DEBUG] Node', i, 'null');
+      }
+    }
+  }
+
+  /**
    * Handle the external sender package from the server (Op 25).
    * Returns the MLSMessage-wrapped key package to send back (Op 26).
    */
   async handleExternalSender(data: Uint8Array): Promise<Uint8Array> {
     this.externalSenderKey = data;
+    {
+      let binary = '';
+      for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]);
+      console.log('[DAVE][TEST-FIXTURE] handleExternalSender input (base64):', btoa(binary));
+    }
     console.log(
       '[DAVE] Received external sender:',
       data.length,
@@ -870,6 +1068,12 @@ export class DaveSession {
         .join(' '),
     );
 
+    {
+      let binary = '';
+      for (let i = 0; i < keyPackage.length; i++) binary += String.fromCharCode(keyPackage[i]);
+      console.log('[DAVE][TEST-FIXTURE] handleExternalSender output keyPackage (base64):', btoa(binary));
+    }
+
     this.state = 'awaiting_welcome';
     return keyPackage;
   }
@@ -882,6 +1086,11 @@ export class DaveSession {
    * to commit, or handle it if we can.
    */
   handleProposals(data: Uint8Array) {
+    {
+      let binary = '';
+      for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]);
+      console.log('[DAVE][TEST-FIXTURE] handleProposals input (base64):', btoa(binary));
+    }
     console.log('[DAVE] Received MLS proposals:', data.length, 'bytes');
     if (data.length < 2) return;
 
@@ -978,12 +1187,40 @@ export class DaveSession {
    * Parses the PublicMessage/Commit, applies proposals to the tree,
    * decrypts the UpdatePath if present, and derives the new epoch secret.
    */
-  async handleCommit(data: Uint8Array): Promise<void> {
+  async handleCommit(data: Uint8Array): Promise<{ confirmationTagVerified: boolean } | null> {
+    {
+      let binary = '';
+      for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]);
+      console.log('[DAVE][TEST-FIXTURE] handleCommit input (base64):', btoa(binary));
+    }
     console.log('[DAVE] Processing commit:', data.length, 'bytes');
 
     if (!this.epochSecret || !this.initSecret || !this.groupId) {
       console.warn('[DAVE] No group state for commit processing');
-      return;
+      return null;
+    }
+
+    // If there's already a pending commit (from a previous handleCommit that hasn't been
+    // executed yet), queue it and chain from its derived state. Without this, the second
+    // commit would use stale epoch/initSecret/confirmedTranscriptHash and produce wrong keys.
+    let baseEpoch = this.epoch;
+    let baseInitSecret = this.initSecret!;
+    let baseConfirmedTranscriptHash = this.confirmedTranscriptHash;
+    if (this.pendingEpochSecret) {
+      this._pendingCommitQueue.push({
+        epochSecret: this.pendingEpochSecret,
+        exporterSecret: this._pendingExporterSecret!,
+        initSecret: this._pendingInitSecret!,
+        confirmedTranscriptHash: this._pendingConfirmedTranscriptHash!,
+      });
+      baseEpoch = this.epoch + this._pendingCommitQueue.length;
+      baseInitSecret = this._pendingInitSecret!;
+      baseConfirmedTranscriptHash = this._pendingConfirmedTranscriptHash!;
+      this.pendingEpochSecret = null;
+      this._pendingExporterSecret = null;
+      this._pendingInitSecret = null;
+      this._pendingConfirmedTranscriptHash = null;
+      console.log('[DAVE] Chaining from pending commit, base epoch now', baseEpoch);
     }
 
     try {
@@ -991,13 +1228,20 @@ export class DaveSession {
       const parsed = this._parsePublicMessage(data);
       if (!parsed) {
         console.warn('[DAVE] Could not parse commit PublicMessage');
-        return;
+        return null;
       }
 
       const { commit, senderLeafIndex, senderType, confirmedTranscriptHashInput, confirmationTag } = parsed;
       if (!commit) {
         console.warn('[DAVE] No Commit in PublicMessage');
-        return;
+        return null;
+      }
+
+      // DEBUG: tree hash before proposals
+      {
+        const nl = Math.ceil((this.tree.length + 1) / 2);
+        const preHash = nl > 0 ? await computeTreeHash(this.tree, treeRoot(nl)) : new Uint8Array(32);
+        console.log('[DAVE][COMMIT-DEBUG] treeHash BEFORE proposals:', hex(preHash));
       }
 
       // 2. Resolve proposals: pre-parsed Op27 proposals for references + inline proposals
@@ -1013,37 +1257,48 @@ export class DaveSession {
       this._applyProposals(resolvedProposals);
       this.pendingProposals = [];
 
-      // 4. Compute provisional GroupContext AFTER proposals are applied.
-      //    Per RFC 9420 Section 12.4.1: the committer encrypts UpdatePath
-      //    using the GroupContext with tree hash from the provisional state
-      //    (after proposals, before commit updates).
-      const numLeavesProv = Math.ceil((this.tree.length + 1) / 2);
-      const provTreeHash = numLeavesProv > 0
-        ? await computeTreeHash(this.tree, treeRoot(numLeavesProv))
-        : new Uint8Array(32);
-      const provisionalGroupContext = buildGroupContext(
-        this.groupId, this.epoch, provTreeHash,
-        this.confirmedTranscriptHash || new Uint8Array(32),
-        this.groupExtensions,
-      );
+      // DEBUG: tree hash after proposals
+      {
+        const nl = Math.ceil((this.tree.length + 1) / 2);
+        const postHash = nl > 0 ? await computeTreeHash(this.tree, treeRoot(nl)) : new Uint8Array(32);
+        console.log('[DAVE][COMMIT-DEBUG] treeHash AFTER proposals:', hex(postHash));
+      }
 
-      // 5. Derive commit_secret from UpdatePath (or zeros if no path)
+      // 4. Process UpdatePath and derive commit_secret.
+      //    Per mlspp: the provisional GroupContext for HPKE decryption uses
+      //    epoch+1 and the tree hash AFTER merging UpdatePath public keys.
       let commitSecret = new Uint8Array(32);
       if (commit.updatePath && senderType === 1) {
-        // Member sender with UpdatePath: decrypt path secret and derive commit_secret
+        // Apply UpdatePath to tree first (blanks sender path, sets new leaf,
+        // places parent node public keys, computes parent_hash chain)
+        await this._applyUpdatePath(commit.updatePath, senderLeafIndex);
+
+        // Compute tree hash from the fully-merged tree
+        const numLeavesProv = Math.ceil((this.tree.length + 1) / 2);
+        const provTreeHash = numLeavesProv > 0
+          ? await computeTreeHash(this.tree, treeRoot(numLeavesProv))
+          : new Uint8Array(32);
+
+        // Provisional GroupContext: epoch+1, merged tree hash, OLD confirmed transcript hash
+        const provisionalGroupContext = buildGroupContext(
+          this.groupId, baseEpoch + 1, provTreeHash,
+          baseConfirmedTranscriptHash || new Uint8Array(32),
+          this.groupExtensions,
+        );
+        console.log('[DAVE] Provisional GC: epoch=' + (baseEpoch + 1) +
+          ', provTreeHash=' + hex(provTreeHash.subarray(0, 8)) + '...' +
+          ', gcBytes=' + provisionalGroupContext.length + 'B');
+
+        // Decrypt path secret using the provisional GroupContext as HPKE info
         const pathSecret = await this._decryptPathSecret(
           commit.updatePath, senderLeafIndex, provisionalGroupContext,
         );
         if (pathSecret) {
-          // Derive commit_secret by iterating path_secret up the sender's direct path
           commitSecret = await this._deriveCommitSecret(pathSecret, senderLeafIndex);
           console.log('[DAVE] Derived commit_secret from UpdatePath:', hex(commitSecret.subarray(0, 8)) + '...');
         } else {
           console.warn('[DAVE] Could not decrypt path secret from UpdatePath');
         }
-
-        // Apply UpdatePath to tree (update sender leaf + parent nodes)
-        await this._applyUpdatePath(commit.updatePath, senderLeafIndex);
       } else if (!commit.updatePath) {
         console.log('[DAVE] No UpdatePath in commit, using zero commit_secret');
       }
@@ -1063,7 +1318,7 @@ export class DaveSession {
       );
 
       // 8. Build new GroupContext for the new epoch
-      const newEpoch = this.epoch + 1;
+      const newEpoch = baseEpoch + 1;
       const newGroupContext = buildGroupContext(
         this.groupId, newEpoch, newTreeHash, newConfirmedTranscriptHash, this.groupExtensions,
       );
@@ -1073,7 +1328,7 @@ export class DaveSession {
       //   joiner_secret = ExpandWithLabel(pre_joiner, "joiner", GroupContext[n], 32)
       //   member_secret = KDF.Extract(salt=joiner_secret, ikm=psk_secret)
       //   epoch_secret = ExpandWithLabel(member_secret, "epoch", GroupContext[n], 32)
-      const preJoiner = await hkdfExtract(this.initSecret!, commitSecret);
+      const preJoiner = await hkdfExtract(baseInitSecret, commitSecret);
       const joinerSecret = await mlsExpandWithLabel(preJoiner, 'joiner', newGroupContext, 32);
       const pskSecret = new Uint8Array(32); // no PSKs
       const memberSecret = await hkdfExtract(joinerSecret, pskSecret);
@@ -1095,17 +1350,16 @@ export class DaveSession {
       // The confirmation_tag in the commit should be the full 32-byte HMAC or truncated
       const tagMatch = confirmationTag.length <= expectedTag.length &&
         confirmationTag.every((b, i) => b === expectedTag[i]);
+      console.log('[DAVE]   treeHash:', hex(newTreeHash));
+      console.log('[DAVE]   confirmedTranscriptHash:', hex(newConfirmedTranscriptHash));
+      console.log('[DAVE]   groupContext:', hex(newGroupContext));
+      console.log('[DAVE]   initSecret:', hex(baseInitSecret));
       if (tagMatch) {
         console.log('[DAVE] ✓ Confirmation tag VERIFIED — epoch_secret and transcript hash are correct');
       } else {
         console.warn('[DAVE] ✗ Confirmation tag MISMATCH — epoch_secret or transcript hash is wrong');
-        console.warn('[DAVE]   expected:', hex(expectedTag.subarray(0, 16)) + '...');
-        console.warn('[DAVE]   got:     ', hex(confirmationTag.subarray(0, 16)) + '...');
-        console.warn('[DAVE]   confirmedTranscriptHash:', hex(newConfirmedTranscriptHash.subarray(0, 16)) + '...');
-        console.warn('[DAVE]   treeHash:', hex(newTreeHash.subarray(0, 16)) + '...');
-        console.warn('[DAVE]   initSecret used:', hex(this.initSecret!.subarray(0, 8)) + '...');
-        console.warn('[DAVE]   commitSecret:', hex(commitSecret.subarray(0, 8)) + '...');
-        console.warn('[DAVE]   groupContext:', hex(newGroupContext.subarray(0, 32)) + '...');
+        console.warn('[DAVE]   expected:', hex(expectedTag));
+        console.warn('[DAVE]   got:     ', hex(confirmationTag));
       }
 
       // Compute new interim_transcript_hash for next commit
@@ -1119,8 +1373,10 @@ export class DaveSession {
       console.log('[DAVE] Commit processed: newEpoch=' + newEpoch +
         ', epochSecret=' + hex(newEpochSecret.subarray(0, 8)) + '...' +
         ', exporterSecret=' + hex(this._pendingExporterSecret.subarray(0, 8)) + '...');
+      return { confirmationTagVerified: tagMatch };
     } catch (err) {
       console.error('[DAVE] Commit processing failed:', err);
+      return null;
     }
   }
 
@@ -1330,12 +1586,15 @@ export class DaveSession {
         // the path from the new leaf to the root, add index to unmerged_leaves.
         const leafIdx = placedNodeIdx / 2;
         const numLeaves = Math.ceil((this.tree.length + 1) / 2);
+        console.log('[DAVE][ADD-DEBUG] placedNodeIdx=' + placedNodeIdx + ', leafIdx=' + leafIdx + ', numLeaves=' + numLeaves + ', treeLen=' + this.tree.length);
         try {
           const dp = treeDirectPath(placedNodeIdx, numLeaves);
+          console.log('[DAVE][ADD-DEBUG] directPath:', dp.join(','));
           for (const p of dp) {
             if (p < this.tree.length && this.tree[p] && this.tree[p]!.type === 'parent') {
               const pn = this.tree[p] as MlsParentNode;
               if (!pn.unmergedLeaves.includes(leafIdx)) {
+                console.log('[DAVE][ADD-DEBUG] Parent', p, 'adding unmerged leaf', leafIdx, 'existing:', pn.unmergedLeaves.join(','), 'rawBytes before:', pn.rawBytes.length + 'B');
                 pn.unmergedLeaves.push(leafIdx);
                 // Recompute rawBytes with updated unmerged_leaves
                 const rw = new MLSWriter();
@@ -1347,18 +1606,19 @@ export class DaveSession {
                 }
                 rw.writeVarVector(ulw.toUint8Array());
                 pn.rawBytes = rw.toUint8Array();
+                console.log('[DAVE][ADD-DEBUG] Parent', p, 'rawBytes after:', pn.rawBytes.length + 'B', 'unmerged now:', pn.unmergedLeaves.join(','));
               }
             }
           }
         } catch { /* tree too small for direct path */ }
       } else if (prop.type === 3) {
-        // Remove: blank out the leaf at the given index
+        // Remove: blank out the leaf AND all parent nodes on the direct path,
+        // then clean up stale unmergedLeaves references on all remaining parent nodes.
         const removed = (prop.data[0] << 24) | (prop.data[1] << 16) | (prop.data[2] << 8) | prop.data[3];
         const nodeIdx = removed * 2;
         if (nodeIdx < this.tree.length) {
           this.tree[nodeIdx] = null;
           console.log('[DAVE] Removed member at leaf', removed);
-          // Also blank parent nodes on the direct path
           const numLeaves = Math.ceil((this.tree.length + 1) / 2);
           try {
             const dp = treeDirectPath(nodeIdx, numLeaves);
@@ -1366,6 +1626,53 @@ export class DaveSession {
               if (p < this.tree.length) this.tree[p] = null;
             }
           } catch { /* tree too small */ }
+
+          // RFC 9420 Section 12.1.2: remove the leaf index from unmergedLeaves
+          // of ALL remaining parent nodes. The direct path blanking handles nodes
+          // on the current path, but the tree may have grown since the leaf was
+          // added, so parent nodes from the original (smaller-tree) add that are
+          // no longer on the current direct path can retain stale entries.
+          for (let i = 1; i < this.tree.length; i += 2) {
+            const node = this.tree[i];
+            if (node && node.type === 'parent') {
+              const idx = node.unmergedLeaves.indexOf(removed);
+              if (idx >= 0) {
+                node.unmergedLeaves.splice(idx, 1);
+                // Recompute rawBytes with updated unmerged_leaves
+                const rw = new MLSWriter();
+                rw.writeVarVector(node.publicKey);
+                rw.writeVarVector(node.parentHash);
+                const ulw = new MLSWriter();
+                for (const ul of node.unmergedLeaves) {
+                  ulw.writeUint32(ul);
+                }
+                rw.writeVarVector(ulw.toUint8Array());
+                node.rawBytes = rw.toUint8Array();
+                console.log('[DAVE] Cleaned up unmergedLeaves for removed leaf', removed, 'from parent node', i);
+              }
+            }
+          }
+
+          // RFC 9420 Section 7.7: Truncate tree after remove.
+          // Remove trailing blank leaves (and their parent nodes) until the
+          // rightmost leaf is non-blank or the tree has only one leaf.
+          while (this.tree.length > 1) {
+            // Check if the rightmost leaf (last even index) is blank
+            const lastLeafIdx = this.tree.length - 1 - ((this.tree.length - 1) % 2);
+            if (this.tree[lastLeafIdx] !== null) break;
+            // Also check if there are any non-blank leaves to the right of the
+            // second-to-last leaf position — if the rightmost leaf is blank,
+            // remove the last two nodes (parent + leaf) or just the last node
+            if (this.tree.length % 2 === 1) {
+              // Odd length: last node is a leaf at even index
+              // Remove last two nodes (this leaf + its parent above)
+              this.tree.splice(this.tree.length - 2, 2);
+            } else {
+              // Even length: shouldn't happen in a well-formed tree, but handle it
+              this.tree.splice(this.tree.length - 1, 1);
+            }
+          }
+          console.log('[DAVE] Tree after truncation: nodes=' + this.tree.length + ', leaves=' + Math.ceil((this.tree.length + 1) / 2));
         }
       }
       // type 0 = reference — we can't resolve these without proposal cache matching
@@ -1673,6 +1980,11 @@ export class DaveSession {
    * For new joiners being welcomed to the group.
    */
   async handleWelcome(data: Uint8Array): Promise<void> {
+    {
+      let binary = '';
+      for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]);
+      console.log('[DAVE][TEST-FIXTURE] handleWelcome input (base64):', btoa(binary));
+    }
     console.log('[DAVE] Received welcome:', data.length, 'bytes');
 
     try {
@@ -1699,39 +2011,57 @@ export class DaveSession {
    * Handle execute transition (Op 22).
    * Applies the pending epoch secret and related state from commit processing.
    */
+  private _lastExecutedTransitionId: number = -1;
+
   async handleExecuteTransition(data: any) {
     const transitionId = typeof data === 'object' ? data.transition_id : 0;
+    console.log('[DAVE][TEST-FIXTURE] handleExecuteTransition input:', JSON.stringify(data));
     console.log('[DAVE] Execute transition, id:', transitionId);
 
-    if (this.pendingEpochSecret) {
+    // Resolve the pending state: dequeue from the commit queue first (older commits),
+    // then fall back to the single pending fields (most recent commit).
+    let pendingState: {
+      epochSecret: Uint8Array;
+      exporterSecret: Uint8Array;
+      initSecret: Uint8Array;
+      confirmedTranscriptHash: Uint8Array;
+    } | null = null;
+
+    if (this._pendingCommitQueue.length > 0) {
+      pendingState = this._pendingCommitQueue.shift()!;
+    } else if (this.pendingEpochSecret) {
+      pendingState = {
+        epochSecret: this.pendingEpochSecret,
+        exporterSecret: this._pendingExporterSecret!,
+        initSecret: this._pendingInitSecret!,
+        confirmedTranscriptHash: this._pendingConfirmedTranscriptHash!,
+      };
+      this.pendingEpochSecret = null;
+      this._pendingExporterSecret = null;
+      this._pendingInitSecret = null;
+      this._pendingConfirmedTranscriptHash = null;
+    }
+
+    // Per Discord DAVE protocol: each transition_id represents one epoch
+    // transition. If the same transition_id fires again (e.g. a remove
+    // commit sharing the same transition as an add), apply the updated
+    // keys but do NOT advance the epoch a second time.
+    const isDuplicate = transitionId > 0 && transitionId === this._lastExecutedTransitionId;
+    this._lastExecutedTransitionId = transitionId;
+
+    if (pendingState) {
       // Reset decrypt log count so we can see errors after each transition
       this._decryptLogCount = 0;
 
       // Move current ratchets to old epoch stack before switching
       this._retireCurrentEpoch();
 
-      this.epochSecret = this.pendingEpochSecret;
-      this.pendingEpochSecret = null;
-      this.epoch++;
+      this.epochSecret = pendingState.epochSecret;
+      if (!isDuplicate) this.epoch++;
       this.sendCounter = 0n;
-
-      // Apply pending commit state if available
-      if (this._pendingExporterSecret) {
-        this.exporterSecret = this._pendingExporterSecret;
-        this._pendingExporterSecret = null;
-      } else {
-        this.exporterSecret = await mlsExpandWithLabel(this.epochSecret, 'exporter', new Uint8Array(0), 32);
-      }
-      if (this._pendingInitSecret) {
-        this.initSecret = this._pendingInitSecret;
-        this._pendingInitSecret = null;
-      } else {
-        this.initSecret = await mlsExpandWithLabel(this.epochSecret, 'init', new Uint8Array(0), 32);
-      }
-      if (this._pendingConfirmedTranscriptHash) {
-        this.confirmedTranscriptHash = this._pendingConfirmedTranscriptHash;
-        this._pendingConfirmedTranscriptHash = null;
-      }
+      this.exporterSecret = pendingState.exporterSecret;
+      this.initSecret = pendingState.initSecret;
+      this.confirmedTranscriptHash = pendingState.confirmedTranscriptHash;
 
       await this._deriveSenderKeys();
 
@@ -1784,9 +2114,11 @@ export class DaveSession {
     this.tree = [];
     this.leafIndex = -1;
     this.pendingProposals = [];
+    this._pendingCommitQueue = [];
     this._pendingExporterSecret = null;
     this._pendingInitSecret = null;
     this._pendingConfirmedTranscriptHash = null;
+    this._lastExecutedTransitionId = -1;
     this.state = 'initialized';
     console.log('[DAVE] Group state reset');
   }
@@ -2175,6 +2507,29 @@ export class DaveSession {
       }
     }
 
+    // Verify that our buildGroupContext reconstruction matches the original wire bytes.
+    // If these differ, all subsequent HPKE info and key schedules will be wrong.
+    const reconstructedGC = buildGroupContext(this.groupId, this.epoch, treeHash, confirmedTranscriptHash, this.groupExtensions);
+    if (reconstructedGC.length === groupContextBytes.length &&
+        reconstructedGC.every((b, i) => b === groupContextBytes[i])) {
+      console.log('[DAVE] ✓ GroupContext reconstruction VERIFIED — buildGroupContext matches wire bytes');
+    } else {
+      console.warn('[DAVE] ✗ GroupContext reconstruction MISMATCH — buildGroupContext differs from wire!');
+      console.warn('[DAVE]   wire:', groupContextBytes.length, 'B, reconstructed:', reconstructedGC.length, 'B');
+      for (let i = 0; i < Math.max(reconstructedGC.length, groupContextBytes.length); i++) {
+        if ((reconstructedGC[i] ?? -1) !== (groupContextBytes[i] ?? -1)) {
+          console.warn('[DAVE]   First diff at byte', i,
+            'wire=0x' + (groupContextBytes[i] ?? 0).toString(16).padStart(2, '0'),
+            'recon=0x' + (reconstructedGC[i] ?? 0).toString(16).padStart(2, '0'));
+          console.warn('[DAVE]   wire[' + Math.max(0,i-4) + '..' + Math.min(groupContextBytes.length, i+8) + ']:',
+            hex(groupContextBytes.subarray(Math.max(0,i-4), Math.min(groupContextBytes.length, i+8))));
+          console.warn('[DAVE]   recon[' + Math.max(0,i-4) + '..' + Math.min(reconstructedGC.length, i+8) + ']:',
+            hex(reconstructedGC.subarray(Math.max(0,i-4), Math.min(reconstructedGC.length, i+8))));
+          break;
+        }
+      }
+    }
+
     // Key schedule (Welcome path):
     //   member_secret = KDF.Extract(joiner_secret, psk_secret) = pre1
     //   epoch_secret = ExpandWithLabel(member_secret, "epoch", GroupContext, Nh)
@@ -2209,6 +2564,33 @@ export class DaveSession {
     }
 
     this.state = 'ready';
+
+    // Dump post-welcome state for test fixture generation
+    {
+      const toB64 = (buf: Uint8Array) => {
+        let binary = '';
+        for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+        return btoa(binary);
+      };
+      const serializedTree = this.tree.map((node, i) => {
+        if (!node) return null;
+        if (node.type === 'leaf') return { t: 'l', raw: toB64(node.rawBytes) };
+        return { t: 'p', raw: toB64(node.rawBytes) };
+      });
+      console.log('[DAVE][TEST-FIXTURE] postWelcomeState:', JSON.stringify({
+        epoch: this.epoch,
+        epochSecret: toB64(this.epochSecret!),
+        exporterSecret: toB64(this.exporterSecret!),
+        initSecret: toB64(this.initSecret!),
+        groupId: toB64(this.groupId!),
+        groupExtensions: toB64(this.groupExtensions),
+        confirmedTranscriptHash: toB64(this.confirmedTranscriptHash!),
+        interimTranscriptHash: toB64(this.interimTranscriptHash!),
+        leafIndex: this.leafIndex,
+        tree: serializedTree,
+      }));
+    }
+
     console.log('[DAVE] Welcome fully processed, epoch:', this.epoch, 'state: ready, receiverRatchets:', this.receiverRatchets.size, 'users:', allUserIds.size);
   }
 
