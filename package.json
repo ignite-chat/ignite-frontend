@@ -40,6 +40,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sapphi-red/web-noise-suppressor": "^0.3.5",
+    "@tanstack/react-virtual": "^3.13.22",
     "axios": "^1.7.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

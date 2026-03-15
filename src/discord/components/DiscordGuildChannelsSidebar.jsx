@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Hash, SpeakerHigh, CaretDown, CaretRight, Megaphone, BookBookmark, MicrophoneStage, ChatsTeardrop, CheckSquare, LockKey, MicrophoneSlash, SpeakerSlash, VideoCamera } from '@phosphor-icons/react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordStore } from '../store/discord.store';
@@ -42,9 +43,11 @@ const DiscordChannelType = {
   GUILD_FORUM: 15,
 };
 
+const isVoiceType = (type) =>
+  type === DiscordChannelType.GUILD_VOICE || type === DiscordChannelType.GUILD_STAGE_VOICE;
+
 const ChannelIcon = ({ type, isRules, isLocked, className }) => {
   if (isRules) return <CheckSquare className={className} weight='fill' />;
-  //if (isLocked) return <LockKey className={className} weight='fill' />;
   switch (type) {
     case DiscordChannelType.GUILD_VOICE:
       return <SpeakerHigh className={className} weight='fill' />;
@@ -68,7 +71,7 @@ const VoiceStatusIcon = ({ icon: Icon, color, label }) => (
   </Tooltip>
 );
 
-const VoiceMemberRow = ({ vs, guildId, channelId, user, memberData, displayName, avatarUrl, openProfile }) => {
+const VoiceMemberRow = memo(({ vs, guildId, channelId, user, memberData, displayName, avatarUrl, openProfile }) => {
   const isSpeaking = useDiscordVoiceStore((s) => s.speakingUsers.has(vs.user_id));
   const [hovered, setHovered] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -130,7 +133,7 @@ const VoiceMemberRow = ({ vs, guildId, channelId, user, memberData, displayName,
   }, []);
 
   return (
-    <Popover open={vs.self_stream && hovered}>
+    <Popover open={!!vs.self_stream && hovered}>
       <ContextMenu>
         <PopoverTrigger asChild>
           <ContextMenuTrigger asChild>
@@ -138,7 +141,7 @@ const VoiceMemberRow = ({ vs, guildId, channelId, user, memberData, displayName,
               onClick={openProfile}
               onMouseEnter={enterHover}
               onMouseLeave={leaveHover}
-              className="flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-gray-500 font-medium outline-none hover:bg-white/5 hover:text-white"
+              className="ml-8 mr-2 flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-gray-500 font-medium outline-none hover:bg-white/5 hover:text-white"
             >
               <img src={avatarUrl} alt="" className={`size-6 rounded-full ${isSpeaking ? 'ring-2 ring-green-500' : ''}`} />
               <span className="flex-1 truncate text-[13px]">{displayName}</span>
@@ -193,69 +196,13 @@ const VoiceMemberRow = ({ vs, guildId, channelId, user, memberData, displayName,
       )}
     </Popover>
   );
-};
+});
 
-const VoiceChannelMembers = ({ guildId, channelId }) => {
-  const guildVoiceStates = useDiscordVoiceStatesStore((s) => s.voiceStates[guildId] || {});
-  const users = useDiscordUsersStore((s) => s.users);
-  const guildMembers = useDiscordMembersStore((s) => s.members[guildId] || {});
-  const members = useMemo(() => {
-    return Object.values(guildVoiceStates).filter((vs) => vs.channel_id === channelId);
-  }, [guildVoiceStates, channelId]);
-
-  // Request member info for unknown users
-  useEffect(() => {
-    if (members.length === 0) return;
-    const unknownIds = members
-      .filter((vs) => !vs.member?.user && !users[vs.user_id])
-      .map((vs) => vs.user_id);
-    if (unknownIds.length > 0) {
-      DiscordGatewayService.requestGuildMembers(guildId, unknownIds);
-    }
-  }, [members, users, guildId]);
-
-  if (members.length === 0) return null;
-
-  return (
-    <div className="ml-8 mr-2 flex flex-col gap-0.5">
-      {members.map((vs) => {
-        const memberData = guildMembers[vs.user_id];
-        const user = vs.member?.user || users[vs.user_id];
-        const displayName = vs.member?.nick || memberData?.nick || user?.global_name || user?.username || 'Unknown';
-        const avatarUrl = DiscordService.getUserAvatarUrl(vs.user_id, user?.avatar, 32);
-
-        const openProfile = () => {
-          if (!user) return;
-          useModalStore.getState().push(DiscordUserProfileModal, {
-            author: user,
-            member: memberData || vs.member,
-            guildId,
-          });
-        };
-
-        return (
-          <VoiceMemberRow
-            key={vs.user_id}
-            vs={vs}
-            guildId={guildId}
-            channelId={channelId}
-            user={user}
-            memberData={memberData}
-            displayName={displayName}
-            avatarUrl={avatarUrl}
-            openProfile={openProfile}
-          />
-        );
-      })}
-    </div>
-  );
-};
-
-const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId, guildName }) => {
+const DiscordChannelRow = memo(({ channel, isActive, joinedAtMs, rulesChannelId, guildName }) => {
   const canView = channel._canView !== false;
   const readStates = useDiscordReadStatesStore((s) => s.readStates);
   const entry = readStates[channel.id];
-  const isVoiceChannel = channel.type === DiscordChannelType.GUILD_VOICE || channel.type === DiscordChannelType.GUILD_STAGE_VOICE;
+  const isVoiceChannel = isVoiceType(channel.type);
   const canConnect = useDiscordHasPermission(channel.guild_id, isVoiceChannel ? channel : undefined, CONNECT);
   const typingUsers = useDiscordTypingStore((s) => s.typing[channel.id] || []);
   const guildVoiceStates = useDiscordVoiceStatesStore((s) => isVoiceChannel ? (s.voiceStates[channel.guild_id] || {}) : {});
@@ -271,21 +218,16 @@ const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId, guil
     !isActive &&
     !!channel.last_message_id &&
     (() => {
-      if (channel.type == DiscordChannelType.GUILD_VOICE || channel.type == DiscordChannelType.GUILD_STAGE_VOICE) {
-        return false;
-      }
-
+      if (isVoiceChannel) return false;
       if (entry?.last_message_id) {
         return BigInt(channel.last_message_id) > BigInt(entry.last_message_id);
       }
-      // No read state — only unread if the last message came after user joined
       if (!joinedAtMs) return false;
       return snowflakeToTimestamp(channel.last_message_id) > joinedAtMs;
     })();
   const mentionCount = canView ? (entry?.mention_count ?? 0) : 0;
   const showTyping = canView && !isVoiceChannel && typingUsers.length > 0 && !mentionCount;
 
-  // Voice channels use a button to join; text channels use Link to navigate
   const handleVoiceClick = () => {
     if (!canConnect || !canView) return;
     DiscordVoiceService.joinVoiceChannel(
@@ -319,7 +261,6 @@ const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId, guil
                 : 'cursor-pointer text-gray-500 hover:bg-white/5 hover:text-gray-100'
       }`}
     >
-      {/* Unread pill on the left edge */}
       {isUnread && (
         <div className="absolute -left-1 top-1/2 h-2 w-1 -translate-y-1/2 rounded-r-full bg-white" />
       )}
@@ -366,70 +307,20 @@ const DiscordChannelRow = ({ channel, isActive, joinedAtMs, rulesChannelId, guil
       )}
     </Wrapper>
   );
-};
+});
 
-const DiscordCategory = ({ category, channels, activeChannelId, joinedAtMs, rulesChannelId, guildName }) => {
-  const [expanded, setExpanded] = useState(true);
+// Item height estimates for the virtualizer
+const CATEGORY_HEADER_HEIGHT = 36;
+const CHANNEL_ROW_HEIGHT = 32;
+const VOICE_MEMBER_HEIGHT = 30;
 
-  const sortedChannels = useMemo(() => {
-    const isVoice = (c) =>
-      c.type === DiscordChannelType.GUILD_VOICE || c.type === DiscordChannelType.GUILD_STAGE_VOICE;
-
-    return [...channels]
-      .filter(
-        (c) =>
-          c.parent_id === category?.id &&
-          c.type !== DiscordChannelType.GUILD_CATEGORY
-      )
-      .sort((a, b) => {
-        const aVoice = isVoice(a) ? 1 : 0;
-        const bVoice = isVoice(b) ? 1 : 0;
-        if (aVoice !== bVoice) return aVoice - bVoice;
-        return (a.position ?? 0) - (b.position ?? 0);
-      });
-  }, [channels, category?.id]);
-
-  if (sortedChannels.length === 0) return null;
-
-  return (
-    <div className="flex w-full flex-col">
-      {category && (
-        <button
-          type="button"
-          className="mb-1 flex items-center pt-4 text-gray-400 hover:text-gray-100"
-          onClick={() => setExpanded(!expanded)}
-        >
-          <div className="flex w-6 items-center justify-center">
-            {expanded ? (
-              <CaretDown className="size-2" />
-            ) : (
-              <CaretRight className="size-2" />
-            )}
-          </div>
-          <span className="text-xs font-bold uppercase">{category.name}</span>
-        </button>
-      )}
-
-      {sortedChannels.map((channel) => {
-        const isVoice = channel.type === DiscordChannelType.GUILD_VOICE || channel.type === DiscordChannelType.GUILD_STAGE_VOICE;
-        return (
-          <div
-            key={channel.id}
-            className={!expanded && channel.id !== activeChannelId ? 'hidden' : ''}
-          >
-            <DiscordChannelRow
-              channel={channel}
-              isActive={channel.id === activeChannelId}
-              joinedAtMs={joinedAtMs}
-              rulesChannelId={rulesChannelId}
-              guildName={guildName}
-            />
-            {isVoice && <VoiceChannelMembers guildId={channel.guild_id} channelId={channel.id} />}
-          </div>
-        );
-      })}
-    </div>
-  );
+const sortChannels = (channels) => {
+  return [...channels].sort((a, b) => {
+    const aVoice = isVoiceType(a.type) ? 1 : 0;
+    const bVoice = isVoiceType(b.type) ? 1 : 0;
+    if (aVoice !== bVoice) return aVoice - bVoice;
+    return (a.position ?? 0) - (b.position ?? 0);
+  });
 };
 
 const DiscordGuildChannelsSidebar = ({ guild }) => {
@@ -438,6 +329,20 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
   const guildMembers = useDiscordGuildsStore((s) => s.guildMembers);
   const currentUser = useDiscordStore((s) => s.user);
   const sidebarRef = useRef();
+  const guildVoiceStates = useDiscordVoiceStatesStore((s) => s.voiceStates[guild?.id] || {});
+  const users = useDiscordUsersStore((s) => s.users);
+  const memberStore = useDiscordMembersStore((s) => s.members[guild?.id] || {});
+
+  // Track collapsed categories
+  const [collapsedCategories, setCollapsedCategories] = useState(new Set());
+  const toggleCategory = useCallback((categoryId) => {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
+      return next;
+    });
+  }, []);
 
   const guildId = guild?.id;
   const guildRoles = guild?.roles || guild?.properties?.roles || [];
@@ -451,7 +356,6 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
 
   const memberRoleIds = myMember?.roles || [];
   const joinedAtMs = useMemo(() => {
-    // guild.joined_at comes directly from the READY / GUILD_CREATE payload
     const raw = guild?.joined_at || myMember?.joined_at;
     return raw ? new Date(raw).getTime() : null;
   }, [guild?.joined_at, myMember?.joined_at]);
@@ -467,20 +371,97 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
     });
   }, [channels, guildId, userId, memberRoleIds, guildRoles, guildOwnerId]);
 
+  // Build voice members lookup: channelId -> voiceState[]
+  const voiceMembersByChannel = useMemo(() => {
+    const map = {};
+    for (const vs of Object.values(guildVoiceStates)) {
+      if (!vs.channel_id) continue;
+      if (!map[vs.channel_id]) map[vs.channel_id] = [];
+      map[vs.channel_id].push(vs);
+    }
+    return map;
+  }, [guildVoiceStates]);
+
+  // Request member info for unknown voice users
+  useEffect(() => {
+    const allVoiceMembers = Object.values(guildVoiceStates);
+    if (allVoiceMembers.length === 0 || !guildId) return;
+    const unknownIds = allVoiceMembers
+      .filter((vs) => !vs.member?.user && !users[vs.user_id])
+      .map((vs) => vs.user_id);
+    if (unknownIds.length > 0) {
+      DiscordGatewayService.requestGuildMembers(guildId, unknownIds);
+    }
+  }, [guildVoiceStates, users, guildId]);
+
   const categories = useMemo(() => {
     return guildChannels
       .filter((c) => c.type === DiscordChannelType.GUILD_CATEGORY)
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   }, [guildChannels]);
 
-  // Channels without a category
   const rootChannels = useMemo(() => {
     return guildChannels.filter(
-      (c) =>
-        !c.parent_id &&
-        c.type !== DiscordChannelType.GUILD_CATEGORY
+      (c) => !c.parent_id && c.type !== DiscordChannelType.GUILD_CATEGORY
     );
   }, [guildChannels]);
+
+  // Flatten everything into a virtual list of items
+  const flatItems = useMemo(() => {
+    const items = [];
+
+    // Root channels (no category)
+    const sortedRoot = sortChannels(rootChannels);
+    for (const channel of sortedRoot) {
+      items.push({ type: 'channel', channel });
+      if (isVoiceType(channel.type)) {
+        const voiceMembers = voiceMembersByChannel[channel.id] || [];
+        for (const vs of voiceMembers) {
+          items.push({ type: 'voice-member', vs, channelId: channel.id });
+        }
+      }
+    }
+
+    // Categories + their children
+    for (const category of categories) {
+      const categoryChannels = guildChannels.filter(
+        (c) => c.parent_id === category.id && c.type !== DiscordChannelType.GUILD_CATEGORY
+      );
+      if (categoryChannels.length === 0) continue;
+
+      const isCollapsed = collapsedCategories.has(category.id);
+      items.push({ type: 'category-header', category, isCollapsed });
+
+      if (!isCollapsed) {
+        const sorted = sortChannels(categoryChannels);
+        for (const channel of sorted) {
+          items.push({ type: 'channel', channel });
+          if (isVoiceType(channel.type)) {
+            const voiceMembers = voiceMembersByChannel[channel.id] || [];
+            for (const vs of voiceMembers) {
+              items.push({ type: 'voice-member', vs, channelId: channel.id });
+            }
+          }
+        }
+      }
+    }
+
+    return items;
+  }, [rootChannels, categories, guildChannels, collapsedCategories, voiceMembersByChannel]);
+
+  const estimateSize = useCallback((index) => {
+    const item = flatItems[index];
+    if (item.type === 'category-header') return CATEGORY_HEADER_HEIGHT;
+    if (item.type === 'voice-member') return VOICE_MEMBER_HEIGHT;
+    return CHANNEL_ROW_HEIGHT;
+  }, [flatItems]);
+
+  const virtualizer = useVirtualizer({
+    count: flatItems.length,
+    getScrollElement: () => sidebarRef.current,
+    estimateSize,
+    overscan: 10,
+  });
 
   // Save sidebar scroll position on every scroll
   const onSidebarScroll = useCallback(() => {
@@ -524,51 +505,104 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
         </div>
       </div>
 
-      <div className="scrollbar-hover flex min-h-0 flex-1 flex-col items-center overflow-y-auto pb-24" ref={sidebarRef} onScroll={onSidebarScroll}>
+      <div
+        className="scrollbar-hover min-h-0 flex-1 overflow-y-auto pb-24"
+        ref={sidebarRef}
+        onScroll={onSidebarScroll}
+      >
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const item = flatItems[virtualRow.index];
 
-        {/* Root channels (no category) */}
-        {rootChannels.length > 0 && (
-          <div className="flex w-full flex-col">
-            {rootChannels
-              .sort((a, b) => {
-                const aVoice = (a.type === DiscordChannelType.GUILD_VOICE || a.type === DiscordChannelType.GUILD_STAGE_VOICE) ? 1 : 0;
-                const bVoice = (b.type === DiscordChannelType.GUILD_VOICE || b.type === DiscordChannelType.GUILD_STAGE_VOICE) ? 1 : 0;
-                if (aVoice !== bVoice) return aVoice - bVoice;
-                return (a.position ?? 0) - (b.position ?? 0);
-              })
-              .map((channel) => {
-                const isVoice = channel.type === DiscordChannelType.GUILD_VOICE || channel.type === DiscordChannelType.GUILD_STAGE_VOICE;
-                return (
-                  <div key={channel.id}>
-                    <DiscordChannelRow
-                      channel={channel}
-                      isActive={channel.id === channelId}
-                      joinedAtMs={joinedAtMs}
-                      rulesChannelId={rulesChannelId}
-                      guildName={guildName}
-                    />
-                    {isVoice && <VoiceChannelMembers guildId={channel.guild_id} channelId={channel.id} />}
-                  </div>
-                );
-              })}
-          </div>
-        )}
-
-        {/* Categorized channels */}
-        {categories.map((category) => (
-          <DiscordCategory
-            key={category.id}
-            category={category}
-            channels={guildChannels}
-            activeChannelId={channelId}
-            joinedAtMs={joinedAtMs}
-            rulesChannelId={rulesChannelId}
-            guildName={guildName}
-          />
-        ))}
+            return (
+              <div
+                key={virtualRow.key}
+                data-index={virtualRow.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                {item.type === 'category-header' && (
+                  <button
+                    type="button"
+                    className="mb-1 flex w-full items-center pt-4 text-gray-400 hover:text-gray-100"
+                    onClick={() => toggleCategory(item.category.id)}
+                  >
+                    <div className="flex w-6 items-center justify-center">
+                      {item.isCollapsed ? (
+                        <CaretRight className="size-2" />
+                      ) : (
+                        <CaretDown className="size-2" />
+                      )}
+                    </div>
+                    <span className="text-xs font-bold uppercase">{item.category.name}</span>
+                  </button>
+                )}
+                {item.type === 'channel' && (
+                  <DiscordChannelRow
+                    channel={item.channel}
+                    isActive={item.channel.id === channelId}
+                    joinedAtMs={joinedAtMs}
+                    rulesChannelId={rulesChannelId}
+                    guildName={guildName}
+                  />
+                )}
+                {item.type === 'voice-member' && (
+                  <VoiceMemberItem
+                    vs={item.vs}
+                    guildId={guildId}
+                    channelId={item.channelId}
+                    users={users}
+                    memberStore={memberStore}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 };
+
+const VoiceMemberItem = memo(({ vs, guildId, channelId, users, memberStore }) => {
+  const memberData = memberStore[vs.user_id];
+  const user = vs.member?.user || users[vs.user_id];
+  const displayName = vs.member?.nick || memberData?.nick || user?.global_name || user?.username || 'Unknown';
+  const avatarUrl = DiscordService.getUserAvatarUrl(vs.user_id, user?.avatar, 32);
+
+  const openProfile = useCallback(() => {
+    if (!user) return;
+    useModalStore.getState().push(DiscordUserProfileModal, {
+      author: user,
+      member: memberData || vs.member,
+      guildId,
+    });
+  }, [user, memberData, vs.member, guildId]);
+
+  return (
+    <VoiceMemberRow
+      vs={vs}
+      guildId={guildId}
+      channelId={channelId}
+      user={user}
+      memberData={memberData}
+      displayName={displayName}
+      avatarUrl={avatarUrl}
+      openProfile={openProfile}
+    />
+  );
+});
 
 export default DiscordGuildChannelsSidebar;
