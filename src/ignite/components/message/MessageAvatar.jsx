@@ -21,7 +21,7 @@ const MessageAvatar = ({ user, guildId }) => {
       <PopoverTrigger asChild>
         <button
           type="button"
-          onContextMenu={(e) => openContextMenu(GuildMemberContextMenu, { user, onViewProfile: handleViewProfile }, e)}
+          onContextMenu={(e) => openContextMenu(GuildMemberContextMenu, { user, guildId, onViewProfile: handleViewProfile }, e)}
         >
           <Avatar user={user} size={40} />
         </button>

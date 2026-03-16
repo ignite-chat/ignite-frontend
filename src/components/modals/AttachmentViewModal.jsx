@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { ArrowSquareOut, CopySimple, DownloadSimple, Image, Link, X } from '@phosphor-icons/react';
+import { ArrowSquareOut, DownloadSimple, X } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { useModalStore } from '@/store/modal.store';
 import { downloadImage, copyImageToClipboard } from '@/ignite/utils/image.utils';
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
+import AttachmentContextMenu from './AttachmentContextMenu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const AttachmentViewModal = ({ modalId, url, blobUrl: initialBlobUrl }) => {
@@ -72,35 +73,21 @@ const AttachmentViewModal = ({ modalId, url, blobUrl: initialBlobUrl }) => {
           </DialogPrimitive.Description>
 
           <div className="relative flex max-h-[90vh] max-w-[90vw] flex-col items-center gap-2">
-            <ContextMenu>
-              <ContextMenuTrigger asChild>
-                <img
-                  src={blobUrl || url}
-                  alt={filename}
-                  className="max-h-[85vh] max-w-[90vw] rounded object-contain"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </ContextMenuTrigger>
-              <ContextMenuContent>
-                <ContextMenuItem onClick={() => copyImageToClipboard(url)}>
-                  <CopySimple className="mr-2 size-4" />
-                  Copy Image
-                </ContextMenuItem>
-                <ContextMenuItem onClick={handleDownload}>
-                  <DownloadSimple className="mr-2 size-4" />
-                  Save Image
-                </ContextMenuItem>
-                <ContextMenuSeparator />
-                <ContextMenuItem onClick={handleCopyImageUrl}>
-                  <Link className="mr-2 size-4" />
-                  Copy Image URL
-                </ContextMenuItem>
-                <ContextMenuItem onClick={handleOpenOriginal}>
-                  <ArrowSquareOut className="mr-2 size-4" />
-                  Open in Browser
-                </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
+            <img
+              src={blobUrl || url}
+              alt={filename}
+              className="max-h-[85vh] max-w-[90vw] rounded object-contain"
+              onClick={(e) => e.stopPropagation()}
+              onContextMenu={(e) => {
+                useContextMenuStore.getState().open(AttachmentContextMenu, {
+                  url,
+                  onCopyImage: () => copyImageToClipboard(url),
+                  onDownload: handleDownload,
+                  onCopyUrl: handleCopyImageUrl,
+                  onOpenOriginal: handleOpenOriginal,
+                }, e);
+              }}
+            />
 
             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
               <Tooltip>

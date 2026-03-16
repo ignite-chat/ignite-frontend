@@ -59,7 +59,7 @@ const MessageHeader = ({ message }) => {
             type="button"
             className="font-semibold leading-none"
             style={{ color: authorColor }}
-            onContextMenu={(e) => openContextMenu(GuildMemberContextMenu, { user: message.author, onViewProfile: handleViewProfile }, e)}
+            onContextMenu={(e) => openContextMenu(GuildMemberContextMenu, { user: message.author, guildId, onViewProfile: handleViewProfile }, e)}
           >
             {message?.author.name} {message?.author.is_webhook && <Badge>Webhook</Badge>}{' '}
             {message?.author.is_bot && <Badge>Bot</Badge>}

@@ -47,7 +47,7 @@ const MentionText = ({ userId, isReply = false }) => {
           type="button"
           className={`inline cursor-pointer rounded px-1 font-medium transition-colors ${roleColor ? 'hover:brightness-110' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 hover:text-blue-300'}`}
           style={mentionStyle}
-          onContextMenu={(e) => openContextMenu(GuildMemberContextMenu, { user }, e)}
+          onContextMenu={(e) => openContextMenu(GuildMemberContextMenu, { user, guildId }, e)}
         >
           @{user.name}
         </button>

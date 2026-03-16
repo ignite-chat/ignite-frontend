@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
 import { useModalStore } from '@/store/modal.store';
 import { useDiscordMemberListStore } from '../store/discord-member-list.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
@@ -55,63 +55,60 @@ const MemberItem = ({ member: rawMember, guildId, ownerId, popoverOpen, setPopov
     });
   };
 
+  const handleContextMenu = (e) => {
+    useContextMenuStore.getState().open(DiscordUserContextMenu, {
+      author: user,
+      guildId,
+      onViewProfile: openProfile,
+    }, e);
+  };
+
   return (
-    <ContextMenu>
-      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-        <ContextMenuTrigger asChild>
-          <PopoverTrigger className="w-full text-left">
-            <div className={`flex items-center gap-2 rounded px-2 py-1 transition hover:bg-white/[0.06] ${status === 'offline' ? 'opacity-30' : ''}`}>
-              <div className="relative shrink-0">
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  className="size-8 rounded-full object-cover"
-                />
-                <DiscordStatusIndicator status={status} clientStatus={storeUser?.client_status} size="xs" borderColor="#1a1a1e" />
-              </div>
-              <div className="flex min-w-0 flex-1 items-center gap-1">
-                <span
-                  className="min-w-0 truncate text-sm font-medium text-gray-300"
-                  style={nameColor ? { color: nameColor } : undefined}
-                >
-                  {displayName}
-                </span>
-                {isOwner && <OwnerCrown />}
-                {isBot && (
-                  <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
-                    {isVerifiedBot && (
-                      <svg className="size-2.5" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
-                      </svg>
-                    )}
-                    APP
-                  </span>
+    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+      <PopoverTrigger className="w-full text-left" onContextMenu={handleContextMenu}>
+        <div className={`flex items-center gap-2 rounded px-2 py-1 transition hover:bg-white/[0.06] ${status === 'offline' ? 'opacity-30' : ''}`}>
+          <div className="relative shrink-0">
+            <img
+              src={avatarUrl}
+              alt=""
+              className="size-8 rounded-full object-cover"
+            />
+            <DiscordStatusIndicator status={status} clientStatus={storeUser?.client_status} size="xs" borderColor="#1a1a1e" />
+          </div>
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            <span
+              className="min-w-0 truncate text-sm font-medium text-gray-300"
+              style={nameColor ? { color: nameColor } : undefined}
+            >
+              {displayName}
+            </span>
+            {isOwner && <OwnerCrown />}
+            {isBot && (
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
+                {isVerifiedBot && (
+                  <svg className="size-2.5" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
+                  </svg>
                 )}
-              </div>
-            </div>
-          </PopoverTrigger>
-        </ContextMenuTrigger>
-        <PopoverContent
-          className="w-auto border-none bg-transparent p-0 shadow-none"
-          align="start"
-          side="left"
-          alignOffset={0}
-        >
-          <DiscordUserPopoverContent
-            author={user}
-            member={{ ...member, user }}
-            guildId={guildId}
-          />
-        </PopoverContent>
-      </Popover>
-      <ContextMenuContent className="w-48">
-        <DiscordUserContextMenu
+                APP
+              </span>
+            )}
+          </div>
+        </div>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-auto border-none bg-transparent p-0 shadow-none"
+        align="start"
+        side="left"
+        alignOffset={0}
+      >
+        <DiscordUserPopoverContent
           author={user}
+          member={{ ...member, user }}
           guildId={guildId}
-          onViewProfile={openProfile}
         />
-      </ContextMenuContent>
-    </ContextMenu>
+      </PopoverContent>
+    </Popover>
   );
 };
 

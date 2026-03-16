@@ -17,7 +17,6 @@ import {
 } from '@/components/ui/context-menu';
 import { useGuildsStore } from '../../store/guilds.store';
 import { useRolesStore } from '../../store/roles.store';
-import { useGuildContext } from '../../contexts/GuildContext';
 import { useModalStore } from '../../store/modal.store';
 import { RolesService } from '../../services/roles.service';
 import { Permissions } from '@/ignite/constants/Permissions';
@@ -29,12 +28,11 @@ const intToHex = (intColor) => {
   return `#${intColor.toString(16).padStart(6, '0')}`;
 };
 
-const GuildMemberContextMenu = ({ user, onViewProfile }) => {
+const GuildMemberContextMenu = ({ user, guildId, onViewProfile }) => {
   const currentUser = useUsersStore((s) => s.getCurrentUser());
   const navigate = useNavigate();
   const { friends, requests } = useFriendsStore();
   const { guildRoles } = useRolesStore();
-  const { guildId } = useGuildContext();
   const { guildMembers } = useGuildsStore();
 
   const availableRoles = useMemo(() => {

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback, memo } from 'react';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
 import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
 import { useDiscordStore } from '../store/discord.store';
@@ -967,9 +967,12 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
   return (
     <>
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <div className={messageClasses}>
+            <div
+              className={messageClasses}
+              onContextMenu={(e) => {
+                useContextMenuStore.getState().open(DiscordMessageContextMenu, { message, canDelete, guildId }, e);
+              }}
+            >
             {/* Hover action bar */}
             {!pending && (
               <div className="absolute -top-3.5 right-4 z-10 hidden items-center gap-0.5 rounded border border-white/10 bg-[#2b2d31] p-0.5 shadow-md group-hover:flex">
@@ -1017,50 +1020,40 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
               {shouldStack ? (
                 <div className="w-10" />
               ) : (
-                <ContextMenu>
-                  <PopoverTrigger asChild>
-                    <ContextMenuTrigger asChild>
-                      <button type="button" className="shrink-0 cursor-pointer">
-                        <DiscordAvatar author={message.author} className="size-10" />
-                      </button>
-                    </ContextMenuTrigger>
-                  </PopoverTrigger>
-                  <ContextMenuContent className="w-48">
-                    <DiscordUserContextMenu
-                      author={message.author}
-                      guildId={guildId}
-                      canKick={canKick}
-                      canBan={canBan}
-                      canManageNicknames={canManageNicknames}
-                      canTimeout={canTimeout}
-                      isOwnMessage={isOwnMessage}
-                      onViewProfile={openProfile}
-                    />
-                  </ContextMenuContent>
-                </ContextMenu>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="shrink-0 cursor-pointer"
+                    onContextMenu={(e) => {
+                      e.stopPropagation();
+                      useContextMenuStore.getState().open(DiscordUserContextMenu, {
+                        author: message.author,
+                        guildId,
+                        canKick, canBan, canManageNicknames, canTimeout, isOwnMessage,
+                        onViewProfile: openProfile,
+                      }, e);
+                    }}
+                  >
+                    <DiscordAvatar author={message.author} className="size-10" />
+                  </button>
+                </PopoverTrigger>
               )}
 
               <div className="flex flex-1 flex-col items-start justify-start overflow-hidden">
                 {!shouldStack && (
-                  <ContextMenu>
-                    <ContextMenuTrigger asChild>
-                      <div>
-                        <DiscordMessageHeader message={message} guildId={guildId} onClickName={openProfile} />
-                      </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent className="w-48">
-                      <DiscordUserContextMenu
-                        author={message.author}
-                        guildId={guildId}
-                        canKick={canKick}
-                        canBan={canBan}
-                        canManageNicknames={canManageNicknames}
-                        canTimeout={canTimeout}
-                        isOwnMessage={isOwnMessage}
-                        onViewProfile={openProfile}
-                      />
-                    </ContextMenuContent>
-                  </ContextMenu>
+                  <div
+                    onContextMenu={(e) => {
+                      e.stopPropagation();
+                      useContextMenuStore.getState().open(DiscordUserContextMenu, {
+                        author: message.author,
+                        guildId,
+                        canKick, canBan, canManageNicknames, canTimeout, isOwnMessage,
+                        onViewProfile: openProfile,
+                      }, e);
+                    }}
+                  >
+                    <DiscordMessageHeader message={message} guildId={guildId} onClickName={openProfile} />
+                  </div>
                 )}
 
                 <div className="select-text whitespace-pre-wrap break-words text-gray-400 [overflow-wrap:anywhere]">
@@ -1088,10 +1081,6 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
               </div>
             )}
           </div>
-          </ContextMenuTrigger>
-
-          <DiscordMessageContextMenu message={message} canDelete={canDelete} guildId={guildId} />
-        </ContextMenu>
 
         <PopoverContent
           className="w-auto border-none bg-transparent p-0 shadow-none"

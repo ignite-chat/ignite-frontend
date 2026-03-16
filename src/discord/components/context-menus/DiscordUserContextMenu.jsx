@@ -11,6 +11,7 @@ import {
   Timer,
 } from '@phosphor-icons/react';
 import {
+  ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
@@ -136,7 +137,7 @@ const DiscordUserContextMenu = ({
   };
 
   return (
-    <>
+    <ContextMenuContent className="w-48">
       <ContextMenuItem className="justify-between" onSelect={onViewProfile}>
         View Profile
         <User className="ml-auto size-[18px]" weight="fill" />
@@ -229,7 +230,7 @@ const DiscordUserContextMenu = ({
           ID
         </span>
       </ContextMenuItem>
-    </>
+    </ContextMenuContent>
   );
 };
 

@@ -39,7 +39,7 @@ const MemberListItem = ({ member, guildId, isOwner, popoverOpen, setPopoverOpen 
     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
       <PopoverTrigger
         className="w-full text-left"
-        onContextMenu={(e) => openContextMenu(GuildMemberContextMenu, { user: member.user, onViewProfile: handleViewProfile }, e)}
+        onContextMenu={(e) => openContextMenu(GuildMemberContextMenu, { user: member.user, guildId, onViewProfile: handleViewProfile }, e)}
       >
         <div className={`flex items-center gap-3 rounded-md p-2 transition hover:bg-gray-700/50 ${status === 'offline' ? 'opacity-40' : ''}`}>
           <div className="shrink-0">

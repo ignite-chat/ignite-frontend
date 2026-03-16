@@ -1,13 +1,8 @@
 import { useState } from 'react';
 import Avatar from '@/ignite/components/Avatar';
 import { useChannelsStore } from '@/ignite/store/channels.store';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-  ContextMenuSeparator,
-} from '@/components/ui/context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
+import DMChannelContextMenu from './DMChannelContextMenu';
 import {
   Dialog,
   DialogContent,
@@ -53,54 +48,34 @@ const DMChannelItem = ({
 
   return (
     <>
-    <ContextMenu>
-      <ContextMenuTrigger className="block w-full">
-        <DMRowBase
-          isActive={isActive}
-          isUnread={unreadState}
-          onClick={onClick}
-          onClose={onClose}
-        >
-          <div className="relative shrink-0">
-            <Avatar user={channel.user} size={32} showStatus showOffline />
-          </div>
+    <DMRowBase
+      isActive={isActive}
+      isUnread={unreadState}
+      onClick={onClick}
+      onClose={onClose}
+      onContextMenu={(e) => {
+        useContextMenuStore.getState().open(DMChannelContextMenu, {
+          channel,
+          onTogglePin: () => togglePin(channel.channel_id),
+          onShowDebugInfo: () => setShowDebugInfo(true),
+        }, e);
+      }}
+    >
+      <div className="relative shrink-0">
+        <Avatar user={channel.user} size={32} showStatus showOffline />
+      </div>
 
-          <div className="flex min-w-0 flex-1 items-center justify-between">
-            <span
-              className={`truncate ${unreadState ? 'font-bold text-gray-100' : 'font-medium'}`}
-            >
-              {channel.user.name}
-            </span>
-            {channel.isPinned && (
-              <PushPin size={12} weight="fill" className="rotate-45 text-gray-500" />
-            )}
-          </div>
-        </DMRowBase>
-      </ContextMenuTrigger>
-      <ContextMenuContent className="w-48">
-        <ContextMenuItem onSelect={() => togglePin(channel.channel_id)}>
-          <div className="flex w-full items-center justify-between">
-            {channel.isPinned ? 'Unpin' : 'Pin'}
-            <PushPin size={14} className={channel.isPinned ? '' : 'rotate-45'} />
-          </div>
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          className="justify-between"
-          onSelect={() => {
-            navigator.clipboard.writeText(channel.user.id);
-            toast.success('Copied User ID');
-          }}
+      <div className="flex min-w-0 flex-1 items-center justify-between">
+        <span
+          className={`truncate ${unreadState ? 'font-bold text-gray-100' : 'font-medium'}`}
         >
-          Copy User ID
-          <span className="ml-auto flex h-[18px] items-center rounded-[3px] bg-[#b5bac1] px-1 text-[10px] font-bold leading-none text-[#111214]">ID</span>
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onSelect={() => setShowDebugInfo(true)}>
-          Debug Info
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+          {channel.user.name}
+        </span>
+        {channel.isPinned && (
+          <PushPin size={12} weight="fill" className="rotate-45 text-gray-500" />
+        )}
+      </div>
+    </DMRowBase>
 
     <Dialog open={showDebugInfo} onOpenChange={setShowDebugInfo}>
       <DialogContent className="flex max-h-[80vh] flex-col sm:max-w-lg">

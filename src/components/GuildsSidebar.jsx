@@ -26,7 +26,7 @@ import {
   isChannelUnread as checkChannelUnread,
   getChannelMentionCount as getChannelMentions,
 } from '@/ignite/utils/unreads.utils';
-import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
 import GuildContextMenu from '@/ignite/components/context-menus/GuildContextMenu';
 import DiscordGuildContextMenu from '@/discord/components/context-menus/DiscordGuildContextMenu';
 import InviteModal from '@/ignite/components/modals/InviteModal';
@@ -125,31 +125,31 @@ const SortableGuildIcon = ({ guild, isActive, isUnread, mentionCount, isDragging
     zIndex: isDragging ? 0 : 'auto',
   };
 
+  const openContextMenu = (e) => {
+    useContextMenuStore.getState().open(GuildContextMenu, {
+      guild,
+      onLeave: () => onLeave(guild),
+      onInvite: () => onInvite(guild),
+    }, e);
+  };
+
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <Link
-            to={`/channels/${guild.id}${lastChannelId ? `/${lastChannelId}` : ''}`}
-            draggable="false"
-            style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
-          >
-            <SidebarIcon
-              guild={guild}
-              text={guild.name}
-              isServerIcon={true}
-              isActive={isActive}
-              isUnread={isUnread}
-              mentionCount={mentionCount}
-            />
-          </Link>
-        </ContextMenuTrigger>
-        <GuildContextMenu
+      <Link
+        to={`/channels/${guild.id}${lastChannelId ? `/${lastChannelId}` : ''}`}
+        draggable="false"
+        style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
+        onContextMenu={openContextMenu}
+      >
+        <SidebarIcon
           guild={guild}
-          onLeave={() => onLeave(guild)}
-          onInvite={() => onInvite(guild)}
+          text={guild.name}
+          isServerIcon={true}
+          isActive={isActive}
+          isUnread={isUnread}
+          mentionCount={mentionCount}
         />
-      </ContextMenu>
+      </Link>
     </div>
   );
 };
@@ -247,40 +247,39 @@ const DiscordGuildIcon = ({ guild, isActive }) => {
     </div>
   ) : null;
 
+  const openContextMenu = (e) => {
+    useContextMenuStore.getState().open(DiscordGuildContextMenu, { guild }, e);
+  };
+
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <Link to={`/discord/${guild.id}${lastChannelId ? `/${lastChannelId}` : ''}`} draggable="false">
-          <div className="relative">
-            <SidebarIcon
-              iconUrl={iconUrl || ''}
-              text={guildName}
-              isServerIcon={true}
-              isActive={isActive}
-              isUnread={unread}
-              mentionCount={mentions}
-              tooltipContent={tooltipContent}
-            />
-            {voiceBadge === 'active' && (
-              <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-[#248046] text-white shadow-md ring-2 ring-[#121214]">
-                <SpeakerSimpleHigh size={9} weight="fill" />
-              </div>
-            )}
-            {voiceBadge === 'screenshare' && (
-              <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-[#4e5058] text-white shadow-md ring-2 ring-[#121214]">
-                <Monitor size={9} weight="fill" />
-              </div>
-            )}
-            {voiceBadge === 'idle' && (
-              <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-[#4e5058] text-white shadow-md ring-2 ring-[#121214]">
-                <SpeakerSimpleHigh size={9} weight="fill" />
-              </div>
-            )}
+    <Link to={`/discord/${guild.id}${lastChannelId ? `/${lastChannelId}` : ''}`} draggable="false" onContextMenu={openContextMenu}>
+      <div className="relative">
+        <SidebarIcon
+          iconUrl={iconUrl || ''}
+          text={guildName}
+          isServerIcon={true}
+          isActive={isActive}
+          isUnread={unread}
+          mentionCount={mentions}
+          tooltipContent={tooltipContent}
+        />
+        {voiceBadge === 'active' && (
+          <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-[#248046] text-white shadow-md ring-2 ring-[#121214]">
+            <SpeakerSimpleHigh size={9} weight="fill" />
           </div>
-        </Link>
-      </ContextMenuTrigger>
-      <DiscordGuildContextMenu guild={guild} />
-    </ContextMenu>
+        )}
+        {voiceBadge === 'screenshare' && (
+          <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-[#4e5058] text-white shadow-md ring-2 ring-[#121214]">
+            <Monitor size={9} weight="fill" />
+          </div>
+        )}
+        {voiceBadge === 'idle' && (
+          <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-[#4e5058] text-white shadow-md ring-2 ring-[#121214]">
+            <SpeakerSimpleHigh size={9} weight="fill" />
+          </div>
+        )}
+      </div>
+    </Link>
   );
 };
 

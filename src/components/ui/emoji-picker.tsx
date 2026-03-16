@@ -13,16 +13,10 @@ import {
   Flag,
 } from 'lucide-react';
 import * as React from 'react';
-import { toast } from 'sonner';
-
 import { cn } from '../../lib/utils';
 import { getTwemojiUrl } from '../../utils/emoji.utils';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from './context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
+import EmojiContextMenu from './EmojiContextMenu';
 
 function EmojiPicker({
   className,
@@ -258,35 +252,16 @@ function EmojiPickerContent({
                     })
                   }
                 >
-                  <ContextMenu>
-                    <ContextMenuTrigger asChild>
-                      <img
-                        src={emoji.url || getTwemojiUrl(emoji.surrogates || '')}
-                        alt={emoji.label}
-                        className="size-6 object-contain"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </ContextMenuTrigger>
-                    {emoji.isCustom && (
-                      <ContextMenuContent className="w-48">
-                        <ContextMenuItem 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            /* backend needed */
-                            // We use the ID stored in the recent emoji object
-                            const id = emoji.id;
-                            if (id) {
-                              navigator.clipboard.writeText(id);
-                              toast.success('Emoji ID copied to clipboard');
-                            }
-                          }}
-                        >
-                          Copy Emoji ID
-                        </ContextMenuItem>
-                      </ContextMenuContent>
-                    )}
-                  </ContextMenu>
+                  <img
+                    src={emoji.url || getTwemojiUrl(emoji.surrogates || '')}
+                    alt={emoji.label}
+                    className="size-6 object-contain"
+                    loading="lazy"
+                    decoding="async"
+                    onContextMenu={emoji.isCustom ? (e: React.MouseEvent) => {
+                      useContextMenuStore.getState().open(EmojiContextMenu, { emojiId: emoji.id }, e);
+                    } : undefined}
+                  />
                 </button>
               ))}
             </div>
@@ -324,28 +299,16 @@ function EmojiPickerContent({
                     onHoverEmojiChange?.({ label: emoji.name, url: emoji.url, isCustom: true })
                   }
                 >
-                  <ContextMenu>
-                    <ContextMenuTrigger asChild>
-                      <img
-                        src={emoji.url}
-                        alt={emoji.name}
-                        className="size-6 object-contain"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </ContextMenuTrigger>
-                    <ContextMenuContent className="w-48">
-                      <ContextMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigator.clipboard.writeText(emoji.id);
-                          toast.success('Emoji ID copied to clipboard');
-                        }}
-                      >
-                        Copy Emoji ID
-                      </ContextMenuItem>
-                    </ContextMenuContent>
-                  </ContextMenu>
+                  <img
+                    src={emoji.url}
+                    alt={emoji.name}
+                    className="size-6 object-contain"
+                    loading="lazy"
+                    decoding="async"
+                    onContextMenu={(e: React.MouseEvent) => {
+                      useContextMenuStore.getState().open(EmojiContextMenu, { emojiId: emoji.id }, e);
+                    }}
+                  />
                 </button>
               ))}
             </div>

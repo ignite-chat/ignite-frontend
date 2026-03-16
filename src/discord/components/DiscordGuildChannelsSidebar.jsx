@@ -21,7 +21,7 @@ import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useModalStore } from '@/store/modal.store';
 import DiscordUserProfileModal from './DiscordUserProfileModal';
 import DiscordUserContextMenu from './context-menus/DiscordUserContextMenu';
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { openAttachmentViewModal } from '@/components/modals/AttachmentViewModal';
@@ -132,43 +132,41 @@ const VoiceMemberRow = memo(({ vs, guildId, channelId, user, memberData, display
     clearInterval(intervalRef.current);
   }, []);
 
+  const handleContextMenu = (e) => {
+    useContextMenuStore.getState().open(DiscordUserContextMenu, {
+      author: user || { id: vs.user_id, username: displayName },
+      guildId,
+      onViewProfile: openProfile,
+    }, e);
+  };
+
   return (
     <Popover open={!!vs.self_stream && hovered}>
-      <ContextMenu>
-        <PopoverTrigger asChild>
-          <ContextMenuTrigger asChild>
-            <div
-              onClick={openProfile}
-              onMouseEnter={enterHover}
-              onMouseLeave={leaveHover}
-              className="ml-8 mr-2 flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-gray-500 font-medium outline-none hover:bg-white/5 hover:text-white"
-            >
-              <img src={avatarUrl} alt="" className={`size-6 rounded-full ${isSpeaking ? 'ring-2 ring-green-500' : ''}`} />
-              <span className="flex-1 truncate text-[13px]">{displayName}</span>
-              <span className="flex items-center gap-1.5">
-                {vs.self_video && <VoiceStatusIcon icon={VideoCamera} color="text-gray-500" label="Video" />}
-                {vs.suppress && <VoiceStatusIcon icon={MicrophoneSlash} color="text-red-500" label="Suppressed" />}
-                {vs.self_mute && !vs.mute && <VoiceStatusIcon icon={MicrophoneSlash} color="text-gray-500" label="Muted" />}
-                {vs.mute && <VoiceStatusIcon icon={MicrophoneSlash} color="text-red-500" label="Server Muted" />}
-                {vs.self_deaf && !vs.deaf && <VoiceStatusIcon icon={SpeakerSlash} color="text-gray-500" label="Deafened" />}
-                {vs.deaf && <VoiceStatusIcon icon={SpeakerSlash} color="text-red-500" label="Server Deafened" />}
-                {vs.self_stream && (
-                  <span className="rounded bg-[#ed4245] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                    LIVE
-                  </span>
-                )}
+      <PopoverTrigger asChild>
+        <div
+          onClick={openProfile}
+          onContextMenu={handleContextMenu}
+          onMouseEnter={enterHover}
+          onMouseLeave={leaveHover}
+          className="ml-8 mr-2 flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-gray-500 font-medium outline-none hover:bg-white/5 hover:text-white"
+        >
+          <img src={avatarUrl} alt="" className={`size-6 rounded-full ${isSpeaking ? 'ring-2 ring-green-500' : ''}`} />
+          <span className="flex-1 truncate text-[13px]">{displayName}</span>
+          <span className="flex items-center gap-1.5">
+            {vs.self_video && <VoiceStatusIcon icon={VideoCamera} color="text-gray-500" label="Video" />}
+            {vs.suppress && <VoiceStatusIcon icon={MicrophoneSlash} color="text-red-500" label="Suppressed" />}
+            {vs.self_mute && !vs.mute && <VoiceStatusIcon icon={MicrophoneSlash} color="text-gray-500" label="Muted" />}
+            {vs.mute && <VoiceStatusIcon icon={MicrophoneSlash} color="text-red-500" label="Server Muted" />}
+            {vs.self_deaf && !vs.deaf && <VoiceStatusIcon icon={SpeakerSlash} color="text-gray-500" label="Deafened" />}
+            {vs.deaf && <VoiceStatusIcon icon={SpeakerSlash} color="text-red-500" label="Server Deafened" />}
+            {vs.self_stream && (
+              <span className="rounded bg-[#ed4245] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                LIVE
               </span>
-            </div>
-          </ContextMenuTrigger>
-        </PopoverTrigger>
-        <ContextMenuContent className="w-48">
-          <DiscordUserContextMenu
-            author={user || { id: vs.user_id, username: displayName }}
-            guildId={guildId}
-            onViewProfile={openProfile}
-          />
-        </ContextMenuContent>
-      </ContextMenu>
+            )}
+          </span>
+        </div>
+      </PopoverTrigger>
       {vs.self_stream && (
         <PopoverContent
           side="right"

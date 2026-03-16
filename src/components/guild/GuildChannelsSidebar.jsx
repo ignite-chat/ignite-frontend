@@ -20,13 +20,9 @@ import {
 } from '@dnd-kit/sortable';
 
 import api from '@/api';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu';
+import { useContextMenuStore } from '@/store/context-menu.store';
+import CategoryContextMenu from '@/ignite/components/context-menus/CategoryContextMenu';
+import GuildSidebarContextMenu from '@/ignite/components/context-menus/GuildSidebarContextMenu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -163,56 +159,41 @@ const GuildSidebarCategory = ({
   return (
     <div className="flex w-full flex-col">
       {category && (
-        <ContextMenu>
-          <ContextMenuTrigger>
-            <div
-              ref={setNodeRef}
-              className={`mb-1 flex items-center pt-4 transition-colors duration-150 ${
-                isDropTarget
-                  ? 'rounded bg-gray-700/60 text-gray-100'
-                  : 'text-gray-400 hover:text-gray-100'
-              }`}
-            >
-              <button
-                type="button"
-                className="flex flex-auto items-center"
-                onClick={() => setExpanded(!expanded)}
-                aria-expanded={expanded}
-              >
-                <div className="flex w-6 items-center justify-center">
-                  {expanded ? <CaretDown className="size-2" /> : <CaretRight className="size-2" />}
-                </div>
-                <span className="text-xs font-bold uppercase">{sectionName}</span>
-              </button>
-
-              {canManageChannels && (
-                <button type="button" onClick={openCreateChannelDialog} aria-label="Create channel">
-                  <Plus className="mr-2 size-3 text-gray-400" />
-                </button>
-              )}
+        <div
+          ref={setNodeRef}
+          className={`mb-1 flex items-center pt-4 transition-colors duration-150 ${
+            isDropTarget
+              ? 'rounded bg-gray-700/60 text-gray-100'
+              : 'text-gray-400 hover:text-gray-100'
+          }`}
+          onContextMenu={(e) => {
+            useContextMenuStore.getState().open(CategoryContextMenu, {
+              anyChannelUnread,
+              canManageChannels,
+              onMarkAsRead: markChannelsAsRead,
+              onEditCategory: () => onEditChannel?.(category),
+              onDeleteCategory: () => handleDeleteChannel(category),
+            }, e);
+          }}
+        >
+          <button
+            type="button"
+            className="flex flex-auto items-center"
+            onClick={() => setExpanded(!expanded)}
+            aria-expanded={expanded}
+          >
+            <div className="flex w-6 items-center justify-center">
+              {expanded ? <CaretDown className="size-2" /> : <CaretRight className="size-2" />}
             </div>
-          </ContextMenuTrigger>
-          <ContextMenuContent className="w-52">
-            <ContextMenuItem disabled={!anyChannelUnread} onSelect={markChannelsAsRead}>
-              Mark as Read
-            </ContextMenuItem>
+            <span className="text-xs font-bold uppercase">{sectionName}</span>
+          </button>
 
-            {canManageChannels && (
-              <>
-                <ContextMenuSeparator />
-                <ContextMenuItem onSelect={() => onEditChannel?.(category)}>
-                  Edit Category
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onSelect={() => handleDeleteChannel(category)}
-                  className="text-red-500 hover:bg-red-600/20"
-                >
-                  Delete Category
-                </ContextMenuItem>
-              </>
-            )}
-          </ContextMenuContent>
-        </ContextMenu>
+          {canManageChannels && (
+            <button type="button" onClick={openCreateChannelDialog} aria-label="Create channel">
+              <Plus className="mr-2 size-3 text-gray-400" />
+            </button>
+          )}
+        </div>
       )}
 
       {/* Drop indicator when dropping directly on category header */}
@@ -495,65 +476,62 @@ const GuildChannelsSidebar = ({
       onDragCancel={handleDragCancel}
       modifiers={[restrictToVerticalAxis]}
     >
-      <ContextMenu>
-        <ContextMenuTrigger>
-          <div className="relative top-0 flex h-full w-80 flex-col bg-[#121214] text-gray-100 select-none">
-            <div className="scrollbar-hover flex min-h-0 flex-1 flex-col items-center overflow-y-auto pb-36" ref={sidebarRef} onScroll={onSidebarScroll}>
-              <GuildSidebarHeader
-                guildName={guild?.name}
-                guild={guild}
-                onOpenServerSettings={onOpenServerSettings}
-                canOpenServerSettings={canOpenServerSettings}
-                onCreateChannel={onCreateChannel}
-                onCreateCategory={onCreateCategory}
-              />
-              <hr className="m-0 w-full border border-t-0 border-white/5 bg-[#121214] p-0" />
+      <div
+        className="relative top-0 flex h-full w-80 flex-col bg-[#121214] text-gray-100 select-none"
+        onContextMenu={(e) => {
+          useContextMenuStore.getState().open(GuildSidebarContextMenu, {
+            canManageChannels,
+            onCreateChannel: () => onCreateChannel(null),
+            onCreateCategory: () => onCreateCategory(),
+          }, e);
+        }}
+      >
+        <div className="scrollbar-hover flex min-h-0 flex-1 flex-col items-center overflow-y-auto pb-36" ref={sidebarRef} onScroll={onSidebarScroll}>
+          <GuildSidebarHeader
+            guildName={guild?.name}
+            guild={guild}
+            onOpenServerSettings={onOpenServerSettings}
+            canOpenServerSettings={canOpenServerSettings}
+            onCreateChannel={onCreateChannel}
+            onCreateCategory={onCreateCategory}
+          />
+          <hr className="m-0 w-full border border-t-0 border-white/5 bg-[#121214] p-0" />
 
-              {/* Root Channels (No Category) */}
-              <GuildSidebarCategory
-                category={null}
-                channels={guildChannels}
-                activeChannelId={channelId}
-                openCreateChannelDialog={() => onCreateChannel(null)}
-                guild={guild}
-                onEditChannel={onEditChannel}
-                canManageChannels={canManageChannels}
-                isDropTarget={dropTargetCategoryId === null && !!activeId}
-                globalIsDragging={!!activeId}
-                overId={overId}
-                activeId={activeId}
-                dropPosition={dropPosition}
-              />
+          {/* Root Channels (No Category) */}
+          <GuildSidebarCategory
+            category={null}
+            channels={guildChannels}
+            activeChannelId={channelId}
+            openCreateChannelDialog={() => onCreateChannel(null)}
+            guild={guild}
+            onEditChannel={onEditChannel}
+            canManageChannels={canManageChannels}
+            isDropTarget={dropTargetCategoryId === null && !!activeId}
+            globalIsDragging={!!activeId}
+            overId={overId}
+            activeId={activeId}
+            dropPosition={dropPosition}
+          />
 
-              {categories.map((category) => (
-                <GuildSidebarCategory
-                  key={category.channel_id || category.id}
-                  category={category}
-                  channels={guildChannels}
-                  activeChannelId={channelId}
-                  openCreateChannelDialog={() => onCreateChannel(category.channel_id)}
-                  guild={guild}
-                  onEditChannel={onEditChannel}
-                  canManageChannels={canManageChannels}
-                  isDropTarget={dropTargetCategoryId === category.channel_id}
-                  globalIsDragging={!!activeId}
-                  overId={overId}
-                  activeId={activeId}
-                  dropPosition={dropPosition}
-                />
-              ))}
-            </div>
-          </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-52">
-          {canManageChannels && (
-            <ContextMenuItem onSelect={() => onCreateChannel(null)}>Create Channel</ContextMenuItem>
-          )}
-          {canManageChannels && (
-            <ContextMenuItem onSelect={() => onCreateCategory()}>Create Category</ContextMenuItem>
-          )}
-        </ContextMenuContent>
-      </ContextMenu>
+          {categories.map((category) => (
+            <GuildSidebarCategory
+              key={category.channel_id || category.id}
+              category={category}
+              channels={guildChannels}
+              activeChannelId={channelId}
+              openCreateChannelDialog={() => onCreateChannel(category.channel_id)}
+              guild={guild}
+              onEditChannel={onEditChannel}
+              canManageChannels={canManageChannels}
+              isDropTarget={dropTargetCategoryId === category.channel_id}
+              globalIsDragging={!!activeId}
+              overId={overId}
+              activeId={activeId}
+              dropPosition={dropPosition}
+            />
+          ))}
+        </div>
+      </div>
 
       <DragOverlay dropAnimation={null}>
         {activeId ? (() => {
