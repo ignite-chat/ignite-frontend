@@ -2,12 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useSortable } from '@dnd-kit/sortable';
-import {
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-} from '@/components/ui/context-menu';
 import { useContextMenuStore } from '@/store/context-menu.store';
+import ChannelItemContextMenu from '../context-menus/ChannelItemContextMenu';
 import {
   Dialog,
   DialogContent,
@@ -125,59 +121,24 @@ const ChannelItem = ({
     );
   };
 
-  const openContextMenu = useContextMenuStore((s) => s.open);
-
-  const ChannelItemMenu = () => (
-    <ContextMenuContent className="w-52">
-      {!isVoice && (
-        <ContextMenuItem disabled={!isUnread} onSelect={handleMarkAsRead}>
-          Mark as Read
-        </ContextMenuItem>
-      )}
-      {!isVoice && <ContextMenuSeparator />}
-      {isVoice ? (
-        <ContextMenuItem
-          onSelect={() => {
-            handleVoiceClick();
-            navigate(`/channels/${channel.guild_id}/${channel.channel_id}`);
-          }}
-        >
-          Join Voice Channel
-        </ContextMenuItem>
-      ) : (
-        <ContextMenuItem
-          onSelect={() => navigate(`/channels/${channel.guild_id}/${channel.channel_id}`)}
-        >
-          Go to Channel
-        </ContextMenuItem>
-      )}
-      <ContextMenuItem onSelect={handleCopyLink}>Copy Link</ContextMenuItem>
-
-      {canManageChannels && (
-        <>
-          <ContextMenuSeparator />
-          <ContextMenuItem onSelect={() => onEditChannel?.(channel)}>
-            Edit Channel
-          </ContextMenuItem>
-          <ContextMenuItem
-            onSelect={() => handleDeleteChannel(channel)}
-            className="text-red-500 hover:bg-red-600/20"
-          >
-            Delete Channel
-          </ContextMenuItem>
-        </>
-      )}
-
-      <ContextMenuSeparator />
-      <ContextMenuItem onSelect={handleCopyId}>Copy Channel ID</ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => setShowDebugInfo(true)}>
-        Debug Info
-      </ContextMenuItem>
-    </ContextMenuContent>
-  );
-
-  const handleContextMenu = (e) => openContextMenu(ChannelItemMenu, {}, e);
+  const handleContextMenu = (e) => {
+    useContextMenuStore.getState().open(ChannelItemContextMenu, {
+      isVoice,
+      isUnread,
+      canManageChannels,
+      onMarkAsRead: handleMarkAsRead,
+      onJoinVoice: () => {
+        handleVoiceClick();
+        navigate(`/channels/${channel.guild_id}/${channel.channel_id}`);
+      },
+      onGoToChannel: () => navigate(`/channels/${channel.guild_id}/${channel.channel_id}`),
+      onCopyLink: handleCopyLink,
+      onEditChannel: () => onEditChannel?.(channel),
+      onDeleteChannel: () => handleDeleteChannel(channel),
+      onCopyId: handleCopyId,
+      onDebugInfo: () => setShowDebugInfo(true),
+    }, e);
+  };
 
   return (
     <>

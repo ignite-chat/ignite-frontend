@@ -7,12 +7,8 @@ import Avatar from '@/ignite/components/Avatar';
 import { ChannelsService } from '@/ignite/services/channels.service';
 import RemoveFriendModal from '@/ignite/components/modals/RemoveFriendModal';
 import { useChannelsStore } from '@/ignite/store/channels.store';
-import {
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-} from '@/components/ui/context-menu';
 import { useContextMenuStore } from '@/store/context-menu.store';
+import FriendContextMenu from '@/ignite/components/context-menus/FriendContextMenu';
 import UserProfileModal from '@/ignite/components/modals/UserProfileModal';
 import { useModalStore } from '@/ignite/store/modal.store';
 import { useUsersStore } from '@/ignite/store/users.store';
@@ -89,35 +85,17 @@ const FriendRow = ({ friend }: FriendRowProps) => {
     toast.success('User ID copied to clipboard.');
   };
 
-  const openContextMenu = useContextMenuStore((s) => s.open);
-
-  const FriendRowMenu = () => (
-    <ContextMenuContent className="w-52">
-      <ContextMenuItem onSelect={() => useModalStore.getState().push(UserProfileModal, { userId: friend.id })}>
-        View Profile
-      </ContextMenuItem>
-      <ContextMenuItem onSelect={messageUser}>
-        Message
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem className="justify-between" onSelect={handleCopyUserId}>
-        Copy User ID
-        <span className="ml-auto flex h-[18px] items-center rounded-[3px] bg-[#b5bac1] px-1 text-[10px] font-bold leading-none text-[#111214]">ID</span>
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem
-        onSelect={deleteFriend}
-        className="text-red-500 hover:bg-red-600/20"
-      >
-        Remove Friend
-      </ContextMenuItem>
-    </ContextMenuContent>
-  );
-
   return (
     <div
       onClick={messageUser}
-      onContextMenu={(e) => openContextMenu(FriendRowMenu, {}, e)}
+      onContextMenu={(e) => {
+        useContextMenuStore.getState().open(FriendContextMenu, {
+          onViewProfile: () => useModalStore.getState().push(UserProfileModal, { userId: friend.id }),
+          onMessage: messageUser,
+          onCopyUserId: handleCopyUserId,
+          onRemoveFriend: deleteFriend,
+        }, e);
+      }}
       className="group flex cursor-pointer items-center justify-between px-2 py-3 hover:rounded-lg hover:bg-gray-600/30"
     >
       <div className="flex items-center gap-3">

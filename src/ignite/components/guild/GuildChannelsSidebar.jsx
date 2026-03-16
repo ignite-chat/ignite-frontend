@@ -20,12 +20,9 @@ import {
 } from '@dnd-kit/sortable';
 
 import api from '@/ignite/api';
-import {
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-} from '@/components/ui/context-menu';
 import { useContextMenuStore } from '@/store/context-menu.store';
+import CategoryContextMenu from '../context-menus/CategoryContextMenu';
+import GuildSidebarContextMenu from '../context-menus/GuildSidebarContextMenu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -159,31 +156,6 @@ const GuildSidebarCategory = ({
     return sortedChannels.some(isChannelUnread);
   }, [sortedChannels, isChannelUnread]);
 
-  const openContextMenu = useContextMenuStore((s) => s.open);
-
-  const CategoryMenu = () => (
-    <ContextMenuContent className="w-52">
-      <ContextMenuItem disabled={!anyChannelUnread} onSelect={markChannelsAsRead}>
-        Mark as Read
-      </ContextMenuItem>
-
-      {canManageChannels && (
-        <>
-          <ContextMenuSeparator />
-          <ContextMenuItem onSelect={() => onEditChannel?.(category)}>
-            Edit Category
-          </ContextMenuItem>
-          <ContextMenuItem
-            onSelect={() => handleDeleteChannel(category)}
-            className="text-red-500 hover:bg-red-600/20"
-          >
-            Delete Category
-          </ContextMenuItem>
-        </>
-      )}
-    </ContextMenuContent>
-  );
-
   return (
     <div className="flex w-full flex-col">
       {category && (
@@ -194,7 +166,15 @@ const GuildSidebarCategory = ({
               ? 'rounded bg-gray-700/60 text-gray-100'
               : 'text-gray-400 hover:text-gray-100'
           }`}
-          onContextMenu={(e) => openContextMenu(CategoryMenu, {}, e)}
+          onContextMenu={(e) => {
+            useContextMenuStore.getState().open(CategoryContextMenu, {
+              anyChannelUnread,
+              canManageChannels,
+              onMarkAsRead: markChannelsAsRead,
+              onEditCategory: () => onEditChannel?.(category),
+              onDeleteCategory: () => handleDeleteChannel(category),
+            }, e);
+          }}
         >
           <button
             type="button"
@@ -484,15 +464,6 @@ const GuildChannelsSidebar = ({
     }
   };
 
-  const openContextMenu = useContextMenuStore((s) => s.open);
-
-  const SidebarMenu = () => (
-    <ContextMenuContent className="w-52">
-      <ContextMenuItem onSelect={() => onCreateChannel(null)}>Create Channel</ContextMenuItem>
-      <ContextMenuItem onSelect={() => onCreateCategory()}>Create Category</ContextMenuItem>
-    </ContextMenuContent>
-  );
-
   return (
     <DndContext
       sensors={sensors}
@@ -507,7 +478,11 @@ const GuildChannelsSidebar = ({
         className="relative top-0 flex h-full w-full flex-col bg-[#121214] text-gray-100 select-none"
         onContextMenu={(e) => {
           if (canManageChannels) {
-            openContextMenu(SidebarMenu, {}, e);
+            useContextMenuStore.getState().open(GuildSidebarContextMenu, {
+              canManageChannels,
+              onCreateChannel: () => onCreateChannel(null),
+              onCreateCategory: () => onCreateCategory(),
+            }, e);
           }
         }}
       >

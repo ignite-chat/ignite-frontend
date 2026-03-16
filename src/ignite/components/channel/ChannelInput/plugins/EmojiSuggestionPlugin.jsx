@@ -8,12 +8,8 @@ import { $createTextNode, $getSelection, $isRangeSelection } from 'lexical';
 import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { emojiMap, getTwemojiUrl } from '@/utils/emoji.utils';
-import {
-  ContextMenuContent,
-  ContextMenuItem,
-} from '@/components/ui/context-menu';
 import { useContextMenuStore } from '@/store/context-menu.store';
-import { toast } from 'sonner';
+import EmojiContextMenu from '@/components/ui/EmojiContextMenu';
 
 const SUGGESTIONS_LIMIT = 10;
 
@@ -153,25 +149,7 @@ export default function EmojiSuggestionPlugin({ guildEmojis, guildId, menuContai
                     className="flex w-full cursor-default items-center gap-3"
                     onContextMenu={(e) => {
                       if (option.custom) {
-                        useContextMenuStore.getState().open(
-                          () => (
-                            <ContextMenuContent className="w-48">
-                              <ContextMenuItem
-                                onClick={(ev) => {
-                                  ev.stopPropagation();
-                                  if (option.id) {
-                                    navigator.clipboard.writeText(option.id);
-                                    toast.success('Emoji ID copied to clipboard');
-                                  }
-                                }}
-                              >
-                                Copy Emoji ID
-                              </ContextMenuItem>
-                            </ContextMenuContent>
-                          ),
-                          {},
-                          e
-                        );
+                        useContextMenuStore.getState().open(EmojiContextMenu, { emojiId: option.id }, e);
                       }
                     }}
                   >
