@@ -26,6 +26,7 @@
     "@lexical/react": "^0.39.0",
     "@livekit/components-react": "^2.9.19",
     "@livekit/components-styles": "^1.2.0",
+    "@noble/curves": "^2.0.1",
     "@phosphor-icons/react": "^2.1.7",
     "@radix-ui/react-context-menu": "^2.2.16",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -70,6 +71,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
+    "ts-mls": "^1.6.2",
     "zustand": "^4.5.4"
   },
   "devDependencies": {

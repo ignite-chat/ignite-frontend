@@ -1269,7 +1269,7 @@ export class DaveSession {
       //    epoch+1 and the tree hash AFTER merging UpdatePath public keys.
       let commitSecret = new Uint8Array(32);
       if (commit.updatePath && senderType === 1) {
-        // Apply UpdatePath to tree first (blanks sender path, sets new leaf,
+        // Apply UpdatePath to tree (blanks sender path, sets new leaf,
         // places parent node public keys, computes parent_hash chain)
         await this._applyUpdatePath(commit.updatePath, senderLeafIndex);
 
@@ -1285,14 +1285,17 @@ export class DaveSession {
           baseConfirmedTranscriptHash || new Uint8Array(32),
           this.groupExtensions,
         );
+
         console.log('[DAVE] Provisional GC: epoch=' + (baseEpoch + 1) +
           ', provTreeHash=' + hex(provTreeHash.subarray(0, 8)) + '...' +
           ', gcBytes=' + provisionalGroupContext.length + 'B');
+
 
         // Decrypt path secret using the provisional GroupContext as HPKE info
         const pathSecret = await this._decryptPathSecret(
           commit.updatePath, senderLeafIndex, provisionalGroupContext,
         );
+
         if (pathSecret) {
           commitSecret = await this._deriveCommitSecret(pathSecret, senderLeafIndex);
           console.log('[DAVE] Derived commit_secret from UpdatePath:', hex(commitSecret.subarray(0, 8)) + '...');
@@ -1749,6 +1752,14 @@ export class DaveSession {
       const resolution = treeResolution(this.tree, copathNode, numLeaves);
       const upNode = updatePath.nodes[i];
 
+      // Log all node/EPS details for debugging multi-node UpdatePaths
+      if (updatePath.nodes.length > 1) {
+        console.log('[DAVE] _decryptPathSecret: node[' + i + '] filteredDP=' + filteredDP[i] +
+          ', copathNode=' + copathNode + ', resolution=[' + resolution.join(',') +
+          '], eps=' + upNode.encryptedPathSecrets.length +
+          ', encKeyLen=' + upNode.encryptionKey.length);
+      }
+
       // Find our leaf in this resolution
       const myResPos = resolution.indexOf(myNodeIdx);
       if (myResPos < 0) continue; // we're not in this subtree
@@ -1789,12 +1800,23 @@ export class DaveSession {
         this._lastFilteredDPLength = filteredDP.length;
         return pathSecret;
       } catch (err) {
-        console.log('[DAVE] HPKE decrypt failed at filteredDP[' + i + ']:', err);
-        console.log('[DAVE]   groupContext hash:', hex(new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(preGroupContext))).subarray(0, 8)));
-        console.log('[DAVE]   ourPubKey:', hex(this.encryptionPublicRaw!.subarray(0, 8)) + '...');
-        if (treeKey) console.log('[DAVE]   treeKey:', hex(treeKey.subarray(0, 8)) + '...');
-        console.log('[DAVE]   kemOutput:', hex(eps.kemOutput.subarray(0, 8)) + '...');
-        console.log('[DAVE]   ciphertext:', hex(eps.ciphertext.subarray(0, 8)) + '...');
+        console.log('[DAVE] HPKE decrypt failed at filteredDP[' + i + '] pos=' + myResPos);
+        // Try ALL other positions to check if the issue is resolution mismatch
+        for (let tryPos = 0; tryPos < upNode.encryptedPathSecrets.length; tryPos++) {
+          if (tryPos === myResPos) continue;
+          try {
+            const tryEps = upNode.encryptedPathSecrets[tryPos];
+            const trySecret = await hpkeBaseOpen(
+              tryEps.kemOutput, this.encryptionKeyPair.privateKey,
+              this.encryptionPublicRaw!, hpkeInfo, new Uint8Array(0),
+              tryEps.ciphertext, 'TryPos[' + tryPos + ']',
+            );
+            console.log('[DAVE] *** POSITION MISMATCH: succeeded at pos=' + tryPos + ' instead of ' + myResPos + ', pathSecret=' + trySecret.length + 'B');
+            this._lastFilteredOverlapIndex = i;
+            this._lastFilteredDPLength = filteredDP.length;
+            return trySecret;
+          } catch { /* continue trying */ }
+        }
         continue;
       }
     }
@@ -1882,14 +1904,21 @@ export class DaveSession {
       '], updatePath.nodes=' + updatePath.nodes.length);
 
     // 1. Compute original sibling tree hashes BEFORE modifying the tree.
+    //    The sibling hash must use the UNCLAMPED right child to match the
+    //    full binary tree used by computeTreeHash (which uses treeRightUnclamped).
+    //    For power-of-2 trees this is the same as treeSibling, but for
+    //    non-power-of-2 trees (e.g. 12 leaves), clamped vs unclamped differ.
     const fullPath = [senderNodeIdx, ...senderDP];
     const originalSiblingHashes: Uint8Array[] = [];
     for (let fi = 0; fi < fullPath.length; fi++) {
       if (fi === fullPath.length - 1) {
-        // Root has no sibling — push a placeholder
         originalSiblingHashes.push(new Uint8Array(0));
       } else {
-        const sib = treeSibling(fullPath[fi], numLeaves);
+        // The parent of fullPath[fi] is fullPath[fi+1].
+        // The sibling is the OTHER child of fullPath[fi+1] (unclamped).
+        const parent = fullPath[fi + 1];
+        const leftChild = treeLeft(parent);
+        const sib = (fullPath[fi] === leftChild) ? treeRightUnclamped(parent) : leftChild;
         const sibHash = await computeTreeHash(this.tree, sib);
         originalSiblingHashes.push(sibHash);
       }
@@ -1924,21 +1953,17 @@ export class DaveSession {
         publicKey: pubKey,
         parentHash: new Uint8Array(0),
         unmergedLeaves: [],
-        rawBytes: new Uint8Array(0), // placeholder, computed below
+        rawBytes: new Uint8Array(0),
       };
     }
 
     // 5. Compute parent_hash chain from root down to leaf (RFC 9420 Section 7.9).
-    //    Only non-blank nodes get parent_hash values.
-    //    Root has no parent, so root's parent_hash = empty.
     const parentHashes: Uint8Array[] = new Array(fullPath.length);
     parentHashes[fullPath.length - 1] = new Uint8Array(0); // root
-
     for (let i = fullPath.length - 2; i >= 0; i--) {
       const parentIdx = fullPath[i + 1];
       const parentNode = this.tree[parentIdx];
       if (!parentNode) {
-        // Parent is blank — parent_hash is empty (no key to reference)
         parentHashes[i] = new Uint8Array(0);
         continue;
       }
@@ -1947,13 +1972,11 @@ export class DaveSession {
         : (parentNode.type === 'leaf' ? parentNode.encryptionKey : new Uint8Array(0));
       const parentPH = parentHashes[i + 1];
       const siblingHash = originalSiblingHashes[i];
-
       const phw = new MLSWriter();
       phw.writeVarVector(parentKey);
       phw.writeVarVector(parentPH);
       phw.writeVarVector(siblingHash);
-      const phData = phw.toUint8Array();
-      parentHashes[i] = new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(phData)));
+      parentHashes[i] = new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(phw.toUint8Array())));
     }
 
     // 6. Update rawBytes on placed parent nodes with correct parentHash
@@ -1961,17 +1984,15 @@ export class DaveSession {
       const treeIdx = filteredDP[i];
       const node = this.tree[treeIdx];
       if (!node || node.type !== 'parent') continue;
-      // Find position of treeIdx in fullPath to get correct parentHash
       const fpIdx = fullPath.indexOf(treeIdx);
       const ph = fpIdx >= 0 ? parentHashes[fpIdx] : new Uint8Array(0);
       node.parentHash = ph;
       const rw = new MLSWriter();
       rw.writeVarVector(node.publicKey);
       rw.writeVarVector(ph);
-      rw.writeVarVector(new Uint8Array(0)); // no unmerged leaves after commit
+      rw.writeVarVector(new Uint8Array(0));
       node.rawBytes = rw.toUint8Array();
     }
-
     console.log('[DAVE] Applied UpdatePath:', updatePath.nodes.length, 'nodes at filteredDP positions');
   }
 

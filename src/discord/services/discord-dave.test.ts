@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { DaveSession } from './discord-dave';
 import fixture from './__fixtures__/dave-session-2.json';
+import fixture3 from './__fixtures__/dave-session-3.json';
+import fixture4 from './__fixtures__/dave-session-4.json';
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -259,5 +261,127 @@ describe('DaveSession', () => {
     // Verify final state
     expect(session.epoch).toBe(epochBefore + 3);
     expect(session.senderRatchet).not.toBeNull();
+  });
+
+  // ─── dave-session-3: longer sequence with multiple removes + adds ───
+
+  describe('dave-session-3', () => {
+    const F3_KEYS = {
+      userId: fixture3.keys.userId,
+      signingPublicRaw: b64ToUint8Array(fixture3.keys.signingPublicRaw),
+      signingPrivateJwk: fixture3.keys.signingPrivateJwk,
+      hpkePublicRaw: b64ToUint8Array(fixture3.keys.hpkePublicRaw),
+      hpkePrivateJwk: fixture3.keys.hpkePrivateJwk,
+      encryptionPublicRaw: b64ToUint8Array(fixture3.keys.encryptionPublicRaw),
+      encryptionPrivateJwk: fixture3.keys.encryptionPrivateJwk,
+    };
+
+    const F3_STATE = fixture3.postWelcomeState;
+
+    async function createSession3(): Promise<DaveSession> {
+      const session = new DaveSession();
+      await session.initializeFromFixture(F3_KEYS);
+      await session.restoreWelcomeStateForTest({
+        epoch: F3_STATE.epoch,
+        epochSecret: b64ToUint8Array(F3_STATE.epochSecret),
+        exporterSecret: b64ToUint8Array(F3_STATE.exporterSecret),
+        initSecret: b64ToUint8Array(F3_STATE.initSecret),
+        groupId: b64ToUint8Array(F3_STATE.groupId),
+        groupExtensions: b64ToUint8Array(F3_STATE.groupExtensions),
+        confirmedTranscriptHash: b64ToUint8Array(F3_STATE.confirmedTranscriptHash),
+        interimTranscriptHash: b64ToUint8Array(F3_STATE.interimTranscriptHash),
+        leafIndex: F3_STATE.leafIndex,
+        tree: F3_STATE.tree.map((entry) =>
+          entry ? { t: entry.t as 'l' | 'p', rawBytes: b64ToUint8Array(entry.raw) } : null,
+        ),
+      });
+      return session;
+    }
+
+    it('should process all proposals and commits with confirmation tags verified', async () => {
+      const session = await createSession3();
+      const messages = fixture3.messages;
+
+      let commitCount = 0;
+      for (const msg of messages) {
+        if (msg.t === 'proposal') {
+          session.handleProposals(b64ToUint8Array(msg.d));
+        } else if (msg.t === 'commit') {
+          const result = await session.handleCommit(b64ToUint8Array(msg.d));
+          expect(result).not.toBeNull();
+          expect(result!.confirmationTagVerified).toBe(true);
+          commitCount++;
+
+          const transitionId = (msg as any).transition_id;
+          if (transitionId != null) {
+            await session.handleExecuteTransition({ transition_id: transitionId });
+          }
+        }
+      }
+
+      expect(commitCount).toBeGreaterThan(0);
+      expect(session.senderRatchet).not.toBeNull();
+    });
+  });
+
+  // ─── dave-session-4: session with different post-welcome state ───
+
+  describe('dave-session-4', () => {
+    const F4_KEYS = {
+      userId: fixture4.keys.userId,
+      signingPublicRaw: b64ToUint8Array(fixture4.keys.signingPublicRaw),
+      signingPrivateJwk: fixture4.keys.signingPrivateJwk,
+      hpkePublicRaw: b64ToUint8Array(fixture4.keys.hpkePublicRaw),
+      hpkePrivateJwk: fixture4.keys.hpkePrivateJwk,
+      encryptionPublicRaw: b64ToUint8Array(fixture4.keys.encryptionPublicRaw),
+      encryptionPrivateJwk: fixture4.keys.encryptionPrivateJwk,
+    };
+
+    const F4_STATE = fixture4.postWelcomeState;
+
+    async function createSession4(): Promise<DaveSession> {
+      const session = new DaveSession();
+      await session.initializeFromFixture(F4_KEYS);
+      await session.restoreWelcomeStateForTest({
+        epoch: F4_STATE.epoch,
+        epochSecret: b64ToUint8Array(F4_STATE.epochSecret),
+        exporterSecret: b64ToUint8Array(F4_STATE.exporterSecret),
+        initSecret: b64ToUint8Array(F4_STATE.initSecret),
+        groupId: b64ToUint8Array(F4_STATE.groupId),
+        groupExtensions: b64ToUint8Array(F4_STATE.groupExtensions),
+        confirmedTranscriptHash: b64ToUint8Array(F4_STATE.confirmedTranscriptHash),
+        interimTranscriptHash: b64ToUint8Array(F4_STATE.interimTranscriptHash),
+        leafIndex: F4_STATE.leafIndex,
+        tree: F4_STATE.tree.map((entry) =>
+          entry ? { t: entry.t as 'l' | 'p', rawBytes: b64ToUint8Array(entry.raw) } : null,
+        ),
+      });
+      return session;
+    }
+
+    it('should process all proposals and commits with confirmation tags verified', async () => {
+      const session = await createSession4();
+      const messages = fixture4.messages;
+
+      let commitCount = 0;
+      for (const msg of messages) {
+        if (msg.t === 'proposal') {
+          session.handleProposals(b64ToUint8Array(msg.d));
+        } else if (msg.t === 'commit') {
+          const result = await session.handleCommit(b64ToUint8Array(msg.d));
+          expect(result).not.toBeNull();
+          expect(result!.confirmationTagVerified).toBe(true);
+          commitCount++;
+
+          const transitionId = (msg as any).transition_id;
+          if (transitionId != null) {
+            await session.handleExecuteTransition({ transition_id: transitionId });
+          }
+        }
+      }
+
+      expect(commitCount).toBeGreaterThan(0);
+      expect(session.senderRatchet).not.toBeNull();
+    });
   });
 });

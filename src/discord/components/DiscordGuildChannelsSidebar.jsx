@@ -93,7 +93,7 @@ const VoiceMemberRow = memo(({ vs, guildId, channelId, user, memberData, display
       .then((data) => {
         if (data?.url) setPreviewUrl(data.url);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, [guildId, channelId, vs.user_id]);
 
@@ -145,18 +145,18 @@ const VoiceMemberRow = memo(({ vs, guildId, channelId, user, memberData, display
             >
               <img src={avatarUrl} alt="" className={`size-6 rounded-full ${isSpeaking ? 'ring-2 ring-green-500' : ''}`} />
               <span className="flex-1 truncate text-[13px]">{displayName}</span>
-              <span className="flex items-center gap-0.5">
-                {vs.self_stream && (
-                  <span className="rounded bg-[#ed4245] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                    LIVE
-                  </span>
-                )}
+              <span className="flex items-center gap-1.5">
                 {vs.self_video && <VoiceStatusIcon icon={VideoCamera} color="text-gray-500" label="Video" />}
                 {vs.suppress && <VoiceStatusIcon icon={MicrophoneSlash} color="text-red-500" label="Suppressed" />}
                 {vs.self_mute && !vs.mute && <VoiceStatusIcon icon={MicrophoneSlash} color="text-gray-500" label="Muted" />}
                 {vs.mute && <VoiceStatusIcon icon={MicrophoneSlash} color="text-red-500" label="Server Muted" />}
                 {vs.self_deaf && !vs.deaf && <VoiceStatusIcon icon={SpeakerSlash} color="text-gray-500" label="Deafened" />}
                 {vs.deaf && <VoiceStatusIcon icon={SpeakerSlash} color="text-red-500" label="Server Deafened" />}
+                {vs.self_stream && (
+                  <span className="rounded bg-[#ed4245] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                    LIVE
+                  </span>
+                )}
               </span>
             </div>
           </ContextMenuTrigger>
@@ -249,8 +249,7 @@ const DiscordChannelRow = memo(({ channel, isActive, joinedAtMs, rulesChannelId,
   return (
     <Wrapper
       {...wrapperProps}
-      className={`group relative mx-2 my-0.5 flex items-center rounded-sm px-2 py-1 transition-colors ${
-        !isClickable
+      className={`group relative mx-2 my-0.5 flex items-center rounded-sm px-2 py-1 transition-colors ${!isClickable
           ? 'cursor-not-allowed text-gray-600 opacity-50'
           : isVoiceConnected
             ? 'bg-white/[0.11] text-gray-100'
@@ -259,7 +258,7 @@ const DiscordChannelRow = memo(({ channel, isActive, joinedAtMs, rulesChannelId,
               : isUnread
                 ? 'text-white hover:bg-white/5'
                 : 'cursor-pointer text-gray-500 hover:bg-white/5 hover:text-gray-100'
-      }`}
+        }`}
     >
       {isUnread && (
         <div className="absolute -left-1 top-1/2 h-2 w-1 -translate-y-1/2 rounded-r-full bg-white" />
@@ -271,9 +270,8 @@ const DiscordChannelRow = memo(({ channel, isActive, joinedAtMs, rulesChannelId,
         className={`size-5 shrink-0 ${!canView ? 'text-gray-600' : isVoiceChannel && voiceUserCount > 0 ? 'text-[#57d163]' : isActive ? 'text-gray-200' : isUnread ? 'text-white' : 'text-gray-500'}`}
       />
       <p
-        className={`ml-1 select-none truncate text-base ${showTyping ? '' : 'flex-1'} ${
-          !canView ? 'font-medium' : isActive ? 'font-semibold text-white' : isUnread ? 'font-semibold' : 'font-medium'
-        }`}
+        className={`ml-1 select-none truncate text-base ${showTyping ? '' : 'flex-1'} ${!canView ? 'font-medium' : isActive ? 'font-semibold text-white' : isUnread ? 'font-semibold' : 'font-medium'
+          }`}
       >
         {channel.name}
       </p>
