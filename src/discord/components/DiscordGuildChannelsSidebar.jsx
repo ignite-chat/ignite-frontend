@@ -198,27 +198,17 @@ const VoiceMemberRow = memo(({ vs, guildId, channelId, user, memberData, display
   );
 });
 
-const DiscordChannelRow = memo(({ channel, isActive, joinedAtMs, rulesChannelId, guildName }) => {
+const TextChannelRow = memo(({ channel, isActive, joinedAtMs, rulesChannelId }) => {
   const canView = channel._canView !== false;
   const readStates = useDiscordReadStatesStore((s) => s.readStates);
   const entry = readStates[channel.id];
-  const isVoiceChannel = isVoiceType(channel.type);
-  const canConnect = useDiscordHasPermission(channel.guild_id, isVoiceChannel ? channel : undefined, CONNECT);
   const typingUsers = useDiscordTypingStore((s) => s.typing[channel.id] || []);
-  const guildVoiceStates = useDiscordVoiceStatesStore((s) => isVoiceChannel ? (s.voiceStates[channel.guild_id] || {}) : {});
-  const voiceConnectedChannelId = useDiscordVoiceStore((s) => s.channelId);
-  const isVoiceConnected = isVoiceChannel && voiceConnectedChannelId === channel.id;
-  const voiceUserCount = useMemo(() => {
-    if (!isVoiceChannel) return 0;
-    return Object.values(guildVoiceStates).filter((vs) => vs.channel_id === channel.id).length;
-  }, [isVoiceChannel, guildVoiceStates, channel.id]);
 
   const isUnread =
     canView &&
     !isActive &&
     !!channel.last_message_id &&
     (() => {
-      if (isVoiceChannel) return false;
       if (entry?.last_message_id) {
         return BigInt(channel.last_message_id) > BigInt(entry.last_message_id);
       }
@@ -226,38 +216,23 @@ const DiscordChannelRow = memo(({ channel, isActive, joinedAtMs, rulesChannelId,
       return snowflakeToTimestamp(channel.last_message_id) > joinedAtMs;
     })();
   const mentionCount = canView ? (entry?.mention_count ?? 0) : 0;
-  const showTyping = canView && !isVoiceChannel && typingUsers.length > 0 && !mentionCount;
+  const showTyping = canView && typingUsers.length > 0 && !mentionCount;
 
-  const handleVoiceClick = () => {
-    if (!canConnect || !canView) return;
-    DiscordVoiceService.joinVoiceChannel(
-      channel.guild_id,
-      channel.id,
-      channel.name,
-      guildName || '',
-    );
-  };
-
-  const isClickable = canView && (!isVoiceChannel || canConnect);
-  const Wrapper = isVoiceChannel ? 'div' : canView ? Link : 'div';
-  const wrapperProps = isVoiceChannel
-    ? { onClick: handleVoiceClick, role: 'button' }
-    : canView
-      ? { to: `/discord/${channel.guild_id}/${channel.id}`, draggable: 'false' }
-      : {};
+  const Wrapper = canView ? Link : 'div';
+  const wrapperProps = canView
+    ? { to: `/discord/${channel.guild_id}/${channel.id}`, draggable: 'false' }
+    : {};
 
   return (
     <Wrapper
       {...wrapperProps}
-      className={`group relative mx-2 my-0.5 flex items-center rounded-sm px-2 py-1 transition-colors ${!isClickable
+      className={`group relative mx-2 my-0.5 flex items-center rounded-sm px-2 py-1 transition-colors ${!canView
           ? 'cursor-not-allowed text-gray-600 opacity-50'
-          : isVoiceConnected
+          : isActive
             ? 'bg-white/[0.11] text-gray-100'
-            : isActive
-              ? 'bg-white/[0.11] text-gray-100'
-              : isUnread
-                ? 'text-white hover:bg-white/5'
-                : 'cursor-pointer text-gray-500 hover:bg-white/5 hover:text-gray-100'
+            : isUnread
+              ? 'text-white hover:bg-white/5'
+              : 'cursor-pointer text-gray-500 hover:bg-white/5 hover:text-gray-100'
         }`}
     >
       {isUnread && (
@@ -266,12 +241,11 @@ const DiscordChannelRow = memo(({ channel, isActive, joinedAtMs, rulesChannelId,
       <ChannelIcon
         type={channel.type}
         isRules={channel.id === rulesChannelId}
-        isLocked={!canView || (isVoiceChannel && !canConnect)}
-        className={`size-5 shrink-0 ${!canView ? 'text-gray-600' : isVoiceChannel && voiceUserCount > 0 ? 'text-[#57d163]' : isActive ? 'text-gray-200' : isUnread ? 'text-white' : 'text-gray-500'}`}
+        isLocked={!canView}
+        className={`size-5 shrink-0 ${!canView ? 'text-gray-600' : isActive ? 'text-gray-200' : isUnread ? 'text-white' : 'text-gray-500'}`}
       />
       <p
-        className={`ml-1 select-none truncate text-base ${showTyping ? '' : 'flex-1'} ${!canView ? 'font-medium' : isActive ? 'font-semibold text-white' : isUnread ? 'font-semibold' : 'font-medium'
-          }`}
+        className={`ml-1 select-none truncate text-base ${showTyping ? '' : 'flex-1'} ${!canView ? 'font-medium' : isActive ? 'font-semibold text-white' : isUnread ? 'font-semibold' : 'font-medium'}`}
       >
         {channel.name}
       </p>
@@ -293,9 +267,78 @@ const DiscordChannelRow = memo(({ channel, isActive, joinedAtMs, rulesChannelId,
           {mentionCount > 99 ? '99+' : mentionCount}
         </div>
       )}
-      {isVoiceChannel && !!channel.user_limit && (
-        <span className="ml-auto flex items-center overflow-hidden rounded-full text-[11px] font-medium leading-none">
-          <span className={`px-1.5 py-1 ${voiceUserCount >= channel.user_limit ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-gray-400'}`}>
+    </Wrapper>
+  );
+});
+
+const formatElapsed = (ms) => {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+};
+
+const useElapsedTime = (unixSeconds) => {
+  const sinceMs = unixSeconds ? unixSeconds * 1000 : null;
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (!sinceMs) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [sinceMs]);
+  if (!sinceMs) return null;
+  return formatElapsed(now - sinceMs);
+};
+
+const VoiceChannelRow = memo(({ channel, guildName }) => {
+  const canView = channel._canView !== false;
+  const canConnect = useDiscordHasPermission(channel.guild_id, channel, CONNECT);
+  const guildVoiceStates = useDiscordVoiceStatesStore((s) => s.voiceStates[channel.guild_id] || {});
+  const voiceConnectedChannelId = useDiscordVoiceStore((s) => s.channelId);
+  const isVoiceConnected = voiceConnectedChannelId === channel.id;
+  const startTime = useDiscordChannelsStore(
+    (s) => s.channels.find((c) => c.id === channel.id)?.voice_start_time,
+  );
+  const voiceUserCount = useMemo(() => {
+    return Object.values(guildVoiceStates).filter((vs) => vs.channel_id === channel.id).length;
+  }, [guildVoiceStates, channel.id]);
+  const elapsed = useElapsedTime(voiceUserCount > 0 ? startTime : null);
+
+  const handleVoiceClick = () => {
+    if (!canConnect || !canView) return;
+    DiscordVoiceService.joinVoiceChannel(channel.guild_id, channel.id, channel.name, guildName || '');
+  };
+
+  const isClickable = canView && canConnect;
+
+  return (
+    <div
+      onClick={handleVoiceClick}
+      role="button"
+      className={`group relative mx-2 my-0.5 flex items-center rounded-sm px-2 py-1 transition-colors ${!isClickable
+          ? 'cursor-not-allowed text-gray-600 opacity-50'
+          : isVoiceConnected
+            ? 'bg-white/[0.11] text-gray-100'
+            : 'cursor-pointer text-gray-500 hover:bg-white/5 hover:text-gray-100'
+        }`}
+    >
+      <ChannelIcon
+        type={channel.type}
+        isLocked={!canView || !canConnect}
+        className={`size-5 shrink-0 ${!canView ? 'text-gray-600' : voiceUserCount > 0 ? 'text-[#57d163]' : 'text-gray-500'}`}
+      />
+      <p className="ml-1 flex-1 select-none truncate text-base font-medium">{channel.name}</p>
+      {elapsed && (
+        <span className="ml-auto mr-1 text-[11px] tabular-nums text-gray-500">{elapsed}</span>
+      )}
+      {!!channel.user_limit && (
+        <span className={`${elapsed ? '' : 'ml-auto'} flex items-center overflow-hidden rounded-full text-[11px] font-medium leading-none`}>
+          <span
+            className={`px-1.5 py-1 ${voiceUserCount >= channel.user_limit ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-gray-400'}`}
+          >
             {String(voiceUserCount).padStart(2, '0')}
           </span>
           <span className="bg-white/5 px-1.5 py-1 text-gray-500">
@@ -303,7 +346,21 @@ const DiscordChannelRow = memo(({ channel, isActive, joinedAtMs, rulesChannelId,
           </span>
         </span>
       )}
-    </Wrapper>
+    </div>
+  );
+});
+
+const DiscordChannelRow = memo(({ channel, isActive, joinedAtMs, rulesChannelId, guildName }) => {
+  if (isVoiceType(channel.type)) {
+    return <VoiceChannelRow channel={channel} guildName={guildName} />;
+  }
+  return (
+    <TextChannelRow
+      channel={channel}
+      isActive={isActive}
+      joinedAtMs={joinedAtMs}
+      rulesChannelId={rulesChannelId}
+    />
   );
 });
 

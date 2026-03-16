@@ -439,6 +439,18 @@ export const DiscordGatewayService = {
       case 'USER_GUILD_SETTINGS_UPDATE':
         this._handleUserGuildSettingsUpdate(data);
         break;
+      case 'VOICE_CHANNEL_STATUS_UPDATE':
+        if (data.id) {
+          useDiscordChannelsStore.getState().updateChannel(data.id, { status: data.status ?? null });
+        }
+        break;
+      case 'VOICE_CHANNEL_START_TIME_UPDATE':
+        if (data.id) {
+          useDiscordChannelsStore.getState().updateChannel(data.id, {
+            voice_start_time: data.voice_start_time ?? null,
+          });
+        }
+        break;
       default:
         console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         break;
@@ -455,7 +467,7 @@ export const DiscordGatewayService = {
   _handleReady(data: any) {
     const { user, guilds, session_id, resume_gateway_url, private_channels, users, read_state, merged_members, relationships, presences } = data;
 
-    console.log(`[Discord Gateway] READY as ${user.username}#${user.discriminator} (${user.id})`);
+    console.log(`[Discord Gateway] READY as ${user.username}#${user.discriminator} (${user.id})`, data);
     console.log(`[Discord Gateway] ${guilds.length} guilds, ${private_channels?.length || 0} DMs, ${users?.length || 0} users`);
 
     useDiscordStore.getState().setUser(user);
@@ -541,7 +553,7 @@ export const DiscordGatewayService = {
   },
 
   _handleReadySupplemental(data: any) {
-    console.log('[Discord Gateway] READY_SUPPLEMENTAL received');
+    console.log('[Discord Gateway] READY_SUPPLEMENTAL received', data);
 
     const { guilds, merged_members, merged_presences } = data;
 
