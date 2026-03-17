@@ -47,6 +47,8 @@ export const DiscordGatewayService = {
 
     // // TODO: Remove artificial delay (testing skeletons)
     // setTimeout(() => this._doConnect(token), 10000);
+
+    this._doConnect(token);
   },
 
   _doConnect(token: string) {
