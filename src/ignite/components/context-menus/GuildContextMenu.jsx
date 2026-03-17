@@ -1,21 +1,33 @@
 import { useState } from 'react';
-import { Copy, Check, UserPlus } from '@phosphor-icons/react';
+import { Copy, Check, UserPlus, Gear } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { ContextMenuContent } from '@/components/ui/context-menu';
 import { Separator } from '@/components/ui/separator';
+import { useContextMenuStore } from '@/store/context-menu.store';
 import { UnreadsService } from '../../services/unreads.service';
 import { ChannelsService } from '../../services/channels.service';
 import { useChannelsStore } from '../../store/channels.store';
 import { useUnreadsStore } from '../../store/unreads.store';
 import { isChannelUnread } from '../../utils/unreads.utils';
+import { useHasPermission } from '../../hooks/useHasPermission';
+import { Permissions } from '../../constants/Permissions';
+import { useModalStore } from '../../store/modal.store';
+import ServerSettingsModal from '../settings/ServerSettings';
 import GuildMenuContent from '../guild/GuildMenuContent';
 
 const GuildContextMenu = ({ guild, onLeave, onInvite }) => {
   const { channels } = useChannelsStore();
   const { channelUnreads } = useUnreadsStore();
   const [view, setView] = useState('main');
+  const canManageGuild = useHasPermission(guild?.id, null, Permissions.MANAGE_GUILD);
+
+  const close = () => useContextMenuStore.getState().close();
+
+  const guildChannels = channels.filter((c) => c.guild_id === guild.id);
+  const hasUnread = guildChannels.some((c) => isChannelUnread(c, channelUnreads, true));
 
   const handleMarkAsRead = () => {
+    close();
     const guildChannels = channels.filter((c) => c.guild_id === guild.id);
 
     const unreadChannels = guildChannels.filter((c) =>
@@ -38,6 +50,7 @@ const GuildContextMenu = ({ guild, onLeave, onInvite }) => {
   };
 
   const handleCopyId = () => {
+    close();
     navigator.clipboard.writeText(guild.id);
     toast.success('Copied Server ID');
   };
@@ -56,7 +69,8 @@ const GuildContextMenu = ({ guild, onLeave, onInvite }) => {
           <>
             <button
               type="button"
-              className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-100 hover:bg-white/5"
+              disabled={!hasUnread}
+              className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-100 hover:bg-white/5 disabled:pointer-events-none disabled:opacity-40"
               onClick={handleMarkAsRead}
             >
               <span>Mark As Read</span>
@@ -68,11 +82,25 @@ const GuildContextMenu = ({ guild, onLeave, onInvite }) => {
             <button
               type="button"
               className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-100 hover:bg-white/5"
-              onClick={onInvite}
+              onClick={() => { close(); onInvite(); }}
             >
               <span>Invite People</span>
               <UserPlus className="ml-2 size-[18px]" />
             </button>
+
+            {canManageGuild && (
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-100 hover:bg-white/5"
+                onClick={() => {
+                  close();
+                  useModalStore.getState().push(ServerSettingsModal, { guild });
+                }}
+              >
+                <span>Server Settings</span>
+                <Gear className="ml-2 size-[18px]" />
+              </button>
+            )}
 
             <Separator className="my-1 bg-white/5" />
           </>
