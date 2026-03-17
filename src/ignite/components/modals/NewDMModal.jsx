@@ -252,6 +252,9 @@ const NewDMModal = ({ modalId }) => {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             autoFocus
+            autoComplete="off"
+            data-1p-ignore=""
+            data-lpignore="true"
             className="w-full rounded-[4px] bg-[#1e1f22] px-2.5 py-[7px] text-[16px] leading-[22px] text-[#dbdee1] placeholder:text-[#6d6f78] focus:outline-none"
           />
         </div>

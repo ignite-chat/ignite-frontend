@@ -83,7 +83,7 @@ const RegisterPage = () => {
                         }}
                         render={({ field, formState }) => (
                           <>
-                            <Input id="username" placeholder="Enter your username" {...field} />
+                            <Input id="username" placeholder="Enter your username" autoComplete="username" {...field} />
                             <FieldError>
                               {formState.errors.username && formState.errors.username.message}
                             </FieldError>
@@ -109,6 +109,7 @@ const RegisterPage = () => {
                                 <Input
                                   type="password"
                                   placeholder="Enter your password"
+                                  autoComplete="new-password"
                                   {...field}
                                 />
                                 <FieldError>
@@ -136,6 +137,7 @@ const RegisterPage = () => {
                                 <Input
                                   type="password"
                                   placeholder="Confirm your password"
+                                  autoComplete="new-password"
                                   {...field}
                                 />
                                 <FieldError>

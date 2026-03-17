@@ -11,7 +11,7 @@ import { useChannelInputContext, useChannelContext } from '../../../contexts/Cha
 import Avatar from '../../Avatar.jsx';
 import { cn } from '@/lib/utils';
 import { useChannelsStore } from '@/ignite/store/channels.store';
-import { X, Hash, Megaphone, SpeakerHigh, Keyboard, Smiley, Sticker as StickerIcon } from '@phosphor-icons/react';
+import { X, Hash, Megaphone, SpeakerHigh, Keyboard, Smiley, Sticker as StickerIcon, MagnifyingGlass } from '@phosphor-icons/react';
 import { useGuildsStore } from '@/ignite/store/guilds.store';
 import { useGuildContext } from '../../../contexts/GuildContext';
 import { ChannelType } from '../../../constants/ChannelType';
@@ -39,6 +39,7 @@ import emojisData from '@/assets/emojis/emojis.json';
 import { useTypingText } from '@/ignite/hooks/useTypingText';
 import { useUsersStore } from '@/ignite/store/users.store';
 import StickerPicker from '../StickerPicker';
+import { openAttachmentViewModal } from '@/components/modals/AttachmentViewModal';
 import { Permissions } from '@/ignite/constants/Permissions';
 import { useHasPermission } from '@/ignite/hooks/useHasPermission';
 
@@ -323,11 +324,20 @@ const ChannelInput = ({ channel }) => {
               className="group/attachment relative flex h-[52px] shrink-0 items-center gap-2 rounded-md bg-[#1e1f22] px-3 pr-8"
             >
               {file.type.startsWith('image/') ? (
-                <img
-                  src={URL.createObjectURL(file)}
-                  alt={file.name}
-                  className="size-8 rounded object-cover"
-                />
+                <button
+                  type="button"
+                  onClick={() => openAttachmentViewModal(URL.createObjectURL(file), URL.createObjectURL(file))}
+                  className="group/img relative cursor-pointer"
+                >
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt={file.name}
+                    className="size-8 rounded object-cover transition-opacity group-hover/img:opacity-70"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center rounded opacity-0 transition-opacity group-hover/img:opacity-100">
+                    <MagnifyingGlass className="size-4 text-white drop-shadow" />
+                  </div>
+                </button>
               ) : (
                 <div className="flex size-8 items-center justify-center rounded bg-[#5865f2]/20">
                   <FileText className="size-4 text-[#5865f2]" />
@@ -392,6 +402,9 @@ const ChannelInput = ({ channel }) => {
                   className={`max-h-[50vh] min-h-[50px] w-full overflow-y-auto px-3 py-4 text-sm outline-none [&_.channel-input-paragraph]:m-0 ${
                     !canSendMessages ? 'cursor-not-allowed opacity-50' : ''
                   }`}
+                  data-1p-ignore=""
+                  data-lpignore="true"
+                  data-form-type="other"
                 />
               }
               placeholder={

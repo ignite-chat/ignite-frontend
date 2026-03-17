@@ -113,6 +113,7 @@ const ChangeUsernameModal = ({ modalId }) => {
                     id="dialogUsernamePassword"
                     type="password"
                     placeholder="Your current password"
+                    autoComplete="current-password"
                     {...field}
                   />
                   <FieldError>{form.formState.errors.currentPassword?.message}</FieldError>

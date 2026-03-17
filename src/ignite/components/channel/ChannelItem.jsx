@@ -122,6 +122,7 @@ const ChannelItem = ({
   };
 
   const handleContextMenu = (e) => {
+    e.stopPropagation();
     useContextMenuStore.getState().open(ChannelItemContextMenu, {
       isVoice,
       isUnread,

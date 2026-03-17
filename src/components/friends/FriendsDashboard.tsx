@@ -112,7 +112,11 @@ const FriendsDashboard = ({ activeSubTab }: FriendsDashboardProps) => {
         )}
       </div>
 
-      {discordConnected && activeSubTab !== 'add_friend' && <DiscordActivitiesPanel />}
+      {discordConnected && activeSubTab !== 'add_friend' && (
+        <div className="hidden xl:block">
+          <DiscordActivitiesPanel />
+        </div>
+      )}
     </div>
   );
 };

@@ -71,7 +71,7 @@ const LoginPage = () => {
                         }}
                         render={({ field, formState }) => (
                           <>
-                            <Input placeholder="Enter your username" {...field} />
+                            <Input placeholder="Enter your username" autoComplete="username" {...field} />
                             <FieldError>
                               {formState.errors.username && formState.errors.username.message}
                             </FieldError>
@@ -97,7 +97,7 @@ const LoginPage = () => {
                         }}
                         render={({ field, formState }) => (
                           <>
-                            <Input type="password" placeholder="Enter your password" {...field} />
+                            <Input type="password" placeholder="Enter your password" autoComplete="current-password" {...field} />
                             <FieldError>
                               {formState.errors.password && formState.errors.password.message}
                             </FieldError>

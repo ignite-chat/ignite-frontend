@@ -81,7 +81,7 @@ const ChangeEmailModal = ({ modalId }) => {
               }}
               render={({ field }) => (
                 <>
-                  <Input id="dialogEmail" placeholder="Your new email address" {...field} />
+                  <Input id="dialogEmail" placeholder="Your new email address" autoComplete="email" {...field} />
                   <FieldError>{form.formState.errors.email?.message}</FieldError>
                 </>
               )}
@@ -104,6 +104,7 @@ const ChangeEmailModal = ({ modalId }) => {
                     id="dialogEmailPassword"
                     type="password"
                     placeholder="Your current password"
+                    autoComplete="current-password"
                     {...field}
                   />
                   <FieldError>{form.formState.errors.currentPassword?.message}</FieldError>

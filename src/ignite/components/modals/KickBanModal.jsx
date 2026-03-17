@@ -65,6 +65,7 @@ export const KickBanModal = ({ modalId, user, guildId, action }) => {
                 placeholder="Optional reason for the ban"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 maxLength={512}
+                autoComplete="off"
               />
             </div>
             <div className="space-y-1.5">

@@ -99,16 +99,18 @@ const FriendRow = ({ friend }: FriendRowProps) => {
       }}
       className="group flex cursor-pointer items-center justify-between px-2 py-3 hover:rounded-lg hover:bg-gray-600/30"
     >
-      <div className="flex items-center gap-3">
-        <Avatar user={user} size={32} showStatus showOffline />
-        <div>
-          <div className="text-sm font-bold text-white">
-            {user.name}
-            <span className="ml-1 hidden text-xs text-gray-400 group-hover:inline">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="shrink-0">
+          <Avatar user={user} size={32} showStatus showOffline />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-sm font-bold text-white">
+            <span className="truncate">{user.name}</span>
+            <span className="hidden shrink-0 text-xs text-gray-400 group-hover:inline">
               {user.username}
             </span>
           </div>
-          <div className="text-xs text-gray-400">{friend.status}</div>
+          <div className="truncate text-xs text-gray-400">{friend.status}</div>
         </div>
       </div>
       <div className="flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
@@ -164,10 +166,10 @@ const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
   return (
     <div
       onClick={messageUser}
-      className="border-white/5/30 group flex cursor-pointer items-center justify-between border-t px-2 py-3 hover:rounded-lg hover:bg-gray-600/30"
+      className="group flex cursor-pointer items-center justify-between px-2 py-3 hover:rounded-lg hover:bg-gray-600/30"
     >
-      <div className="flex items-center gap-3">
-        <div className="relative">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="relative shrink-0">
           <img
             src={avatarUrl}
             alt={user.global_name || user.username}
@@ -175,11 +177,11 @@ const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
           />
           <div className={`absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full border-2 border-[#1a1a1e] ${statusColors[status] || statusColors.offline}`} />
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-sm font-bold text-white">
-            {user.global_name || user.username}
+            <span className="truncate">{user.global_name || user.username}</span>
             {user.global_name && (
-              <span className="hidden text-xs text-gray-400 group-hover:inline">
+              <span className="hidden shrink-0 text-xs text-gray-400 group-hover:inline">
                 {user.username}
               </span>
             )}

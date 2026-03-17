@@ -69,6 +69,7 @@ const ChangePasswordModal = ({ modalId }) => {
                     id="dialogCurrentPassword"
                     type="password"
                     placeholder="Your current password"
+                    autoComplete="current-password"
                     {...field}
                   />
                   <FieldError>{form.formState.errors.currentPassword?.message}</FieldError>
@@ -97,6 +98,7 @@ const ChangePasswordModal = ({ modalId }) => {
                     id="dialogNewPassword"
                     type="password"
                     placeholder="Your new password"
+                    autoComplete="new-password"
                     {...field}
                   />
                   <FieldError>{form.formState.errors.newPassword?.message}</FieldError>
@@ -126,6 +128,7 @@ const ChangePasswordModal = ({ modalId }) => {
                     id="dialogConfirmNewPassword"
                     type="password"
                     placeholder="Confirm your new password"
+                    autoComplete="new-password"
                     {...field}
                   />
                   <FieldError>{form.formState.errors.confirmNewPassword?.message}</FieldError>
