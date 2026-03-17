@@ -1,3 +1,4 @@
+import { User, ChatCircle, UserMinus } from '@phosphor-icons/react';
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -12,8 +13,14 @@ const FriendContextMenu = ({
 }) => {
   return (
     <ContextMenuContent className="w-52">
-      <ContextMenuItem onSelect={onViewProfile}>View Profile</ContextMenuItem>
-      <ContextMenuItem onSelect={onMessage}>Message</ContextMenuItem>
+      <ContextMenuItem className="justify-between" onSelect={onViewProfile}>
+        View Profile
+        <User className="ml-auto size-[18px]" weight="fill" />
+      </ContextMenuItem>
+      <ContextMenuItem className="justify-between" onSelect={onMessage}>
+        Message
+        <ChatCircle className="ml-auto size-[18px]" weight="fill" />
+      </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem className="justify-between" onSelect={onCopyUserId}>
         Copy User ID
@@ -22,8 +29,12 @@ const FriendContextMenu = ({
         </span>
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem onSelect={onRemoveFriend} className="text-red-500 hover:bg-red-600/20">
+      <ContextMenuItem
+        onSelect={onRemoveFriend}
+        className="justify-between text-[#f23f42] focus:bg-[#da373c] focus:text-white"
+      >
         Remove Friend
+        <UserMinus className="ml-auto size-[18px]" weight="fill" />
       </ContextMenuItem>
     </ContextMenuContent>
   );

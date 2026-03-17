@@ -1,3 +1,4 @@
+import { Check, PencilSimple, Trash } from '@phosphor-icons/react';
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -7,19 +8,24 @@ import {
 const CategoryContextMenu = ({ anyChannelUnread, canManageChannels, onMarkAsRead, onEditCategory, onDeleteCategory }) => {
   return (
     <ContextMenuContent className="w-52">
-      <ContextMenuItem disabled={!anyChannelUnread} onSelect={onMarkAsRead}>
+      <ContextMenuItem className="justify-between" disabled={!anyChannelUnread} onSelect={onMarkAsRead}>
         Mark as Read
+        <Check className="ml-auto size-[18px]" />
       </ContextMenuItem>
 
       {canManageChannels && (
         <>
           <ContextMenuSeparator />
-          <ContextMenuItem onSelect={onEditCategory}>Edit Category</ContextMenuItem>
+          <ContextMenuItem className="justify-between" onSelect={onEditCategory}>
+            Edit Category
+            <PencilSimple className="ml-auto size-[18px]" weight="fill" />
+          </ContextMenuItem>
           <ContextMenuItem
             onSelect={onDeleteCategory}
-            className="text-red-500 hover:bg-red-600/20"
+            className="justify-between text-[#f23f42] focus:bg-[#da373c] focus:text-white"
           >
             Delete Category
+            <Trash className="ml-auto size-[18px]" weight="fill" />
           </ContextMenuItem>
         </>
       )}

@@ -1,4 +1,4 @@
-import { PushPin } from '@phosphor-icons/react';
+import { PushPin, Bug } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import {
   ContextMenuContent,
@@ -9,11 +9,9 @@ import {
 const DMChannelContextMenu = ({ channel, onTogglePin, onShowDebugInfo }) => {
   return (
     <ContextMenuContent className="w-48">
-      <ContextMenuItem onSelect={onTogglePin}>
-        <div className="flex w-full items-center justify-between">
-          {channel.isPinned ? 'Unpin' : 'Pin'}
-          <PushPin size={14} className={channel.isPinned ? '' : 'rotate-45'} />
-        </div>
+      <ContextMenuItem className="justify-between" onSelect={onTogglePin}>
+        {channel.isPinned ? 'Unpin' : 'Pin'}
+        <PushPin className={`ml-auto size-[18px] ${channel.isPinned ? '' : 'rotate-45'}`} weight="fill" />
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem
@@ -29,7 +27,10 @@ const DMChannelContextMenu = ({ channel, onTogglePin, onShowDebugInfo }) => {
         </span>
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem onSelect={onShowDebugInfo}>Debug Info</ContextMenuItem>
+      <ContextMenuItem className="justify-between" onSelect={onShowDebugInfo}>
+        Debug Info
+        <Bug className="ml-auto size-[18px]" />
+      </ContextMenuItem>
     </ContextMenuContent>
   );
 };

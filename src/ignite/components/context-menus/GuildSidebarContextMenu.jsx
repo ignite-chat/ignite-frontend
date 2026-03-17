@@ -1,3 +1,4 @@
+import { PlusCircle, FolderPlus } from '@phosphor-icons/react';
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -7,10 +8,16 @@ const GuildSidebarContextMenu = ({ canManageChannels, onCreateChannel, onCreateC
   return (
     <ContextMenuContent className="w-52">
       {canManageChannels && (
-        <ContextMenuItem onSelect={onCreateChannel}>Create Channel</ContextMenuItem>
+        <ContextMenuItem className="justify-between" onSelect={onCreateChannel}>
+          Create Channel
+          <PlusCircle className="ml-auto size-[18px]" weight="fill" />
+        </ContextMenuItem>
       )}
       {canManageChannels && (
-        <ContextMenuItem onSelect={onCreateCategory}>Create Category</ContextMenuItem>
+        <ContextMenuItem className="justify-between" onSelect={onCreateCategory}>
+          Create Category
+          <FolderPlus className="ml-auto size-[18px]" weight="fill" />
+        </ContextMenuItem>
       )}
     </ContextMenuContent>
   );
