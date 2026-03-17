@@ -19,7 +19,7 @@ type FriendsDashboardProps = {
 
 const FriendsDashboard = ({ activeSubTab }: FriendsDashboardProps) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const { friends, requests } = useFriendsStore();
+  const { friends, requests, friendsLoaded, requestsLoaded } = useFriendsStore();
   const currentUser = useUsersStore((s) => s.getCurrentUser());
 
   // Discord data
@@ -95,6 +95,7 @@ const FriendsDashboard = ({ activeSubTab }: FriendsDashboardProps) => {
                   discordFriends={discordFriends}
                   filter={activeSubTab}
                   searchQuery={searchQuery}
+                  loading={!friendsLoaded}
                 />
               )}
               {activeSubTab === 'pending' && currentUser && (
@@ -103,6 +104,7 @@ const FriendsDashboard = ({ activeSubTab }: FriendsDashboardProps) => {
                   currentUser={currentUser}
                   discordRequests={discordPendingRequests}
                   searchQuery={searchQuery}
+                  loading={!requestsLoaded}
                 />
               )}
             </div>

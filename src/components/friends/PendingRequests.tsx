@@ -40,6 +40,7 @@ import type { DiscordUser } from '@/discord/store/discord-users.store';
 import { DiscordService } from '@/discord/services/discord.service';
 import { DiscordApiService } from '@/discord/services/discord-api.service';
 import { useDiscordRelationshipsStore } from '@/discord/store/discord-relationships.store';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type PendingRequestRowProps = {
   request: FriendRequest;
@@ -213,18 +214,35 @@ export type DiscordPendingRequest = {
   isOutgoing: boolean;
 };
 
+const PendingRowSkeleton = () => (
+  <div className="flex items-center justify-between border-t border-white/5/30 px-2 py-3">
+    <div className="flex items-center gap-3">
+      <Skeleton className="size-8 rounded-full" />
+      <div>
+        <Skeleton className="mb-1.5 h-3.5 w-24 rounded" />
+        <Skeleton className="h-3 w-16 rounded" />
+      </div>
+    </div>
+    <div className="flex gap-2">
+      <Skeleton className="size-9 rounded-full" />
+      <Skeleton className="size-9 rounded-full" />
+    </div>
+  </div>
+);
+
 type PendingRequestsProps = {
   requests: FriendRequest[];
   currentUser: User;
   discordRequests: DiscordPendingRequest[];
   searchQuery: string;
+  loading?: boolean;
 };
 
 type MergedPending =
   | { source: 'ignite'; data: FriendRequest; sortName: string; isOutgoing: boolean }
   | { source: 'discord'; data: DiscordPendingRequest; sortName: string; isOutgoing: boolean };
 
-const PendingRequests = ({ requests, currentUser, discordRequests, searchQuery }: PendingRequestsProps) => {
+const PendingRequests = ({ requests, currentUser, discordRequests, searchQuery, loading }: PendingRequestsProps) => {
   const getUser = useUsersStore((s) => s.getUser);
   const openProfile = (userId: string) => {
     useModalStore.getState().push(UserProfileModal, { userId });
@@ -281,6 +299,17 @@ const PendingRequests = ({ requests, currentUser, discordRequests, searchQuery }
         onClickUser={openDiscordProfile}
       />
     );
+
+  if (loading) {
+    return (
+      <div className="space-y-1">
+        <Skeleton className="mt-4 mb-2 h-3 w-24 rounded" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <PendingRowSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1">

@@ -1,6 +1,16 @@
 const Avatar = ({ user, className = '', size = null, showStatus = false, showOffline = false }) => {
-  const isOnline = user?.status === 'online';
-  const isOffline = user?.status === 'offline';
+  if (!user) {
+    const sizeStyle = size ? { width: size, height: size } : undefined;
+    return (
+      <div
+        className={`inline-flex cursor-pointer items-center justify-center rounded-full bg-[#2b2d31] select-none ${className}`}
+        style={sizeStyle}
+      />
+    );
+  }
+
+  const isOnline = user.status === 'online';
+  const isOffline = user.status === 'offline';
 
   const sizeStyle = size ? { width: size, height: size } : undefined;
 

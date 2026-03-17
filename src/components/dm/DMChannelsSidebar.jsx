@@ -16,6 +16,7 @@ import { useDiscordRelationshipsStore, RelationshipType } from '@/discord/store/
 import { DiscordService } from '@/discord/services/discord.service';
 import { DiscordApiService } from '@/discord/services/discord-api.service';
 import DiscordStatusIndicator from '@/discord/components/DiscordStatusIndicator';
+import { Skeleton } from '@/components/ui/skeleton';
 import DMChannelItem from './DMChannelItem';
 import DMRowBase from './DMRowBase';
 import NewDMModal from '@/ignite/components/modals/NewDMModal';
@@ -119,6 +120,13 @@ const DiscordDMChannelItem = ({ channel, isActive, currentUserId, usersMap, onCl
     </DMRowBase>
   );
 };
+
+const DMChannelSkeleton = () => (
+  <div className="flex items-center gap-3 rounded-md px-2 py-1.5">
+    <Skeleton className="size-8 shrink-0 rounded-full" />
+    <Skeleton className="h-3.5 w-24 rounded" />
+  </div>
+);
 
 const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
   const currentUser = useUsersStore((s) => s.getCurrentUser()) || { id: 'me' };
@@ -270,37 +278,41 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
         )}
 
         {/* All DMs — merged Ignite + Discord, sorted by last message */}
-        {mergedDms.length > 0 && (
-          <>
-            <div className="mt-2.5 flex cursor-default select-none items-center px-2 text-[13px] font-medium text-gray-500">
-              Direct Messages
-            </div>
-            <div className="mt-2 space-y-0.5">
-              {mergedDms.map((item) =>
-                item._source === 'discord' ? (
-                  <DiscordDMChannelItem
-                    key={`discord-${item._id}`}
-                    channel={item.data}
-                    isActive={activeChannelId === item._id}
-                    currentUserId={discordUser?.id}
-                    usersMap={discordUsersMap}
-                    onClick={() => onNavigate(item._id)}
-                    onClose={() => handleCloseDiscordDM(item._id)}
-                  />
-                ) : (
-                  <DMChannelItem
-                    key={item._id}
-                    channel={item.data}
-                    isActive={activeChannelId === item._id}
-                    onClick={() => onNavigate(item._id)}
-                    onClose={() => handleCloseIgniteDM(item._id)}
-                    channelUnreads={channelUnreads}
-                    channelUnreadsLoaded={channelUnreadsLoaded}
-                  />
-                )
-              )}
-            </div>
-          </>
+        <div className="mt-2.5 flex cursor-default select-none items-center px-2 text-[13px] font-medium text-gray-500">
+          Direct Messages
+        </div>
+        {mergedDms.length > 0 ? (
+          <div className="mt-2 space-y-0.5">
+            {mergedDms.map((item) =>
+              item._source === 'discord' ? (
+                <DiscordDMChannelItem
+                  key={`discord-${item._id}`}
+                  channel={item.data}
+                  isActive={activeChannelId === item._id}
+                  currentUserId={discordUser?.id}
+                  usersMap={discordUsersMap}
+                  onClick={() => onNavigate(item._id)}
+                  onClose={() => handleCloseDiscordDM(item._id)}
+                />
+              ) : (
+                <DMChannelItem
+                  key={item._id}
+                  channel={item.data}
+                  isActive={activeChannelId === item._id}
+                  onClick={() => onNavigate(item._id)}
+                  onClose={() => handleCloseIgniteDM(item._id)}
+                  channelUnreads={channelUnreads}
+                  channelUnreadsLoaded={channelUnreadsLoaded}
+                />
+              )
+            )}
+          </div>
+        ) : (
+          <div className="mt-2 space-y-1">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <DMChannelSkeleton key={i} />
+            ))}
+          </div>
         )}
       </div>
     </aside>

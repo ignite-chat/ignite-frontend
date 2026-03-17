@@ -18,6 +18,8 @@ export type FriendRequest = {
 type FriendsStore = {
   friends: Friend[];
   requests: FriendRequest[];
+  friendsLoaded: boolean;
+  requestsLoaded: boolean;
 
   setFriends: (friends: Friend[]) => void;
   setRequests: (requests: FriendRequest[]) => void;
@@ -27,9 +29,11 @@ type FriendsStore = {
 export const useFriendsStore = create<FriendsStore>((set) => ({
   friends: [],
   requests: [],
+  friendsLoaded: false,
+  requestsLoaded: false,
 
-  setFriends: (friends) => set({ friends }),
-  setRequests: (requests) => set({ requests }),
+  setFriends: (friends) => set({ friends, friendsLoaded: true }),
+  setRequests: (requests) => set({ requests, requestsLoaded: true }),
 
-  reset: () => set({ friends: [], requests: [] }),
+  reset: () => set({ friends: [], requests: [], friendsLoaded: false, requestsLoaded: false }),
 }));

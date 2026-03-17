@@ -26,6 +26,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { LogOut } from 'lucide-react';
 import Avatar from './Avatar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useVoiceStore } from '@/ignite/store/voice.store';
 import { useUsersStore } from '@/ignite/store/users.store';
 import { VoiceService } from '@/ignite/services/voice.service';
@@ -426,39 +427,49 @@ const UserBar = () => {
 
       {/* User Info Bar */}
       <div className="flex items-center rounded-lg bg-[#1a1a1d] px-2.5 py-2.5">
-        <Popover>
-          <PopoverTrigger asChild>
-            <button type="button" className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-0.5 py-0.5 transition-colors hover:bg-white/5 mr-2">
-              <div className="shrink-0">
-                {showDiscord ? (
-                  <DiscordAvatarWithStatus
-                    avatarUrl={discordAvatarUrl}
-                    name={displayName}
-                    status={discordStatus}
-                    size={36}
-                  />
-                ) : (
-                  <Avatar user={user} size={36} showStatus showOffline />
-                )}
-              </div>
-              <div className="flex min-w-0 flex-col text-left">
-                <span className="truncate text-base font-semibold leading-tight text-gray-100">
-                  {displayName}
-                </span>
-                <span className="truncate text-xs text-gray-500">
-                  {displayStatus}
-                </span>
-              </div>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="top" align="start" className="w-56 border-white/10 bg-[#1a1a1d] p-1">
-            <UserProfilePopoverMenu
-              igniteUser={user}
-              activeDisplay={activeDisplay}
-              onSwitch={handleSwitch}
-            />
-          </PopoverContent>
-        </Popover>
+        {!user && !showDiscord ? (
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 px-0.5 py-0.5 mr-2">
+            <Skeleton className="size-9 shrink-0 rounded-full" />
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Skeleton className="h-3.5 w-20 rounded" />
+              <Skeleton className="h-2.5 w-12 rounded" />
+            </div>
+          </div>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button type="button" className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-0.5 py-0.5 transition-colors hover:bg-white/5 mr-2">
+                <div className="shrink-0">
+                  {showDiscord ? (
+                    <DiscordAvatarWithStatus
+                      avatarUrl={discordAvatarUrl}
+                      name={displayName}
+                      status={discordStatus}
+                      size={36}
+                    />
+                  ) : (
+                    <Avatar user={user} size={36} showStatus showOffline />
+                  )}
+                </div>
+                <div className="flex min-w-0 flex-col text-left">
+                  <span className="truncate text-base font-semibold leading-tight text-gray-100">
+                    {displayName}
+                  </span>
+                  <span className="truncate text-xs text-gray-500">
+                    {displayStatus}
+                  </span>
+                </div>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="start" className="w-56 border-white/10 bg-[#1a1a1d] p-1">
+              <UserProfilePopoverMenu
+                igniteUser={user}
+                activeDisplay={activeDisplay}
+                onSwitch={handleSwitch}
+              />
+            </PopoverContent>
+          </Popover>
+        )}
 
         <div className="flex shrink-0 items-center gap-0.5">
           <button

@@ -15,6 +15,8 @@ import type { Channel } from '../store/channels.store';
 
 export const InitializationService = {
   async initialize() {
+    // // TODO: Remove artificial delay (testing skeletons)
+    // await new Promise((r) => setTimeout(r, 10000));
     try {
       const localToken = localStorage.getItem('token');
       if (!localToken) {

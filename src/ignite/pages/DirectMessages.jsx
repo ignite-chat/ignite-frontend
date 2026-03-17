@@ -1,12 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { ChannelContextProvider } from '@/ignite/contexts/ChannelContext';
 import Channel from '@/ignite/components/channel/Channel';
 import DMChannelsSidebar from '@/components/dm/DMChannelsSidebar';
+import FriendsHeader from '@/components/friends/FriendsHeader';
 import FriendsDashboard from '@/components/friends/FriendsDashboard';
 import MessageRequests from '@/components/friends/MessageRequests';
 import PageTitle from '@/ignite/components/PageTitle';
@@ -115,40 +112,13 @@ const DirectMessagesPage = () => {
         <main className={`relative flex h-full flex-1 flex-col overflow-hidden text-gray-100 bg-[#1a1a1e]`}>
           {isSpecialView ? (
             <div className="flex h-full flex-col select-none">
-              {/* Header with top tabs + subtabs */}
-              <header className="flex h-12 items-center justify-between border-b border-white/5 px-4 shadow-sm">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 font-semibold text-[#f2f3f5]">
-                    <Users size={20} className="text-[#80848e]" />
-                    Friends
-                  </div>
-                  {/* Subtabs — only when Friends top tab is active */}
-                  {activeTopTab === 'friends' && (
-                    <>
-                      <Separator orientation="vertical" className="h-6 bg-[#4e5058]" />
-                      <nav className="flex items-center gap-2">
-                        <TabButton label="Online" isActive={activeSubTab === 'online'} onClick={() => setActiveSubTab('online')} />
-                        <TabButton label="All" isActive={activeSubTab === 'all'} onClick={() => setActiveSubTab('all')} />
-                        <TabButton label="Pending" isActive={activeSubTab === 'pending'} onClick={() => setActiveSubTab('pending')} count={pendingCount} />
-                        <Button
-                          variant={activeSubTab === 'add_friend' ? 'ghost' : 'default'}
-                          size="sm"
-                          className={`h-7 px-2 text-sm font-medium ${
-                            activeSubTab === 'add_friend'
-                              ? 'text-[#23a559]'
-                              : 'bg-[#248046] text-white hover:bg-[#1a6334]'
-                          }`}
-                          onClick={() => setActiveSubTab('add_friend')}
-                        >
-                          Add Friend
-                        </Button>
-                      </nav>
-                    </>
-                  )}
-                </div>
-              </header>
+              <FriendsHeader
+                activeTopTab={activeTopTab}
+                activeSubTab={activeSubTab}
+                onSubTabChange={setActiveSubTab}
+                pendingCount={pendingCount}
+              />
 
-              {/* Content */}
               {activeTopTab === 'friends' ? (
                 <FriendsDashboard activeSubTab={activeSubTab} />
               ) : (
@@ -174,21 +144,5 @@ const DirectMessagesPage = () => {
     </>
   );
 };
-
-const TabButton = ({ label, isActive, onClick, count }) => (
-  <Button
-    variant={isActive ? 'secondary' : 'ghost'}
-    size="sm"
-    className="h-7 px-3 text-sm font-medium"
-    onClick={onClick}
-  >
-    {label}
-    {count != null && count > 0 && (
-      <Badge className="ml-2 h-4 min-w-4 bg-[#f23f42] p-1 text-[11px] font-bold hover:bg-[#f23f42]">
-        {count}
-      </Badge>
-    )}
-  </Button>
-);
 
 export default DirectMessagesPage;

@@ -45,6 +45,11 @@ export const DiscordGatewayService = {
       this.disconnect();
     }
 
+    // // TODO: Remove artificial delay (testing skeletons)
+    // setTimeout(() => this._doConnect(token), 10000);
+  },
+
+  _doConnect(token: string) {
     this._worker = new Worker(
       new URL('../workers/discord-gateway.worker.ts', import.meta.url),
       { type: 'module' },

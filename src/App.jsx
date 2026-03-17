@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate, Outlet, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from './ignite/store/auth.store';
 import PageTitle from './ignite/components/PageTitle';
@@ -66,7 +66,6 @@ const AuthRoute = ({ children }) => {
   }, [guilds, initialized, userId]);
 
   if (failed) {
-    // If we initialization failed, show an error message with a retry button
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 bg-body">
         <div className="text-xl font-semibold text-red-500">Server Error</div>
@@ -85,12 +84,14 @@ const AuthRoute = ({ children }) => {
     );
   }
 
+  // If no token exists, redirect to login immediately
+  if (!localStorage.getItem('token')) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // While initializing, render the app layout so skeletons show instead of a spinner
   if (!initialized) {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center bg-body">
-        <div className="size-16 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
-      </div>
-    );
+    return children ? children : <Outlet />;
   }
 
   if (!userId) {
@@ -109,34 +110,18 @@ const GuestRoute = ({ children }) => {
 };
 
 const PublicRoute = ({ children }) => {
-  const [initialized, setInitialized] = useState(false);
-
-  const initializing = useRef(false);
-
   useEffect(() => {
     const init = async () => {
       try {
         await InitializationService.initialize();
       } catch (error) {
         console.error('Failed to initialize on public route', error);
-        // Remove invalid token but don't prevent access
         localStorage.removeItem('token');
       }
-
-      setInitialized(true);
-      initializing.current = false;
     };
 
     init();
   }, []);
-
-  if (!initialized) {
-    return (
-      <div className="flex h-full items-center justify-center bg-body">
-        <div className="size-16 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
-      </div>
-    );
-  }
 
   return children ? children : <Outlet />;
 };

@@ -15,6 +15,7 @@ import { useUsersStore } from '@/ignite/store/users.store';
 import type { Friend } from '@/ignite/store/friends.store';
 import type { DiscordUser } from '@/discord/store/discord-users.store';
 import { DiscordService } from '@/discord/services/discord.service';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useDiscordChannelsStore } from '@/discord/store/discord-channels.store';
 import { useDiscordRelationshipsStore } from '@/discord/store/discord-relationships.store';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -230,14 +231,31 @@ type MergedFriend =
   | { source: 'ignite'; data: Friend; sortName: string }
   | { source: 'discord'; data: DiscordUser; sortName: string };
 
+const FriendRowSkeleton = () => (
+  <div className="flex items-center justify-between px-2 py-3">
+    <div className="flex items-center gap-3">
+      <Skeleton className="size-8 rounded-full" />
+      <div>
+        <Skeleton className="mb-1.5 h-3.5 w-24 rounded" />
+        <Skeleton className="h-3 w-16 rounded" />
+      </div>
+    </div>
+    <div className="flex gap-2">
+      <Skeleton className="size-9 rounded-full" />
+      <Skeleton className="size-9 rounded-full" />
+    </div>
+  </div>
+);
+
 type FriendsListProps = {
   friends: Friend[];
   discordFriends: DiscordUser[];
   filter: string;
   searchQuery: string;
+  loading?: boolean;
 };
 
-const FriendsList = ({ friends, discordFriends, filter, searchQuery }: FriendsListProps) => {
+const FriendsList = ({ friends, discordFriends, filter, searchQuery, loading }: FriendsListProps) => {
   const merged = useMemo(() => {
     const igniteFiltered = filter === 'online' ? friends.filter((f) => f.status !== 'offline') : friends;
 
@@ -267,6 +285,17 @@ const FriendsList = ({ friends, discordFriends, filter, searchQuery }: FriendsLi
 
     return items.sort((a, b) => a.sortName.localeCompare(b.sortName));
   }, [friends, discordFriends, filter, searchQuery]);
+
+  if (loading) {
+    return (
+      <div className="space-y-1">
+        <Skeleton className="mb-4 h-3 w-20 rounded" />
+        {Array.from({ length: 8 }).map((_, i) => (
+          <FriendRowSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1">

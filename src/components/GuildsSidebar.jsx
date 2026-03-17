@@ -56,6 +56,7 @@ import { ChannelType } from '@/ignite/constants/ChannelType';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { SpeakerSimpleHigh, Monitor } from '@phosphor-icons/react';
 import GuildIcon from '@/ignite/components/GuildIcon';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const SidebarIcon = ({
   icon = '',
@@ -520,6 +521,12 @@ const GuildsSidebar = () => {
         <hr className="mx-auto mb-2 w-8 rounded-full border-1 border-white/5 bg-gray-800" />
 
         {/* Guilds — drag-to-reorder */}
+        {orderedGuilds.length === 0 &&
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="mb-2 flex justify-center px-3">
+              <Skeleton className="size-12 rounded-2xl" />
+            </div>
+          ))}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -577,11 +584,11 @@ const GuildsSidebar = () => {
                 ))}
               </>
             ) : (
-              <div className="group relative mb-2 flex min-w-min items-center justify-center px-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1d1d1e]">
-                  <div className="size-5 animate-spin rounded-full border-2 border-solid border-[#5865f2] border-t-transparent" />
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="mb-2 flex justify-center px-3">
+                  <Skeleton className="size-12 rounded-2xl" />
                 </div>
-              </div>
+              ))
             )}
             <button
               type="button"
