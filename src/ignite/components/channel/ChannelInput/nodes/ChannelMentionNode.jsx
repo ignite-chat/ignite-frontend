@@ -1,4 +1,5 @@
 import { DecoratorNode, $applyNodeReplacement } from 'lexical';
+import ChannelMention from '@/ignite/components/message/markdown/ChannelMention';
 
 export class ChannelMentionNode extends DecoratorNode {
   __channelId;
@@ -33,8 +34,7 @@ export class ChannelMentionNode extends DecoratorNode {
 
   createDOM() {
     const span = document.createElement('span');
-    span.className =
-      'inline-flex items-center gap-0.5 rounded bg-blue-500/10 px-1 py-0.5 mx-[1px] text-blue-400 cursor-pointer select-none font-medium';
+    span.className = 'inline select-none';
     return span;
   }
 
@@ -43,14 +43,14 @@ export class ChannelMentionNode extends DecoratorNode {
   }
 
   decorate() {
-    return <span>#{this.__channelName}</span>;
+    return <ChannelMention channelId={this.__channelId} />;
   }
 
   isInline() {
     return true;
   }
 
-  isIsolated() {
+  isKeyboardSelectable() {
     return true;
   }
 
@@ -69,4 +69,10 @@ export function $createChannelMentionNode(channelId, channelName) {
 
 export function $isChannelMentionNode(node) {
   return node instanceof ChannelMentionNode;
+}
+
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    window.location.reload();
+  });
 }

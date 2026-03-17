@@ -1,4 +1,5 @@
 import { DecoratorNode, $applyNodeReplacement } from 'lexical';
+import MentionText from '@/ignite/components/message/markdown/MentionText';
 
 export class MentionNode extends DecoratorNode {
   __userId;
@@ -36,14 +37,7 @@ export class MentionNode extends DecoratorNode {
 
   createDOM() {
     const span = document.createElement('span');
-    if (this.__color !== 'inherit') {
-      span.className = 'inline-flex rounded px-1 py-0.5 mx-[1px] select-none font-medium';
-      span.style.backgroundColor = `${this.__color}33`;
-      span.style.color = this.__color;
-    } else {
-      span.className =
-        'inline-flex rounded bg-blue-500/20 text-blue-400 px-1 py-0.5 mx-[1px] select-none font-medium';
-    }
+    span.className = 'inline select-none';
     return span;
   }
 
@@ -52,14 +46,14 @@ export class MentionNode extends DecoratorNode {
   }
 
   decorate() {
-    return <span>{this.__displayName}</span>;
+    return <MentionText userId={this.__userId} />;
   }
 
   isInline() {
     return true;
   }
 
-  isIsolated() {
+  isKeyboardSelectable() {
     return true;
   }
 
@@ -78,4 +72,10 @@ export function $createMentionNode(userId, displayName, color) {
 
 export function $isMentionNode(node) {
   return node instanceof MentionNode;
+}
+
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    window.location.reload();
+  });
 }
