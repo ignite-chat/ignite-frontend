@@ -22,6 +22,7 @@ type EmojisStore = {
   addGuildEmoji: (guildId: string, emoji: Emoji) => void;
   removeGuildEmoji: (guildId: string, emojiId: string) => void;
   addRecentEmoji: (emoji: RecentEmoji) => void;
+  pruneRecentEmojis: () => void;
 };
 
 export const useEmojisStore = create<EmojisStore>()(
@@ -64,6 +65,16 @@ export const useEmojisStore = create<EmojisStore>()(
           const filtered = state.recentEmojis.filter((e) => e.label !== emoji.label);
           const newRecent = [emoji, ...filtered].slice(0, 20);
           return { recentEmojis: newRecent };
+        }),
+
+      pruneRecentEmojis: () =>
+        set((state) => {
+          const allCustomIds = new Set(
+            Object.values(state.guildEmojis).flatMap((emojis) => emojis.map((e) => e.id))
+          );
+          const pruned = state.recentEmojis.filter((e) => !e.isCustom || (e.id && allCustomIds.has(e.id)));
+          if (pruned.length === state.recentEmojis.length) return state;
+          return { recentEmojis: pruned };
         }),
     }),
     {

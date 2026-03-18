@@ -64,6 +64,9 @@ export const InitializationService = {
 
       useGuildsStore.getState().setGuilds(cleanGuilds);
 
+      // Prune recent emojis that reference deleted custom emojis
+      useEmojisStore.getState().pruneRecentEmojis();
+
       // Store guild channels + DM channels
       useChannelsStore.getState().setChannels([...guildChannels, ...(private_channels || [])]);
       VoiceService.seedVoiceStates(guildChannels);
