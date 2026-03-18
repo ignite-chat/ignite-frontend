@@ -268,6 +268,24 @@ export const ChannelsService = {
         setUsers(newAuthors);
       }
 
+      // Load reactions from messages into the reactions store
+      const currentUser = useUsersStore.getState().getCurrentUser();
+      const { setMessageReactions } = useChannelsStore.getState();
+      for (const msg of data) {
+        if (msg.reactions && msg.reactions.length > 0) {
+          const reactions = msg.reactions.map((r) => {
+            const emoji = r.emoji.id ? `<${r.emoji.id}:${r.emoji.name}>` : r.emoji.name;
+            return {
+              emoji,
+              count: r.count,
+              users: r.me && currentUser ? [currentUser.id] : [],
+              me: r.me,
+            };
+          });
+          setMessageReactions(channelId, msg.id, reactions);
+        }
+      }
+
       return data;
     } catch {
       toast.error('Unable to load channel messages.');
@@ -398,16 +416,24 @@ export const ChannelsService = {
   },
 
   /**
-   * Toggle a reaction on a message (add if not present, remove if present)
-   *
-   * FRONTEND-ONLY IMPLEMENTATION: Currently, reactions are stored only in the Zustand store (in-memory).
-   * When the page is refreshed, all reactions are lost. This is because the backend API is not yet implemented.
-   *
-   * For persistence across page refreshes and real-time sync with other users, the following backend integration is needed:
-   * 1. API endpoints to save/remove reactions to the server
-   * 2. WebSocket events to broadcast reaction changes to all connected clients
+   * Encode an emoji for use in the reaction API URL.
+   * - Standard unicode emoji → URL-encoded character (e.g. 👍 → %F0%9F%91%8D)
+   * - Custom emoji `<id:name>` → `name:id` URL-encoded (e.g. `name%3Aid`)
    */
-  toggleMessageReaction(channelId: string, messageId: string, emoji: string) {
+  _encodeReactionEmoji(emoji: string): string {
+    const customMatch = emoji.match(/^<(\w+):(\w+)>$/);
+    if (customMatch) {
+      const [, id, name] = customMatch;
+      return encodeURIComponent(`${name}:${id}`);
+    }
+    return encodeURIComponent(emoji);
+  },
+
+  /**
+   * Toggle a reaction on a message (add if not present, remove if present).
+   * Optimistically updates the store, then syncs with the backend API.
+   */
+  async toggleMessageReaction(channelId: string, messageId: string, emoji: string) {
     const user = useUsersStore.getState().getCurrentUser();
     if (!user) return;
 
@@ -415,11 +441,31 @@ export const ChannelsService = {
 
     const messageReactions = channelReactions[channelId]?.[messageId] || [];
     const existingReaction = messageReactions.find((r) => r.emoji === emoji);
+    const isRemoving = existingReaction?.users.includes(user.id);
 
-    if (existingReaction?.users.includes(user.id)) {
+    // Optimistic update
+    if (isRemoving) {
       removeReaction(channelId, messageId, emoji, user.id);
     } else {
       addReaction(channelId, messageId, emoji, user.id);
+    }
+
+    const encodedEmoji = this._encodeReactionEmoji(emoji);
+    const url = `/channels/${channelId}/messages/${messageId}/reactions/${encodedEmoji}/@me`;
+
+    try {
+      if (isRemoving) {
+        await api.delete(url);
+      } else {
+        await api.put(url);
+      }
+    } catch {
+      // Rollback on failure
+      if (isRemoving) {
+        addReaction(channelId, messageId, emoji, user.id);
+      } else {
+        removeReaction(channelId, messageId, emoji, user.id);
+      }
     }
   },
 

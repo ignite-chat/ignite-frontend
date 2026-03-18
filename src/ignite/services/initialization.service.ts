@@ -84,10 +84,12 @@ export const InitializationService = {
       useUnreadsStore.getState().setChannelUnreads(unreads || []);
       useNotificationStore.getState().setGuildNotificationSettings(guild_settings || []);
 
+      useAuthStore.getState().setInitialized(true);
       console.log('Initialization complete.');
       return { success: true, authenticated: true };
     } catch (error) {
       console.error('Failed to initialize', error);
+      useAuthStore.getState().setInitialized(true);
       return { success: false, authenticated: false, error };
     }
   },

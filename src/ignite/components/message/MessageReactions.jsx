@@ -6,6 +6,19 @@ import { useUsersStore } from '../../store/users.store';
 
 import { getTwemojiUrl } from '@/utils/emoji.utils';
 
+const CUSTOM_EMOJI_RE = /^<(\w+):(\w+)>$/;
+
+function getReactionEmojiSrc(emoji) {
+  const customMatch = emoji.match(CUSTOM_EMOJI_RE);
+  if (customMatch) {
+    return `${import.meta.env.VITE_CDN_BASE_URL}/emojis/${customMatch[1]}`;
+  }
+  if (emoji.startsWith('http')) {
+    return emoji;
+  }
+  return getTwemojiUrl(emoji);
+}
+
 const MessageReactions = ({ message, channelId }) => {
   const currentUser = useUsersStore((s) => s.getCurrentUser());
   const channelReactions = useChannelsStore((s) => s.channelReactions);
@@ -42,16 +55,12 @@ const MessageReactions = ({ message, channelId }) => {
               : 'border-white/5 bg-gray-800 hover:border-white/5 hover:bg-gray-700'
           )}
         >
-          {reaction.emoji.startsWith('http') ? (
-            <img src={reaction.emoji} className="size-4 object-contain" alt="reaction" draggable="false" />
-          ) : (
-            <img
-              src={getTwemojiUrl(reaction.emoji)}
-              className="size-4 object-contain"
-              alt={reaction.emoji}
-              draggable="false"
-            />
-          )}
+          <img
+            src={getReactionEmojiSrc(reaction.emoji)}
+            className="size-4 object-contain"
+            alt="reaction"
+            draggable="false"
+          />
           <span className="text-xs font-medium text-gray-300">{reaction.count}</span>
         </button>
       ))}

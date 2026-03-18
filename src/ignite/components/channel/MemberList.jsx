@@ -9,10 +9,12 @@ import { useModalStore } from '../../store/modal.store';
 import Avatar from '../Avatar.jsx';
 import { useRolesStore } from '../../store/roles.store.ts';
 import { useGuildsStore } from '@/ignite/store/guilds.store.ts';
+import { useAuthStore } from '@/ignite/store/auth.store';
 import { useUsersStore } from '@/ignite/store/users.store.ts';
 import { GuildsService } from '@/ignite/services/guilds.service.ts';
-import { CircleNotch, CaretDown, CaretRight } from '@phosphor-icons/react';
+import { CaretDown, CaretRight } from '@phosphor-icons/react';
 import OwnerCrown from '@/components/OwnerCrown';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const MemberListItem = ({ member, guildId, isOwner, popoverOpen, setPopoverOpen }) => {
   const userFromStore = useUsersStore((state) => state.users[member.user.id]);
@@ -85,13 +87,15 @@ const MemberList = ({ guildId }) => {
   const activeGuild = guilds.find((g) => g.id === guildId);
   const activeGuildMembers = guildMembers[guildId];
 
+  const initialized = useAuthStore((s) => s.initialized);
+
   useEffect(() => {
-    if (!guildId) return;
+    if (!guildId || !initialized) return;
 
     setIsLoading(true);
 
     GuildsService.loadGuildMembers(guildId).finally(() => setIsLoading(false));
-  }, [guildId]);
+  }, [guildId, initialized]);
 
   const roles = useMemo(() => useRolesStore.getState().guildRoles[guildId] || [], [guildId]);
 
@@ -159,7 +163,24 @@ const MemberList = ({ guildId }) => {
           </div>
           <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2 text-gray-400">
             {isLoading ? (
-              <CircleNotch size={32} className="mx-auto animate-spin text-gray-500" />
+              <div className="flex flex-col gap-1">
+                {/* Role group skeleton */}
+                <Skeleton className="mb-1 mt-2 h-3 w-24 rounded px-2" />
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-md p-2">
+                    <Skeleton className="size-8 shrink-0 rounded-full" />
+                    <Skeleton className="h-3.5 rounded" style={{ width: `${50 + Math.random() * 60}px` }} />
+                  </div>
+                ))}
+                {/* Second role group skeleton */}
+                <Skeleton className="mb-1 mt-3 h-3 w-20 rounded px-2" />
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={`b${i}`} className="flex items-center gap-3 rounded-md p-2">
+                    <Skeleton className="size-8 shrink-0 rounded-full" />
+                    <Skeleton className="h-3.5 rounded" style={{ width: `${50 + Math.random() * 60}px` }} />
+                  </div>
+                ))}
+              </div>
             ) : (
               <>
                 {roles.map((role) =>

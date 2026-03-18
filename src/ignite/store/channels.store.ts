@@ -40,22 +40,39 @@ export type MessageReference = {
   message_id: string;
 };
 
+export type ApiReactionEmoji = {
+  id: string | null;
+  name: string;
+};
+
+export type ApiReaction = {
+  emoji: ApiReactionEmoji;
+  count: number;
+  me: boolean;
+};
+
 export type Message = {
   id: string;
   content: string;
   nonce?: string;
   author: User;
   channel_id?: string;
+  user_id?: string;
+  webhook_id?: string | null;
+  name?: string | null;
+  avatar_url?: string | null;
   created_at: string;
   updated_at?: string;
   attachments?: Attachment[];
   message_reference?: MessageReference | null;
   message_references?: MessageReference[];
   sticker_ids?: string[];
-  mentions?: { user_id: string }[];
+  stickers?: unknown[];
+  mentions?: { user_id: string; message_id?: string }[];
   mention_everyone?: boolean;
   mention_roles?: string[];
   pinned?: boolean;
+  reactions?: ApiReaction[];
 };
 
 export type PendingMessage = {
@@ -98,12 +115,6 @@ export const useChannelsStore = create<ChannelsStore>((set) => ({
   channels: [],
   channelMessages: {},
   channelPendingMessages: {},
-  // FRONTEND-ONLY: channelReactions is stored in-memory only (not persisted to localStorage or server)
-  // Reactions are lost on page refresh until the backend API is implemented.
-  // To persist reactions:
-  // 1. Implement API endpoints: PUT/DELETE /channels/{id}/messages/{id}/reactions/{emoji}/@me
-  // 2. Set up WebSocket events: 'message.reaction.added', 'message.reaction.removed', 'message.reactions.set'
-  // 3. Load reactions when channel/messages are loaded (e.g., in loadChannelMessages)
   channelReactions: {},
   pinnedChannelIds: JSON.parse(localStorage.getItem('pinnedChannels') || '[]'),
 

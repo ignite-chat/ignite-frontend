@@ -44,6 +44,8 @@ import { scrollPositions } from '@/store/last-channel.store';
 import ChannelItem from '@/ignite/components/channel/ChannelItem';
 import ChannelRow from '@/ignite/components/channel/ChannelRow';
 import GuildSidebarHeader from './GuildSidebarHeader';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAuthStore } from '@/ignite/store/auth.store';
 
 const GuildSidebarCategory = ({
   category,
@@ -275,6 +277,7 @@ const GuildChannelsSidebar = ({
 }) => {
   const { channelId } = useParams();
   const { channels, setChannels } = useChannelsStore();
+  const initialized = useAuthStore((s) => s.initialized);
   const [activeId, setActiveId] = useState(null);
   const [overId, setOverId] = useState(null);
   const [dropPosition, setDropPosition] = useState(null);
@@ -495,6 +498,35 @@ const GuildChannelsSidebar = ({
         <hr className="m-0 w-full border border-t-0 border-white/5 bg-[#121214] p-0" />
         <div className="scrollbar-hover flex min-h-0 flex-1 flex-col items-center overflow-y-auto pb-36" ref={sidebarRef} onScroll={onSidebarScroll}>
 
+          {!initialized || guildChannels.length === 0 ? (
+            <div className="flex w-full flex-col gap-1 px-2 pt-4">
+              {/* Category skeleton */}
+              <Skeleton className="mb-2 h-3 w-20 rounded" />
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-2 rounded px-2 py-1.5">
+                  <Skeleton className="size-5 shrink-0 rounded" />
+                  <Skeleton className="h-3.5 rounded" style={{ width: `${60 + Math.random() * 60}px` }} />
+                </div>
+              ))}
+              {/* Second category skeleton */}
+              <Skeleton className="mb-2 mt-4 h-3 w-24 rounded" />
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={`b${i}`} className="flex items-center gap-2 rounded px-2 py-1.5">
+                  <Skeleton className="size-5 shrink-0 rounded" />
+                  <Skeleton className="h-3.5 rounded" style={{ width: `${60 + Math.random() * 60}px` }} />
+                </div>
+              ))}
+              {/* Third category skeleton */}
+              <Skeleton className="mb-2 mt-4 h-3 w-16 rounded" />
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={`c${i}`} className="flex items-center gap-2 rounded px-2 py-1.5">
+                  <Skeleton className="size-5 shrink-0 rounded" />
+                  <Skeleton className="h-3.5 rounded" style={{ width: `${60 + Math.random() * 60}px` }} />
+                </div>
+              ))}
+            </div>
+          ) : (
+          <>
           {/* Root Channels (No Category) */}
           <GuildSidebarCategory
             category={null}
@@ -528,6 +560,8 @@ const GuildChannelsSidebar = ({
               dropPosition={dropPosition}
             />
           ))}
+          </>
+          )}
         </div>
       </div>
 

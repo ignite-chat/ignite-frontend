@@ -4,17 +4,20 @@ type AuthStore = {
   userId: string | null;
   token: string | null;
   isAuthenticated: boolean;
+  initialized: boolean;
 
   login: (userId: string, token: string) => void;
   logout: () => void;
   setUserId: (userId: string) => void;
   setToken: (token: string) => void;
+  setInitialized: (initialized: boolean) => void;
 };
 
 export const useAuthStore = create<AuthStore>((set) => ({
   userId: null,
   token: null,
   isAuthenticated: false,
+  initialized: false,
 
   login: (userId, token) => {
     localStorage.setItem('token', token);
@@ -23,7 +26,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   logout: () => {
     localStorage.removeItem('token');
-    set({ userId: null, token: null, isAuthenticated: false });
+    set({ userId: null, token: null, isAuthenticated: false, initialized: false });
   },
 
   setUserId: (userId) => set({ userId }),
@@ -34,4 +37,6 @@ export const useAuthStore = create<AuthStore>((set) => ({
     }
     set({ token });
   },
+
+  setInitialized: (initialized) => set({ initialized }),
 }));

@@ -5,6 +5,7 @@ import { EmojisService } from '../services/emojis.service';
 import { useGuildsStore } from '../store/guilds.store';
 import { useChannelsStore } from '../store/channels.store';
 import { useNotificationStore } from '../store/notification.store';
+import { useAuthStore } from '../store/auth.store';
 import { useLastChannelStore } from '@/store/last-channel.store';
 import GuildLayout from '../layouts/GuildLayout';
 import Channel from '../components/channel/Channel';
@@ -17,6 +18,7 @@ const GuildChannelPage = () => {
 
   const { guilds } = useGuildsStore();
   const { channels } = useChannelsStore();
+  const initialized = useAuthStore((s) => s.initialized);
 
   // get the guild id from the URL
   const { guildId, channelId, messageId } = useParams();
@@ -24,12 +26,12 @@ const GuildChannelPage = () => {
   // find guild from guilds
   const guild = useMemo(() => guilds.find((g) => g.id == guildId), [guilds, guildId]);
 
-  // if no guild redirect away
+  // if no guild redirect away (only after initialization is complete)
   useEffect(() => {
-    if (!guild) {
+    if (initialized && !guild) {
       navigate('/channels/@me', { replace: true });
     }
-  }, [guild, navigate]);
+  }, [initialized, guild, navigate]);
 
   // Track active channel for notification suppression
   useEffect(() => {
