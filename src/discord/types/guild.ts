@@ -6,7 +6,12 @@ export type DiscordGuildProperties = {
   owner_id?: string;
   discovery_splash?: string | null;
   hub_type?: string | null;
+  afk_channel_id?: string | null;
+  afk_timeout?: number;
+  mfa_level?: number;
   nsfw_level?: number;
+  system_channel_id?: string | null;
+  system_channel_flags?: number;
   safety_alerts_channel_id?: string | null;
   rules_channel_id?: string | null;
   description?: string | null;

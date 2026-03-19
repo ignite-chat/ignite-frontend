@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import ServerInfo from './ServerInfo';
+import ServerAccess from './ServerAccess';
 import ServerRoleManager from './roles/ServerRoleManager';
 import ServerMemberManager from './ServerMemberManager';
 import ServerInviteManager from './ServerInviteManager';
@@ -7,7 +8,7 @@ import ServerEmojiManager from './ServerEmojiManager';
 import ServerStickerManager from './ServerStickerManager';
 import ServerBanManager from './ServerBanManager';
 import { Button } from '@/components/ui/button';
-import { Info, Shield, Users, Mail, X, Smile, StickyNote, Ban } from 'lucide-react';
+import { Info, Shield, Users, Mail, X, Smile, StickyNote, Ban, DoorOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useModalStore } from '@/ignite/store/modal.store';
 
@@ -22,6 +23,7 @@ const ServerSettingsModal = ({ modalId, guild, initialTab = 'info' }) => {
         label: guild?.name?.toUpperCase() || 'SERVER',
         items: [
           { id: 'info', label: 'Overview', icon: Info, component: <ServerInfo guild={guild} /> },
+          { id: 'access', label: 'Access', icon: DoorOpen, component: <ServerAccess guild={guild} /> },
           { id: 'emoji', label: 'Emoji', icon: Smile, component: <ServerEmojiManager guild={guild} /> },
           { id: 'stickers', label: 'Stickers', icon: StickyNote, component: <ServerStickerManager guild={guild} /> },
         ],
@@ -93,7 +95,7 @@ const ServerSettingsModal = ({ modalId, guild, initialTab = 'info' }) => {
           </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-10 py-14">
+        <div className="relative flex-1 overflow-y-auto px-10 py-14">
           {activeItem?.component}
         </div>
       </div>

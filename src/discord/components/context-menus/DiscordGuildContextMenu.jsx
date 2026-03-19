@@ -1,4 +1,4 @@
-import { Copy, Bug } from '@phosphor-icons/react';
+import { Copy, Bug, GearSix } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import {
   ContextMenuContent,
@@ -14,6 +14,7 @@ import { useDiscordGuildSettingsStore } from '../../store/discord-guild-settings
 import { useDiscordGuildsStore } from '../../store/discord-guilds.store';
 import { DiscordApiService } from '../../services/discord-api.service';
 import DebugInfoModal from '../DebugInfoModal';
+import DiscordServerSettingsModal from '../modals/DiscordServerSettingsModal';
 
 const RadioIndicator = ({ checked }) => (
   <div className={`flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 ${checked ? 'border-[#5865f2] bg-[#5865f2]' : 'border-[#4e5058]'}`}>
@@ -236,6 +237,17 @@ const DiscordGuildContextMenu = ({ guild }) => {
           </button>
         </ContextMenuSubContent>
       </ContextMenuSub>
+
+      <Separator className="my-1 bg-white/5" />
+
+      <button
+        type="button"
+        className="flex w-full items-center justify-between rounded p-2 text-left text-sm font-medium text-gray-100 hover:bg-white/5"
+        onClick={() => useModalStore.getState().push(DiscordServerSettingsModal, { guild })}
+      >
+        <span>Server Settings</span>
+        <GearSix className="ml-2 size-[18px]" />
+      </button>
 
       <Separator className="my-1 bg-white/5" />
 

@@ -1,4 +1,3 @@
-import { CircleNotch, FloppyDisk } from '@phosphor-icons/react';
 import { Shield, Users, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -6,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { isEveryone } from '@/ignite/constants/Roles';
 import RoleDisplay from './RoleDisplay';
 import RolePermissions from './RolePermissions';
+import UnsavedChangesBar from '@/components/ui/unsaved-changes-bar';
 
 const RoleEditor = ({
   activeRole,
@@ -88,32 +88,12 @@ const RoleEditor = ({
           </TabsContent>
         </div>
 
-        {hasChanged && (
-          <div className="absolute bottom-4 left-4 right-4 z-50 flex items-center justify-between gap-2 rounded-md border border-primary/20 bg-primary/5 px-4 py-3 backdrop-blur-md animate-in fade-in slide-in-from-bottom-2">
-            <span className="text-xs font-medium text-primary">
-              Careful — you have unsaved changes!
-            </span>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={onReset}>
-                Reset
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                className="gap-2"
-                onClick={onSave}
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <CircleNotch size={14} className="animate-spin" />
-                ) : (
-                  <FloppyDisk size={14} />
-                )}
-                Save Changes
-              </Button>
-            </div>
-          </div>
-        )}
+        <UnsavedChangesBar
+          show={hasChanged}
+          saving={isSaving}
+          onSave={onSave}
+          onReset={onReset}
+        />
       </Tabs>
     </div>
   );

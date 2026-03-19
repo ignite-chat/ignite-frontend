@@ -7,9 +7,45 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Camera, Pencil, Trash2 } from 'lucide-react';
 import ImageCropperModal from '@/ignite/components/modals/ImageCropperModal';
 import GuildCard from '../guild/GuildCard';
+import UnsavedChangesBar from '@/components/ui/unsaved-changes-bar';
+
+const AFK_TIMEOUT_OPTIONS = [
+  { label: '1 Minute', value: 60 },
+  { label: '5 Minutes', value: 300 },
+  { label: '15 Minutes', value: 900 },
+  { label: '30 Minutes', value: 1800 },
+  { label: '1 Hour', value: 3600 },
+];
+
+const MFA_LEVEL_OPTIONS = [
+  { label: 'None', value: 0 },
+  { label: 'Elevated', value: 1 },
+];
+
+const NSFW_LEVEL_OPTIONS = [
+  { label: 'Default', value: 0 },
+  { label: 'Explicit', value: 1 },
+  { label: 'Safe', value: 2 },
+  { label: 'Age Restricted', value: 3 },
+];
+
+const SYSTEM_CHANNEL_FLAGS = [
+  { label: 'Suppress member join notifications', flag: 1 << 0 },
+  { label: 'Suppress server boost notifications', flag: 1 << 1 },
+  { label: 'Suppress server setup tips', flag: 1 << 2 },
+  { label: 'Suppress member join sticker replies', flag: 1 << 3 },
+];
 
 const CDN_BASE = import.meta.env.VITE_CDN_BASE_URL;
 
@@ -39,15 +75,22 @@ const ServerInfo = ({ guild }) => {
   const [ownerWarning, setOwnerWarning] = useState('');
   const [editingField, setEditingField] = useState(null);
 
-  // null = no change, '' = remove, '<data:...>' = new image
-  const [pendingIcon, setPendingIcon] = useState(null);
+  // Pending changes (null = unchanged from saved profile)
+  const [pendingName, setPendingName] = useState(null);
+  const [pendingDescription, setPendingDescription] = useState(null);
+  const [pendingIcon, setPendingIcon] = useState(null); // '' = remove, '<data:...>' = new
   const [pendingBanner, setPendingBanner] = useState(null);
+  const [pendingAfkChannelId, setPendingAfkChannelId] = useState(null);
+  const [pendingAfkTimeout, setPendingAfkTimeout] = useState(null);
+  const [pendingSystemChannelId, setPendingSystemChannelId] = useState(null);
+  const [pendingSystemChannelFlags, setPendingSystemChannelFlags] = useState(null);
+  const [pendingRulesChannelId, setPendingRulesChannelId] = useState(null);
+  const [pendingMfaLevel, setPendingMfaLevel] = useState(null);
+  const [pendingNsfwLevel, setPendingNsfwLevel] = useState(null);
 
   const iconInputRef = useRef(null);
   const bannerInputRef = useRef(null);
 
-  const nameForm = useForm({ defaultValues: { name: '' } });
-  const descriptionForm = useForm({ defaultValues: { description: '' } });
   const ownerForm = useForm({ defaultValues: { owner_id: '', confirm_transfer: false } });
   const confirmTransfer = ownerForm.watch('confirm_transfer');
 
@@ -62,14 +105,16 @@ const ServerInfo = ({ guild }) => {
   const displayBannerUrl =
     pendingBanner === null ? savedBannerUrl : pendingBanner === REMOVE ? null : pendingBanner;
 
-  const guildInitials = (profile?.name || guild?.name || '')
+  const displayName = pendingName !== null ? pendingName : profile?.name || guild?.name || '';
+  const displayDescription =
+    pendingDescription !== null ? pendingDescription : profile?.description || '';
+
+  const guildInitials = (displayName || 'Unnamed Server')
     .trim()
     .split(/\s+/)
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('');
-
-  const getErrorMessage = (form, field) => form.formState.errors?.[field]?.message;
 
   useEffect(() => {
     if (!guild?.id) return;
@@ -83,8 +128,6 @@ const ServerInfo = ({ guild }) => {
       .then((response) => {
         if (!active) return;
         setProfile(response.data);
-        nameForm.reset({ name: response.data?.name || '' });
-        descriptionForm.reset({ description: response.data?.description || '' });
         ownerForm.reset({
           owner_id: response.data?.owner_id ? String(response.data.owner_id) : '',
           confirm_transfer: false,
@@ -109,7 +152,21 @@ const ServerInfo = ({ guild }) => {
     ownerForm.register('confirm_transfer');
   }, [ownerForm]);
 
-  const handleSave = async (body, resetForm) => {
+  // Detect unsaved changes
+  const hasUnsavedChanges =
+    pendingIcon !== null ||
+    pendingBanner !== null ||
+    pendingName !== null ||
+    pendingDescription !== null ||
+    pendingAfkChannelId !== null ||
+    pendingAfkTimeout !== null ||
+    pendingSystemChannelId !== null ||
+    pendingSystemChannelFlags !== null ||
+    pendingRulesChannelId !== null ||
+    pendingMfaLevel !== null ||
+    pendingNsfwLevel !== null;
+
+  const handleSaveField = async (body, resetForm) => {
     if (!guild?.id) return false;
     setSaving(true);
     setError('');
@@ -128,6 +185,51 @@ const ServerInfo = ({ guild }) => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSaveAll = async () => {
+    const body = {};
+    if (pendingIcon !== null) body.icon = pendingIcon === REMOVE ? null : pendingIcon;
+    if (pendingBanner !== null) body.banner = pendingBanner === REMOVE ? null : pendingBanner;
+    if (pendingName !== null) body.name = pendingName.trim() || profile?.name;
+    if (pendingDescription !== null) body.description = pendingDescription.trim();
+    if (pendingAfkChannelId !== null) body.afk_channel_id = pendingAfkChannelId;
+    if (pendingAfkTimeout !== null) body.afk_timeout = pendingAfkTimeout;
+    if (pendingSystemChannelId !== null) body.system_channel_id = pendingSystemChannelId;
+    if (pendingSystemChannelFlags !== null) body.system_channel_flags = pendingSystemChannelFlags;
+    if (pendingRulesChannelId !== null) body.rules_channel_id = pendingRulesChannelId;
+    if (pendingMfaLevel !== null) body.mfa_level = pendingMfaLevel;
+    if (pendingNsfwLevel !== null) body.nsfw_level = pendingNsfwLevel;
+    if (Object.keys(body).length === 0) return;
+
+    const saved = await handleSaveField(body);
+    if (saved) {
+      setPendingIcon(null);
+      setPendingBanner(null);
+      setPendingName(null);
+      setPendingDescription(null);
+      setPendingAfkChannelId(null);
+      setPendingAfkTimeout(null);
+      setPendingSystemChannelId(null);
+      setPendingSystemChannelFlags(null);
+      setPendingRulesChannelId(null);
+      setPendingMfaLevel(null);
+      setPendingNsfwLevel(null);
+    }
+  };
+
+  const handleResetAll = () => {
+    setPendingIcon(null);
+    setPendingBanner(null);
+    setPendingName(null);
+    setPendingDescription(null);
+    setPendingAfkChannelId(null);
+    setPendingAfkTimeout(null);
+    setPendingSystemChannelId(null);
+    setPendingSystemChannelFlags(null);
+    setPendingRulesChannelId(null);
+    setPendingMfaLevel(null);
+    setPendingNsfwLevel(null);
   };
 
   const openCropper = async (e, mode) => {
@@ -153,24 +255,6 @@ const ServerInfo = ({ guild }) => {
   const handleIconChange = (e) => openCropper(e, 'icon');
   const handleBannerChange = (e) => openCropper(e, 'banner');
 
-  const handleSaveImages = async () => {
-    const body = {};
-    if (pendingIcon !== null) body.icon = pendingIcon === REMOVE ? null : pendingIcon;
-    if (pendingBanner !== null) body.banner = pendingBanner === REMOVE ? null : pendingBanner;
-    if (Object.keys(body).length === 0) return;
-    const saved = await handleSave(body);
-    if (saved) {
-      setPendingIcon(null);
-      setPendingBanner(null);
-    }
-  };
-
-  const resetImages = () => {
-    setPendingIcon(null);
-    setPendingBanner(null);
-  };
-
-  const hasUnsavedImages = pendingIcon !== null || pendingBanner !== null;
   const canRemoveIcon = !!(savedIconUrl || (pendingIcon && pendingIcon !== REMOVE));
   const canRemoveBanner = !!(savedBannerUrl || (pendingBanner && pendingBanner !== REMOVE));
 
@@ -183,15 +267,51 @@ const ServerInfo = ({ guild }) => {
       )}
 
       {loading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <div className="space-y-8">
+          {/* Preview card skeleton */}
+          <Skeleton className="h-[200px] max-w-sm rounded-lg" />
+
+          {/* Icon skeleton */}
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-24" />
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-16 w-16 rounded-full" />
+              <Skeleton className="h-8 w-28 rounded-md" />
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Banner skeleton */}
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-24 w-full rounded-md" />
+          </div>
+
+          <Separator />
+
+          {/* Name skeleton */}
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-9 w-full rounded-md" />
+          </div>
+
+          <Separator />
+
+          {/* Description skeleton */}
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-9 w-full rounded-md" />
+          </div>
+        </div>
       ) : (
         <>
           {/* ── Preview card (read-only) ── */}
           <GuildCard
             guild={{
               ...guild,
-              name: profile?.name || guild?.name || 'Unnamed Server',
-              description: profile?.description || guild?.description,
+              name: displayName || 'Unnamed Server',
+              description: displayDescription || guild?.description,
               icon_file_id: pendingIcon === null ? (profile?.icon_file_id ?? guild?.icon_file_id) : undefined,
               banner_file_id: pendingBanner === null ? (profile?.banner_file_id ?? guild?.banner_file_id) : undefined,
             }}
@@ -327,188 +447,282 @@ const ServerInfo = ({ guild }) => {
             />
           </div>
 
-          {/* ── Unsaved image changes bar ── */}
-          {hasUnsavedImages && (
-            <div className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-4 py-2.5">
-              <p className="text-sm text-muted-foreground">You have unsaved image changes.</p>
-              <div className="flex gap-2">
-                <Button type="button" variant="ghost" size="sm" onClick={resetImages}>
-                  Reset
-                </Button>
-                <Button type="button" size="sm" disabled={saving} onClick={handleSaveImages}>
-                  Save Changes
-                </Button>
-              </div>
-            </div>
-          )}
-
           <Separator />
 
-          {/* ── Server Discovery ── */}
+          {/* ── Server Name ── */}
           <div className="space-y-3">
-            <div>
-              <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Server Discovery
-              </Label>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Allow this server to appear in Server Discovery so anyone can find and join it.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Switch
-                checked={Boolean(profile?.is_discoverable)}
-                onCheckedChange={async (checked) => {
-                  await handleSave({ is_discoverable: checked });
-                }}
-                disabled={saving}
-              />
-              <span className="text-sm">
-                {profile?.is_discoverable ? 'Discoverable' : 'Not discoverable'}
-              </span>
-            </div>
+            <Label
+              htmlFor="profile-name"
+              className="text-xs font-bold uppercase tracking-wide text-muted-foreground"
+            >
+              Server Name
+            </Label>
+            <Input
+              id="profile-name"
+              type="text"
+              placeholder="Enter server name"
+              className="bg-background"
+              value={displayName}
+              onChange={(e) => {
+                const val = e.target.value;
+                const savedName = profile?.name || guild?.name || '';
+                setPendingName(val === savedName ? null : val);
+              }}
+            />
           </div>
 
           <Separator />
 
-          {/* ── Server Name ── */}
-          <form
-            onSubmit={nameForm.handleSubmit(async (data) => {
-              const name = data.name?.trim();
-              if (!name) return;
-              const saved = await handleSave({ name }, (nextProfile) =>
-                nameForm.reset({ name: nextProfile?.name || '' })
-              );
-              if (saved) setEditingField(null);
-            })}
-            className="space-y-3"
-          >
-            <div className="flex items-center justify-between">
+          {/* ── Server Description ── */}
+          <div className="space-y-3">
+            <div>
               <Label
-                htmlFor="profile-name"
+                htmlFor="profile-description"
                 className="text-xs font-bold uppercase tracking-wide text-muted-foreground"
               >
-                Server Name
+                Server Description
               </Label>
-              {editingField !== 'name' && (
-                <button
-                  type="button"
-                  onClick={() => setEditingField('name')}
-                  className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Pencil className="h-3 w-3" />
-                  Edit
-                </button>
-              )}
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Help others discover your server with a short description.
+              </p>
             </div>
-
-            {editingField === 'name' ? (
-              <div className="space-y-3">
-                <Input
-                  id="profile-name"
-                  type="text"
-                  placeholder="Enter server name"
-                  className="bg-background"
-                  {...nameForm.register('name')}
-                />
-                {getErrorMessage(nameForm, 'name') && (
-                  <p className="text-sm text-destructive">{getErrorMessage(nameForm, 'name')}</p>
-                )}
-                <div className="flex gap-2">
-                  <Button type="submit" size="sm" disabled={saving}>
-                    Save
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      nameForm.reset({ name: profile?.name || '' });
-                      setEditingField(null);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-md bg-muted/30 px-3 py-2.5">
-                <span className="text-sm">{profile?.name || guild?.name || 'Unnamed Server'}</span>
-              </div>
-            )}
-          </form>
+            <Input
+              id="profile-description"
+              type="text"
+              placeholder="Enter server description"
+              className="bg-background"
+              value={displayDescription}
+              onChange={(e) => {
+                const val = e.target.value;
+                const savedDesc = profile?.description || '';
+                setPendingDescription(val === savedDesc ? null : val);
+              }}
+            />
+          </div>
 
           <Separator />
 
-          {/* ── Server Description ── */}
-          <form
-            onSubmit={descriptionForm.handleSubmit(async (data) => {
-              const description = data.description?.trim();
-              const saved = await handleSave({ description: description || '' }, (nextProfile) =>
-                descriptionForm.reset({ description: nextProfile?.description || '' })
-              );
-              if (saved) setEditingField(null);
-            })}
-            className="space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <Label
-                  htmlFor="profile-description"
-                  className="text-xs font-bold uppercase tracking-wide text-muted-foreground"
-                >
-                  Server Description
-                </Label>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Help others discover your server with a short description.
-                </p>
-              </div>
-              {editingField !== 'description' && (
-                <button
-                  type="button"
-                  onClick={() => setEditingField('description')}
-                  className="flex flex-shrink-0 items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Pencil className="h-3 w-3" />
-                  Edit
-                </button>
-              )}
+          {/* ── AFK Channel ── */}
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Inactive Channel
+              </Label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Members will be moved to this voice channel after the inactive timeout.
+              </p>
             </div>
+            <Select
+              value={(pendingAfkChannelId !== null ? pendingAfkChannelId : profile?.afk_channel_id) || '__none__'}
+              onValueChange={(v) => {
+                const val = v === '__none__' ? null : v;
+                const saved = profile?.afk_channel_id || null;
+                setPendingAfkChannelId(val === saved ? null : val);
+              }}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">No Inactive Channel</SelectItem>
+                {(guild?.channels || [])
+                  .filter((c) => c.type === 2)
+                  .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+                  .map((ch) => (
+                    <SelectItem key={ch.channel_id} value={ch.channel_id}>
+                      {ch.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            {editingField === 'description' ? (
-              <div className="space-y-3">
-                <Input
-                  id="profile-description"
-                  type="text"
-                  placeholder="Enter server description"
-                  className="bg-background"
-                  {...descriptionForm.register('description')}
-                />
-                <div className="flex gap-2">
-                  <Button type="submit" size="sm" disabled={saving}>
-                    Save
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      descriptionForm.reset({ description: profile?.description || '' });
-                      setEditingField(null);
+          {/* ── AFK Timeout ── */}
+          <div className="space-y-3">
+            <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Inactive Timeout
+            </Label>
+            <Select
+              value={String(pendingAfkTimeout !== null ? pendingAfkTimeout : (profile?.afk_timeout ?? 300))}
+              onValueChange={(v) => {
+                const val = Number(v);
+                const saved = profile?.afk_timeout ?? 300;
+                setPendingAfkTimeout(val === saved ? null : val);
+              }}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AFK_TIMEOUT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={String(opt.value)}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
+          {/* ── System Channel ── */}
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                System Messages Channel
+              </Label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                The channel where system messages like welcome events are sent.
+              </p>
+            </div>
+            <Select
+              value={(pendingSystemChannelId !== null ? pendingSystemChannelId : profile?.system_channel_id) || '__none__'}
+              onValueChange={(v) => {
+                const val = v === '__none__' ? null : v;
+                const saved = profile?.system_channel_id || null;
+                setPendingSystemChannelId(val === saved ? null : val);
+              }}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">No System Channel</SelectItem>
+                {(guild?.channels || [])
+                  .filter((c) => c.type === 0)
+                  .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+                  .map((ch) => (
+                    <SelectItem key={ch.channel_id} value={ch.channel_id}>
+                      # {ch.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* ── System Channel Flags ── */}
+          <div className="space-y-2">
+            <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              System Channel Flags
+            </Label>
+            {SYSTEM_CHANNEL_FLAGS.map((item) => {
+              const displayFlags = pendingSystemChannelFlags !== null
+                ? pendingSystemChannelFlags
+                : (profile?.system_channel_flags ?? 0);
+              const isChecked = Boolean(displayFlags & item.flag);
+              return (
+                <div key={item.flag} className="flex items-center gap-3">
+                  <Switch
+                    checked={isChecked}
+                    onCheckedChange={(checked) => {
+                      const newFlags = checked
+                        ? displayFlags | item.flag
+                        : displayFlags & ~item.flag;
+                      const saved = profile?.system_channel_flags ?? 0;
+                      setPendingSystemChannelFlags(newFlags === saved ? null : newFlags);
                     }}
-                  >
-                    Cancel
-                  </Button>
+                  />
+                  <span className="text-sm">{item.label}</span>
                 </div>
-              </div>
-            ) : (
-              <div className="rounded-md bg-muted/30 px-3 py-2.5">
-                <span className="text-sm text-muted-foreground">
-                  {profile?.description || 'No description set'}
-                </span>
-              </div>
-            )}
-          </form>
+              );
+            })}
+          </div>
+
+          <Separator />
+
+          {/* ── Rules Channel ── */}
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Rules Channel
+              </Label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                The channel where server rules are displayed.
+              </p>
+            </div>
+            <Select
+              value={(pendingRulesChannelId !== null ? pendingRulesChannelId : profile?.rules_channel_id) || '__none__'}
+              onValueChange={(v) => {
+                const val = v === '__none__' ? null : v;
+                const saved = profile?.rules_channel_id || null;
+                setPendingRulesChannelId(val === saved ? null : val);
+              }}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">No Rules Channel</SelectItem>
+                {(guild?.channels || [])
+                  .filter((c) => c.type === 0)
+                  .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+                  .map((ch) => (
+                    <SelectItem key={ch.channel_id} value={ch.channel_id}>
+                      # {ch.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
+          {/* ── MFA Level ── */}
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                2FA Requirement
+              </Label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Require members with moderation powers to have 2FA enabled.
+              </p>
+            </div>
+            <Select
+              value={String(pendingMfaLevel !== null ? pendingMfaLevel : (profile?.mfa_level ?? 0))}
+              onValueChange={(v) => {
+                const val = Number(v);
+                const saved = profile?.mfa_level ?? 0;
+                setPendingMfaLevel(val === saved ? null : val);
+              }}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MFA_LEVEL_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={String(opt.value)}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* ── NSFW Level ── */}
+          <div className="space-y-3">
+            <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              NSFW Level
+            </Label>
+            <Select
+              value={String(pendingNsfwLevel !== null ? pendingNsfwLevel : (profile?.nsfw_level ?? 0))}
+              onValueChange={(v) => {
+                const val = Number(v);
+                const saved = profile?.nsfw_level ?? 0;
+                setPendingNsfwLevel(val === saved ? null : val);
+              }}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {NSFW_LEVEL_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={String(opt.value)}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <Separator />
 
@@ -523,7 +737,7 @@ const ServerInfo = ({ guild }) => {
                 setOwnerWarning('Confirm the ownership transfer to continue.');
                 return;
               }
-              const saved = await handleSave({ owner_id: nextOwnerId }, (nextProfile) =>
+              const saved = await handleSaveField({ owner_id: nextOwnerId }, (nextProfile) =>
                 ownerForm.reset({
                   owner_id: nextProfile?.owner_id ? String(nextProfile.owner_id) : '',
                   confirm_transfer: false,
@@ -615,6 +829,12 @@ const ServerInfo = ({ guild }) => {
         </>
       )}
 
+      <UnsavedChangesBar
+        show={hasUnsavedChanges}
+        saving={saving}
+        onSave={handleSaveAll}
+        onReset={handleResetAll}
+      />
     </div>
   );
 };

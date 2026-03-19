@@ -326,6 +326,14 @@ export const DiscordApiService = {
   },
 
   /**
+   * Modify a guild's settings (name, icon, afk channel, etc.)
+   */
+  async modifyGuild(guildId: string, body: Record<string, any>): Promise<DiscordGuild> {
+    const { data } = await discordApi.patch<DiscordGuild>(`/guilds/${guildId}`, body);
+    return data;
+  },
+
+  /**
    * Update user guild settings (mute, notifications, etc.)
    */
   async updateUserGuildSettings(guildId: string, settings: Record<string, any>): Promise<UserGuildSettingsResponse> {
