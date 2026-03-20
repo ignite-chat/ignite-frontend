@@ -238,6 +238,7 @@ export const VoiceService = {
       store.setRoom(room);
       store.setConnectionState('connected');
       store.setChannelVoiceStates(channelId, buildVoiceStates(room));
+      SoundService.playSound('voice_connected');
 
       // Respect the user's current mute state when joining
       const shouldEnableMic = !useVoiceStore.getState().isMuted;

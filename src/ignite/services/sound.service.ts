@@ -1,20 +1,21 @@
 import { useSoundStore, type SoundEventType } from '../store/sound.store';
 
-// Default sound imports
-import messageNotification from '@/assets/sounds/message_notification.wav';
-import voiceMute from '@/assets/sounds/voice_mute.wav';
-import voiceUnmute from '@/assets/sounds/voice_unmute.wav';
-import voiceDeafen from '@/assets/sounds/voice_deafen.wav';
-import voiceUndeafen from '@/assets/sounds/voice_undeafen.wav';
-import userJoinChannel from '@/assets/sounds/user_join_channel.wav';
-import userLeaveChannel from '@/assets/sounds/user_leave_channel.wav';
-import userMovedChannel from '@/assets/sounds/user_moved_channel.wav';
-import viewerJoinStream from '@/assets/sounds/viewer_join_stream.wav';
-import viewerLeaveStream from '@/assets/sounds/viewer_leave_stream.wav';
-import voiceDisconnected from '@/assets/sounds/voice_disconnected.wav';
-import incomingCall from '@/assets/sounds/incoming_call.wav';
-import cameraOn from '@/assets/sounds/camera_on.wav';
-import cameraOff from '@/assets/sounds/camera_off.wav';
+// Default sound imports (from fluxer sound pack)
+import messageNotification from '@/assets/sounds/message.mp3';
+import voiceMute from '@/assets/sounds/mute.mp3';
+import voiceUnmute from '@/assets/sounds/unmute.mp3';
+import voiceDeafen from '@/assets/sounds/deaf.mp3';
+import voiceUndeafen from '@/assets/sounds/undeaf.mp3';
+import userJoinChannel from '@/assets/sounds/user-join.mp3';
+import userLeaveChannel from '@/assets/sounds/user-leave.mp3';
+import userMovedChannel from '@/assets/sounds/user-move.mp3';
+import viewerJoinStream from '@/assets/sounds/viewer-join.mp3';
+import viewerLeaveStream from '@/assets/sounds/viewer-leave.mp3';
+import voiceConnected from '@/assets/sounds/stream-start.mp3';
+import voiceDisconnected from '@/assets/sounds/voice-disconnect.mp3';
+import incomingCall from '@/assets/sounds/incoming-ring.mp3';
+import cameraOn from '@/assets/sounds/camera-on.mp3';
+import cameraOff from '@/assets/sounds/camera-off.mp3';
 
 const DEFAULT_SOUNDS: Record<SoundEventType, string> = {
   message_notification: messageNotification,
@@ -27,6 +28,7 @@ const DEFAULT_SOUNDS: Record<SoundEventType, string> = {
   user_moved_channel: userMovedChannel,
   viewer_join_stream: viewerJoinStream,
   viewer_leave_stream: viewerLeaveStream,
+  voice_connected: voiceConnected,
   voice_disconnected: voiceDisconnected,
   incoming_call: incomingCall,
   camera_on: cameraOn,

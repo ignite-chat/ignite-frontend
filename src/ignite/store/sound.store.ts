@@ -11,6 +11,7 @@ export type SoundEventType =
   | 'user_moved_channel'
   | 'viewer_join_stream'
   | 'viewer_leave_stream'
+  | 'voice_connected'
   | 'voice_disconnected'
   | 'incoming_call'
   | 'camera_on'
@@ -27,6 +28,7 @@ export const SOUND_EVENTS: SoundEventType[] = [
   'user_moved_channel',
   'viewer_join_stream',
   'viewer_leave_stream',
+  'voice_connected',
   'voice_disconnected',
   'incoming_call',
   'camera_on',
@@ -44,6 +46,7 @@ export const SOUND_EVENT_LABELS: Record<SoundEventType, string> = {
   user_moved_channel: 'User Moved Channel',
   viewer_join_stream: 'Viewer Joins Stream',
   viewer_leave_stream: 'Viewer Leaves Stream',
+  voice_connected: 'Voice Connected',
   voice_disconnected: 'Voice Disconnected',
   incoming_call: 'Incoming Call',
   camera_on: 'Camera On',
