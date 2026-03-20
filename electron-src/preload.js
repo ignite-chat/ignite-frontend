@@ -8,10 +8,13 @@ if (!process.isMainFrame) {
 }
 if (window.opener === null) {
     const { contextBridge, ipcRenderer } = require('electron');
+    const { version: appVersion } = require('./package.json');
     const IgniteNative = {
         isRenderer: process.type === 'renderer',
         isElectron: true,
         platform: process.platform,
+        electronVersion: process.versions.electron,
+        appVersion,
         minimize: () => ipcRenderer.invoke('window:minimize'),
         maximize: () => ipcRenderer.invoke('window:maximize'),
         close: () => ipcRenderer.invoke('window:close'),

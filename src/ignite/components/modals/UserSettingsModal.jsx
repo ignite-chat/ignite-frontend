@@ -144,6 +144,20 @@ const UserSettingsModal = ({ modalId }) => {
             </button>
           </div>
         </nav>
+
+        {/* Version info */}
+        <div className="border-t border-border px-4 py-3">
+          <p className="text-xs text-muted-foreground/60">
+            {window.IgniteNative?.appVersion
+              ? `Ignite v${window.IgniteNative.appVersion}`
+              : 'Ignite Web'}
+          </p>
+          {window.IgniteNative?.electronVersion && (
+            <p className="text-xs text-muted-foreground/60">
+              Electron {window.IgniteNative.electronVersion}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Content area */}

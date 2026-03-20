@@ -12,6 +12,8 @@ interface Window {
   IgniteNative?: {
     isRenderer: boolean;
     isElectron: boolean;
+    electronVersion: string;
+    appVersion: string;
     minimize: () => Promise<void>;
     maximize: () => Promise<void>;
     close: () => Promise<void>;
