@@ -14,6 +14,7 @@ import { useDiscordProfilesStore } from '../store/discord-profiles.store';
 import { parseMarkdown } from '@/components/message/markdown/parser';
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
 import DiscordStatusIndicator from './DiscordStatusIndicator';
+import DiscordClanTag from './DiscordClanTag';
 
 const DISCORD_EPOCH = 1420070400000;
 
@@ -289,6 +290,7 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
                       APP
                     </span>
                   )}
+                  {!user.bot && <DiscordClanTag userId={user.id} guildId={guildId} size="md" />}
                 </h2>
                 <div className="text-sm font-medium text-gray-300">{user.username}</div>
               </div>

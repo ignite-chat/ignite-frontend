@@ -20,6 +20,7 @@ import DiscordUserProfileModal from './DiscordUserProfileModal';
 import { useModalStore } from '@/store/modal.store';
 import DiscordMessageContextMenu from './context-menus/DiscordMessageContextMenu';
 import DiscordUserContextMenu from './context-menus/DiscordUserContextMenu';
+import DiscordClanTag from './DiscordClanTag';
 import { ArrowBendUpLeft, Smiley, Plus, ArrowSquareOut } from '@phosphor-icons/react';
 import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
 import { DiscordBurstReaction, DiscordReaction, getReactionEmojiString } from './DiscordEmojiIcon';
@@ -128,6 +129,9 @@ const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
           </span>
         )}
       </span>
+      {!message.author.bot && (
+        <DiscordClanTag userId={message.author.id} guildId={guildId} size="sm" />
+      )}
       <time className="cursor-default text-xs font-medium text-gray-500" dateTime={message.timestamp}>{formattedDateTime}</time>
     </header>
   );

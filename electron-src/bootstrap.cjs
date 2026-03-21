@@ -99,6 +99,18 @@ const startCore = () => {
     return require('./package.json').version;
   });
 
+  // Process memory info — uses app.getAppMetrics() for all Electron processes
+  ipcMain.handle('app:getMemoryUsage', () => {
+    const metrics = app.getAppMetrics();
+    return metrics.map((m) => ({
+      pid: m.pid,
+      type: m.type,
+      name: m.name || m.type,
+      memory: m.memory, // { workingSetSize, peakWorkingSetSize, privateBytes }
+      cpu: m.cpu,
+    }));
+  });
+
   // Setup IPC handlers for window controls
   ipcMain.handle('window:minimize', () => {
     if (mainWindow) {

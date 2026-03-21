@@ -18,6 +18,7 @@ if (window.opener === null) {
         openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
         setBadgeCount: (count) => ipcRenderer.invoke('badge:set', count),
         showNotification: (opts) => ipcRenderer.invoke('notification:show', opts),
+        getMemoryUsage: () => ipcRenderer.invoke('app:getMemoryUsage'),
         getDiscordLocalTokens: () => ipcRenderer.invoke('discord:getLocalTokens'),
         onWindowOpen: (callback) => {
             const handler = (_event, url) => callback(url);

@@ -10,6 +10,7 @@ import { useDiscordProfilesStore } from '../../store/discord-profiles.store';
 import { parseMarkdown } from '@/components/message/markdown/parser';
 import DiscordMarkdownRenderer from '../DiscordMarkdownRenderer';
 import DiscordStatusIndicator from '../DiscordStatusIndicator';
+import DiscordClanTag from '../DiscordClanTag';
 import DiscordUserProfileModal from '../DiscordUserProfileModal';
 import { useModalStore } from '@/store/modal.store';
 
@@ -132,6 +133,7 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
                 APP
               </span>
             )}
+            {!user.bot && <DiscordClanTag userId={user.id} guildId={guildId} size="md" />}
           </h2>
           <p className="text-xs font-medium text-gray-300">{user.username}</p>
 
