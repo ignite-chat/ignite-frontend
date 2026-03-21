@@ -21,6 +21,7 @@ const FriendsDashboard = ({ activeSubTab }: FriendsDashboardProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const { friends, requests, friendsLoaded, requestsLoaded } = useFriendsStore();
   const currentUser = useUsersStore((s) => s.getCurrentUser());
+  const hasIgniteToken = !!localStorage.getItem('token');
 
   // Discord data
   const discordConnected = useDiscordStore((s) => s.isConnected);
@@ -95,16 +96,16 @@ const FriendsDashboard = ({ activeSubTab }: FriendsDashboardProps) => {
                   discordFriends={discordFriends}
                   filter={activeSubTab}
                   searchQuery={searchQuery}
-                  loading={!friendsLoaded}
+                  loading={hasIgniteToken && !friendsLoaded}
                 />
               )}
-              {activeSubTab === 'pending' && currentUser && (
+              {activeSubTab === 'pending' && (
                 <PendingRequests
                   requests={requests}
                   currentUser={currentUser}
                   discordRequests={discordPendingRequests}
                   searchQuery={searchQuery}
-                  loading={!requestsLoaded}
+                  loading={hasIgniteToken && !requestsLoaded}
                 />
               )}
             </div>

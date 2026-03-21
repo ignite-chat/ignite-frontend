@@ -13,7 +13,7 @@ interface Window {
     isRenderer: boolean;
     isElectron: boolean;
     electronVersion: string;
-    appVersion: string;
+    getAppVersion: () => Promise<string>;
     minimize: () => Promise<void>;
     maximize: () => Promise<void>;
     close: () => Promise<void>;

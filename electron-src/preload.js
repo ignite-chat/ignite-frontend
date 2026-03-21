@@ -1,20 +1,16 @@
 "use strict";
 
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
 if (!process.isMainFrame) {
     throw new Error('IgniteNative preload script should only be loaded in main frames');
 }
 if (window.opener === null) {
     const { contextBridge, ipcRenderer } = require('electron');
-    const { version: appVersion } = require('./package.json');
     const IgniteNative = {
         isRenderer: process.type === 'renderer',
         isElectron: true,
         platform: process.platform,
         electronVersion: process.versions.electron,
-        appVersion,
+        getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
         minimize: () => ipcRenderer.invoke('window:minimize'),
         maximize: () => ipcRenderer.invoke('window:maximize'),
         close: () => ipcRenderer.invoke('window:close'),

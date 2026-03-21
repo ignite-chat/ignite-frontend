@@ -94,6 +94,11 @@ const startCore = () => {
   //  mainWindow.webContents.openDevTools();
   }
 
+  // App version (preload can't require package.json in sandboxed mode)
+  ipcMain.handle('app:getVersion', () => {
+    return require('./package.json').version;
+  });
+
   // Setup IPC handlers for window controls
   ipcMain.handle('window:minimize', () => {
     if (mainWindow) {

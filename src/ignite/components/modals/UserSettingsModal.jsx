@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUsersStore } from '../../store/users.store';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import Avatar from '../Avatar';
@@ -41,6 +41,11 @@ const UserSettingsModal = ({ modalId }) => {
 
   const [tab, setTab] = useState('account');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [appVersion, setAppVersion] = useState(null);
+
+  useEffect(() => {
+    window.IgniteNative?.getAppVersion?.().then(setAppVersion).catch(() => {});
+  }, []);
 
   const handleTabChange = (newTab) => {
     setTab(newTab);
@@ -148,8 +153,8 @@ const UserSettingsModal = ({ modalId }) => {
         {/* Version info */}
         <div className="border-t border-border px-4 py-3">
           <p className="text-xs text-muted-foreground/60">
-            {window.IgniteNative?.appVersion
-              ? `Ignite v${window.IgniteNative.appVersion}`
+            {appVersion
+              ? `Ignite v${appVersion}`
               : 'Ignite Web'}
           </p>
           {window.IgniteNative?.electronVersion && (

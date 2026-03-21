@@ -231,6 +231,13 @@ export const DiscordApiService = {
   },
 
   /**
+   * Send a friend request by username.
+   */
+  async sendFriendRequestByUsername(username: string): Promise<void> {
+    await discordApi.post('/users/@me/relationships', { username });
+  },
+
+  /**
    * Block a user.
    */
   async blockUser(userId: string): Promise<void> {

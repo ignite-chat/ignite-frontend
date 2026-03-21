@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import HCaptcha from '@hcaptcha/react-hcaptcha';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Dialog,
@@ -17,7 +18,7 @@ import { useDiscordStore } from '../store/discord.store';
 import { useDiscordRemoteAuth } from '../hooks/useDiscordRemoteAuth';
 import { DiscordService } from '../services/discord.service';
 
-function QrAuthContent({
+export function QrAuthContent({
   active,
   onAuthenticated,
 }: {
@@ -189,15 +190,12 @@ function TokenRow({
           <span className="text-sm font-medium text-destructive">Invalid Token</span>
         )}
         <span className="text-xs text-gray-500">{entry.sources.join(', ')}</span>
-        <span className="font-mono text-xs text-gray-400">
-          {entry.token.slice(0, 18)}...
-        </span>
       </div>
     </button>
   );
 }
 
-function AutoDetectContent({
+export function AutoDetectContent({
   onAuthenticated,
 }: {
   onAuthenticated: (token: string) => void;
@@ -359,7 +357,7 @@ function AutoDetectContent({
         ))}
 
       {/* Invalid tokens accordion */}
-      {invalidEntries.length > 0 && (
+      {/* {invalidEntries.length > 0 && (
         <div className="mt-1">
           <button
             onClick={() => setShowInvalid((v) => !v)}
@@ -388,7 +386,7 @@ function AutoDetectContent({
             </div>
           )}
         </div>
-      )}
+      )} */}
 
       {/* Rescan button */}
       {!stillValidating && (
@@ -404,7 +402,210 @@ function AutoDetectContent({
   );
 }
 
-function TokenAuthContent({
+export function LoginAuthContent({
+  onAuthenticated,
+}: {
+  onAuthenticated: (token: string) => void;
+}) {
+  const [login, setLogin] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // MFA state
+  const [mfaTicket, setMfaTicket] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+
+  // Captcha state
+  const [captcha, setCaptcha] = useState<{
+    sitekey: string;
+    rqdata?: string;
+    rqtoken?: string;
+    service?: string;
+  } | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<any>(null);
+
+  const doLogin = useCallback(
+    async (captchaKey?: string, captchaRqtoken?: string) => {
+      setError('');
+      setLoading(true);
+
+      try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (captchaKey) {
+          headers['X-Captcha-Key'] = captchaKey;
+          if (captchaRqtoken) headers['X-Captcha-Rqtoken'] = captchaRqtoken;
+        }
+
+        const res = await axios.post(
+          'https://discord.com/api/v9/auth/login',
+          { login: login.trim(), password },
+          { headers },
+        );
+
+        if (res.data.mfa) {
+          setMfaTicket(res.data.ticket);
+          setCaptcha(null);
+          setCaptchaToken(null);
+        } else if (res.data.token) {
+          onAuthenticated(res.data.token);
+        }
+      } catch (err: any) {
+        const data = err.response?.data;
+
+        // Captcha required
+        if (
+          err.response?.status === 400 &&
+          Array.isArray(data?.captcha_key) &&
+          data.captcha_key.includes('captcha-required') &&
+          data.captcha_sitekey
+        ) {
+          setCaptcha({
+            sitekey: data.captcha_sitekey,
+            rqdata: data.captcha_rqdata,
+            rqtoken: data.captcha_rqtoken,
+            service: data.captcha_service,
+          });
+          setCaptchaToken(null);
+          captchaRef.current?.resetCaptcha();
+        } else {
+          setError(
+            data?.errors?.login?._errors?.[0]?.message ||
+              data?.errors?.password?._errors?.[0]?.message ||
+              data?.message ||
+              'Login failed',
+          );
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [login, password, onAuthenticated],
+  );
+
+  const doMfa = useCallback(async () => {
+    if (!mfaTicket || mfaCode.length < 6) return;
+    setError('');
+    setLoading(true);
+
+    try {
+      const res = await axios.post('https://discord.com/api/v9/auth/mfa/totp', {
+        code: mfaCode.replace(/\s/g, ''),
+        ticket: mfaTicket,
+      });
+
+      if (res.data.token) {
+        onAuthenticated(res.data.token);
+      }
+    } catch (err: any) {
+      const data = err.response?.data;
+      setError(data?.message || 'Invalid authentication code');
+      setMfaCode('');
+    } finally {
+      setLoading(false);
+    }
+  }, [mfaTicket, mfaCode, onAuthenticated]);
+
+  // When captcha is solved, retry login with the token
+  useEffect(() => {
+    if (captchaToken && captcha) {
+      doLogin(captchaToken, captcha.rqtoken);
+    }
+  }, [captchaToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // MFA screen
+  if (mfaTicket) {
+    return (
+      <div className="flex flex-col gap-3 py-2">
+        <p className="text-center text-sm text-gray-400">
+          Enter the 6-digit code from your authenticator app
+        </p>
+        <Input
+          type="text"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="6-digit code"
+          value={mfaCode}
+          onChange={(e) => setMfaCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') doMfa();
+          }}
+        />
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => {
+              setMfaTicket(null);
+              setMfaCode('');
+              setError('');
+            }}
+          >
+            Back
+          </Button>
+          <Button
+            className="flex-1"
+            disabled={loading || mfaCode.length < 6}
+            onClick={doMfa}
+          >
+            {loading ? 'Verifying...' : 'Verify'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3 py-2">
+      <Input
+        type="text"
+        autoComplete="username"
+        placeholder="Email or phone number"
+        value={login}
+        onChange={(e) => setLogin(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && login.trim() && password) doLogin();
+        }}
+      />
+      <Input
+        type="password"
+        autoComplete="current-password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && login.trim() && password) doLogin();
+        }}
+      />
+
+      {captcha && (
+        <div className="flex justify-center py-2">
+          <HCaptcha
+            ref={captchaRef}
+            sitekey={captcha.sitekey}
+            theme="dark"
+            onVerify={(token: string) => setCaptchaToken(token)}
+            onExpire={() => setCaptchaToken(null)}
+            {...(captcha.rqdata ? ({ rqdata: captcha.rqdata } as any) : {})}
+          />
+        </div>
+      )}
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <Button
+        disabled={loading || !login.trim() || !password}
+        onClick={() => doLogin()}
+      >
+        {loading ? 'Logging in...' : 'Log In'}
+      </Button>
+    </div>
+  );
+}
+
+export function TokenAuthContent({
   onAuthenticated,
   onCancel,
 }: {
@@ -453,7 +654,7 @@ export default function ConnectDiscordDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const isNative = !!window.IgniteNative;
-  const defaultTab = isNative ? 'detect' : 'qr';
+  const defaultTab = isNative ? 'detect' : 'login';
   const [activeTab, setActiveTab] = useState(defaultTab);
 
   const handleAuthenticated = useCallback((token: string) => {
@@ -473,13 +674,14 @@ export default function ConnectDiscordDialog({
         <DialogHeader>
           <DialogTitle>Connect Discord</DialogTitle>
           <DialogDescription>
-            Scan the QR code with your Discord mobile app, or enter your token.
+            Log in with your Discord account, scan a QR code, or enter a token.
           </DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full">
             {isNative && <TabsTrigger value="detect">Auto Detect</TabsTrigger>}
+            <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="qr">QR Code</TabsTrigger>
             <TabsTrigger value="token">Token</TabsTrigger>
           </TabsList>
@@ -491,6 +693,10 @@ export default function ConnectDiscordDialog({
               />
             </TabsContent>
           )}
+
+          <TabsContent value="login">
+            <LoginAuthContent onAuthenticated={handleAuthenticated} />
+          </TabsContent>
 
           <TabsContent value="qr">
             <QrAuthContent

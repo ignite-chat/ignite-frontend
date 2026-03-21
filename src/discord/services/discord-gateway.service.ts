@@ -12,6 +12,8 @@ import { useDiscordTypingStore } from '../store/discord-typing.store';
 import { useDiscordThreadsStore } from '../store/discord-threads.store';
 import { useDiscordVoiceStatesStore } from '../store/discord-voice-states.store';
 import { useDiscordGuildSettingsStore } from '../store/discord-guild-settings.store';
+import { useDiscordGuildFoldersStore } from '../store/discord-guild-folders.store';
+import { decodeGuildFolders } from '../utils/proto-decode';
 import { DiscordVoiceService } from './discord-voice.service';
 import { GatewayOp } from '../constants/gateway-opcodes';
 
@@ -446,6 +448,16 @@ export const DiscordGatewayService = {
       case 'USER_GUILD_SETTINGS_UPDATE':
         this._handleUserGuildSettingsUpdate(data);
         break;
+      case 'USER_SETTINGS_PROTO_UPDATE': {
+        // Partial update — only re-decode if the guild_folders field (type 3) changed
+        if (data.settings?.proto) {
+          const folders = decodeGuildFolders(data.settings.proto);
+          if (folders.length > 0) {
+            useDiscordGuildFoldersStore.getState().setFolders(folders);
+          }
+        }
+        break;
+      }
       case 'VOICE_CHANNEL_STATUS_UPDATE':
         if (data.id) {
           useDiscordChannelsStore.getState().updateChannel(data.id, { status: data.status ?? null });
@@ -527,6 +539,14 @@ export const DiscordGatewayService = {
     const guildSettingsEntries = data.user_guild_settings?.entries ?? data.user_guild_settings;
     if (Array.isArray(guildSettingsEntries) && guildSettingsEntries.length > 0) {
       useDiscordGuildSettingsStore.getState().setAllSettings(guildSettingsEntries);
+    }
+
+    // Decode guild folders from protobuf user settings
+    if (data.user_settings_proto) {
+      const folders = decodeGuildFolders(data.user_settings_proto);
+      if (folders.length > 0) {
+        useDiscordGuildFoldersStore.getState().setFolders(folders);
+      }
     }
 
     if (private_channels && private_channels.length > 0) {

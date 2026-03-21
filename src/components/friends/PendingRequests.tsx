@@ -232,7 +232,7 @@ const PendingRowSkeleton = () => (
 
 type PendingRequestsProps = {
   requests: FriendRequest[];
-  currentUser: User;
+  currentUser: User | null | undefined;
   discordRequests: DiscordPendingRequest[];
   searchQuery: string;
   loading?: boolean;
@@ -255,7 +255,7 @@ const PendingRequests = ({ requests, currentUser, discordRequests, searchQuery, 
   const { incoming, outgoing } = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const items: MergedPending[] = [
-      ...requests.map((req): MergedPending => {
+      ...(currentUser ? requests.map((req): MergedPending => {
         const outgoing = req.sender_id === currentUser.id;
         const userId = outgoing ? req.receiver?.id : req.sender?.id;
         const user = (userId && getUser(userId)) || (outgoing ? req.receiver : req.sender);
@@ -265,7 +265,7 @@ const PendingRequests = ({ requests, currentUser, discordRequests, searchQuery, 
           sortName: (user?.name || user?.username || '').toLowerCase(),
           isOutgoing: outgoing,
         };
-      }),
+      }) : []),
       ...discordRequests.map((r): MergedPending => ({
         source: 'discord',
         data: r,

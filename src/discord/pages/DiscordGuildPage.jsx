@@ -26,10 +26,11 @@ const DiscordGuildPage = () => {
     return channels.filter((c) => c.guild_id === guildId);
   }, [channels, guildId]);
 
-  // Redirect if not connected
+  // Redirect if not connected and no token
   useEffect(() => {
     if (!isConnected && !useDiscordStore.getState().token) {
-      navigate('/channels/@me', { replace: true });
+      const hasIgniteToken = !!localStorage.getItem('token');
+      navigate(hasIgniteToken ? '/channels/@me' : '/login', { replace: true });
     }
   }, [isConnected, navigate]);
 

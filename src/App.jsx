@@ -9,6 +9,7 @@ import GuildChannelPage from './ignite/pages/GuildChannel';
 import InvitePage from './ignite/pages/InvitePage';
 import GuildDiscoveryPage from './ignite/pages/GuildDiscovery';
 import DiscordGuildPage from './discord/pages/DiscordGuildPage';
+import DiscordLandingPage from './discord/pages/DiscordLandingPage';
 import AppLayout from './layouts/AppLayout';
 import { InitializationService } from './ignite/services/initialization.service';
 import { EchoService } from './ignite/services/echo.service';
@@ -24,6 +25,10 @@ const AuthRoute = ({ children }) => {
   const [initialized, setInitialized] = useState(false);
   const [failed, setFailed] = useState(false);
 
+  const hasIgniteToken = !!localStorage.getItem('token');
+  const hasDiscordToken = !!localStorage.getItem('discord_token');
+  const discordOnly = !hasIgniteToken && hasDiscordToken;
+
   // Sync taskbar badge with unread/mention state (Electron only)
   useElectronBadge();
 
@@ -32,6 +37,11 @@ const AuthRoute = ({ children }) => {
 
   // Initialize app on mount
   useEffect(() => {
+    if (discordOnly) {
+      setInitialized(true);
+      return;
+    }
+
     const init = async () => {
       const result = await InitializationService.initialize();
 
@@ -43,11 +53,11 @@ const AuthRoute = ({ children }) => {
     };
 
     init();
-  }, []);
+  }, [discordOnly]);
 
   // Subscribe to user private channel via Echo
   useEffect(() => {
-    if (!initialized || !userId) return;
+    if (!initialized || !userId || discordOnly) return;
 
     EchoService.subscribeToUserChannel(userId);
 
@@ -56,14 +66,14 @@ const AuthRoute = ({ children }) => {
         EchoService.unsubscribeFromUserChannel(userId);
       }
     };
-  }, [initialized, userId]);
+  }, [initialized, userId, discordOnly]);
 
   // Subscribe to guild channels via Echo
   useEffect(() => {
-    if (!initialized || !userId || guilds.length === 0) return;
+    if (!initialized || !userId || guilds.length === 0 || discordOnly) return;
 
     EchoService.subscribeToGuilds(guilds);
-  }, [guilds, initialized, userId]);
+  }, [guilds, initialized, userId, discordOnly]);
 
   if (failed) {
     return (
@@ -84,9 +94,14 @@ const AuthRoute = ({ children }) => {
     );
   }
 
-  // If no token exists, redirect to login immediately
-  if (!localStorage.getItem('token')) {
+  // No auth at all → redirect to login
+  if (!hasIgniteToken && !hasDiscordToken) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Discord-only: skip Ignite init requirements, just render
+  if (discordOnly) {
+    return children ? children : <Outlet />;
   }
 
   // While initializing, render the app layout so skeletons show instead of a spinner
@@ -104,6 +119,10 @@ const AuthRoute = ({ children }) => {
 const GuestRoute = ({ children }) => {
   if (localStorage.getItem('token')) {
     return <Navigate to="/channels/@me" replace />;
+  }
+
+  if (localStorage.getItem('discord_token')) {
+    return <Navigate to="/discord" replace />;
   }
 
   return children ? children : <Outlet />;
@@ -160,7 +179,15 @@ function App() {
       <Routes>
         <Route
           index
-          element={userId ? <Navigate to="/channels/@me" replace /> : <Navigate to="/login" replace />}
+          element={
+            userId ? (
+              <Navigate to="/channels/@me" replace />
+            ) : localStorage.getItem('discord_token') ? (
+              <Navigate to="/discord" replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         />
         <Route element={<PublicRoute />}>
           <Route
@@ -221,6 +248,7 @@ function App() {
               path="/channels/:guildId/:channelId?/:messageId?"
               element={<GuildChannelPage />}
             />
+            <Route path="/discord" element={<DiscordLandingPage />} />
             <Route
               path="/discord/:guildId/:channelId?"
               element={<DiscordGuildPage />}

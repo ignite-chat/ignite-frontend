@@ -51,10 +51,11 @@ import { DiscordService } from '../discord/services/discord.service';
 import { useDiscordRelationshipsStore, RelationshipType } from '../discord/store/discord-relationships.store';
 import { useDiscordUsersStore } from '../discord/store/discord-users.store';
 import { useDiscordVoiceStatesStore } from '../discord/store/discord-voice-states.store';
+import { useDiscordGuildFoldersStore } from '../discord/store/discord-guild-folders.store';
 import { useLastChannelStore } from '@/store/last-channel.store';
 import { ChannelType } from '@/ignite/constants/ChannelType';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { SpeakerSimpleHigh, Monitor } from '@phosphor-icons/react';
+import { SpeakerSimpleHigh, Monitor, FolderSimple } from '@phosphor-icons/react';
 import GuildIcon from '@/ignite/components/GuildIcon';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -72,43 +73,43 @@ const SidebarIcon = ({
 }) => {
   const hasIcon = icon || iconUrl || guild?.icon_file_id;
   return (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <div className="group relative mb-2 min-w-min px-3">
-        <div
-          className={`absolute -left-1 top-1/2 block w-2 -translate-y-1/2 rounded-lg bg-white transition-all duration-200 ${isActive
-            ? 'h-10'
-            : `group-hover:h-5 ${isUnread ? 'h-2' : 'h-0'}`
-            }`}
-        />
-
-        <div className="relative mx-auto h-12 w-12">
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="group relative mb-2 min-w-min px-3">
           <div
-            className={`absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden ${isDm ? 'rounded-full' : `transition-all duration-300 ease-out ${isActive ? 'rounded-xl' : 'rounded-2xl hover:rounded-xl'} ${isServerIcon ? (hasIcon ? 'bg-[#1d1d1e] text-gray-100' : isActive ? 'bg-primary text-white' : 'bg-[#1d1d1e] text-gray-100 hover:bg-primary hover:text-white') : 'bg-[#1d1d1e] text-green-500 hover:bg-green-500 hover:text-white'}`}`}
-          >
-            {icon ? (
-              icon
-            ) : guild ? (
-              <GuildIcon guild={guild} size={12} className="!rounded-none !bg-transparent" />
-            ) : iconUrl ? (
-              <img src={iconUrl} alt={text} className="size-full object-cover" />
-            ) : (
-              <span className="text-xl leading-none text-gray-400">{text.slice(0, 2)}</span>
+            className={`absolute -left-1 top-1/2 block w-2 -translate-y-1/2 rounded-lg bg-white transition-all duration-200 ${isActive
+              ? 'h-10'
+              : `group-hover:h-5 ${isUnread ? 'h-2' : 'h-0'}`
+              }`}
+          />
+
+          <div className="relative mx-auto h-12 w-12">
+            <div
+              className={`absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden ${isDm ? 'rounded-full' : `transition-all duration-300 ease-out ${isActive ? 'rounded-xl' : 'rounded-2xl hover:rounded-xl'} ${isServerIcon ? (hasIcon ? 'bg-[#1d1d1e] text-gray-100' : isActive ? 'bg-primary text-white' : 'bg-[#1d1d1e] text-gray-100 hover:bg-primary hover:text-white') : 'bg-[#1d1d1e] text-green-500 hover:bg-green-500 hover:text-white'}`}`}
+            >
+              {icon ? (
+                icon
+              ) : guild ? (
+                <GuildIcon guild={guild} size={12} className="!rounded-none !bg-transparent" />
+              ) : iconUrl ? (
+                <img src={iconUrl} alt={text} className="size-full object-cover" />
+              ) : (
+                <span className="text-xl leading-none text-gray-400">{text.slice(0, 2)}</span>
+              )}
+            </div>
+
+            {mentionCount > 0 && (
+              <div className="absolute -bottom-1 -right-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#1a1a1e] bg-destructive px-1 text-[11px] font-bold text-white">
+                {mentionCount > 99 ? '99+' : mentionCount}
+              </div>
             )}
           </div>
-
-          {mentionCount > 0 && (
-            <div className="absolute -bottom-1 -right-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#1a1a1e] bg-destructive px-1 text-[11px] font-bold text-white">
-              {mentionCount > 99 ? '99+' : mentionCount}
-            </div>
-          )}
         </div>
-      </div>
-    </TooltipTrigger>
-    <TooltipContent side="right" className="font-bold">
-      {tooltipContent || text}
-    </TooltipContent>
-  </Tooltip>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="font-bold">
+        {tooltipContent || text}
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
@@ -284,12 +285,156 @@ const DiscordGuildIcon = ({ guild, isActive }) => {
   );
 };
 
+const DiscordFolderIcon = ({ folder, guilds, isExpanded, onToggle, totalMentions, hasUnread }) => {
+  // Show a mini grid of up to 4 guild icons when collapsed
+  const folderColor = folder.color != null ? `#${folder.color.toString(16).padStart(6, '0')}` : '#5865f2';
+  const folderName = folder.name || 'Server Folder';
+
+  if (isExpanded) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="group relative mb-2 min-w-min px-3">
+            <div className="relative mx-auto h-12 w-12">
+              <button
+                type="button"
+                onClick={onToggle}
+                className="absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden rounded-2xl bg-[#1d1d1e] transition-all duration-300 ease-out hover:rounded-xl"
+              >
+                <FolderSimple size={24} weight="fill" style={{ color: folderColor }} />
+              </button>
+              {totalMentions > 0 && (
+                <div className="absolute -bottom-1 -right-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#1a1a1e] bg-destructive px-1 text-[11px] font-bold text-white">
+                  {totalMentions > 99 ? '99+' : totalMentions}
+                </div>
+              )}
+            </div>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="font-bold">
+          {folderName} (click to collapse)
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  // Collapsed: show 2x2 mini grid of guild icons
+  const previewGuilds = guilds.slice(0, 4);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="group relative mb-2 min-w-min px-3">
+          <div
+            className={`absolute -left-1 top-1/2 block w-2 -translate-y-1/2 rounded-lg bg-white transition-all duration-200 ${
+              hasUnread ? 'h-2 group-hover:h-5' : 'h-0 group-hover:h-5'
+            }`}
+          />
+          <div className="relative mx-auto h-12 w-12">
+            <button
+              type="button"
+              onClick={onToggle}
+              className="absolute inset-0 flex cursor-pointer flex-wrap items-center justify-center gap-0.5 overflow-hidden rounded-2xl p-1.5 transition-all duration-300 ease-out hover:rounded-xl"
+              style={{ backgroundColor: `${folderColor}20` }}
+            >
+              {previewGuilds.map((g) => {
+                const iconUrl = DiscordService.getGuildIconUrl(g.id, g.properties?.icon, 64);
+                return iconUrl ? (
+                  <img key={g.id} src={iconUrl} alt="" className="size-4 rounded-sm object-cover" />
+                ) : (
+                  <div key={g.id} className="flex size-4 items-center justify-center rounded-sm bg-[#2b2d31] text-[6px] font-bold text-gray-400">
+                    {(g.properties?.name || '?').charAt(0)}
+                  </div>
+                );
+              })}
+            </button>
+            {totalMentions > 0 && (
+              <div className="absolute -bottom-1 -right-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#1a1a1e] bg-destructive px-1 text-[11px] font-bold text-white">
+                {totalMentions > 99 ? '99+' : totalMentions}
+              </div>
+            )}
+          </div>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="font-bold">
+        {folderName}
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
+const DiscordGuildFolderGroup = ({ folder, guilds, activeGuildPath }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const channels = useDiscordChannelsStore((s) => s.channels);
+  const readStates = useDiscordReadStatesStore((s) => s.readStates);
+
+  const { totalMentions, hasUnread } = useMemo(() => {
+    let mentions = 0;
+    let unread = false;
+    for (const guild of guilds) {
+      const guildChannels = channels.filter((c) => c.guild_id === guild.id);
+      const joinedAtMs = guild.joined_at ? new Date(guild.joined_at).getTime() : null;
+      for (const ch of guildChannels) {
+        if (ch.last_message_id) {
+          const entry = readStates[ch.id];
+          if (entry?.last_message_id) {
+            if (BigInt(ch.last_message_id) > BigInt(entry.last_message_id)) unread = true;
+          } else if (joinedAtMs && snowflakeToTimestamp(ch.last_message_id) > joinedAtMs) {
+            unread = true;
+          }
+        }
+        mentions += readStates[ch.id]?.mention_count ?? 0;
+      }
+    }
+    return { totalMentions: mentions, hasUnread: unread };
+  }, [guilds, channels, readStates]);
+
+  // Auto-expand if a guild in this folder is active
+  const hasActiveGuild = guilds.some((g) => activeGuildPath.startsWith(`/discord/${g.id}`));
+
+  useEffect(() => {
+    if (hasActiveGuild && !isExpanded) {
+      setIsExpanded(true);
+    }
+  }, [hasActiveGuild]);
+
+  return (
+    <div>
+      <DiscordFolderIcon
+        folder={folder}
+        guilds={guilds}
+        isExpanded={isExpanded}
+        onToggle={() => setIsExpanded((v) => !v)}
+        totalMentions={totalMentions}
+        hasUnread={hasUnread}
+      />
+      {isExpanded && (
+        <div className="relative">
+          {/* Vertical folder bar */}
+          <div
+            className="absolute left-[34px] top-0 bottom-1 w-1 rounded-full"
+            style={{ backgroundColor: `${folder.color != null ? `#${folder.color.toString(16).padStart(6, '0')}` : '#5865f2'}40` }}
+          />
+          {guilds.map((guild) => (
+            <DiscordGuildIcon
+              key={`discord-${guild.id}`}
+              guild={guild}
+              isActive={activeGuildPath.startsWith(`/discord/${guild.id}`)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const GuildsSidebar = () => {
   const { guildId, channelId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const user = useUsersStore((s) => s.getCurrentUser());
   const { guilds } = useGuildsStore();
+  const hasIgniteToken = !!localStorage.getItem('token');
   const { channelUnreads, channelUnreadsLoaded } = useUnreadsStore();
   const { channels, channelMessages } = useChannelsStore();
   const { requests } = useFriendsStore();
@@ -302,10 +447,59 @@ const GuildsSidebar = () => {
   // Discord state
   const { token: discordToken, isConnected: discordConnected, user: discordUser } = useDiscordStore();
   const { guilds: discordGuilds } = useDiscordGuildsStore();
+  const discordGuildFolders = useDiscordGuildFoldersStore((s) => s.folders);
   const discordUsersMap = useDiscordUsersStore((s) => s.users);
   const discordChannels = useDiscordChannelsStore((s) => s.channels);
   const discordChannelMessages = useDiscordChannelsStore((s) => s.channelMessages);
   const discordReadStates = useDiscordReadStatesStore((s) => s.readStates);
+
+  // Build ordered Discord sidebar entries from guild folders
+  const discordSidebarEntries = useMemo(() => {
+    if (!discordConnected || discordGuilds.length === 0) return [];
+
+    const guildsById = {};
+    for (const g of discordGuilds) {
+      guildsById[g.id] = g;
+    }
+
+    // If we have folder data, use it for ordering
+    if (discordGuildFolders.length > 0) {
+      const entries = [];
+      const placed = new Set();
+
+      for (const folder of discordGuildFolders) {
+        const folderGuilds = folder.guild_ids
+          .map((id) => guildsById[id])
+          .filter(Boolean);
+
+        for (const g of folderGuilds) placed.add(g.id);
+
+        if (folderGuilds.length === 0) continue;
+
+        // Real folder (has an id and multiple guilds, or has a name)
+        if (folder.id && (folderGuilds.length > 1 || folder.name)) {
+          entries.push({ type: 'folder', folder, guilds: folderGuilds });
+        } else {
+          // Standalone guild(s)
+          for (const g of folderGuilds) {
+            entries.push({ type: 'guild', guild: g });
+          }
+        }
+      }
+
+      // Any guilds not in folders (shouldn't happen but be safe)
+      for (const g of discordGuilds) {
+        if (!placed.has(g.id)) {
+          entries.push({ type: 'guild', guild: g });
+        }
+      }
+
+      return entries;
+    }
+
+    // No folder data — render guilds in original order
+    return discordGuilds.map((g) => ({ type: 'guild', guild: g }));
+  }, [discordConnected, discordGuilds, discordGuildFolders]);
 
   // Auto-connect to Discord if token exists
   useEffect(() => {
@@ -379,8 +573,9 @@ const GuildsSidebar = () => {
   const discordRelationships = useDiscordRelationshipsStore((s) => s.relationships);
 
   const pendingCount = useMemo(() => {
-    if (!user) return 0;
-    const igniteCount = requests.filter((req) => req.sender_id != user.id).length;
+    const igniteCount = user
+      ? requests.filter((req) => req.sender_id != user.id).length
+      : 0;
     const discordCount = discordConnected
       ? discordRelationships.filter((r) => r.type === RelationshipType.INCOMING_REQUEST).length
       : 0;
@@ -491,7 +686,7 @@ const GuildsSidebar = () => {
         </Link>
 
         {/* Unread DMs */}
-        {unreadDmChannels.map((dm) => (
+        {hasIgniteToken && unreadDmChannels.map((dm) => (
           <Link key={dm.channel_id} to={`/channels/@me/${dm.channel_id}`}>
             <SidebarIcon
               icon={<Avatar user={dm.otherUser} className="size-full" />}
@@ -518,10 +713,12 @@ const GuildsSidebar = () => {
           </Link>
         ))}
 
-        <hr className="mx-auto mb-2 w-8 rounded-full border-1 border-white/5 bg-gray-800" />
+        {hasIgniteToken && (
+          <hr className="mx-auto mb-2 w-8 rounded-full border-1 border-white/5 bg-gray-800" />
+        )}
 
         {/* Guilds — drag-to-reorder */}
-        {orderedGuilds.length === 0 &&
+        {hasIgniteToken && orderedGuilds.length === 0 &&
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="mb-2 flex justify-center px-3">
               <Skeleton className="size-12 rounded-2xl" />
@@ -575,13 +772,22 @@ const GuildsSidebar = () => {
           <>
             {discordConnected ? (
               <>
-                {discordGuilds.map((guild) => (
-                  <DiscordGuildIcon
-                    key={`discord-${guild.id}`}
-                    guild={guild}
-                    isActive={location.pathname.startsWith(`/discord/${guild.id}`)}
-                  />
-                ))}
+                {discordSidebarEntries.map((entry) =>
+                  entry.type === 'folder' ? (
+                    <DiscordGuildFolderGroup
+                      key={`folder-${entry.folder.id}`}
+                      folder={entry.folder}
+                      guilds={entry.guilds}
+                      activeGuildPath={location.pathname}
+                    />
+                  ) : (
+                    <DiscordGuildIcon
+                      key={`discord-${entry.guild.id}`}
+                      guild={entry.guild}
+                      isActive={location.pathname.startsWith(`/discord/${entry.guild.id}`)}
+                    />
+                  )
+                )}
               </>
             ) : (
               Array.from({ length: 3 }).map((_, i) => (
@@ -616,12 +822,16 @@ const GuildsSidebar = () => {
           </>
         )}
 
-        <button type="button" onClick={() => useModalStore.getState().push(GuildModal)}>
-          <SidebarIcon icon={<Plus className="size-6" />} text="Add a Server" />
-        </button>
-        <Link to="/guild-discovery">
-          <SidebarIcon icon={<Compass className="size-6" />} text="Discover Servers" />
-        </Link>
+        {hasIgniteToken && (
+          <>
+            <button type="button" onClick={() => useModalStore.getState().push(GuildModal)}>
+              <SidebarIcon icon={<Plus className="size-6" />} text="Add a Server" />
+            </button>
+            <Link to="/guild-discovery">
+              <SidebarIcon icon={<Compass className="size-6" />} text="Discover Servers" />
+            </Link>
+          </>
+        )}
       </div>
 
       <ConnectDiscordDialog
@@ -642,7 +852,7 @@ const GuildsSidebar = () => {
             <AlertDialogAction
               onClick={() => {
                 DiscordService.logout();
-                navigate('/channels/@me');
+                navigate(hasIgniteToken ? '/channels/@me' : '/login');
               }}
               className="bg-red-500 text-white hover:bg-red-600"
             >
