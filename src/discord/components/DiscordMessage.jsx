@@ -21,6 +21,7 @@ import { useModalStore } from '@/store/modal.store';
 import DiscordMessageContextMenu from './context-menus/DiscordMessageContextMenu';
 import DiscordUserContextMenu from './context-menus/DiscordUserContextMenu';
 import { ArrowBendUpLeft, Smiley, Plus, ArrowSquareOut } from '@phosphor-icons/react';
+import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
 import { DiscordBurstReaction, DiscordReaction, getReactionEmojiString } from './DiscordEmojiIcon';
 import {
   EmojiPicker,
@@ -106,12 +107,14 @@ const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
   }, [message.timestamp]);
 
   return (
-    <div className="relative mb-1 flex items-baseline gap-2 leading-none">
-      <button
-        type="button"
-        className="font-semibold hover:underline"
+    <header className="relative mb-1 flex items-baseline gap-2 leading-none">
+      <span
+        role="button"
+        tabIndex={0}
+        className="cursor-pointer font-medium hover:underline"
         style={{ color: nameColor || 'white' }}
         onClick={onClickName}
+        onKeyDown={(e) => e.key === 'Enter' && onClickName()}
       >
         {displayName}
         {message.author.bot && (
@@ -124,9 +127,9 @@ const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
             APP
           </span>
         )}
-      </button>
-      <span className="text-xs font-medium text-gray-500">{formattedDateTime}</span>
-    </div>
+      </span>
+      <time className="cursor-default text-xs font-medium text-gray-500" dateTime={message.timestamp}>{formattedDateTime}</time>
+    </header>
   );
 };
 
@@ -886,37 +889,37 @@ const DiscordSystemMessage = memo(({ message, prevMessage, guildId }) => {
   }, [text, authorName]);
 
   return (
-    <>
-      <div className="group relative flex items-center gap-4 px-4 py-1 hover:bg-gray-800/40">
-        <div className="flex w-10 shrink-0 items-center justify-center">
-          <SystemMessageIcon type={message.type} />
-        </div>
-        <div className="flex min-w-0 flex-1 items-baseline gap-2">
-          <span className="text-sm text-gray-400">
-            {parts.map((p, i) => {
-              if (p.type === 'author') {
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    className="font-semibold hover:underline"
-                    style={{ color: nameColor || '#e5e7eb' }}
-                    onClick={() => useModalStore.getState().push(DiscordUserProfileModal, { author: message.author, member, guildId })}
-                  >
-                    {p.text}
-                  </button>
-                );
-              }
-              if (p.type === 'bold') {
-                return <strong key={i} className="font-semibold text-gray-200">{p.text}</strong>;
-              }
-              return <span key={i}>{p.text}</span>;
-            })}
-          </span>
-          <span className="shrink-0 text-xs text-gray-500">{formattedTime}</span>
-        </div>
+    <article className="group relative flex items-center gap-4 px-4 py-1 hover:bg-gray-800/40">
+      <div className="flex w-10 shrink-0 items-center justify-center">
+        <SystemMessageIcon type={message.type} />
       </div>
-    </>
+      <p className="flex min-w-0 flex-1 items-baseline gap-2 text-sm text-gray-400">
+        <span>
+          {parts.map((p, i) => {
+            if (p.type === 'author') {
+              return (
+                <span
+                  key={i}
+                  role="button"
+                  tabIndex={0}
+                  className="cursor-pointer font-semibold hover:underline"
+                  style={{ color: nameColor || '#e5e7eb' }}
+                  onClick={() => useModalStore.getState().push(DiscordUserProfileModal, { author: message.author, member, guildId })}
+                  onKeyDown={(e) => e.key === 'Enter' && useModalStore.getState().push(DiscordUserProfileModal, { author: message.author, member, guildId })}
+                >
+                  {p.text}
+                </span>
+              );
+            }
+            if (p.type === 'bold') {
+              return <strong key={i} className="font-semibold text-gray-200">{p.text}</strong>;
+            }
+            return <span key={i}>{p.text}</span>;
+          })}
+        </span>
+        <time className="shrink-0 text-xs text-gray-500" dateTime={message.timestamp}>{formattedTime}</time>
+      </p>
+    </article>
   );
 });
 
@@ -925,6 +928,7 @@ DiscordSystemMessage.displayName = 'DiscordSystemMessage';
 const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channelId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, hasManageNicknames, hasModerateMembers, pending }) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
+  const chatFontSize = useDiscordPreferencesStore((s) => s.chatFontSize);
 
   const hasReply = !!message.referenced_message || !!message.message_reference;
 
@@ -958,145 +962,143 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
   };
 
   const messageClasses = cn(
-    'group relative block py-1 transition-all duration-200 hover:bg-gray-800/40',
+    'group relative block border-l-2 border-transparent py-1 transition-colors duration-200 hover:bg-gray-800/40',
     shouldStack ? '' : 'mt-3.5',
-    isMentioned && 'border-l-2 border-yellow-500/70 bg-yellow-500/5 hover:bg-yellow-500/10',
+    isMentioned && 'border-yellow-500/70 bg-yellow-500/5 hover:bg-yellow-500/10',
     pending && 'opacity-50 pointer-events-none'
   );
 
   return (
-    <>
-      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+    <article
+      className={messageClasses}
+      onContextMenu={(e) => {
+        useContextMenuStore.getState().open(DiscordMessageContextMenu, { message, canDelete, guildId }, e);
+      }}
+    >
+      {/* Hover action bar */}
+      {!pending && (
+        <nav className="absolute -top-3.5 right-4 z-10 hidden items-center gap-0.5 rounded border border-white/10 bg-[#2b2d31] p-0.5 shadow-md group-hover:flex">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setReactionPickerOpen(true);
+              }}
+              className="rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200"
+              title="Add Reaction"
+            >
+              <Smiley size={16} />
+            </button>
+            <ReactionEmojiPicker
+              channelId={channelId}
+              messageId={message.id}
+              guildId={guildId}
+              open={reactionPickerOpen}
+              onOpenChange={setReactionPickerOpen}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              useDiscordReplyStore.getState().setReplyingMessage(message.id, message);
+            }}
+            className="rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200"
+            title="Reply"
+          >
+            <ArrowBendUpLeft size={16} />
+          </button>
+        </nav>
+      )}
+
+      {hasReply && (
+        <div className="mb-1 px-4">
+          <DiscordReplyBar referencedMessage={message.referenced_message} guildId={guildId} />
+        </div>
+      )}
+
+      <div className="flex items-start gap-4 px-4">
+        {shouldStack ? (
+          <div className="w-10" />
+        ) : (
+          <Popover open={popoverOpen} onOpenChange={setPopoverOpen} modal={false}>
+            <PopoverTrigger asChild>
+              <figure
+                role="button"
+                tabIndex={0}
+                className="shrink-0 cursor-pointer"
+                onContextMenu={(e) => {
+                  e.stopPropagation();
+                  useContextMenuStore.getState().open(DiscordUserContextMenu, {
+                    author: message.author,
+                    guildId,
+                    canKick, canBan, canManageNicknames, canTimeout, isOwnMessage,
+                    onViewProfile: openProfile,
+                  }, e);
+                }}
+              >
+                <DiscordAvatar author={message.author} className="size-10" />
+              </figure>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-auto border-none bg-transparent p-0 shadow-none"
+              align="start"
+              alignOffset={0}
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
+              <DiscordUserPopoverContent
+                author={message.author}
+                member={message.member}
+                guildId={guildId}
+                onOpenProfile={openProfile}
+              />
+            </PopoverContent>
+          </Popover>
+        )}
+
+        <section className="flex flex-1 flex-col items-start justify-start overflow-hidden">
+          {!shouldStack && (
             <div
-              className={messageClasses}
               onContextMenu={(e) => {
-                useContextMenuStore.getState().open(DiscordMessageContextMenu, { message, canDelete, guildId }, e);
+                e.stopPropagation();
+                useContextMenuStore.getState().open(DiscordUserContextMenu, {
+                  author: message.author,
+                  guildId,
+                  canKick, canBan, canManageNicknames, canTimeout, isOwnMessage,
+                  onViewProfile: openProfile,
+                }, e);
               }}
             >
-            {/* Hover action bar */}
-            {!pending && (
-              <div className="absolute -top-3.5 right-4 z-10 hidden items-center gap-0.5 rounded border border-white/10 bg-[#2b2d31] p-0.5 shadow-md group-hover:flex">
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setReactionPickerOpen(true);
-                    }}
-                    className="rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200"
-                    title="Add Reaction"
-                  >
-                    <Smiley size={16} />
-                  </button>
-                  <ReactionEmojiPicker
-                    channelId={channelId}
-                    messageId={message.id}
-                    guildId={guildId}
-                    open={reactionPickerOpen}
-                    onOpenChange={setReactionPickerOpen}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    useDiscordReplyStore.getState().setReplyingMessage(message.id, message);
-                  }}
-                  className="rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200"
-                  title="Reply"
-                >
-                  <ArrowBendUpLeft size={16} />
-                </button>
-              </div>
-            )}
-
-            {hasReply && (
-              <div className="mb-1 px-4">
-                <DiscordReplyBar referencedMessage={message.referenced_message} guildId={guildId} />
-              </div>
-            )}
-
-            <div className="flex items-start gap-4 px-4">
-              {shouldStack ? (
-                <div className="w-10" />
-              ) : (
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="shrink-0 cursor-pointer"
-                    onContextMenu={(e) => {
-                      e.stopPropagation();
-                      useContextMenuStore.getState().open(DiscordUserContextMenu, {
-                        author: message.author,
-                        guildId,
-                        canKick, canBan, canManageNicknames, canTimeout, isOwnMessage,
-                        onViewProfile: openProfile,
-                      }, e);
-                    }}
-                  >
-                    <DiscordAvatar author={message.author} className="size-10" />
-                  </button>
-                </PopoverTrigger>
-              )}
-
-              <div className="flex flex-1 flex-col items-start justify-start overflow-hidden">
-                {!shouldStack && (
-                  <div
-                    onContextMenu={(e) => {
-                      e.stopPropagation();
-                      useContextMenuStore.getState().open(DiscordUserContextMenu, {
-                        author: message.author,
-                        guildId,
-                        canKick, canBan, canManageNicknames, canTimeout, isOwnMessage,
-                        onViewProfile: openProfile,
-                      }, e);
-                    }}
-                  >
-                    <DiscordMessageHeader message={message} guildId={guildId} onClickName={openProfile} />
-                  </div>
-                )}
-
-                <div className="select-text whitespace-pre-wrap break-words text-gray-400 [overflow-wrap:anywhere]">
-                  <DiscordMessageContent content={message.content} guildId={guildId} />
-                  {message.edited_timestamp && (
-                    <span className="ml-1 text-[0.65rem] text-gray-500">(edited)</span>
-                  )}
-                </div>
-
-                <DiscordAttachments attachments={message.attachments} />
-                <DiscordEmbeds embeds={message.embeds} guildId={guildId} />
-                <DiscordStickers stickerItems={message.sticker_items} />
-                <DiscordMessageComponents
-                  components={message.components}
-                  channelId={channelId}
-                  messageId={message.id}
-                  guildId={guildId}
-                  applicationId={message.application_id || message.interaction_metadata?.id_of_integration_owner || message.author?.id}
-                />
-              </div>
+              <DiscordMessageHeader message={message} guildId={guildId} onClickName={openProfile} />
             </div>
-            {message.reactions?.length > 0 && (
-              <div className="pl-[72px]">
-                <DiscordReactions reactions={message.reactions} channelId={channelId} messageId={message.id} guildId={guildId} />
-              </div>
+          )}
+
+          <p className="select-text whitespace-pre-wrap text-gray-400 [overflow-wrap:anywhere]" style={{ fontSize: chatFontSize, lineHeight: `${Math.round(chatFontSize * 1.375)}px` }}>
+            <DiscordMessageContent content={message.content} guildId={guildId} />
+            {message.edited_timestamp && (
+              <span className="ml-1 text-[0.65rem] text-gray-500">(edited)</span>
             )}
-          </div>
+          </p>
 
-        <PopoverContent
-          className="w-auto border-none bg-transparent p-0 shadow-none"
-          align="start"
-          alignOffset={0}
-        >
-          <DiscordUserPopoverContent
-            author={message.author}
-            member={message.member}
+          <DiscordAttachments attachments={message.attachments} />
+          <DiscordEmbeds embeds={message.embeds} guildId={guildId} />
+          <DiscordStickers stickerItems={message.sticker_items} />
+          <DiscordMessageComponents
+            components={message.components}
+            channelId={channelId}
+            messageId={message.id}
             guildId={guildId}
-            onOpenProfile={openProfile}
+            applicationId={message.application_id || message.interaction_metadata?.id_of_integration_owner || message.author?.id}
           />
-        </PopoverContent>
-      </Popover>
-
-    </>
+        </section>
+      </div>
+      {message.reactions?.length > 0 && (
+        <footer className="pl-[72px]">
+          <DiscordReactions reactions={message.reactions} channelId={channelId} messageId={message.id} guildId={guildId} />
+        </footer>
+      )}
+    </article>
   );
 });
 

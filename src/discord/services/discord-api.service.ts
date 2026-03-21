@@ -115,7 +115,37 @@ export const DiscordApiService = {
   /**
    * Send a message to a channel.
    */
-  async sendMessage(channelId: string, content: string, nonce?: string, messageReference?: { message_id: string }): Promise<DiscordMessage> {
+  async sendMessage(
+    channelId: string,
+    content: string,
+    nonce?: string,
+    messageReference?: { message_id: string },
+    attachments?: File[],
+  ): Promise<DiscordMessage> {
+    if (attachments && attachments.length > 0) {
+      const formData = new FormData();
+      const payloadJson: any = { content, nonce };
+      if (messageReference) {
+        payloadJson.message_reference = messageReference;
+        payloadJson.allowed_mentions = { replied_user: true };
+      }
+      // Discord expects attachments metadata in payload_json
+      payloadJson.attachments = attachments.map((file, i) => ({
+        id: i,
+        filename: file.name,
+      }));
+      formData.append('payload_json', JSON.stringify(payloadJson));
+      attachments.forEach((file, i) => {
+        formData.append(`files[${i}]`, file, file.name);
+      });
+      const { data } = await discordApi.post<DiscordMessage>(
+        `/channels/${channelId}/messages`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      );
+      return data;
+    }
+
     const body: any = { content, nonce };
     if (messageReference) {
       body.message_reference = messageReference;

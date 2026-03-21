@@ -105,7 +105,12 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const _hasReadMessageHistory = useDiscordHasPermission(guildId, channel, READ_MESSAGE_HISTORY);
   const hasReadMessageHistory = !guildId || _hasReadMessageHistory;
 
-  const channelMessages = useDiscordChannelsStore((s) => s.channelMessages);
+  const messages = useDiscordChannelsStore(
+    useCallback((s) => s.channelMessages[channelId] || [], [channelId])
+  );
+  const pendingMessages = useDiscordChannelsStore(
+    useCallback((s) => s.channelPendingMessages[channelId] || [], [channelId])
+  );
   const channels = useDiscordChannelsStore((s) => s.channels);
 
   const [hasMore, setHasMore] = useState(true);
@@ -121,18 +126,6 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const lastAckedRef = useRef(null);
   const wasNearBottomRef = useRef(true);
   const unreadCountRef = useRef(0);
-
-  const channelPendingMessages = useDiscordChannelsStore((s) => s.channelPendingMessages);
-
-  const messages = useMemo(
-    () => channelMessages[channelId] || [],
-    [channelMessages, channelId]
-  );
-
-  const pendingMessages = useMemo(
-    () => channelPendingMessages[channelId] || [],
-    [channelPendingMessages, channelId]
-  );
 
   const lastMessageId = useMemo(
     () => channels.find((c) => c.id === channelId)?.last_message_id,
@@ -350,6 +343,10 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     let prevScrollHeight = scrollEl.scrollHeight;
     const observer = new ResizeObserver(() => {
       if (scrollTopOnRenderRef.current) return;
+      // Don't adjust scroll while user is selecting text — it breaks the selection
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) return;
+
       const newScrollHeight = scrollEl.scrollHeight;
       const delta = newScrollHeight - prevScrollHeight;
       prevScrollHeight = newScrollHeight;
@@ -400,9 +397,11 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
         {isLoading ? (
           <MessageSkeletonList />
         ) : (
-          <div className="pb-4">
+          <ol className="list-none pb-4">
             {!hasMore && (
-              <ChannelWelcome channel={channel} />
+              <li>
+                <ChannelWelcome channel={channel} />
+              </li>
             )}
             {messages.map((msg, i) => {
               const prevMessage = i > 0 ? messages[i - 1] : null;
@@ -416,7 +415,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
                 new Date(msgTs).toDateString() !== new Date(prevTs).toDateString();
 
               return (
-                <div key={msg.id} data-message-id={msg.id}>
+                <li key={msg.id} data-message-id={msg.id}>
                   {showDateSeparator && <DateSeparator timestamp={msgTs} />}
                   {showNewSeparator && <NewMessagesSeparator />}
                   <DiscordMessage
@@ -431,7 +430,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
                     hasManageNicknames={true}
                     hasModerateMembers={true}
                   />
-                </div>
+                </li>
               );
             })}
             {pendingMessages.map((msg, i) => {
@@ -439,18 +438,19 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
                 ? messages[messages.length - 1] || null
                 : pendingMessages[i - 1];
               return (
-                <DiscordMessage
-                  key={msg.nonce}
-                  message={msg}
-                  prevMessage={prevMessage}
-                  currentUserId={currentUser?.id}
-                  channelId={channelId}
-                  guildId={guildId}
-                  pending
-                />
+                <li key={msg.nonce}>
+                  <DiscordMessage
+                    message={msg}
+                    prevMessage={prevMessage}
+                    currentUserId={currentUser?.id}
+                    channelId={channelId}
+                    guildId={guildId}
+                    pending
+                  />
+                </li>
               );
             })}
-          </div>
+          </ol>
         )}
       </div>
     </div>

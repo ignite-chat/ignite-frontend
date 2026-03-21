@@ -8,7 +8,8 @@ import {
   EmojiPickerSidebar,
 } from '@/components/ui/emoji-picker';
 import { cn } from '@/lib/utils';
-import { X, Smiley, Timer, Keyboard } from '@phosphor-icons/react';
+import { toast } from 'sonner';
+import { X, Smiley, Timer, Keyboard, Plus, File as FileIcon } from '@phosphor-icons/react';
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,6 +35,7 @@ import { useDiscordGuildsStore } from '../../store/discord-guilds.store';
 import { useDiscordMembersStore } from '../../store/discord-members.store';
 import { useDiscordChannelsStore } from '../../store/discord-channels.store';
 import TypingDots from '@/components/ui/typing-dots';
+import { useDiscordFileDropStore } from '../../store/discord-file-drop.store';
 
 // Lexical imports
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
@@ -76,11 +78,55 @@ function formatSlowmodeDuration(seconds) {
   return `${seconds} second${seconds !== 1 ? 's' : ''}`;
 }
 
+const MAX_FILES = 10;
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB (Discord default for non-Nitro)
+
+const FilePreview = ({ file, onRemove }) => {
+  const isImage = file.type.startsWith('image/');
+  const [preview, setPreview] = useState(null);
+
+  useEffect(() => {
+    if (!isImage) return;
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file, isImage]);
+
+  const sizeStr = file.size > 1048576
+    ? `${(file.size / 1048576).toFixed(1)} MB`
+    : `${(file.size / 1024).toFixed(1)} KB`;
+
+  return (
+    <div className="group/file relative flex h-[200px] w-[200px] shrink-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-[#2b2d31]">
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute right-1 top-1 z-10 hidden size-6 items-center justify-center rounded-full bg-black/60 text-gray-300 hover:bg-black/80 hover:text-white group-hover/file:flex"
+      >
+        <X size={12} weight="bold" />
+      </button>
+      {isImage && preview ? (
+        <img src={preview} alt={file.name} className="h-[140px] w-full object-contain" />
+      ) : (
+        <div className="flex h-[140px] w-full items-center justify-center bg-[#232428]">
+          <FileIcon size={48} weight="thin" className="text-gray-500" />
+        </div>
+      )}
+      <div className="flex flex-1 flex-col justify-center px-2">
+        <p className="truncate text-xs font-medium text-gray-200">{file.name}</p>
+        <p className="text-[10px] text-gray-500">{sizeStr}</p>
+      </div>
+    </div>
+  );
+};
+
 const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   const [inputMessage, setInputMessage] = useState('');
+  const [stagedFiles, setStagedFiles] = useState([]);
   const [silentTyping, setSilentTyping] = useState(() => localStorage.getItem('silentTyping') === 'true');
   const editorRef = useRef(null);
   const menuContainerRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const channelId = channel?.id;
   const guildId = channel?.guild_id;
@@ -207,15 +253,62 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   const [hoveredEmoji, setHoveredEmoji] = useState(null);
   const [emojiSearch, setEmojiSearch] = useState('');
 
+  /* ---------------- file attachments ---------------- */
+
+  const addFiles = useCallback((files) => {
+    const newFiles = Array.from(files).filter((f) => {
+      if (f.size > MAX_FILE_SIZE) {
+        toast.error(`${f.name} is too large (max ${MAX_FILE_SIZE / 1024 / 1024} MB)`);
+        return false;
+      }
+      return true;
+    });
+    setStagedFiles((prev) => [...prev, ...newFiles].slice(0, MAX_FILES));
+  }, []);
+
+  const removeFile = useCallback((index) => {
+    setStagedFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleFileInputChange = useCallback((e) => {
+    if (e.target.files?.length) addFiles(e.target.files);
+    e.target.value = '';
+  }, [addFiles]);
+
+  // Handle paste files
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const files = Array.from(e.clipboardData?.files || []);
+      if (files.length > 0) {
+        e.preventDefault();
+        addFiles(files);
+      }
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [addFiles]);
+
+  // Pick up files dropped anywhere on the window (via global store)
+  const droppedFiles = useDiscordFileDropStore((s) => s.droppedFiles);
+  useEffect(() => {
+    if (droppedFiles.length > 0) {
+      addFiles(droppedFiles);
+      useDiscordFileDropStore.getState().clearDroppedFiles();
+    }
+  }, [droppedFiles, addFiles]);
+
   /* ---------------- send message ---------------- */
 
   const sendMessage = useCallback(() => {
     if (!canSendMessages || isOnCooldown) return;
-    if (!channelId || !inputMessage.trim()) return;
+    const hasContent = inputMessage.trim().length > 0;
+    const hasFiles = stagedFiles.length > 0;
+    if (!channelId || (!hasContent && !hasFiles)) return;
     if (inputMessage.length > MAX_MESSAGE_LENGTH) return;
 
-    DiscordService.sendMessage(channelId, inputMessage, replyingMessageId);
+    DiscordService.sendMessage(channelId, inputMessage, replyingMessageId, hasFiles ? stagedFiles : undefined);
     setInputMessage('');
+    setStagedFiles([]);
     clearReply();
     onMessageSent?.();
 
@@ -226,7 +319,7 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
     if (editorRef.current) {
       editorRef.current.dispatchCommand(CLEAR_EDITOR_COMMAND, undefined);
     }
-  }, [canSendMessages, isOnCooldown, channelId, inputMessage, replyingMessageId, clearReply, onMessageSent, slowmodeSeconds]);
+  }, [canSendMessages, isOnCooldown, channelId, inputMessage, stagedFiles, replyingMessageId, clearReply, onMessageSent, slowmodeSeconds]);
 
   const handleEmojiSelect = useCallback(({ id, label, emoji, url }) => {
     addRecentEmoji({
@@ -352,13 +445,50 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
         </div>
       </div>
 
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
       <div ref={menuContainerRef} className="relative">
+        {/* Staged file previews */}
+        {stagedFiles.length > 0 && (
+          <div className={cn(
+            'flex gap-2 overflow-x-auto border border-b-0 border-white/5 bg-[#2b2d31] p-3',
+            replyingMessage ? 'rounded-t-none' : 'rounded-t-md'
+          )}>
+            {stagedFiles.map((file, i) => (
+              <FilePreview key={`${file.name}-${i}`} file={file} onRemove={() => removeFile(i)} />
+            ))}
+          </div>
+        )}
+
         <InputGroup
           className={cn(
             'relative flex h-auto items-center border border-white/5 bg-[#222327] transition-all duration-200',
-            replyingMessage ? 'rounded-t-none border-t-0' : 'rounded-t-md'
+            replyingMessage && stagedFiles.length === 0 ? 'rounded-t-none border-t-0' : '',
+            stagedFiles.length > 0 ? 'rounded-t-none border-t-0' : '',
+            !replyingMessage && stagedFiles.length === 0 ? 'rounded-t-md' : ''
           )}
         >
+          {/* Upload button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="ml-3 mt-2.5 flex size-8 shrink-0 items-center justify-center self-start rounded-full text-[#949ba4] transition-colors hover:text-[#dbdee1]"
+              >
+                <Plus size={20} weight="bold" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Upload a File</TooltipContent>
+          </Tooltip>
+
           <LexicalComposer initialConfig={initialConfig} key={channelId}>
             <div className="relative flex-1">
               <PlainTextPlugin

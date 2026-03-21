@@ -122,7 +122,7 @@ export const DiscordService = {
    * Creates a pending message immediately for instant UI feedback,
    * then removes it once the server confirms via MESSAGE_CREATE.
    */
-  async sendMessage(channelId: string, content: string, replyToMessageId?: string | null) {
+  async sendMessage(channelId: string, content: string, replyToMessageId?: string | null, attachments?: File[]) {
     const nonce = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
     const currentUser = useDiscordStore.getState().user;
 
@@ -154,16 +154,22 @@ export const DiscordService = {
         type: 0,
         ...(messageReference && { message_reference: messageReference }),
         ...(referencedMessage && { referenced_message: referencedMessage }),
+        ...(attachments && attachments.length > 0 && {
+          attachments: attachments.map((f, i) => ({
+            id: String(i),
+            filename: f.name,
+            size: f.size,
+            content_type: f.type,
+          })),
+        }),
       });
     }
 
     try {
-      await DiscordApiService.sendMessage(channelId, content, nonce, messageReference);
-      // The real message arrives via MESSAGE_CREATE which removes the pending one by nonce
+      await DiscordApiService.sendMessage(channelId, content, nonce, messageReference, attachments);
       return true;
     } catch (error) {
       console.error(`[Discord] Failed to send message to channel ${channelId}:`, error);
-      // Remove the pending message on failure
       useDiscordChannelsStore.getState().removePendingByNonce(channelId, nonce);
       return false;
     }
