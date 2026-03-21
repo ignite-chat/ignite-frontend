@@ -47,6 +47,7 @@
     "clsx": "^2.1.1",
     "cors": "^2.8.5",
     "cross-env": "^10.1.0",
+    "discord-protos": "^1.2.121",
     "express": "^4.19.2",
     "frimousse": "^0.3.0",
     "gifenc": "^1.0.3",

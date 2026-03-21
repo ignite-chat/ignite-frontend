@@ -13,7 +13,7 @@ import { useDiscordThreadsStore } from '../store/discord-threads.store';
 import { useDiscordVoiceStatesStore } from '../store/discord-voice-states.store';
 import { useDiscordGuildSettingsStore } from '../store/discord-guild-settings.store';
 import { useDiscordGuildFoldersStore } from '../store/discord-guild-folders.store';
-import { decodeGuildFolders } from '../utils/proto-decode';
+import { decodeGuildFolders, decodeUserSettings } from '../utils/proto-decode';
 import { DiscordVoiceService } from './discord-voice.service';
 import { GatewayOp } from '../constants/gateway-opcodes';
 
@@ -541,12 +541,18 @@ export const DiscordGatewayService = {
       useDiscordGuildSettingsStore.getState().setAllSettings(guildSettingsEntries);
     }
 
-    // Decode guild folders from protobuf user settings
+    // Decode guild folders from protobuf user settings (field 14 of PreloadedUserSettings)
     if (data.user_settings_proto) {
+      const decoded = decodeUserSettings(data.user_settings_proto);
+      console.log('[Discord Gateway] Decoded user_settings_proto:', decoded);
+
       const folders = decodeGuildFolders(data.user_settings_proto);
+      console.log(`[Discord Gateway] Decoded ${folders.length} guild folders:`, folders);
       if (folders.length > 0) {
         useDiscordGuildFoldersStore.getState().setFolders(folders);
       }
+    } else {
+      console.log('[Discord Gateway] No user_settings_proto in READY payload');
     }
 
     if (private_channels && private_channels.length > 0) {

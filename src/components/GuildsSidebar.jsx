@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Fire, Plus, Compass, DiscordLogo, SignOut } from '@phosphor-icons/react';
 import {
@@ -29,6 +29,7 @@ import {
 import { useContextMenuStore } from '@/store/context-menu.store';
 import GuildContextMenu from '@/ignite/components/context-menus/GuildContextMenu';
 import DiscordGuildContextMenu from '@/discord/components/context-menus/DiscordGuildContextMenu';
+import DiscordFolderContextMenu from '@/discord/components/context-menus/DiscordFolderContextMenu';
 import InviteModal from '@/ignite/components/modals/InviteModal';
 import { useModalStore } from '@/ignite/store/modal.store';
 import {
@@ -290,11 +291,16 @@ const DiscordFolderIcon = ({ folder, guilds, isExpanded, onToggle, totalMentions
   const folderColor = folder.color != null ? `#${folder.color.toString(16).padStart(6, '0')}` : '#5865f2';
   const folderName = folder.name || 'Server Folder';
 
+  const openContextMenu = (e) => {
+    e.preventDefault();
+    useContextMenuStore.getState().open(DiscordFolderContextMenu, { folder }, e);
+  };
+
   if (isExpanded) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="group relative mb-2 min-w-min px-3">
+          <div className="group relative mb-2 min-w-min px-3" onContextMenu={openContextMenu}>
             <div className="relative mx-auto h-12 w-12">
               <button
                 type="button"
@@ -312,7 +318,7 @@ const DiscordFolderIcon = ({ folder, guilds, isExpanded, onToggle, totalMentions
           </div>
         </TooltipTrigger>
         <TooltipContent side="right" className="font-bold">
-          {folderName} (click to collapse)
+          {folderName}
         </TooltipContent>
       </Tooltip>
     );
@@ -324,7 +330,7 @@ const DiscordFolderIcon = ({ folder, guilds, isExpanded, onToggle, totalMentions
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="group relative mb-2 min-w-min px-3">
+        <div className="group relative mb-2 min-w-min px-3" onContextMenu={openContextMenu}>
           <div
             className={`absolute -left-1 top-1/2 block w-2 -translate-y-1/2 rounded-lg bg-white transition-all duration-200 ${
               hasUnread ? 'h-2 group-hover:h-5' : 'h-0 group-hover:h-5'
@@ -334,7 +340,7 @@ const DiscordFolderIcon = ({ folder, guilds, isExpanded, onToggle, totalMentions
             <button
               type="button"
               onClick={onToggle}
-              className="absolute inset-0 flex cursor-pointer flex-wrap items-center justify-center gap-0.5 overflow-hidden rounded-2xl p-1.5 transition-all duration-300 ease-out hover:rounded-xl"
+              className="absolute inset-0 grid cursor-pointer grid-cols-2 grid-rows-2 gap-0.5 overflow-hidden rounded-2xl p-2 transition-all duration-300 ease-out hover:rounded-xl"
               style={{ backgroundColor: `${folderColor}20` }}
             >
               {previewGuilds.map((g) => {
@@ -363,7 +369,7 @@ const DiscordFolderIcon = ({ folder, guilds, isExpanded, onToggle, totalMentions
   );
 };
 
-const DiscordGuildFolderGroup = ({ folder, guilds, activeGuildPath }) => {
+const DiscordGuildFolderGroup = ({ folder, guilds, activeGuildPath, renderGuildItem, isMergeTarget, folderHeaderRef }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const channels = useDiscordChannelsStore((s) => s.channels);
   const readStates = useDiscordReadStatesStore((s) => s.readStates);
@@ -398,32 +404,314 @@ const DiscordGuildFolderGroup = ({ folder, guilds, activeGuildPath }) => {
     }
   }, [hasActiveGuild]);
 
+  const folderColor = folder.color != null ? `#${folder.color.toString(16).padStart(6, '0')}` : '#5865f2';
+
   return (
     <div>
-      <DiscordFolderIcon
-        folder={folder}
-        guilds={guilds}
-        isExpanded={isExpanded}
-        onToggle={() => setIsExpanded((v) => !v)}
-        totalMentions={totalMentions}
-        hasUnread={hasUnread}
-      />
+      <div ref={folderHeaderRef} className="relative">
+        {isMergeTarget && (
+          <div className="pointer-events-none absolute -left-0.5 top-1/2 z-10 size-3 -translate-y-1/2 rounded-full bg-green-500" />
+        )}
+        <DiscordFolderIcon
+          folder={folder}
+          guilds={guilds}
+          isExpanded={isExpanded}
+          onToggle={() => setIsExpanded((v) => !v)}
+          totalMentions={totalMentions}
+          hasUnread={hasUnread}
+        />
+      </div>
       {isExpanded && (
-        <div className="relative">
-          {/* Vertical folder bar */}
+        <div className="relative mb-1">
+          {/* Colored background pill behind guild icons */}
           <div
-            className="absolute left-[34px] top-0 bottom-1 w-1 rounded-full"
-            style={{ backgroundColor: `${folder.color != null ? `#${folder.color.toString(16).padStart(6, '0')}` : '#5865f2'}40` }}
+            className="absolute left-1/2 -top-1 -bottom-1 -translate-x-1/2 rounded-[20px]"
+            style={{
+              width: 56,
+              backgroundColor: `${folderColor}25`,
+            }}
           />
-          {guilds.map((guild) => (
-            <DiscordGuildIcon
-              key={`discord-${guild.id}`}
-              guild={guild}
-              isActive={activeGuildPath.startsWith(`/discord/${guild.id}`)}
-            />
-          ))}
+          {renderGuildItem
+            ? guilds.map((guild) => renderGuildItem(guild))
+            : guilds.map((guild) => (
+                <DiscordGuildIcon
+                  key={`discord-${guild.id}`}
+                  guild={guild}
+                  isActive={activeGuildPath.startsWith(`/discord/${guild.id}`)}
+                />
+              ))}
         </div>
       )}
+    </div>
+  );
+};
+
+/**
+ * Custom drag-and-drop for Discord guilds/folders.
+ * No SortableContext — items stay static. Visual indicators show drop targets:
+ * - Green line between items = insert here
+ * - Green dot on folder = drop into folder
+ */
+const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
+  const [draggingGuildId, setDraggingGuildId] = useState(null);
+  // dropTarget: { type: 'between', entryIndex } or { type: 'folder', folderId } or { type: 'within-folder', folderId, afterGuildId } or null
+  const [dropTarget, setDropTarget] = useState(null);
+  const containerRef = useRef(null);
+  const itemRefsMap = useRef({});
+
+  // Build a flat list of all rendered items with their refs and metadata
+  const flatItems = useMemo(() => {
+    const items = [];
+    for (let ei = 0; ei < entries.length; ei++) {
+      const entry = entries[ei];
+      if (entry.type === 'guild') {
+        items.push({ kind: 'guild', guildId: entry.guild.id, guild: entry.guild, folderId: null, entryIndex: ei });
+      } else if (entry.type === 'folder') {
+        items.push({ kind: 'folder-header', folderId: entry.folder.id, folder: entry.folder, entryIndex: ei });
+        for (const guild of entry.guilds) {
+          items.push({ kind: 'guild', guildId: guild.id, guild, folderId: entry.folder.id, entryIndex: ei });
+        }
+      }
+    }
+    return items;
+  }, [entries]);
+
+  const setItemRef = useCallback((key, el) => {
+    if (el) itemRefsMap.current[key] = el;
+    else delete itemRefsMap.current[key];
+  }, []);
+
+  const handlePointerMove = useCallback((e) => {
+    if (!draggingGuildId || !containerRef.current) return;
+
+    const mouseY = e.clientY;
+
+    // Find the closest item the pointer is over
+    let bestTarget = null;
+    let bestDist = Infinity;
+
+    for (const item of flatItems) {
+      if (item.kind === 'guild' && item.guildId === draggingGuildId) continue;
+
+      const key = item.kind === 'folder-header' ? `fh-${item.folderId}` : `gi-${item.guildId}`;
+      const el = itemRefsMap.current[key];
+      if (!el) continue;
+
+      const rect = el.getBoundingClientRect();
+      const center = rect.top + rect.height / 2;
+      const dist = Math.abs(mouseY - center);
+
+      if (dist < bestDist) {
+        bestDist = dist;
+        const h = rect.height;
+        // How far from center (0 = center, 1 = edge)
+        const fromCenter = Math.abs(mouseY - center) / (h / 2);
+
+        if (item.kind === 'folder-header') {
+          // Folder header: inner 50% = merge into folder, outer = insert before/after
+          if (fromCenter <= 0.5) {
+            bestTarget = { type: 'folder', folderId: item.folderId, key };
+          } else if (mouseY < center) {
+            bestTarget = { type: 'between', entryIndex: item.entryIndex, position: 'before', key };
+          } else {
+            bestTarget = { type: 'between', entryIndex: item.entryIndex, position: 'after', key };
+          }
+        } else if (item.folderId) {
+          // Guild inside a folder: inner 50% = stay in folder (reorder), outer = insert before/after in folder
+          if (mouseY < center) {
+            bestTarget = { type: 'within-folder', folderId: item.folderId, beforeGuildId: item.guildId, key };
+          } else {
+            bestTarget = { type: 'within-folder', folderId: item.folderId, afterGuildId: item.guildId, key };
+          }
+        } else {
+          // Standalone guild: inner 50% = create folder together, outer = insert before/after
+          if (fromCenter <= 0.5) {
+            bestTarget = { type: 'merge-guild', targetGuildId: item.guildId, entryIndex: item.entryIndex, key };
+          } else if (mouseY < center) {
+            bestTarget = { type: 'between', entryIndex: item.entryIndex, position: 'before', key };
+          } else {
+            bestTarget = { type: 'between', entryIndex: item.entryIndex, position: 'after', key };
+          }
+        }
+      }
+    }
+
+    setDropTarget(bestTarget);
+  }, [draggingGuildId, flatItems]);
+
+  const handlePointerUp = useCallback(() => {
+    if (!draggingGuildId || !dropTarget) {
+      setDraggingGuildId(null);
+      setDropTarget(null);
+      return;
+    }
+
+    const store = useDiscordGuildFoldersStore.getState();
+    const draggedMeta = flatItems.find((i) => i.kind === 'guild' && i.guildId === draggingGuildId);
+
+    if (dropTarget.type === 'merge-guild') {
+      // Merge two guilds into a new folder
+      store.createFolderFromGuilds(draggingGuildId, dropTarget.targetGuildId);
+    } else if (dropTarget.type === 'folder') {
+      // Drop into existing folder
+      if (draggedMeta?.folderId !== dropTarget.folderId) {
+        store.addGuildToFolder(draggingGuildId, dropTarget.folderId);
+      }
+    } else if (dropTarget.type === 'within-folder') {
+      if (draggedMeta?.folderId === dropTarget.folderId) {
+        // Reorder within same folder
+        const targetGuildId = dropTarget.afterGuildId || dropTarget.beforeGuildId;
+        if (targetGuildId && targetGuildId !== draggingGuildId) {
+          store.reorderWithinFolder(dropTarget.folderId, draggingGuildId, targetGuildId);
+        }
+      } else {
+        // Move into this folder
+        store.addGuildToFolder(draggingGuildId, dropTarget.folderId);
+      }
+    } else if (dropTarget.type === 'between') {
+      let insertIdx = dropTarget.position === 'after' ? dropTarget.entryIndex + 1 : dropTarget.entryIndex;
+      if (draggedMeta?.folderId) {
+        // Pull out of folder — adjust if dragged item's folder is before the insert point
+        store.removeGuildFromFolder(draggingGuildId, insertIdx);
+      } else if (draggedMeta) {
+        // Reorder standalone — convert insert position to a move target
+        // After removing from `fromIndex`, indices shift, so adjust
+        const fromIdx = draggedMeta.entryIndex;
+        if (fromIdx < insertIdx) insertIdx--;
+        if (fromIdx !== insertIdx) {
+          store.reorderFolders(fromIdx, insertIdx);
+        }
+      }
+    }
+
+    setDraggingGuildId(null);
+    setDropTarget(null);
+  }, [draggingGuildId, dropTarget, flatItems]);
+
+  useEffect(() => {
+    if (!draggingGuildId) return;
+    const onMove = (e) => handlePointerMove(e);
+    const onUp = () => handlePointerUp();
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [draggingGuildId, handlePointerMove, handlePointerUp]);
+
+  const startDrag = useCallback((guildId, e) => {
+    e.preventDefault();
+    setDraggingGuildId(guildId);
+    setDropTarget(null);
+  }, []);
+
+  // Determine indicator for a standalone guild: 'before', 'after', 'merge', or null
+  const getIndicator = (guildId) => {
+    if (!dropTarget || !draggingGuildId) return null;
+    if (dropTarget.type === 'between' && dropTarget.key === `gi-${guildId}`) {
+      return dropTarget.position; // 'before' or 'after'
+    }
+    if (dropTarget.type === 'merge-guild' && dropTarget.targetGuildId === guildId) {
+      return 'merge';
+    }
+    return null;
+  };
+
+  const isFolderMergeTarget = (folderId) => {
+    if (!dropTarget || !draggingGuildId) return false;
+    if (dropTarget.type === 'folder' && dropTarget.folderId === folderId) return true;
+    return false;
+  };
+
+  const getWithinFolderIndicator = (guildId, folderId) => {
+    if (!dropTarget || dropTarget.type !== 'within-folder') return null;
+    if (dropTarget.folderId !== folderId) return null;
+    if (dropTarget.beforeGuildId === guildId) return 'before';
+    if (dropTarget.afterGuildId === guildId) return 'after';
+    return null;
+  };
+
+  // Indicator for folder entries (before/after the whole folder)
+  const getFolderIndicator = (folderId) => {
+    if (!dropTarget || !draggingGuildId) return null;
+    if (dropTarget.type === 'between' && dropTarget.key === `fh-${folderId}`) {
+      return dropTarget.position;
+    }
+    return null;
+  };
+
+  const GreenLine = () => (
+    <div className="flex items-center justify-center py-1">
+      <div className="h-[3px] w-10 rounded-full bg-green-500" />
+    </div>
+  );
+
+  return (
+    <div ref={containerRef}>
+      {entries.map((entry, ei) => {
+        if (entry.type === 'guild') {
+          const isDragging = draggingGuildId === entry.guild.id;
+          const indicator = getIndicator(entry.guild.id);
+          return (
+            <div key={`dg-${entry.guild.id}`}>
+              {indicator === 'before' && <GreenLine />}
+              <div
+                ref={(el) => setItemRef(`gi-${entry.guild.id}`, el)}
+                onPointerDown={(e) => startDrag(entry.guild.id, e)}
+                className="relative"
+                style={{ opacity: isDragging ? 0.4 : 1, cursor: 'grab', userSelect: 'none' }}
+              >
+                {indicator === 'merge' && (
+                  <div className="pointer-events-none absolute -left-0.5 top-1/2 z-10 size-3 -translate-y-1/2 rounded-full bg-green-500" />
+                )}
+                <DiscordGuildIcon
+                  guild={entry.guild}
+                  isActive={pathname.startsWith(`/discord/${entry.guild.id}`)}
+                />
+              </div>
+              {indicator === 'after' && <GreenLine />}
+            </div>
+          );
+        }
+
+        // Folder
+        const folderMerge = isFolderMergeTarget(entry.folder.id);
+        const folderIndicator = getFolderIndicator(entry.folder.id);
+        return (
+          <div key={`folder-${entry.folder.id}`}>
+            {folderIndicator === 'before' && <GreenLine />}
+            <DiscordGuildFolderGroup
+              folder={entry.folder}
+              guilds={entry.guilds}
+              activeGuildPath={pathname}
+              isMergeTarget={folderMerge}
+              renderGuildItem={(guild) => {
+                const isDragging = draggingGuildId === guild.id;
+                const indicator = getWithinFolderIndicator(guild.id, entry.folder.id);
+                return (
+                  <div key={`dg-${guild.id}`}>
+                    {indicator === 'before' && <GreenLine />}
+                    <div
+                      ref={(el) => setItemRef(`gi-${guild.id}`, el)}
+                      onPointerDown={(e) => startDrag(guild.id, e)}
+                      style={{ opacity: isDragging ? 0.4 : 1, cursor: 'grab', userSelect: 'none' }}
+                    >
+                      <DiscordGuildIcon
+                        guild={guild}
+                        isActive={pathname.startsWith(`/discord/${guild.id}`)}
+                      />
+                    </div>
+                    {indicator === 'after' && <GreenLine />}
+                  </div>
+                );
+              }}
+              folderHeaderRef={(el) => setItemRef(`fh-${entry.folder.id}`, el)}
+            />
+            {folderIndicator === 'after' && <GreenLine />}
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -476,11 +764,10 @@ const GuildsSidebar = () => {
 
         if (folderGuilds.length === 0) continue;
 
-        // Real folder (has an id and multiple guilds, or has a name)
-        if (folder.id && (folderGuilds.length > 1 || folder.name)) {
+        // id !== null = real folder, id === null = standalone guild
+        if (folder.id != null) {
           entries.push({ type: 'folder', folder, guilds: folderGuilds });
         } else {
-          // Standalone guild(s)
           for (const g of folderGuilds) {
             entries.push({ type: 'guild', guild: g });
           }
@@ -673,7 +960,7 @@ const GuildsSidebar = () => {
 
   return (
     <>
-      <div className="scrollbar-none relative left-0 top-0 m-0 flex h-full min-w-min flex-col items-center overflow-y-auto bg-[#121214] pb-36 pt-3 text-white shadow">
+      <div className="scrollbar-none relative left-0 top-0 m-0 flex h-full min-w-min flex-col items-center overflow-y-auto bg-[#121214] pb-36 text-white shadow">
         {/* Home / Friends */}
         <Link to={lastDmChannelId ? `/channels/@me/${lastDmChannelId}` : '/channels/@me'}>
           <SidebarIcon
@@ -771,24 +1058,11 @@ const GuildsSidebar = () => {
         {discordToken && (
           <>
             {discordConnected ? (
-              <>
-                {discordSidebarEntries.map((entry) =>
-                  entry.type === 'folder' ? (
-                    <DiscordGuildFolderGroup
-                      key={`folder-${entry.folder.id}`}
-                      folder={entry.folder}
-                      guilds={entry.guilds}
-                      activeGuildPath={location.pathname}
-                    />
-                  ) : (
-                    <DiscordGuildIcon
-                      key={`discord-${entry.guild.id}`}
-                      guild={entry.guild}
-                      isActive={location.pathname.startsWith(`/discord/${entry.guild.id}`)}
-                    />
-                  )
-                )}
-              </>
+              <DiscordGuildsDnd
+                entries={discordSidebarEntries}
+                folders={discordGuildFolders}
+                pathname={location.pathname}
+              />
             ) : (
               Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="mb-2 flex justify-center px-3">

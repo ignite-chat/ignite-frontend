@@ -238,6 +238,16 @@ export const DiscordApiService = {
   },
 
   /**
+   * Update user settings proto (type 1 = PreloadedUserSettings).
+   * Used for guild folder ordering, status, etc.
+   */
+  async updateSettingsProto(settingsBase64: string): Promise<void> {
+    await discordApi.patch('/users/@me/settings-proto/1', {
+      settings: settingsBase64,
+    });
+  },
+
+  /**
    * Block a user.
    */
   async blockUser(userId: string): Promise<void> {

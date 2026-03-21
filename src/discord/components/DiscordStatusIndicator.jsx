@@ -19,7 +19,7 @@ const platformLabels = {
   desktop: 'Desktop',
   mobile: 'Mobile',
   web: 'Web',
-  embedded: 'Console',
+  embedded: 'Embedded',
 };
 
 const platformPhosphorIcons = {

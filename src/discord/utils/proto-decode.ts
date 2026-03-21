@@ -1,95 +1,16 @@
 /**
- * Minimal protobuf wire-format decoder for Discord's user_settings_proto.
- *
- * Discord sends guild folder ordering as a base64-encoded protobuf in the
- * READY payload's `user_settings_proto` field. This module decodes just
- * enough of the wire format to extract guild folders without pulling in a
- * full protobuf library.
+ * Decodes Discord's user_settings_proto using generated protobuf-ts types.
+ * Proto source: https://github.com/discord-userdoccers/discord-protos
  */
 
-export type ProtoMessage = Map<number, ProtoValue[]>;
-export type ProtoValue = bigint | Uint8Array;
+import {
+  PreloadedUserSettings,
+  PreloadedUserSettings_GuildFolders,
+  PreloadedUserSettings_GuildFolder,
+} from '../generated/PreloadedUserSettings';
+import { Int64Value, StringValue, UInt64Value } from '../generated/google/protobuf/wrappers';
 
-function decodeVarint(buf: Uint8Array, offset: number): [bigint, number] {
-  let result = 0n;
-  let shift = 0n;
-  let pos = offset;
-  while (pos < buf.length) {
-    const byte = buf[pos];
-    result |= BigInt(byte & 0x7f) << shift;
-    pos++;
-    if ((byte & 0x80) === 0) break;
-    shift += 7n;
-  }
-  return [result, pos];
-}
-
-export function decodeMessage(buf: Uint8Array, start = 0, end?: number): ProtoMessage {
-  const message: ProtoMessage = new Map();
-  let pos = start;
-  const limit = end ?? buf.length;
-
-  while (pos < limit) {
-    const [tag, newPos] = decodeVarint(buf, pos);
-    pos = newPos;
-    const fieldNumber = Number(tag >> 3n);
-    const wireType = Number(tag & 7n);
-
-    let value: ProtoValue;
-    switch (wireType) {
-      case 0: {
-        // varint
-        const [v, np] = decodeVarint(buf, pos);
-        pos = np;
-        value = v;
-        break;
-      }
-      case 1: {
-        // 64-bit fixed
-        const bytes = buf.slice(pos, pos + 8);
-        let v = 0n;
-        for (let i = 7; i >= 0; i--) {
-          v = (v << 8n) | BigInt(bytes[i]);
-        }
-        pos += 8;
-        value = v;
-        break;
-      }
-      case 2: {
-        // length-delimited (string, bytes, embedded message)
-        const [len, np] = decodeVarint(buf, pos);
-        pos = np;
-        const dataEnd = pos + Number(len);
-        value = buf.slice(pos, dataEnd);
-        pos = dataEnd;
-        break;
-      }
-      case 5: {
-        // 32-bit fixed
-        const bytes = buf.slice(pos, pos + 4);
-        let v = 0;
-        for (let i = 3; i >= 0; i--) {
-          v = (v << 8) | bytes[i];
-        }
-        pos += 4;
-        value = BigInt(v);
-        break;
-      }
-      default:
-        // Unknown wire type — skip the rest (can't determine size)
-        return message;
-    }
-
-    if (!message.has(fieldNumber)) {
-      message.set(fieldNumber, []);
-    }
-    message.get(fieldNumber)!.push(value);
-  }
-
-  return message;
-}
-
-// ─── Guild Folder Extraction ──────────────────────────────────
+export { PreloadedUserSettings };
 
 export type GuildFolder = {
   id: string | null;
@@ -98,77 +19,70 @@ export type GuildFolder = {
   color: number | null;
 };
 
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const buf = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    buf[i] = binary.charCodeAt(i);
+  }
+  return buf;
+}
+
+function bytesToBase64(buf: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < buf.length; i++) {
+    binary += String.fromCharCode(buf[i]);
+  }
+  return btoa(binary);
+}
+
 /**
- * Read a snowflake ID from a length-delimited field that wraps a varint.
+ * Decode the full PreloadedUserSettings from base64.
  */
-function readSnowflake(buf: Uint8Array): string {
-  const [val] = decodeVarint(buf, 0);
-  return val.toString();
+export function decodeUserSettings(base64Proto: string) {
+  return PreloadedUserSettings.fromBinary(base64ToBytes(base64Proto));
 }
 
 /**
  * Decode guild folders from Discord's base64-encoded user_settings_proto.
- *
- * Proto path: PreloadedUserSettings → field 3 (GuildFolders) → field 1 (repeated GuildFolder)
- *
- * GuildFolder fields:
- *   1 = id (length-delimited varint snowflake)
- *   2 = repeated guild_ids (length-delimited varint snowflake)
- *   3 = name (string)
- *   4 = color (length-delimited varint)
  */
 export function decodeGuildFolders(base64Proto: string): GuildFolder[] {
   try {
-    const binary = atob(base64Proto);
-    const buf = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      buf[i] = binary.charCodeAt(i);
-    }
+    const decoded = PreloadedUserSettings.fromBinary(base64ToBytes(base64Proto));
+    const folders = decoded.guildFolders?.folders;
+    if (!folders || folders.length === 0) return [];
 
-    const root = decodeMessage(buf);
-
-    // Field 3 = GuildFolders wrapper message
-    const guildFoldersRaw = root.get(3);
-    if (!guildFoldersRaw || guildFoldersRaw.length === 0) return [];
-
-    const guildFoldersMsg = decodeMessage(guildFoldersRaw[0] as Uint8Array);
-
-    // Field 1 = repeated GuildFolder
-    const folderEntries = guildFoldersMsg.get(1) || [];
-
-    return folderEntries.map((folderBuf) => {
-      const folder = decodeMessage(folderBuf as Uint8Array);
-
-      // Field 1 = id
-      const idRaw = folder.get(1);
-      let id: string | null = null;
-      if (idRaw && idRaw.length > 0) {
-        id = readSnowflake(idRaw[0] as Uint8Array);
-      }
-
-      // Field 2 = repeated guild_ids
-      const guildIdsRaw = folder.get(2) || [];
-      const guild_ids = guildIdsRaw.map((raw) => readSnowflake(raw as Uint8Array));
-
-      // Field 3 = name
-      const nameRaw = folder.get(3);
-      let name: string | null = null;
-      if (nameRaw && nameRaw.length > 0) {
-        name = new TextDecoder().decode(nameRaw[0] as Uint8Array);
-      }
-
-      // Field 4 = color
-      const colorRaw = folder.get(4);
-      let color: number | null = null;
-      if (colorRaw && colorRaw.length > 0) {
-        const [val] = decodeVarint(colorRaw[0] as Uint8Array, 0);
-        color = Number(val);
-      }
-
-      return { id, guild_ids, name, color };
-    });
+    return folders.map((f) => ({
+      id: f.id?.value != null ? f.id.value.toString() : null,
+      guild_ids: (f.guildIds || []).map((id) => id.toString()),
+      name: f.name?.value ?? null,
+      color: f.color?.value != null ? Number(f.color.value) : null,
+    }));
   } catch (err) {
     console.error('[Proto Decode] Failed to decode guild folders:', err);
     return [];
   }
+}
+
+/**
+ * Encode a GuildFolders update into a base64 proto string suitable for
+ * PATCH /users/@me/settings-proto/1
+ */
+export function encodeGuildFolders(folders: GuildFolder[]): string {
+  const protoFolders: PreloadedUserSettings_GuildFolder[] = folders.map((f) => ({
+    guildIds: f.guild_ids.map((id) => BigInt(id)),
+    id: f.id != null ? Int64Value.create({ value: BigInt(f.id) }) : undefined,
+    name: f.name != null ? StringValue.create({ value: f.name }) : undefined,
+    color: f.color != null ? UInt64Value.create({ value: BigInt(f.color) }) : undefined,
+  }));
+
+  // Build a partial PreloadedUserSettings with only guild_folders set
+  const settings = PreloadedUserSettings.create({
+    guildFolders: PreloadedUserSettings_GuildFolders.create({
+      folders: protoFolders,
+    }),
+  });
+
+  const buf = PreloadedUserSettings.toBinary(settings);
+  return bytesToBase64(buf);
 }
