@@ -259,9 +259,11 @@ export const DiscordGatewayService = {
         useDiscordRelationshipsStore.getState().updateRelationship(data.id, { type: data.type, nickname: data.nickname });
         break;
       case 'GUILD_MEMBERS_CHUNK':
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleGuildMembersChunk(data);
         break;
       case 'GUILD_MEMBER_UPDATE':
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleGuildMemberUpdate(data);
         break;
       case 'GUILD_MEMBER_LIST_UPDATE':

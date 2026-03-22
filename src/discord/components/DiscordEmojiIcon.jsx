@@ -93,6 +93,8 @@ const DiscordEmojiIcon = ({ emoji, className = 'size-5' }) => (
     alt={emoji.name}
     className={`${className} object-contain`}
     draggable="false"
+    loading="lazy"
+    decoding="async"
   />
 );
 

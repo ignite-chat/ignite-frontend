@@ -130,10 +130,10 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
                     <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
                   </svg>
                 )}
-                APP
+                {user.id === '643945264868098049' ? 'OFFICIAL' : 'APP'}
               </span>
             )}
-            {!user.bot && <DiscordClanTag userId={user.id} guildId={guildId} size="md" />}
+            {!user.bot && <DiscordClanTag userId={user.id} size="md" />}
           </h2>
           <p className="text-xs font-medium text-gray-300">{user.username}</p>
 

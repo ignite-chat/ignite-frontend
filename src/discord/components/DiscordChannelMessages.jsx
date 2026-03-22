@@ -238,6 +238,13 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     }
   }, [channelId]);
 
+  // Clear cached messages for other channels when switching to save memory
+  useEffect(() => {
+    if (channelId) {
+      useDiscordChannelsStore.getState().clearInactiveMessages(channelId);
+    }
+  }, [channelId]);
+
   // Load initial messages or restore scroll position (only on channel switch)
   useEffect(() => {
     if (!channelId || !hasReadMessageHistory) return;

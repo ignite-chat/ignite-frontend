@@ -173,6 +173,8 @@ function renderInlineNode(node, index, guildId) {
             title={`:${node.kind.name}:`}
             className="inline size-6 object-contain align-text-bottom"
             draggable="false"
+            loading="lazy"
+            decoding="async"
           />
         );
       }
@@ -184,6 +186,8 @@ function renderInlineNode(node, index, guildId) {
           alt={node.kind.name}
           className="inline size-5 object-contain align-text-bottom"
           draggable="false"
+          loading="lazy"
+          decoding="async"
         />
       );
     }

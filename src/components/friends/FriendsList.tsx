@@ -20,6 +20,7 @@ import { useDiscordChannelsStore } from '@/discord/store/discord-channels.store'
 import { useDiscordRelationshipsStore } from '@/discord/store/discord-relationships.store';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useDiscordActivitiesStore, ActivityType } from '@/discord/store/discord-activities.store';
+import DiscordClanTag from '@/discord/components/DiscordClanTag';
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -180,6 +181,18 @@ const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-sm font-bold text-white">
             <span className="truncate">{user.global_name || user.username}</span>
+            {user.bot && (
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
+                {user.verified_bot !== false && (
+                  <svg width="10" height="10" viewBox="0 0 16 15.2" fill="currentColor">
+                    <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
+                  </svg>
+                )}
+                {user.id === '643945264868098049' ? 'OFFICIAL' : 'APP'}
+              </span>
+            )}
+            {/* @ts-ignore - JSX component */}
+            <DiscordClanTag userId={user.id} size="sm" />
             {user.global_name && (
               <span className="hidden shrink-0 text-xs text-gray-400 group-hover:inline">
                 {user.username}

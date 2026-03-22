@@ -3,6 +3,9 @@ import type { DiscordUser, Presence } from '../types';
 
 export type { DiscordUser } from '../types';
 
+/** Max users kept in memory. Oldest entries are evicted when exceeded. */
+const MAX_USERS = 5000;
+
 type DiscordUsersStore = {
   users: { [userId: string]: DiscordUser };
 
@@ -33,6 +36,14 @@ export const useDiscordUsersStore = create<DiscordUsersStore>((set, get) => ({
       const updated = { ...state.users };
       for (const user of users) {
         updated[user.id] = { ...updated[user.id], ...user };
+      }
+      // Evict oldest entries when over the limit
+      const keys = Object.keys(updated);
+      if (keys.length > MAX_USERS) {
+        const excess = keys.length - MAX_USERS;
+        for (let i = 0; i < excess; i++) {
+          delete updated[keys[i]];
+        }
       }
       return { users: updated };
     }),

@@ -1,31 +1,23 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { useDiscordProfilesStore } from '../store/discord-profiles.store';
+import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { DiscordService } from '../services/discord.service';
 
 /**
  * Renders a Discord clan/identity tag badge next to a username.
- * The tag comes from user_profile.primary_guild in the profile API response.
+ * Reads primary_guild directly from the user object (sent via gateway),
+ * no profile API call needed.
  *
  * @param {string} userId - The Discord user ID
- * @param {string} [guildId] - Optional guild context for profile lookup
  * @param {'sm' | 'md'} [size='sm'] - Badge size variant
  */
-const DiscordClanTag = ({ userId, guildId, size = 'sm' }) => {
-  const profile = useDiscordProfilesStore((s) => s.getProfile(userId, guildId));
-  const fetchProfile = useDiscordProfilesStore((s) => s.fetchProfile);
+const DiscordClanTag = ({ userId, size = 'sm' }) => {
+  const user = useDiscordUsersStore((s) => s.users[userId]);
   const guilds = useDiscordGuildsStore((s) => s.guilds);
 
-  useEffect(() => {
-    if (!profile) {
-      fetchProfile(userId, guildId);
-    }
-  }, [userId, guildId, profile, fetchProfile]);
-
   const clanData = useMemo(() => {
-    const primaryGuild =
-      profile?.user_profile?.primary_guild || profile?.user?.primary_guild;
+    const primaryGuild = user?.primary_guild;
     if (!primaryGuild?.identity_enabled || !primaryGuild?.tag) return null;
 
     const clanGuildId = primaryGuild.identity_guild_id;
@@ -41,7 +33,7 @@ const DiscordClanTag = ({ userId, guildId, size = 'sm' }) => {
       iconUrl,
       badge: primaryGuild.badge,
     };
-  }, [profile, guilds]);
+  }, [user, guilds]);
 
   if (!clanData) return null;
 

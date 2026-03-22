@@ -51,6 +51,8 @@ const DiscordAvatar = ({ author, className = 'size-10' }) => {
       alt={author.username}
       className={cn('rounded-full object-cover select-none', className)}
       draggable="false"
+      loading="lazy"
+      decoding="async"
     />
   );
 };
@@ -125,12 +127,12 @@ const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
                 <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
               </svg>
             )}
-            APP
+            {message.author.id === '643945264868098049' ? 'OFFICIAL' : 'APP'}
           </span>
         )}
       </span>
       {!message.author.bot && (
-        <DiscordClanTag userId={message.author.id} guildId={guildId} size="sm" />
+        <DiscordClanTag userId={message.author.id} size="sm" />
       )}
       <time className="cursor-default text-xs font-medium text-gray-500" dateTime={message.timestamp}>{formattedDateTime}</time>
     </header>
@@ -1078,12 +1080,12 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
             </div>
           )}
 
-          <p className="select-text whitespace-pre-wrap text-gray-400 [overflow-wrap:anywhere]" style={{ fontSize: chatFontSize, lineHeight: `${Math.round(chatFontSize * 1.375)}px` }}>
+          <div className="select-text whitespace-pre-wrap text-gray-400 [overflow-wrap:anywhere]" style={{ fontSize: chatFontSize, lineHeight: `${Math.round(chatFontSize * 1.375)}px` }}>
             <DiscordMessageContent content={message.content} guildId={guildId} />
             {message.edited_timestamp && (
               <span className="ml-1 text-[0.65rem] text-gray-500">(edited)</span>
             )}
-          </p>
+          </div>
 
           <DiscordAttachments attachments={message.attachments} />
           <DiscordEmbeds embeds={message.embeds} guildId={guildId} />

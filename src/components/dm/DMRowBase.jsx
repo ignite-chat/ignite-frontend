@@ -6,12 +6,14 @@ const DMRowBase = ({
   isUnread = false,
   onClick,
   onClose,
+  onContextMenu,
   children,
   className,
 }) => {
   return (
     <button
       onClick={onClick}
+      onContextMenu={onContextMenu}
       className={cn(
         'dm-row group relative flex min-h-[40px] w-full items-center gap-3 rounded px-2 text-sm transition-all',
         isActive

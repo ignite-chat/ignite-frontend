@@ -90,7 +90,7 @@ const MemberItem = ({ member: rawMember, guildId, ownerId, popoverOpen, setPopov
                     <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
                   </svg>
                 )}
-                APP
+                {userId === '643945264868098049' ? 'OFFICIAL' : 'APP'}
               </span>
             )}
           </div>

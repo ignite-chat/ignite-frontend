@@ -108,6 +108,7 @@ export const DiscordService = {
         a.id.localeCompare(b.id)
       );
 
+      // setChannelMessages applies the per-channel cap automatically
       setChannelMessages(channelId, unique);
       return messages;
     } catch (error) {
@@ -194,7 +195,7 @@ export const DiscordService = {
   /**
    * Get the avatar URL for a Discord user.
    */
-  getUserAvatarUrl(userId: string, avatarHash: string | null, size: number = 128) {
+  getUserAvatarUrl(userId: string, avatarHash: string | null, size: number = 64) {
     if (!avatarHash) {
       // Default avatar based on discriminator or user ID
       const index = Number(BigInt(userId) >> 22n) % 6;
@@ -207,7 +208,7 @@ export const DiscordService = {
   /**
    * Get the banner URL for a Discord user.
    */
-  getUserBannerUrl(userId: string, bannerHash: string | null, size: number = 600) {
+  getUserBannerUrl(userId: string, bannerHash: string | null, size: number = 300) {
     if (!bannerHash) return null;
     const ext = bannerHash.startsWith('a_') ? 'gif' : 'png';
     return `https://cdn.discordapp.com/banners/${userId}/${bannerHash}.${ext}?size=${size}`;
@@ -216,7 +217,7 @@ export const DiscordService = {
   /**
    * Get the icon URL for a Discord guild.
    */
-  getGuildIconUrl(guildId: string, iconHash: string | null, size: number = 128) {
+  getGuildIconUrl(guildId: string, iconHash: string | null, size: number = 64) {
     if (!iconHash) return null;
     const ext = iconHash.startsWith('a_') ? 'gif' : 'png';
     return `https://cdn.discordapp.com/icons/${guildId}/${iconHash}.${ext}?size=${size}`;

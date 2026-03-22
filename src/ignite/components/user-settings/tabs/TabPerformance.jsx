@@ -2,6 +2,85 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 
+// --- Zustand store imports for memory measurement ---
+import { useDiscordActivitiesStore } from '@/discord/store/discord-activities.store';
+import { useDiscordChannelsStore } from '@/discord/store/discord-channels.store';
+import { useDiscordGuildsStore } from '@/discord/store/discord-guilds.store';
+import { useDiscordGuildFoldersStore } from '@/discord/store/discord-guild-folders.store';
+import { useDiscordGuildSettingsStore } from '@/discord/store/discord-guild-settings.store';
+import { useDiscordMemberListStore } from '@/discord/store/discord-member-list.store';
+import { useDiscordMembersStore } from '@/discord/store/discord-members.store';
+import { useDiscordPreferencesStore } from '@/discord/store/discord-preferences.store';
+import { useDiscordProfilesStore } from '@/discord/store/discord-profiles.store';
+import { useDiscordReadStatesStore } from '@/discord/store/discord-readstates.store';
+import { useDiscordRelationshipsStore } from '@/discord/store/discord-relationships.store';
+import { useDiscordStore } from '@/discord/store/discord.store';
+import { useDiscordThreadsStore } from '@/discord/store/discord-threads.store';
+import { useDiscordTypingStore } from '@/discord/store/discord-typing.store';
+import { useDiscordUsersStore } from '@/discord/store/discord-users.store';
+import { useDiscordVoiceStore } from '@/discord/store/discord-voice.store';
+import { useDiscordVoiceStatesStore } from '@/discord/store/discord-voice-states.store';
+import { useAuthStore } from '@/ignite/store/auth.store';
+import { useChannelsStore } from '@/ignite/store/channels.store';
+import { useEmojisStore } from '@/ignite/store/emojis.store';
+import { useFriendsStore } from '@/ignite/store/friends.store';
+import { useGuildsStore } from '@/ignite/store/guilds.store';
+import { useRolesStore } from '@/ignite/store/roles.store';
+import { useUsersStore } from '@/ignite/store/users.store';
+import { useUnreadsStore } from '@/ignite/store/unreads.store';
+import { useVoiceStore } from '@/ignite/store/voice.store';
+
+/** Estimate the serialized byte size of a value */
+const estimateSize = (value) => {
+  try {
+    return new Blob([JSON.stringify(value)]).size;
+  } catch {
+    return 0;
+  }
+};
+
+const STORES = [
+  { name: 'Discord Users', store: useDiscordUsersStore },
+  { name: 'Discord Channels', store: useDiscordChannelsStore },
+  { name: 'Discord Guilds', store: useDiscordGuildsStore },
+  { name: 'Discord Members', store: useDiscordMembersStore },
+  { name: 'Discord Member List', store: useDiscordMemberListStore },
+  { name: 'Discord Activities', store: useDiscordActivitiesStore },
+  { name: 'Discord Profiles', store: useDiscordProfilesStore },
+  { name: 'Discord Read States', store: useDiscordReadStatesStore },
+  { name: 'Discord Relationships', store: useDiscordRelationshipsStore },
+  { name: 'Discord Guild Folders', store: useDiscordGuildFoldersStore },
+  { name: 'Discord Guild Settings', store: useDiscordGuildSettingsStore },
+  { name: 'Discord Preferences', store: useDiscordPreferencesStore },
+  { name: 'Discord Threads', store: useDiscordThreadsStore },
+  { name: 'Discord Typing', store: useDiscordTypingStore },
+  { name: 'Discord Voice', store: useDiscordVoiceStore },
+  { name: 'Discord Voice States', store: useDiscordVoiceStatesStore },
+  { name: 'Discord (Core)', store: useDiscordStore },
+  { name: 'Ignite Auth', store: useAuthStore },
+  { name: 'Ignite Channels', store: useChannelsStore },
+  { name: 'Ignite Emojis', store: useEmojisStore },
+  { name: 'Ignite Friends', store: useFriendsStore },
+  { name: 'Ignite Guilds', store: useGuildsStore },
+  { name: 'Ignite Roles', store: useRolesStore },
+  { name: 'Ignite Users', store: useUsersStore },
+  { name: 'Ignite Unreads', store: useUnreadsStore },
+  { name: 'Ignite Voice', store: useVoiceStore },
+];
+
+const measureStores = () => {
+  const results = STORES.map(({ name, store }) => {
+    const state = store.getState();
+    // Only measure data properties, skip functions
+    const dataOnly = {};
+    for (const [key, val] of Object.entries(state)) {
+      if (typeof val !== 'function') dataOnly[key] = val;
+    }
+    return { name, size: estimateSize(dataOnly) };
+  });
+  return results.sort((a, b) => b.size - a.size);
+};
+
 const formatBytes = (bytes) => {
   if (bytes == null) return '—';
   if (bytes < 1024) return `${bytes} B`;
@@ -87,6 +166,7 @@ const ProcessCard = ({ process: proc, totalMemory }) => {
 const TabPerformance = () => {
   const [processes, setProcesses] = useState(null);
   const [jsMemory, setJsMemory] = useState(null);
+  const [storeStats, setStoreStats] = useState([]);
   const [loading, setLoading] = useState(false);
   const isNative = !!window.IgniteNative;
 
@@ -111,6 +191,9 @@ const TabPerformance = () => {
         // not available
       }
     }
+
+    // Measure Zustand store sizes
+    setStoreStats(measureStores());
 
     setLoading(false);
   }, []);
@@ -199,6 +282,36 @@ const TabPerformance = () => {
               .map((proc) => (
                 <ProcessCard key={proc.pid} process={proc} totalMemory={totalMemory} />
               ))}
+          </div>
+        </section>
+      )}
+
+      {/* Zustand Store Memory */}
+      {storeStats.length > 0 && (
+        <section className="space-y-3 rounded-lg border border-border p-4">
+          <div className="flex items-baseline justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Store Memory (Zustand)
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              Total: {formatBytes(storeStats.reduce((s, e) => s + e.size, 0))}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground/60">
+            Serialized size of each store's data. Actual in-memory footprint is higher due to V8 object overhead.
+          </p>
+          <div className="space-y-0.5">
+            {storeStats.map(({ name, size }) => (
+              <div
+                key={name}
+                className="flex items-center justify-between border-b border-border/30 py-1.5 last:border-0"
+              >
+                <span className="text-sm text-muted-foreground">{name}</span>
+                <span className={`text-sm font-medium ${size > 1024 * 1024 ? 'text-yellow-500' : size > 5 * 1024 * 1024 ? 'text-red-500' : 'text-foreground'}`}>
+                  {formatBytes(size)}
+                </span>
+              </div>
+            ))}
           </div>
         </section>
       )}

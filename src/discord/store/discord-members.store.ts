@@ -3,6 +3,9 @@ import type { DiscordMember } from '../types';
 
 export type { DiscordMember } from '../types';
 
+/** Max members kept per guild. Oldest entries evicted when exceeded. */
+const MAX_MEMBERS_PER_GUILD = 1000;
+
 type DiscordMembersStore = {
   /** members[guildId][userId] = DiscordMember */
   members: { [guildId: string]: { [userId: string]: DiscordMember } };
@@ -61,6 +64,14 @@ export const useDiscordMembersStore = create<DiscordMembersStore>((set) => ({
       for (const m of members) {
         const id = getMemberId(m);
         if (id) guild[id] = { ...guild[id], ...m };
+      }
+      // Evict oldest entries when over the limit
+      const keys = Object.keys(guild);
+      if (keys.length > MAX_MEMBERS_PER_GUILD) {
+        const excess = keys.length - MAX_MEMBERS_PER_GUILD;
+        for (let i = 0; i < excess; i++) {
+          delete guild[keys[i]];
+        }
       }
       return { members: { ...state.members, [guildId]: guild } };
     }),

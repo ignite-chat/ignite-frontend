@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import type { DiscordMessage, PendingMessage, DiscordChannel } from '../types';
 
+/** Max messages kept in memory per channel. Oldest are evicted when exceeded. */
+const MAX_MESSAGES_PER_CHANNEL = 100;
+
 type DiscordChannelsStore = {
   channels: DiscordChannel[];
   channelMessages: { [channelId: string]: DiscordMessage[] };
@@ -19,6 +22,9 @@ type DiscordChannelsStore = {
 
   addPendingMessage: (channelId: string, pending: PendingMessage) => void;
   removePendingByNonce: (channelId: string, nonce: string) => void;
+
+  /** Clear cached messages for all channels except the given one */
+  clearInactiveMessages: (activeChannelId: string) => void;
 
   clear: () => void;
 };
@@ -61,18 +67,31 @@ export const useDiscordChannelsStore = create<DiscordChannelsStore>((set) => ({
     }),
 
   setChannelMessages: (channelId, messages) =>
-    set((state) => ({
-      channelMessages: { ...state.channelMessages, [channelId]: messages },
-    })),
+    set((state) => {
+      // Keep only the most recent messages to limit memory usage
+      const capped =
+        messages.length > MAX_MESSAGES_PER_CHANNEL
+          ? messages.slice(-MAX_MESSAGES_PER_CHANNEL)
+          : messages;
+      return {
+        channelMessages: { ...state.channelMessages, [channelId]: capped },
+      };
+    }),
 
   appendMessage: (channelId, message) =>
     set((state) => {
       const existing = state.channelMessages[channelId] || [];
       if (existing.some((m) => m.id === message.id)) return state;
+      const updated = [...existing, message];
+      // Evict oldest messages when over the limit
+      const capped =
+        updated.length > MAX_MESSAGES_PER_CHANNEL
+          ? updated.slice(-MAX_MESSAGES_PER_CHANNEL)
+          : updated;
       return {
         channelMessages: {
           ...state.channelMessages,
-          [channelId]: [...existing, message],
+          [channelId]: capped,
         },
       };
     }),
@@ -119,6 +138,15 @@ export const useDiscordChannelsStore = create<DiscordChannelsStore>((set) => ({
           [channelId]: pending.filter((p) => p.nonce !== nonce),
         },
       };
+    }),
+
+  clearInactiveMessages: (activeChannelId) =>
+    set((state) => {
+      const kept: { [id: string]: DiscordMessage[] } = {};
+      if (state.channelMessages[activeChannelId]) {
+        kept[activeChannelId] = state.channelMessages[activeChannelId];
+      }
+      return { channelMessages: kept };
     }),
 
   clear: () => set({ channels: [], channelMessages: {}, channelPendingMessages: {} }),
