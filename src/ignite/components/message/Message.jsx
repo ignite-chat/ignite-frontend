@@ -52,6 +52,7 @@ const Message = memo(
     );
 
     const hasManageMessages = useHasPermission(guildId, message.channel_id, Permissions.MANAGE_MESSAGES);
+    const canAddReactions = useHasPermission(guildId, message.channel_id, Permissions.ADD_REACTIONS);
     const canDelete = message.author.id === currentUser.id || hasManageMessages;
 
     const isMentioned = useMemo(() => {
@@ -220,6 +221,7 @@ const Message = memo(
             channelId={channelId}
             canEdit={canEdit}
             canDelete={canDelete}
+            canAddReactions={canAddReactions}
             onEdit={() => setEditingId(message.id)}
             onDelete={handleDelete}
             onReply={() => setReplyingId(message.id)}

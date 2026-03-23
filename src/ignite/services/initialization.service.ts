@@ -10,6 +10,7 @@ import { useEmojisStore } from '../store/emojis.store';
 import { useStickersStore } from '../store/stickers.store';
 import { useNotificationStore } from '../store/notification.store';
 import { VoiceService } from './voice.service';
+import { EchoService } from './echo.service';
 import type { User } from '../store/users.store';
 import type { Channel } from '../store/channels.store';
 
@@ -22,6 +23,8 @@ export const InitializationService = {
       if (!localToken) {
         return { success: false, authenticated: false };
       }
+
+      EchoService.connect();
 
       const { data } = await api.get('/@me/ready', {
         headers: { Authorization: `Bearer ${localToken}` },

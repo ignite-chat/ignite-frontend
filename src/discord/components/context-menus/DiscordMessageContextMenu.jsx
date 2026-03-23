@@ -31,7 +31,7 @@ const COMMON_REACTION_EMOJIS = [
 
 const QUICK_REACTION_LIMIT = 4;
 
-const DiscordMessageContextMenu = ({ message, canDelete, guildId }) => {
+const DiscordMessageContextMenu = ({ message, canDelete, guildId, hasAddReactions = true, hasSendMessages = true }) => {
   const guilds = useDiscordGuildsStore((s) => s.guilds);
   const storeMember = useDiscordMembersStore((s) =>
     guildId ? s.members[guildId]?.[message.author.id] : undefined
@@ -114,7 +114,7 @@ const DiscordMessageContextMenu = ({ message, canDelete, guildId }) => {
   return (
     <ContextMenuContent className="w-52">
       {/* Quick reaction bar */}
-      {quickEmojis.length > 0 && (
+      {hasAddReactions && quickEmojis.length > 0 && (
         <>
           <div className="flex items-center gap-1 px-2 py-1.5">
             {quickEmojis.map((emoji, i) => {
@@ -141,39 +141,42 @@ const DiscordMessageContextMenu = ({ message, canDelete, guildId }) => {
       )}
 
       {/* Add Reaction submenu with common emojis */}
-      <ContextMenuSub>
-        <ContextMenuSubTrigger className="justify-between">
-          Add Reaction
-          <Smiley className="ml-auto size-[18px]" weight="fill" />
-        </ContextMenuSubTrigger>
-        <ContextMenuSubContent className="w-auto p-2">
-          <div className="grid grid-cols-6 gap-0.5">
-            {COMMON_REACTION_EMOJIS.map((emoji) => {
-              const url = getTwemojiUrl(emoji);
-              return (
-                <ContextMenuItem
-                  key={emoji}
-                  className="flex size-8 items-center justify-center rounded p-0"
-                  onSelect={() => addReaction({ id: null, name: emoji })}
-                >
-                  {url ? (
-                    <img src={url} alt={emoji} className="size-5" />
-                  ) : (
-                    <span className="text-lg">{emoji}</span>
-                  )}
-                </ContextMenuItem>
-              );
-            })}
-          </div>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
+      {hasAddReactions && (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger className="justify-between">
+            Add Reaction
+            <Smiley className="ml-auto size-[18px]" weight="fill" />
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-auto p-2">
+            <div className="grid grid-cols-6 gap-0.5">
+              {COMMON_REACTION_EMOJIS.map((emoji) => {
+                const url = getTwemojiUrl(emoji);
+                return (
+                  <ContextMenuItem
+                    key={emoji}
+                    className="flex size-8 items-center justify-center rounded p-0"
+                    onSelect={() => addReaction({ id: null, name: emoji })}
+                  >
+                    {url ? (
+                      <img src={url} alt={emoji} className="size-5" />
+                    ) : (
+                      <span className="text-lg">{emoji}</span>
+                    )}
+                  </ContextMenuItem>
+                );
+              })}
+            </div>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      )}
 
-      <ContextMenuSeparator />
-      <ContextMenuItem className="justify-between" onSelect={handleReply}>
-        Reply
-        <ArrowBendUpLeft className="ml-auto size-[18px]" weight="fill" />
-      </ContextMenuItem>
-      <ContextMenuSeparator />
+      {hasSendMessages && (
+        <ContextMenuItem className="justify-between" onSelect={handleReply}>
+          Reply
+          <ArrowBendUpLeft className="ml-auto size-[18px]" weight="fill" />
+        </ContextMenuItem>
+      )}
+      {(hasAddReactions || hasSendMessages) && <ContextMenuSeparator />}
       {message.content && (
         <ContextMenuItem className="justify-between" onSelect={handleCopyText}>
           Copy Text

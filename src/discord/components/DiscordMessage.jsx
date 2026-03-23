@@ -703,7 +703,7 @@ const ReactionEmojiPicker = ({ channelId, messageId, guildId, open, onOpenChange
   );
 };
 
-const DiscordReactions = ({ reactions, channelId, messageId, guildId }) => {
+const DiscordReactions = ({ reactions, channelId, messageId, guildId, hasAddReactions = true }) => {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const toggleReaction = useCallback((emoji, currentlyMe) => {
@@ -742,22 +742,24 @@ const DiscordReactions = ({ reactions, channelId, messageId, guildId }) => {
           </div>
         );
       })}
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          className="flex h-8 cursor-pointer items-center justify-center rounded-sm border border-transparent bg-[#232428] px-2 hover:border-[#4e505c]"
-        >
-          <Plus size={16} className="text-[#b5bac1]" />
-        </button>
-        <ReactionEmojiPicker
-          channelId={channelId}
-          messageId={messageId}
-          guildId={guildId}
-          open={pickerOpen}
-          onOpenChange={setPickerOpen}
-        />
-      </div>
+      {hasAddReactions && (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="flex h-8 cursor-pointer items-center justify-center rounded-sm border border-transparent bg-[#232428] px-2 hover:border-[#4e505c]"
+          >
+            <Plus size={16} className="text-[#b5bac1]" />
+          </button>
+          <ReactionEmojiPicker
+            channelId={channelId}
+            messageId={messageId}
+            guildId={guildId}
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+          />
+        </div>
+      )}
     </div>
   );
 };
@@ -945,7 +947,7 @@ const DiscordFailedMessageContextMenu = ({ onRetry, onDelete }) => (
   </ContextMenuContent>
 );
 
-const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channelId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, hasManageNicknames, hasModerateMembers, pending }) => {
+const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channelId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, hasManageNicknames, hasModerateMembers, hasAddReactions = true, hasSendMessages = true, pending }) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const chatFontSize = useDiscordPreferencesStore((s) => s.chatFontSize);
@@ -1012,7 +1014,7 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
         if (isFailed) {
           useContextMenuStore.getState().open(DiscordFailedMessageContextMenu, { message, channelId, onRetry: handleRetry, onDelete: handleDeleteFailed }, e);
         } else if (!isSending) {
-          useContextMenuStore.getState().open(DiscordMessageContextMenu, { message, canDelete, guildId }, e);
+          useContextMenuStore.getState().open(DiscordMessageContextMenu, { message, canDelete, guildId, hasAddReactions, hasSendMessages }, e);
         }
       }}
     >
@@ -1039,37 +1041,41 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
       )}
       {!pending && (
         <nav className="absolute -top-3.5 right-4 z-10 hidden items-center gap-0.5 rounded border border-white/10 bg-[#2b2d31] p-0.5 shadow-md group-hover:flex">
-          <div className="relative">
+          {hasAddReactions && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setReactionPickerOpen(true);
+                }}
+                className="rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200"
+                title="Add Reaction"
+              >
+                <Smiley size={16} />
+              </button>
+              <ReactionEmojiPicker
+                channelId={channelId}
+                messageId={message.id}
+                guildId={guildId}
+                open={reactionPickerOpen}
+                onOpenChange={setReactionPickerOpen}
+              />
+            </div>
+          )}
+          {hasSendMessages && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setReactionPickerOpen(true);
+                useDiscordReplyStore.getState().setReplyingMessage(message.id, message);
               }}
               className="rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200"
-              title="Add Reaction"
+              title="Reply"
             >
-              <Smiley size={16} />
+              <ArrowBendUpLeft size={16} />
             </button>
-            <ReactionEmojiPicker
-              channelId={channelId}
-              messageId={message.id}
-              guildId={guildId}
-              open={reactionPickerOpen}
-              onOpenChange={setReactionPickerOpen}
-            />
-          </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              useDiscordReplyStore.getState().setReplyingMessage(message.id, message);
-            }}
-            className="rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200"
-            title="Reply"
-          >
-            <ArrowBendUpLeft size={16} />
-          </button>
+          )}
         </nav>
       )}
 
@@ -1160,7 +1166,7 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
       </div>
       {message.reactions?.length > 0 && (
         <footer className="pl-[72px]">
-          <DiscordReactions reactions={message.reactions} channelId={channelId} messageId={message.id} guildId={guildId} />
+          <DiscordReactions reactions={message.reactions} channelId={channelId} messageId={message.id} guildId={guildId} hasAddReactions={hasAddReactions} />
         </footer>
       )}
       {isEphemeral && (
@@ -1194,7 +1200,7 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
 
 DiscordNormalMessage.displayName = 'DiscordNormalMessage';
 
-const DiscordMessage = memo(({ message, prevMessage, currentUserId, channelId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, hasManageNicknames, hasModerateMembers, pending }) => {
+const DiscordMessage = memo(({ message, prevMessage, currentUserId, channelId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, hasManageNicknames, hasModerateMembers, hasAddReactions, hasSendMessages, pending }) => {
   if (!NORMAL_MESSAGE_TYPES.has(message.type)) {
     return <DiscordSystemMessage message={message} prevMessage={prevMessage} guildId={guildId} />;
   }
@@ -1210,6 +1216,8 @@ const DiscordMessage = memo(({ message, prevMessage, currentUserId, channelId, g
       hasBanMembers={hasBanMembers}
       hasManageNicknames={hasManageNicknames}
       hasModerateMembers={hasModerateMembers}
+      hasAddReactions={hasAddReactions}
+      hasSendMessages={hasSendMessages}
       pending={pending}
     />
   );

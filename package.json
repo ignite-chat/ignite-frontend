@@ -20,7 +20,6 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@fontsource/ibm-plex-sans": "^5.2.8",
-    "@fontsource/inter": "^5.2.8",
     "@hcaptcha/react-hcaptcha": "^2.0.2",
     "@headlessui/react": "^2.1.2",
     "@lexical/markdown": "^0.39.0",

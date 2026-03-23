@@ -153,26 +153,6 @@ const DiscordDMRedirect = () => {
 
 function App() {
   const { userId } = useAuthStore();
-  const { pathname } = useLocation();
-
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
-
-  // useEffect(() => {
-  //   // eslint-disable-next-line no-undef
-  //   if (process.env.NODE_ENV === 'development') return;
-
-  //   const handleContextMenu = (e) => {
-  //     e.preventDefault();
-  //   };
-
-  //   document.addEventListener('contextmenu', handleContextMenu);
-
-  //   return () => {
-  //     document.removeEventListener('contextmenu', handleContextMenu);
-  //   };
-  // }, []);
 
   return (
     <>

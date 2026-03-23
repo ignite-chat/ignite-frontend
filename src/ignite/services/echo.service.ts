@@ -1,3 +1,7 @@
+// eslint-disable-next-line no-unused-vars
+import Pusher from 'pusher-js';
+import Echo from 'laravel-echo';
+import api from '@/ignite/api';
 import { useAuthStore } from '../store/auth.store';
 import {
   handleChannelCreated,
@@ -39,6 +43,31 @@ import {
 export const EchoService = {
   activeGuildSubscriptions: new Set<string>(),
   userChannelSubscription: null as any,
+
+  /** Initialize the Echo/Reverb WebSocket connection. Safe to call multiple times. */
+  connect() {
+    if (window.Echo) return;
+    window.Echo = new Echo({
+      broadcaster: 'reverb',
+      key: import.meta.env.VITE_REVERB_APP_KEY,
+      wsHost: import.meta.env.VITE_REVERB_HOST,
+      wsPort: import.meta.env.VITE_REVERB_PORT,
+      wssPort: import.meta.env.VITE_REVERB_PORT,
+      forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
+      enabledTransports: ['ws', 'wss'],
+      authorizer: (channel: any) => ({
+        authorize: (socketId: string, callback: any) => {
+          api
+            .post('broadcasting/auth', {
+              socket_id: socketId,
+              channel_name: channel.name,
+            })
+            .then((response: any) => callback(false, response.data))
+            .catch((error: any) => callback(true, error));
+        },
+      }),
+    });
+  },
 
   subscribeToUserChannel(userId: string) {
     if (this.userChannelSubscription) {

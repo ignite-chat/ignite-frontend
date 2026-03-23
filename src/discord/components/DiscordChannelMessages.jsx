@@ -7,7 +7,7 @@ import { useDiscordProfilesStore } from '../store/discord-profiles.store';
 import { useDiscordRelationshipsStore, RelationshipType } from '../store/discord-relationships.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordHasPermission } from '../hooks/useDiscordPermission';
-import { MANAGE_MESSAGES, KICK_MEMBERS, BAN_MEMBERS, READ_MESSAGE_HISTORY, MANAGE_NICKNAMES, MODERATE_MEMBERS } from '../constants/permissions';
+import { MANAGE_MESSAGES, KICK_MEMBERS, BAN_MEMBERS, READ_MESSAGE_HISTORY, MANAGE_NICKNAMES, MODERATE_MEMBERS, ADD_REACTIONS, SEND_MESSAGES } from '../constants/permissions';
 import { scrollPositions } from '@/store/last-channel.store';
 import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
@@ -275,6 +275,8 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const hasBanMembers = useDiscordHasPermission(guildId, channel, BAN_MEMBERS);
   const hasManageNicknames = useDiscordHasPermission(guildId, channel, BAN_MEMBERS);
   const hasModerateMembers = useDiscordHasPermission(guildId, channel, BAN_MEMBERS);
+  const hasAddReactions = useDiscordHasPermission(guildId, channel, ADD_REACTIONS);
+  const hasSendMessages = useDiscordHasPermission(guildId, channel, SEND_MESSAGES);
   const _hasReadMessageHistory = useDiscordHasPermission(guildId, channel, READ_MESSAGE_HISTORY);
   const hasReadMessageHistory = !guildId || _hasReadMessageHistory;
 
@@ -612,6 +614,8 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
                     hasBanMembers={hasBanMembers}
                     hasManageNicknames={true}
                     hasModerateMembers={true}
+                    hasAddReactions={hasAddReactions}
+                    hasSendMessages={hasSendMessages}
                   />
                 </li>
               );

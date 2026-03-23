@@ -56,7 +56,6 @@ const startCore = () => {
       preload: join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false,
     },
   });
 
@@ -69,6 +68,40 @@ const startCore = () => {
   });
 
   const isDev = !app.isPackaged;
+
+  // Handle response headers: set CSP (production only) and fix CORS for Discord API requests
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    const headers = { ...details.responseHeaders };
+
+    // Set Content-Security-Policy in production only — Vite's React plugin
+    // injects inline scripts for HMR that are incompatible with a strict CSP.
+    if (!isDev) {
+      headers['Content-Security-Policy'] = [
+        "default-src 'self' https://app.ignite-chat.com;" +
+        " script-src 'self';" +
+        " style-src 'self' 'unsafe-inline';" +
+        " img-src 'self' data: blob: https: http:;" +
+        " media-src 'self' data: blob: https: http:;" +
+        " connect-src 'self' https: wss:;" +
+        " font-src 'self' data:;"
+      ];
+    }
+
+    // Fix CORS for Discord and related API responses — delete any existing
+    // CORS headers first to avoid duplicate values which browsers reject.
+    const url = details.url || '';
+    if (/discord\.com|discord\.gg|discordapp\.com|googleapis\.com/.test(url)) {
+      delete headers['access-control-allow-origin'];
+      delete headers['Access-Control-Allow-Origin'];
+      headers['Access-Control-Allow-Origin'] = [isDev ? 'http://localhost:5173' : 'https://app.ignite-chat.com'];
+      headers['Access-Control-Allow-Headers'] = ['*'];
+      headers['Access-Control-Allow-Methods'] = ['GET, POST, PUT, PATCH, DELETE, OPTIONS'];
+      headers['Access-Control-Allow-Credentials'] = ['true'];
+    }
+
+    callback({ responseHeaders: headers });
+  });
+
   mainWindow.loadURL(isDev ? "http://localhost:5173" : "https://app.ignite-chat.com");
 
   // Rewrite Origin header for Discord requests so they appear to come from the Discord app

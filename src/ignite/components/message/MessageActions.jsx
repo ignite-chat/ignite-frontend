@@ -28,7 +28,7 @@ import {
   Flag as FlagIcon,
 } from 'lucide-react';
 
-const MessageActions = ({ message, channelId, canEdit, canDelete, onEdit, onDelete, onReply }) => {
+const MessageActions = ({ message, channelId, canEdit, canDelete, canAddReactions = true, onEdit, onDelete, onReply }) => {
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [emojiSearch, setEmojiSearch] = useState('');
   const [hoveredEmoji, setHoveredEmoji] = useState(null);
@@ -111,7 +111,7 @@ const MessageActions = ({ message, channelId, canEdit, canDelete, onEdit, onDele
         <ArrowBendUpLeft className="size-5" />
       </button>
 
-      <Popover.Root open={emojiPickerOpen} onOpenChange={(open) => {
+      {canAddReactions && <Popover.Root open={emojiPickerOpen} onOpenChange={(open) => {
         setEmojiPickerOpen(open);
         if (!open) setEmojiSearch('');
       }} modal={false}>
@@ -181,7 +181,7 @@ const MessageActions = ({ message, channelId, canEdit, canDelete, onEdit, onDele
             </EmojiPicker>
           </Popover.Content>
         </Popover.Portal>
-      </Popover.Root>
+      </Popover.Root>}
 
       {canEdit && (
         <button
