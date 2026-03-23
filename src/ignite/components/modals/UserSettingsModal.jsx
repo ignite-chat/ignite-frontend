@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import Avatar from '../Avatar';
 import { Button } from '@/components/ui/button';
 import { SheetDescription } from '@/components/ui/sheet';
-import { User, UserCircle, Mic, Bot, LogOut, X, Menu, Bell, Activity } from 'lucide-react';
+import { User, UserCircle, Mic, Bot, LogOut, X, Menu, Bell, Activity, MessageSquare } from 'lucide-react';
 import { useAuthStore } from '../../store/auth.store';
 import { useModalStore } from '@/ignite/store/modal.store';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ import TabVoiceAudio from '../user-settings/tabs/TabVoiceAudio';
 import TabNotificationSounds from '../user-settings/tabs/TabNotificationSounds';
 import TabBots from '../user-settings/tabs/TabBots';
 import TabPerformance from '../user-settings/tabs/TabPerformance';
+import TabDiscord from '../user-settings/tabs/TabDiscord';
 
 const navigationSections = [
   {
@@ -29,6 +30,7 @@ const navigationSections = [
       { id: 'voice', title: 'Voice & Audio', icon: Mic },
       { id: 'notifications', title: 'Notification Sounds', icon: Bell },
       { id: 'performance', title: 'Performance', icon: Activity },
+      { id: 'discord', title: 'Discord', icon: MessageSquare },
     ],
   },
   {
@@ -71,6 +73,8 @@ const UserSettingsModal = ({ modalId }) => {
         return <TabBots />;
       case 'performance':
         return <TabPerformance />;
+      case 'discord':
+        return <TabDiscord />;
       default:
         return null;
     }

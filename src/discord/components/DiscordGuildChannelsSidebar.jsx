@@ -13,6 +13,7 @@ import { VIEW_CHANNEL, CONNECT } from '../constants/permissions';
 import { useDiscordHasPermission } from '../hooks/useDiscordPermission';
 import { scrollPositions } from '@/store/last-channel.store';
 import { useDiscordTypingStore } from '../store/discord-typing.store';
+import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
 import { useDiscordVoiceStatesStore } from '../store/discord-voice-states.store';
 import { useDiscordVoiceStore } from '../store/discord-voice.store';
 import { DiscordVoiceService } from '../services/discord-voice.service';
@@ -30,6 +31,96 @@ import TypingDots from '@/components/ui/typing-dots';
 
 const DISCORD_EPOCH = 1420070400000;
 const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
+
+const VerifiedIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 15.2" className="shrink-0">
+    <path
+      d="M16,7.6c0-0.79-0.38-1.5-0.97-1.95a3.05,3.05,0,0,0,.09-2.17,3.06,3.06,0,0,0-1.56-1.56,3.05,3.05,0,0,0-2.17.09C10.93.38,10.22,0,9.43,0A2.58,2.58,0,0,0,7.6.97,2.58,2.58,0,0,0,5.77,0c-0.79,0-1.5.38-1.95.97a3.05,3.05,0,0,0-2.17-.09A3.06,3.06,0,0,0,.09,2.44a3.05,3.05,0,0,0,.09,2.17C.38,5.07,0,5.78,0,6.57A2.58,2.58,0,0,0,.97,8.4,2.58,2.58,0,0,0,0,10.23c0,0.79.38,1.5.97,1.95a3.05,3.05,0,0,0-.09,2.17,3.06,3.06,0,0,0,1.56,1.56,3.05,3.05,0,0,0,2.17-.09A2.58,2.58,0,0,0,6.57,16.8a2.58,2.58,0,0,0,1.83-.97A2.58,2.58,0,0,0,10.23,16.8c0.79,0,1.5-.38,1.95-.97a3.05,3.05,0,0,0,2.17.09,3.06,3.06,0,0,0,1.56-1.56,3.05,3.05,0,0,0-.09-2.17c0.59-.45.97-1.16.97-1.95A2.58,2.58,0,0,0,16,8.4,2.58,2.58,0,0,0,16,7.6Z"
+      fill="#23a559"
+    />
+    <path
+      d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z"
+      fill="white"
+    />
+  </svg>
+);
+
+const PartneredIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 15.2" className="shrink-0">
+    <path
+      d="M16,7.6c0-0.79-0.38-1.5-0.97-1.95a3.05,3.05,0,0,0,.09-2.17,3.06,3.06,0,0,0-1.56-1.56,3.05,3.05,0,0,0-2.17.09C10.93.38,10.22,0,9.43,0A2.58,2.58,0,0,0,7.6.97,2.58,2.58,0,0,0,5.77,0c-0.79,0-1.5.38-1.95.97a3.05,3.05,0,0,0-2.17-.09A3.06,3.06,0,0,0,.09,2.44a3.05,3.05,0,0,0,.09,2.17C.38,5.07,0,5.78,0,6.57A2.58,2.58,0,0,0,.97,8.4,2.58,2.58,0,0,0,0,10.23c0,0.79.38,1.5.97,1.95a3.05,3.05,0,0,0-.09,2.17,3.06,3.06,0,0,0,1.56,1.56,3.05,3.05,0,0,0,2.17-.09A2.58,2.58,0,0,0,6.57,16.8a2.58,2.58,0,0,0,1.83-.97A2.58,2.58,0,0,0,10.23,16.8c0.79,0,1.5-.38,1.95-.97a3.05,3.05,0,0,0,2.17.09,3.06,3.06,0,0,0,1.56-1.56,3.05,3.05,0,0,0-.09-2.17c0.59-.45.97-1.16.97-1.95A2.58,2.58,0,0,0,16,8.4,2.58,2.58,0,0,0,16,7.6Z"
+      fill="#5865f2"
+    />
+    <path
+      d="M10.5,6.5L8,9.5L5.5,7.5"
+      stroke="white"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </svg>
+);
+
+const DiscordGuildHeader = memo(({ guild }) => {
+  const props = guild?.properties || guild || {};
+  const name = props.name || 'Discord Server';
+  const features = props.features || guild?.features || [];
+  const isVerified = features.includes('VERIFIED');
+  const isPartnered = features.includes('PARTNERED');
+  const bannerHash = props.banner || props.splash;
+  const bannerUrl = bannerHash
+    ? `https://cdn.discordapp.com/banners/${guild?.id}/${bannerHash}.${bannerHash.startsWith('a_') ? 'gif' : 'png'}?size=480`
+    : null;
+
+  return (
+    <div className="group/header relative shrink-0">
+      {bannerUrl ? (
+        <>
+          <div className="relative h-32 overflow-hidden">
+            <img
+              src={bannerUrl}
+              alt=""
+              className="h-full w-full object-cover"
+              draggable="false"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-transparent" />
+          </div>
+          {/* Header bar overlaid on top of banner */}
+          <button
+            type="button"
+            className="absolute inset-x-0 top-0 flex h-12 items-center justify-between gap-2 px-4 transition-all duration-200 group-hover/header:border-b group-hover/header:border-white/10 group-hover/header:backdrop-blur-sm group-hover/header:backdrop-brightness-50"
+          >
+            <div className="flex min-w-0 items-center gap-1.5">
+              {isVerified && <VerifiedIcon />}
+              {!isVerified && isPartnered && <PartneredIcon />}
+              <span className="truncate text-sm font-medium text-white drop-shadow-sm">
+                {name}
+              </span>
+            </div>
+            <CaretDown size={12} weight="bold" className="shrink-0 text-white" />
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="flex h-12 w-full items-center justify-between gap-2 border-b border-white/5 px-4 transition-colors hover:bg-white/5"
+        >
+          <div className="flex min-w-0 items-center gap-1.5">
+            {isVerified && <VerifiedIcon />}
+            {!isVerified && isPartnered && <PartneredIcon />}
+            <span className="truncate text-sm font-medium text-white">
+              {name}
+            </span>
+          </div>
+          <CaretDown size={12} weight="bold" className="shrink-0 text-white" />
+        </button>
+      )}
+    </div>
+  );
+});
+
+DiscordGuildHeader.displayName = 'DiscordGuildHeader';
 
 // Discord channel types
 const DiscordChannelType = {
@@ -382,6 +473,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
   const guildMembers = useDiscordGuildsStore((s) => s.guildMembers);
   const currentUser = useDiscordStore((s) => s.user);
   const sidebarRef = useRef();
+  const showHiddenChannels = useDiscordPreferencesStore((s) => s.showHiddenChannels);
   const guildVoiceStates = useDiscordVoiceStatesStore((s) => s.voiceStates[guild?.id] || {});
   const users = useDiscordUsersStore((s) => s.users);
   const memberStore = useDiscordMembersStore((s) => s.members[guild?.id] || {});
@@ -466,6 +558,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
     // Root channels (no category)
     const sortedRoot = sortChannels(rootChannels);
     for (const channel of sortedRoot) {
+      if (!showHiddenChannels && channel._canView === false) continue;
       items.push({ type: 'channel', channel });
       if (isVoiceType(channel.type)) {
         const voiceMembers = voiceMembersByChannel[channel.id] || [];
@@ -480,7 +573,10 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
       const categoryChannels = guildChannels.filter(
         (c) => c.parent_id === category.id && c.type !== DiscordChannelType.GUILD_CATEGORY
       );
-      if (categoryChannels.length === 0) continue;
+      const visibleCategoryChannels = showHiddenChannels
+        ? categoryChannels
+        : categoryChannels.filter((c) => c._canView !== false);
+      if (visibleCategoryChannels.length === 0) continue;
 
       const isCollapsed = collapsedCategories.has(category.id);
       items.push({ type: 'category-header', category, isCollapsed });
@@ -488,6 +584,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
       if (!isCollapsed) {
         const sorted = sortChannels(categoryChannels);
         for (const channel of sorted) {
+          if (!showHiddenChannels && channel._canView === false) continue;
           items.push({ type: 'channel', channel });
           if (isVoiceType(channel.type)) {
             const voiceMembers = voiceMembersByChannel[channel.id] || [];
@@ -500,7 +597,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
     }
 
     return items;
-  }, [rootChannels, categories, guildChannels, collapsedCategories, voiceMembersByChannel]);
+  }, [rootChannels, categories, guildChannels, collapsedCategories, voiceMembersByChannel, showHiddenChannels]);
 
   const estimateSize = useCallback((index) => {
     const item = flatItems[index];
@@ -542,21 +639,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
 
   return (
     <div className="relative top-0 flex h-full w-full flex-col bg-[#121214] text-gray-100">
-      {/* Guild Header */}
-      <div className="flex h-12 shrink-0 items-center border-b border-white/5 px-4">
-        <div className="flex w-full items-center gap-2">
-          {iconUrl && (
-            <img
-              src={iconUrl}
-              alt=""
-              className="size-6 rounded-full"
-            />
-          )}
-          <div className="flex-1 truncate text-base font-semibold">
-            {guild?.properties?.name || 'Discord Server'}
-          </div>
-        </div>
-      </div>
+      <DiscordGuildHeader guild={guild} />
 
       <div
         className="scrollbar-hover min-h-0 flex-1 overflow-y-auto pb-24"
@@ -589,7 +672,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
                 {item.type === 'category-header' && (
                   <button
                     type="button"
-                    className="mb-1 flex w-full items-center pt-4 text-gray-400 hover:text-gray-100"
+                    className="mb-1 flex w-full items-center pt-4 text-gray-600 hover:text-gray-300"
                     onClick={() => toggleCategory(item.category.id)}
                   >
                     <div className="flex w-6 items-center justify-center">
@@ -599,7 +682,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
                         <CaretDown className="size-2" />
                       )}
                     </div>
-                    <span className="text-xs font-bold uppercase">{item.category.name}</span>
+                    <span className="text-xs font-bold">{item.category.name}</span>
                   </button>
                 )}
                 {item.type === 'channel' && (
