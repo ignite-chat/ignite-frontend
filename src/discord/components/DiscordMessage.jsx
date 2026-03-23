@@ -20,8 +20,15 @@ import DiscordUserProfileModal from './DiscordUserProfileModal';
 import { useModalStore } from '@/store/modal.store';
 import DiscordMessageContextMenu from './context-menus/DiscordMessageContextMenu';
 import DiscordUserContextMenu from './context-menus/DiscordUserContextMenu';
+import {
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from '@/components/ui/context-menu';
 import DiscordClanTag from './DiscordClanTag';
-import { ArrowBendUpLeft, Smiley, Plus, ArrowSquareOut } from '@phosphor-icons/react';
+import { ArrowBendUpLeft, Smiley, Plus, ArrowSquareOut, ArrowClockwise, Trash, WarningCircle, Eye } from '@phosphor-icons/react';
+import { useDiscordChannelsStore } from '../store/discord-channels.store';
+import { generateNonce } from '../utils/snowflake';
 import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
 import { DiscordBurstReaction, DiscordReaction, getReactionEmojiString } from './DiscordEmojiIcon';
 import {
@@ -57,31 +64,61 @@ const DiscordAvatar = ({ author, className = 'size-10' }) => {
   );
 };
 
-const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
+/** Resolve a member's top role color for a guild. */
+function useNameColor(guildId, member) {
   const guilds = useDiscordGuildsStore((s) => s.guilds);
+  return useMemo(() => {
+    if (!guildId || !member?.roles) return undefined;
+    const guild = guilds.find((g) => g.id === guildId);
+    const guildRoles = guild?.roles || guild?.properties?.roles;
+    if (!guildRoles) return undefined;
+    const topColorRole = guildRoles
+      .filter((r) => member.roles.includes(r.id) && r.id !== guildId)
+      .sort((a, b) => (b.position || 0) - (a.position || 0))
+      .find((r) => r.color && r.color !== 0);
+    if (!topColorRole) return undefined;
+    return `#${topColorRole.color.toString(16).padStart(6, '0')}`;
+  }, [guildId, guilds, member?.roles]);
+}
+
+/**
+ * Clickable username with member role color, underline on hover, and opens profile on click.
+ * @param {object} props
+ * @param {object} props.author - Discord user object
+ * @param {object} [props.member] - Guild member object (for nick/roles)
+ * @param {string} [props.guildId]
+ * @param {string} [props.fallbackColor] - Color when no role color (default: 'white')
+ * @param {string} [props.prefix] - Text before the name (e.g. '@')
+ * @param {string} [props.className] - Additional classes
+ */
+const DiscordUserName = ({ author, member, guildId, fallbackColor = 'white', prefix = '', className = '' }) => {
+  const nameColor = useNameColor(guildId, member);
+  const displayName = member?.nick || author?.global_name || author?.username || 'Unknown';
+
+  const openProfile = useCallback(() => {
+    useModalStore.getState().push(DiscordUserProfileModal, { author, member, guildId });
+  }, [author, member, guildId]);
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      className={cn('cursor-pointer font-medium hover:underline', className)}
+      style={{ color: nameColor || fallbackColor }}
+      onClick={openProfile}
+      onKeyDown={(e) => e.key === 'Enter' && openProfile()}
+    >
+      {prefix}{displayName}
+    </span>
+  );
+};
+
+const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
   const storeMember = useDiscordMembersStore((s) =>
     guildId ? s.members[guildId]?.[message.author.id] : undefined
   );
 
   const member = message.member || storeMember;
-
-  const displayName =
-    member?.nick || message.author.global_name || message.author.username;
-
-  const nameColor = useMemo(() => {
-    if (!guildId || !member?.roles) return undefined;
-    const guild = guilds.find((g) => g.id === guildId);
-    const guildRoles = guild?.roles || guild?.properties?.roles;
-    if (!guildRoles) return undefined;
-
-    const topColorRole = guildRoles
-      .filter((r) => member.roles.includes(r.id) && r.id !== guildId)
-      .sort((a, b) => (b.position || 0) - (a.position || 0))
-      .find((r) => r.color && r.color !== 0);
-
-    if (!topColorRole) return undefined;
-    return `#${topColorRole.color.toString(16).padStart(6, '0')}`;
-  }, [guildId, guilds, member?.roles]);
 
   const formattedDateTime = useMemo(() => {
     const date = new Date(message.timestamp);
@@ -111,26 +148,17 @@ const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
 
   return (
     <header className="relative mb-1 flex items-baseline gap-2 leading-none">
-      <span
-        role="button"
-        tabIndex={0}
-        className="cursor-pointer font-medium hover:underline"
-        style={{ color: nameColor || 'white' }}
-        onClick={onClickName}
-        onKeyDown={(e) => e.key === 'Enter' && onClickName()}
-      >
-        {displayName}
-        {message.author.bot && (
-          <span className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white no-underline">
-            {(message.author.public_flags & 65536) !== 0 && (
-              <svg className="size-2.5" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
-              </svg>
-            )}
-            {message.author.id === '643945264868098049' ? 'OFFICIAL' : 'APP'}
-          </span>
-        )}
-      </span>
+      <DiscordUserName author={message.author} member={member} guildId={guildId} />
+      {message.author.bot && (
+        <span className="inline-flex items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
+          {(message.author.public_flags & 65536) !== 0 && (
+            <svg className="size-2.5" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
+            </svg>
+          )}
+          {message.author.id === '643945264868098049' ? 'OFFICIAL' : 'APP'}
+        </span>
+      )}
       {!message.author.bot && (
         <DiscordClanTag userId={message.author.id} size="sm" />
       )}
@@ -381,10 +409,10 @@ const DiscordStickers = ({ stickerItems }) => {
 
 const BUTTON_STYLE_CLASSES = {
   1: 'bg-[#5865f2] hover:bg-[#4752c4] text-white',        // Primary
-  2: 'bg-[#4e5058] hover:bg-[#6d6f78] text-white',        // Secondary
+  2: 'bg-discord-secondary hover:bg-[#6d6f78] text-white',        // Secondary
   3: 'bg-[#248046] hover:bg-[#1a6334] text-white',        // Success
   4: 'bg-[#da373c] hover:bg-[#a12d31] text-white',        // Danger
-  5: 'bg-[#4e5058] hover:bg-[#6d6f78] text-white',        // Link
+  5: 'bg-discord-secondary hover:bg-[#6d6f78] text-white',        // Link
 };
 
 const DiscordComponentEmoji = ({ emoji }) => {
@@ -453,7 +481,7 @@ const DiscordMessageComponents = ({ components, channelId, messageId, guildId, a
     const sessionId = useDiscordStore.getState().sessionId;
     if (!sessionId || !applicationId) return;
 
-    const nonce = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+    const nonce = generateNonce();
     await DiscordApiService.sendInteraction({
       type: 3,
       application_id: applicationId,
@@ -492,27 +520,10 @@ const DiscordMessageComponents = ({ components, channelId, messageId, guildId, a
 const DiscordReplyBar = ({ referencedMessage, guildId }) => {
   if (!referencedMessage) return null;
 
-  const guilds = useDiscordGuildsStore((s) => s.guilds);
   const storeMember = useDiscordMembersStore((s) =>
     guildId && referencedMessage.author?.id ? s.members[guildId]?.[referencedMessage.author.id] : undefined
   );
   const member = referencedMessage.member || storeMember;
-
-  const displayName =
-    member?.nick || referencedMessage.author?.global_name || referencedMessage.author?.username || 'Unknown';
-
-  const nameColor = useMemo(() => {
-    if (!guildId || !member?.roles) return undefined;
-    const guild = guilds.find((g) => g.id === guildId);
-    const guildRoles = guild?.roles || guild?.properties?.roles;
-    if (!guildRoles) return undefined;
-    const topColorRole = guildRoles
-      .filter((r) => member.roles.includes(r.id) && r.id !== guildId)
-      .sort((a, b) => (b.position || 0) - (a.position || 0))
-      .find((r) => r.color && r.color !== 0);
-    if (!topColorRole) return undefined;
-    return `#${topColorRole.color.toString(16).padStart(6, '0')}`;
-  }, [guildId, guilds, member?.roles]);
 
   const scrollToMessage = () => {
     const el = document.querySelector(`[data-message-id="${referencedMessage.id}"]`);
@@ -521,14 +532,6 @@ const DiscordReplyBar = ({ referencedMessage, guildId }) => {
       el.style.backgroundColor = 'rgba(255, 255, 255, 0.06)';
       setTimeout(() => { el.style.backgroundColor = ''; }, 1500);
     }
-  };
-
-  const openProfile = () => {
-    useModalStore.getState().push(DiscordUserProfileModal, {
-      author: referencedMessage.author,
-      member,
-      guildId,
-    });
   };
 
   return (
@@ -565,33 +568,19 @@ const DiscordReplyBar = ({ referencedMessage, guildId }) => {
               author={referencedMessage.author}
               member={member}
               guildId={guildId}
-              onOpenProfile={openProfile}
+              onOpenProfile={() => useModalStore.getState().push(DiscordUserProfileModal, { author: referencedMessage.author, member, guildId })}
             />
           </PopoverContent>
         </Popover>
       )}
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="shrink-0 font-medium hover:underline"
-            style={{ color: nameColor || '#d1d5db' }}
-          >
-            @{displayName}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-auto border-none bg-transparent p-0 shadow-none"
-          align="start"
-        >
-          <DiscordUserPopoverContent
-            author={referencedMessage.author}
-            member={member}
-            guildId={guildId}
-            onOpenProfile={openProfile}
-          />
-        </PopoverContent>
-      </Popover>
+      <DiscordUserName
+        author={referencedMessage.author}
+        member={member}
+        guildId={guildId}
+        fallbackColor="#d1d5db"
+        prefix="@"
+        className="shrink-0"
+      />
       <button
         type="button"
         onClick={scrollToMessage}
@@ -847,18 +836,7 @@ const DiscordSystemMessage = memo(({ message, prevMessage, guildId }) => {
   const text = useMemo(() => getSystemMessageText(message, guildName), [message, guildName]);
 
   const authorName = message.author?.global_name || message.author?.username || 'Unknown';
-
-  const nameColor = useMemo(() => {
-    if (!guildId || !member?.roles) return undefined;
-    const guildRoles = guild?.roles || guild?.properties?.roles;
-    if (!guildRoles) return undefined;
-    const topColorRole = guildRoles
-      .filter((r) => member.roles.includes(r.id) && r.id !== guildId)
-      .sort((a, b) => (b.position || 0) - (a.position || 0))
-      .find((r) => r.color && r.color !== 0);
-    if (!topColorRole) return undefined;
-    return `#${topColorRole.color.toString(16).padStart(6, '0')}`;
-  }, [guildId, guild, member?.roles]);
+  const nameColor = useNameColor(guildId, member);
 
   const formattedTime = useMemo(() => {
     const date = new Date(message.timestamp);
@@ -931,14 +909,52 @@ const DiscordSystemMessage = memo(({ message, prevMessage, guildId }) => {
 
 DiscordSystemMessage.displayName = 'DiscordSystemMessage';
 
+const InteractionBar = ({ interaction, message, guildId }) => {
+  const user = interaction.user || message.author;
+  const member = useDiscordMembersStore((s) =>
+    guildId && user?.id ? s.members[guildId]?.[user.id] : undefined
+  );
+
+  return (
+    <div className="mb-1 flex items-center gap-1.5 px-4 pl-[72px] text-sm">
+      <DiscordAvatar author={user} className="size-4" />
+      <DiscordUserName author={user} member={member} guildId={guildId} />
+      <span className="text-gray-400">used</span>
+      <span className="font-medium text-[#00aafc]">/{interaction.name || 'command'}</span>
+    </div>
+  );
+};
+
+/** Context menu for failed pending messages */
+const DiscordFailedMessageContextMenu = ({ onRetry, onDelete }) => (
+  <ContextMenuContent className="w-52">
+    <ContextMenuItem className="justify-between" onSelect={onRetry}>
+      Retry
+      <ArrowClockwise className="ml-auto size-[18px]" />
+    </ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem
+      onSelect={onDelete}
+      className="justify-between text-[#f23f42] focus:bg-[#da373c] focus:text-white"
+    >
+      Delete
+      <Trash className="ml-auto size-[18px]" weight="fill" />
+    </ContextMenuItem>
+  </ContextMenuContent>
+);
+
 const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channelId, guildId, hasManageMessages, hasKickMembers, hasBanMembers, hasManageNicknames, hasModerateMembers, pending }) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const chatFontSize = useDiscordPreferencesStore((s) => s.chatFontSize);
 
+  const isEphemeral = (message.flags & 64) !== 0;
+  const interaction = message.interaction || message.interaction_metadata;
+  const hasInteractionBar = !!(interaction && (interaction.name || interaction.user));
   const hasReply = !!message.referenced_message || !!message.message_reference;
 
   const shouldStack = useMemo(() => {
+    if (hasInteractionBar) return false;
     if (hasReply) return false;
     if (!prevMessage) return false;
     // Don't stack after a system message
@@ -967,21 +983,58 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
     useModalStore.getState().push(DiscordUserProfileModal, { author: message.author, member: message.member, guildId });
   };
 
+  const isFailed = pending && message.status === 'failed';
+  const isSending = pending && !isFailed;
+
   const messageClasses = cn(
     'group relative block border-l-2 border-transparent py-1 transition-colors duration-200 hover:bg-gray-800/40',
     shouldStack ? '' : 'mt-3.5',
     isMentioned && 'border-yellow-500/70 bg-yellow-500/5 hover:bg-yellow-500/10',
-    pending && 'opacity-50 pointer-events-none'
+    isSending && 'opacity-50 pointer-events-none',
+    isFailed && 'border-red-500/70 bg-red-500/5 hover:bg-red-500/10',
+    isEphemeral && !isFailed && 'border-[#5865f2]/40 bg-[#5865f2]/5 hover:bg-[#5865f2]/10',
   );
+
+  const handleRetry = () => {
+    DiscordService.retryMessage(channelId, message.nonce);
+  };
+
+  const handleDeleteFailed = () => {
+    useDiscordChannelsStore.getState().removePendingByNonce(channelId, message.nonce);
+  };
 
   return (
     <article
       className={messageClasses}
       onContextMenu={(e) => {
-        useContextMenuStore.getState().open(DiscordMessageContextMenu, { message, canDelete, guildId }, e);
+        if (isFailed) {
+          useContextMenuStore.getState().open(DiscordFailedMessageContextMenu, { message, channelId, onRetry: handleRetry, onDelete: handleDeleteFailed }, e);
+        } else if (!isSending) {
+          useContextMenuStore.getState().open(DiscordMessageContextMenu, { message, canDelete, guildId }, e);
+        }
       }}
     >
       {/* Hover action bar */}
+      {isFailed && (
+        <nav className="absolute -top-3.5 right-4 z-10 hidden items-center gap-0.5 rounded border border-red-500/30 bg-[#2b2d31] p-0.5 shadow-md group-hover:flex">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleRetry(); }}
+            className="rounded p-1 text-red-400 transition-colors hover:bg-white/10 hover:text-red-300"
+            title="Retry"
+          >
+            <ArrowClockwise size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleDeleteFailed(); }}
+            className="rounded p-1 text-red-400 transition-colors hover:bg-white/10 hover:text-red-300"
+            title="Delete"
+          >
+            <Trash size={16} />
+          </button>
+        </nav>
+      )}
       {!pending && (
         <nav className="absolute -top-3.5 right-4 z-10 hidden items-center gap-0.5 rounded border border-white/10 bg-[#2b2d31] p-0.5 shadow-md group-hover:flex">
           <div className="relative">
@@ -1018,7 +1071,11 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
         </nav>
       )}
 
-      {hasReply && (
+      {hasInteractionBar && (
+        <InteractionBar interaction={interaction} message={message} guildId={guildId} />
+      )}
+
+      {!hasInteractionBar && hasReply && (
         <div className="mb-1 px-4">
           <DiscordReplyBar referencedMessage={message.referenced_message} guildId={guildId} />
         </div>
@@ -1080,7 +1137,7 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
             </div>
           )}
 
-          <div className="select-text whitespace-pre-wrap text-gray-400 [overflow-wrap:anywhere]" style={{ fontSize: chatFontSize, lineHeight: `${Math.round(chatFontSize * 1.375)}px` }}>
+          <div className={cn('select-text whitespace-pre-wrap [overflow-wrap:anywhere]', isFailed ? 'text-red-400' : 'text-gray-400')} style={{ fontSize: chatFontSize, lineHeight: `${Math.round(chatFontSize * 1.375)}px` }}>
             <DiscordMessageContent content={message.content} guildId={guildId} />
             {message.edited_timestamp && (
               <span className="ml-1 text-[0.65rem] text-gray-500">(edited)</span>
@@ -1103,6 +1160,31 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
         <footer className="pl-[72px]">
           <DiscordReactions reactions={message.reactions} channelId={channelId} messageId={message.id} guildId={guildId} />
         </footer>
+      )}
+      {isEphemeral && (
+        <div className="flex items-center gap-1 pl-[72px] pt-1 text-xs text-gray-400">
+          <Eye size={14} className="shrink-0" />
+          <span>Only you can see this</span>
+          <span className="text-gray-500">·</span>
+          <button
+            type="button"
+            onClick={() => useDiscordChannelsStore.getState().removeMessage(channelId, message.id)}
+            className="font-medium text-[#5865f2] hover:underline"
+          >
+            Dismiss message
+          </button>
+        </div>
+      )}
+      {isFailed && (
+        <div className="flex items-center gap-2 pl-[72px] pt-2">
+          <WarningCircle size={14} className="shrink-0 text-red-400" />
+          <span className="text-xs text-red-400">
+            Message failed to send —{' '}
+            <button type="button" onClick={handleRetry} className="font-medium underline hover:text-red-300">Retry</button>
+            {' · '}
+            <button type="button" onClick={handleDeleteFailed} className="font-medium underline hover:text-red-300">Delete</button>
+          </span>
+        </div>
       )}
     </article>
   );

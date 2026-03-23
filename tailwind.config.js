@@ -19,6 +19,7 @@ export default {
   			body: '#0c0c0c',
   			'dark-bg': '#0c1427',
   			'dark-bg-active': '#0f1932',
+			'discord-secondary': '#242428',
   			gray: {
   				'100': '#f2f3f5',
   				'200': '#ebedef',

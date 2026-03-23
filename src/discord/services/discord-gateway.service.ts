@@ -13,6 +13,7 @@ import { useDiscordThreadsStore } from '../store/discord-threads.store';
 import { useDiscordVoiceStatesStore } from '../store/discord-voice-states.store';
 import { useDiscordGuildSettingsStore } from '../store/discord-guild-settings.store';
 import { useDiscordGuildFoldersStore } from '../store/discord-guild-folders.store';
+import { useDiscordInteractionsStore } from '../store/discord-interactions.store';
 import { decodeGuildFolders, decodeUserSettings } from '../utils/proto-decode';
 import { DiscordVoiceService } from './discord-voice.service';
 import { GatewayOp } from '../constants/gateway-opcodes';
@@ -472,6 +473,20 @@ export const DiscordGatewayService = {
           });
         }
         break;
+      case 'INTERACTION_CREATE': {
+        const icNonce = data.nonce || data.id;
+        if (icNonce) {
+          useDiscordInteractionsStore.getState().setThinking(icNonce);
+        }
+        break;
+      }
+      case 'INTERACTION_SUCCESS': {
+        const isNonce = data.nonce || data.id;
+        if (isNonce) {
+          useDiscordInteractionsStore.getState().remove(isNonce);
+        }
+        break;
+      }
       default:
         console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         break;

@@ -22,6 +22,7 @@ type DiscordChannelsStore = {
 
   addPendingMessage: (channelId: string, pending: PendingMessage) => void;
   removePendingByNonce: (channelId: string, nonce: string) => void;
+  markPendingFailed: (channelId: string, nonce: string, error: { code: number; message: string }) => void;
 
   /** Clear cached messages for all channels except the given one */
   clearInactiveMessages: (activeChannelId: string) => void;
@@ -136,6 +137,20 @@ export const useDiscordChannelsStore = create<DiscordChannelsStore>((set) => ({
         channelPendingMessages: {
           ...state.channelPendingMessages,
           [channelId]: pending.filter((p) => p.nonce !== nonce),
+        },
+      };
+    }),
+
+  markPendingFailed: (channelId, nonce, error) =>
+    set((state) => {
+      const pending = state.channelPendingMessages[channelId];
+      if (!pending) return state;
+      return {
+        channelPendingMessages: {
+          ...state.channelPendingMessages,
+          [channelId]: pending.map((p) =>
+            p.nonce === nonce ? { ...p, status: 'failed' as const, error } : p,
+          ),
         },
       };
     }),

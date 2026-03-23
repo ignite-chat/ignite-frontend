@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { useModalStore } from '@/store/modal.store';
 import { useDiscordStore } from '../store/discord.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
@@ -9,6 +10,7 @@ import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useDiscordGuildFoldersStore } from '../store/discord-guild-folders.store';
 import { DiscordGatewayService } from './discord-gateway.service';
 import { DiscordApiService } from './discord-api.service';
+import { generateNonce } from '../utils/snowflake';
 
 export const DiscordService = {
   /**
@@ -123,8 +125,8 @@ export const DiscordService = {
    * Creates a pending message immediately for instant UI feedback,
    * then removes it once the server confirms via MESSAGE_CREATE.
    */
-  async sendMessage(channelId: string, content: string, replyToMessageId?: string | null, attachments?: File[]) {
-    const nonce = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+  async sendMessage(channelId: string, content: string, replyToMessageId?: string | null, attachments?: { file: File; uploaded_filename: string }[]) {
+    const nonce = generateNonce();
     const currentUser = useDiscordStore.getState().user;
 
     const messageReference = replyToMessageId
@@ -153,29 +155,74 @@ export const DiscordService = {
         },
         timestamp: new Date().toISOString(),
         type: 0,
+        status: 'sending',
         ...(messageReference && { message_reference: messageReference }),
         ...(referencedMessage && { referenced_message: referencedMessage }),
         ...(attachments && attachments.length > 0 && {
-          attachments: attachments.map((f, i) => ({
+          attachments: attachments.map((att, i) => ({
             id: String(i),
-            filename: f.name,
-            size: f.size,
-            content_type: f.type,
+            filename: att.file.name,
+            size: att.file.size,
+            content_type: att.file.type,
           })),
         }),
+        _retryData: { replyToMessageId, attachments },
       });
     }
 
     try {
       await DiscordApiService.sendMessage(channelId, content, nonce, messageReference, attachments);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[Discord] Failed to send message to channel ${channelId}:`, error);
-      useDiscordChannelsStore.getState().removePendingByNonce(channelId, nonce);
+      const data = error.response?.data;
+      const errInfo = {
+        code: data?.code || error.response?.status || 0,
+        message: data?.message || error.message || 'Failed to send message',
+      };
+      useDiscordChannelsStore.getState().markPendingFailed(channelId, nonce, errInfo);
+
+      // Show error modal for specific error codes
+      const ERROR_MODALS: Record<number, { title: string; description: string }> = {
+        340001: { title: 'Your account has limited access', description: 'Discord has limited your access to sending messages in guild channels. Please check for system messages from Discord with more information.' },
+        340002: { title: 'Your account has limited access', description: 'Discord has limited your access to sending DMs. Please check for system messages from Discord with more information.' },
+        340003: { title: 'Your account has limited access', description: 'Discord has limited your access to sending messages in group DMs. Please check for system messages from Discord with more information.' },
+        340004: { title: 'Your account has limited access', description: 'Discord has limited your access to uploading attachments to guilds. Please check for system messages from Discord with more information.' },
+        340005: { title: 'Your account has limited access', description: 'Discord has limited your access to uploading attachments to DMs. Please check for system messages from Discord with more information.' },
+        340006: { title: 'Your account has limited access', description: 'Discord has limited your access to uploading attachments to group DMs. Please check for system messages from Discord with more information.' },
+        340013: { title: 'Your account has limited access', description: 'Discord has limited your access to sending messages in server channels. Please check for system messages from Discord with more information.' },
+        340014: { title: 'Your account has limited access', description: 'Discord has limited your access to uploading attachments to servers. Please check for system messages from Discord with more information.' },
+        50007: { title: 'Cannot send message', description: 'Cannot send messages to this user.' },
+        50278: { title: 'Cannot send message', description: 'Cannot send messages to this user.' },
+        40004: { title: 'Messages disabled', description: 'Send message has been temporarily disabled.' },
+        20028: { title: 'Slow down', description: 'You are sending messages too fast. Please slow down.' },
+        50013: { title: 'Missing Permissions', description: 'You do not have permission to send messages in this channel.' },
+      };
+      const modalInfo = ERROR_MODALS[errInfo.code];
+      if (modalInfo) {
+        const { default: DiscordErrorModal } = await import('../components/modals/DiscordErrorModal');
+        useModalStore.getState().push(DiscordErrorModal, modalInfo);
+      }
+
       return false;
     }
   },
 
+  /** Retry a failed pending message */
+  async retryMessage(channelId: string, nonce: string) {
+    const store = useDiscordChannelsStore.getState();
+    const pending = (store.channelPendingMessages[channelId] || []).find((p) => p.nonce === nonce);
+    if (!pending || pending.status !== 'failed') return;
+
+    // Remove the failed message and re-send
+    store.removePendingByNonce(channelId, nonce);
+    await this.sendMessage(
+      channelId,
+      pending.content,
+      pending._retryData?.replyToMessageId,
+      pending._retryData?.attachments,
+    );
+  },
 
   /**
    * Load guild members via REST API.

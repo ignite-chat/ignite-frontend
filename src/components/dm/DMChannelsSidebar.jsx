@@ -99,14 +99,12 @@ const DiscordDMChannelInfo = ({ info, isUnread }) => {
         <span className={cn('truncate text-sm', isUnread ? 'font-bold text-gray-100' : 'font-medium')}>
           {info.name}
         </span>
-        {info.user?.bot && (
+        {info.user?.id === '643945264868098049' && (
           <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
-            {info.user.verified_bot !== false && (
-              <svg width="10" height="10" viewBox="0 0 16 15.2" fill="currentColor">
-                <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
-              </svg>
-            )}
-            {info.user.id === '643945264868098049' ? 'OFFICIAL' : 'APP'}
+            <svg width="10" height="10" viewBox="0 0 16 15.2" fill="currentColor">
+              <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
+            </svg>
+            OFFICIAL
           </span>
         )}
         {!info.isGroup && info.user && <DiscordClanTag userId={info.user.id} size="sm" />}
@@ -120,7 +118,10 @@ const DiscordDMChannelInfo = ({ info, isUnread }) => {
           <TooltipContent side="top">Discord</TooltipContent>
         </Tooltip>
       </div>
-      {(primaryActivity || customStatus?.state) && (
+      {info.user?.id === '643945264868098049' && (
+        <div className="truncate text-left text-[11px] text-gray-400">Official Discord Message</div>
+      )}
+      {info.user?.id !== '643945264868098049' && (primaryActivity || customStatus?.state) && (
         <div className="flex items-center gap-1 truncate text-[11px] text-gray-400">
           {primaryActivity && (
             <Tooltip>

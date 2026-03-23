@@ -47,7 +47,7 @@ const SYSTEM_CHANNEL_FLAGS = [
 
 const CheckboxIndicator = ({ checked }) => (
   <div
-    className={`flex size-[18px] shrink-0 items-center justify-center rounded-[3px] ${checked ? 'bg-[#5865f2]' : 'border-2 border-[#4e5058]'}`}
+    className={`flex size-[18px] shrink-0 items-center justify-center rounded-[3px] ${checked ? 'bg-[#5865f2]' : 'border-2 border-discord-secondary'}`}
   >
     {checked && (
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

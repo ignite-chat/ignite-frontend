@@ -272,12 +272,12 @@ const DiscordGuildIcon = ({ guild, isActive }) => {
           </div>
         )}
         {voiceBadge === 'screenshare' && (
-          <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-[#4e5058] text-white shadow-md ring-2 ring-[#121214]">
+          <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-discord-secondary text-white shadow-md ring-2 ring-[#121214]">
             <Monitor size={9} weight="fill" />
           </div>
         )}
         {voiceBadge === 'idle' && (
-          <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-[#4e5058] text-white shadow-md ring-2 ring-[#121214]">
+          <div className="absolute right-1.5 top-0 z-20 flex size-4 items-center justify-center rounded-full bg-discord-secondary text-white shadow-md ring-2 ring-[#121214]">
             <SpeakerSimpleHigh size={9} weight="fill" />
           </div>
         )}

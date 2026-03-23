@@ -25,4 +25,12 @@ export type PendingMessage = {
   author: DiscordMessage['author'];
   timestamp: string;
   type: number;
+  status?: 'sending' | 'failed';
+  error?: { code: number; message: string } | null;
+  /** Data needed to retry the message */
+  _retryData?: {
+    replyToMessageId?: string | null;
+    attachments?: { file: File; uploaded_filename: string }[];
+  };
+  [key: string]: any;
 };

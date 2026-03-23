@@ -115,34 +115,71 @@ export const DiscordApiService = {
   /**
    * Send a message to a channel.
    */
+  /**
+   * Request upload URLs and upload files to Discord's GCS bucket.
+   * Returns the upload results needed for sendMessage.
+   */
+  async prepareAttachments(
+    channelId: string,
+    files: File[],
+  ): Promise<{ file: File; uploaded_filename: string }[]> {
+    const filesPayload = files.map((file, i) => ({
+      filename: file.name,
+      file_size: file.size,
+      id: `${i}`,
+      is_clip: false,
+      original_content_type: file.type || 'application/octet-stream',
+    }));
+    const { data: uploadData } = await discordApi.post(`/channels/${channelId}/attachments`, {
+      files: filesPayload,
+    });
+
+    await Promise.all(
+      uploadData.attachments.map(async (att: any, i: number) => {
+        const buffer = await files[i].arrayBuffer();
+        return new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', att.upload_url);
+          xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`)));
+          xhr.onerror = () => reject(new Error('Upload network error'));
+          xhr.send(buffer);
+        });
+      }),
+    );
+
+    return uploadData.attachments.map((att: any, i: number) => ({
+      file: files[i],
+      uploaded_filename: att.upload_filename,
+    }));
+  },
+
   async sendMessage(
     channelId: string,
     content: string,
     nonce?: string,
     messageReference?: { message_id: string },
-    attachments?: File[],
+    uploadedAttachments?: { file: File; uploaded_filename: string }[],
   ): Promise<DiscordMessage> {
-    if (attachments && attachments.length > 0) {
-      const formData = new FormData();
-      const payloadJson: any = { content, nonce };
+    if (uploadedAttachments && uploadedAttachments.length > 0) {
+      const body: any = {
+        content,
+        nonce,
+        tts: false,
+        flags: 0,
+        mobile_network_type: 'unknown',
+        attachments: uploadedAttachments.map((att, i) => ({
+          id: `${i}`,
+          filename: att.file.name,
+          uploaded_filename: att.uploaded_filename,
+          original_content_type: att.file.type || 'application/octet-stream',
+        })),
+      };
       if (messageReference) {
-        payloadJson.message_reference = messageReference;
-        payloadJson.allowed_mentions = { replied_user: true };
+        body.message_reference = messageReference;
+        body.allowed_mentions = { replied_user: true };
       }
-      // Discord expects attachments metadata in payload_json
-      payloadJson.attachments = attachments.map((file, i) => ({
-        id: i,
-        filename: file.name,
-      }));
-      formData.append('payload_json', JSON.stringify(payloadJson));
-      attachments.forEach((file, i) => {
-        formData.append(`files[${i}]`, file, file.name);
-      });
-      const { data } = await discordApi.post<DiscordMessage>(
-        `/channels/${channelId}/messages`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } },
-      );
+      const { data } = await discordApi.post<DiscordMessage>(`/channels/${channelId}/messages`, body, { _silent: true } as any);
       return data;
     }
 
@@ -151,7 +188,7 @@ export const DiscordApiService = {
       body.message_reference = messageReference;
       body.allowed_mentions = { replied_user: true };
     }
-    const { data } = await discordApi.post<DiscordMessage>(`/channels/${channelId}/messages`, body);
+    const { data } = await discordApi.post<DiscordMessage>(`/channels/${channelId}/messages`, body, { _silent: true } as any);
     return data;
   },
 
@@ -404,6 +441,16 @@ export const DiscordApiService = {
         offset,
       },
     });
+    return data;
+  },
+
+  /**
+   * Fetch the application command index for a guild (all commands).
+   */
+  async getGuildApplicationCommandIndex(guildId: string): Promise<any> {
+    const { data } = await discordApi.get(`/guilds/${guildId}/application-command-index`, {
+      _silent: true,
+    } as any);
     return data;
   },
 

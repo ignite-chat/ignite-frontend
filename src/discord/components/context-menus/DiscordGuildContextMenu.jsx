@@ -17,13 +17,13 @@ import DebugInfoModal from '../DebugInfoModal';
 import DiscordServerSettingsModal from '../modals/DiscordServerSettingsModal';
 
 const RadioIndicator = ({ checked }) => (
-  <div className={`flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 ${checked ? 'border-[#5865f2] bg-[#5865f2]' : 'border-[#4e5058]'}`}>
+  <div className={`flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 ${checked ? 'border-[#5865f2] bg-[#5865f2]' : 'border-discord-secondary'}`}>
     {checked && <div className="size-2 rounded-full bg-white" />}
   </div>
 );
 
 const CheckboxIndicator = ({ checked }) => (
-  <div className={`flex size-[18px] shrink-0 items-center justify-center rounded-[3px] ${checked ? 'bg-[#5865f2]' : 'border-2 border-[#4e5058]'}`}>
+  <div className={`flex size-[18px] shrink-0 items-center justify-center rounded-[3px] ${checked ? 'bg-[#5865f2]' : 'border-2 border-discord-secondary'}`}>
     {checked && (
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <path d="M3.5 7L6 9.5L10.5 5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

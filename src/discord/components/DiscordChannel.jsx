@@ -60,6 +60,12 @@ const DiscordChannel = ({ channel }) => {
   const [messageSentCount, setMessageSentCount] = useState(0);
   const onMessageSent = useCallback(() => setMessageSentCount((c) => c + 1), []);
 
+  const isOfficialDiscordDM = useMemo(() => {
+    if (!isDM || channel?.type !== DM) return false;
+    const recipientIds = channel.recipient_ids || [];
+    return recipientIds.includes('643945264868098049');
+  }, [channel, isDM]);
+
   if (!channel) return null;
 
   if (isForum) {
@@ -89,7 +95,13 @@ const DiscordChannel = ({ channel }) => {
           <DiscordChannelMessages channel={channel} messageSentCount={messageSentCount} />
 
           {/* Input */}
-          <DiscordChannelInput channel={channel} channelName={placeholderName} onMessageSent={onMessageSent} />
+          {isOfficialDiscordDM ? (
+            <div className="flex items-center justify-center border-t border-white/5 px-4 py-3">
+              <span className="text-sm text-gray-400">You cannot reply to official Discord messages.</span>
+            </div>
+          ) : (
+            <DiscordChannelInput channel={channel} channelName={placeholderName} onMessageSent={onMessageSent} />
+          )}
         </div>
 
         {guildId && memberListOpen && !searchOpen && !isDM && <DiscordMemberList guildId={guildId} />}

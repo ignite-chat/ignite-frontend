@@ -155,7 +155,7 @@ const ActivitySection = ({ activity }) => {
             {activity.buttons.map((btn, i) => (
               <div
                 key={i}
-                className="flex-1 truncate rounded bg-[#4e5058]/50 px-3 py-1.5 text-center text-xs font-medium text-gray-300"
+                className="flex-1 truncate rounded bg-discord-secondary/50 px-3 py-1.5 text-center text-xs font-medium text-gray-300"
               >
                 {typeof btn === 'string' ? btn : btn.label}
               </div>

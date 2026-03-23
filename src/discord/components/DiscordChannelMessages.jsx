@@ -2,6 +2,9 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordReadStatesStore } from '../store/discord-readstates.store';
 import { useDiscordStore } from '../store/discord.store';
+import { useDiscordUsersStore } from '../store/discord-users.store';
+import { useDiscordProfilesStore } from '../store/discord-profiles.store';
+import { useDiscordRelationshipsStore, RelationshipType } from '../store/discord-relationships.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordHasPermission } from '../hooks/useDiscordPermission';
 import { MANAGE_MESSAGES, KICK_MEMBERS, BAN_MEMBERS, READ_MESSAGE_HISTORY, MANAGE_NICKNAMES, MODERATE_MEMBERS } from '../constants/permissions';
@@ -12,6 +15,8 @@ import { Check, Hash, Megaphone, SpeakerHigh, MicrophoneStage, ChatsTeardrop, At
 import * as DiscordChannelType from '../constants/channel-types';
 import DiscordMessage from './DiscordMessage';
 import MessageSkeletonList from '@/components/message/MessageSkeleton';
+import { useDiscordInteractionsStore } from '../store/discord-interactions.store';
+import TypingDots from '@/components/ui/typing-dots';
 
 const WelcomeIcon = ({ type }) => {
   const cls = 'size-10 text-white';
@@ -34,21 +39,189 @@ const WelcomeIcon = ({ type }) => {
 
 const ChannelWelcome = ({ channel }) => {
   const isDM = channel.type === DiscordChannelType.DM || channel.type === DiscordChannelType.GROUP_DM;
-  const name = isDM ? (channel.recipients?.[0]?.username || channel.name) : channel.name;
+  const currentUser = useDiscordStore((s) => s.user);
+  const usersMap = useDiscordUsersStore((s) => s.users);
+  const guilds = useDiscordGuildsStore((s) => s.guilds);
+  const [mutualGuilds, setMutualGuilds] = useState([]);
+
+  const dmUser = useMemo(() => {
+    if (!isDM) return null;
+    const recipientIds = channel.recipient_ids || [];
+    if (channel.type === DiscordChannelType.GROUP_DM) return null;
+    const otherId = recipientIds.find((id) => id !== currentUser?.id) || recipientIds[0];
+    return otherId ? usersMap[otherId] : null;
+  }, [isDM, channel, currentUser?.id, usersMap]);
+
+  const relationships = useDiscordRelationshipsStore((s) => s.relationships);
+  const relationship = useMemo(
+    () => dmUser ? relationships.find((r) => r.id === dmUser.id) : null,
+    [dmUser, relationships]
+  );
+  const isFriend = relationship?.type === RelationshipType.FRIEND;
+  const isBlocked = relationship?.type === RelationshipType.BLOCKED;
+
+  const handleAddFriend = async () => {
+    if (!dmUser) return;
+    try {
+      await DiscordApiService.sendFriendRequest(dmUser.id);
+    } catch {}
+  };
+
+  const handleBlock = async () => {
+    if (!dmUser) return;
+    try {
+      await DiscordApiService.blockUser(dmUser.id);
+    } catch {}
+  };
+
+  // Fetch profile for mutual guilds
+  useEffect(() => {
+    if (!dmUser?.id) return;
+    const { fetchProfile } = useDiscordProfilesStore.getState();
+    fetchProfile(dmUser.id).then((profile) => {
+      if (profile?.mutual_guilds) setMutualGuilds(profile.mutual_guilds);
+    });
+  }, [dmUser?.id]);
+
+  const name = isDM
+    ? channel.type === DiscordChannelType.GROUP_DM
+      ? channel.name || (channel.recipient_ids || []).map((id) => usersMap[id]?.global_name || usersMap[id]?.username).filter(Boolean).join(', ')
+      : dmUser?.global_name || dmUser?.username || 'Unknown User'
+    : channel.name;
+
+  const avatarUrl = dmUser ? DiscordService.getUserAvatarUrl(dmUser.id, dmUser.avatar, 128) : null;
+
+  const mutualGuildDetails = useMemo(
+    () =>
+      mutualGuilds
+        .map((mg) => {
+          const guild = guilds.find((g) => g.id === mg.id);
+          return guild
+            ? {
+                id: guild.id,
+                name: guild.properties?.name || guild.name,
+                icon: DiscordService.getGuildIconUrl(guild.id, guild.properties?.icon || guild.icon, 32),
+              }
+            : null;
+        })
+        .filter(Boolean),
+    [mutualGuilds, guilds]
+  );
 
   return (
     <div className="px-4 pb-2 pt-16">
-      <div className="mb-2 flex size-[68px] items-center justify-center rounded-full bg-white/10">
-        <WelcomeIcon type={channel.type} />
-      </div>
-      <h1 className="text-[28px] font-bold leading-tight text-white">
+      {isDM && avatarUrl ? (
+        <img src={avatarUrl} alt={name} className="mb-2 size-20 rounded-full object-cover" />
+      ) : (
+        <div className="mb-2 flex size-20 items-center justify-center rounded-full bg-white/10">
+          <WelcomeIcon type={channel.type} />
+        </div>
+      )}
+      <h1 className="text-[32px] font-bold leading-tight text-white">
         {isDM ? name : `Welcome to #${name}!`}
       </h1>
-      <p className="mt-1 text-sm text-gray-400">
+      {isDM && dmUser && (
+        <p className="mt-0.5 text-[15px] text-gray-400">
+          {dmUser.username}{dmUser.bot && dmUser.discriminator ? `#${dmUser.discriminator}` : ''}
+        </p>
+      )}
+      <p className="mt-1.5 text-[15px] text-gray-400">
         {isDM
           ? `This is the beginning of your direct message history with ${name}.`
           : `This is the start of the #${name} channel. ${channel.topic ? channel.topic : ''}`}
       </p>
+      {isDM && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {mutualGuildDetails.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="flex -space-x-2">
+                {mutualGuildDetails.slice(0, 3).map((g) =>
+                  g.icon ? (
+                    <img
+                      key={g.id}
+                      src={g.icon}
+                      alt={g.name}
+                      title={g.name}
+                      className="size-6 rounded-full border-2 border-[#1a1a1e] object-cover"
+                    />
+                  ) : (
+                    <div
+                      key={g.id}
+                      title={g.name}
+                      className="flex size-6 items-center justify-center rounded-full border-2 border-[#1a1a1e] bg-[#5865f2] text-[9px] font-medium text-white"
+                    >
+                      {g.name.charAt(0)}
+                    </div>
+                  )
+                )}
+              </div>
+              <span className="text-sm text-gray-400">
+                {mutualGuildDetails.length} Mutual Server{mutualGuildDetails.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
+          {dmUser && !dmUser.bot && (
+            <div className="flex items-center gap-2">
+              {!isFriend && !isBlocked && (
+                <button
+                  onClick={handleAddFriend}
+                  className="rounded bg-[#5865f2] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#4752c4]"
+                >
+                  Add Friend
+                </button>
+              )}
+              {!isBlocked && (
+                <button
+                  onClick={handleBlock}
+                  className="rounded bg-discord-secondary px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#6d6f78]"
+                >
+                  Block
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const PendingInteractionIndicator = ({ interaction }) => {
+  const botUser = useDiscordUsersStore((s) => interaction.botId ? s.users[interaction.botId] : null);
+  const avatarUrl = botUser?.avatar
+    ? DiscordService.getUserAvatarUrl(botUser.id, botUser.avatar, 40)
+    : interaction.botAvatar
+      ? DiscordService.getUserAvatarUrl(interaction.botId, interaction.botAvatar, 40)
+      : interaction.appIcon
+        ? `https://cdn.discordapp.com/app-icons/${interaction.appId}/${interaction.appIcon}.png?size=40`
+        : interaction.botId
+          ? `https://cdn.discordapp.com/embed/avatars/${(BigInt(interaction.botId) >> 22n) % 6n}.png`
+          : null;
+
+  const isSending = interaction.status === 'sending';
+  const label = isSending
+    ? 'Sending command...'
+    : `${interaction.botName} is thinking...`;
+
+  return (
+    <div className={`mt-3.5 flex items-start gap-4 px-4 py-1 ${isSending ? 'opacity-50' : ''}`}>
+      {avatarUrl ? (
+        <img src={avatarUrl} alt={interaction.botName} className="size-10 rounded-full object-cover" />
+      ) : (
+        <div className="flex size-10 items-center justify-center rounded-full bg-[#5865f2] text-sm font-bold text-white">
+          /
+        </div>
+      )}
+      <div className="flex flex-col">
+        <div className="flex items-baseline gap-2">
+          <span className="font-medium text-white">{interaction.botName}</span>
+          <span className="rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">APP</span>
+        </div>
+        <div className="mt-0.5 flex items-center gap-1.5 text-sm text-gray-400">
+          <TypingDots />
+          <span>{label}</span>
+        </div>
+      </div>
     </div>
   );
 };
@@ -110,6 +283,9 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   );
   const pendingMessages = useDiscordChannelsStore(
     useCallback((s) => s.channelPendingMessages[channelId] || [], [channelId])
+  );
+  const pendingInteractions = useDiscordInteractionsStore(
+    useCallback((s) => s.getForChannel(channelId), [channelId])
   );
   const channels = useDiscordChannelsStore((s) => s.channels);
 
@@ -457,6 +633,11 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
                 </li>
               );
             })}
+            {pendingInteractions.map((pi) => (
+              <li key={pi.nonce}>
+                <PendingInteractionIndicator interaction={pi} />
+              </li>
+            ))}
           </ol>
         )}
       </div>

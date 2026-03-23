@@ -67,7 +67,7 @@ const DiscordTimeoutModal = ({ modalId, author, guildId }) => {
                 className={`whitespace-nowrap rounded-full border px-3 py-[5px] text-[13px] font-medium transition-colors ${
                   selectedDuration === seconds
                     ? 'border-[#5865f2] bg-[#5865f2] text-white'
-                    : 'border-[#4e5058] bg-transparent text-[#b5bac1] hover:border-[#6d6f78] hover:text-[#dbdee1]'
+                    : 'border-discord-secondary bg-transparent text-[#b5bac1] hover:border-[#6d6f78] hover:text-[#dbdee1]'
                 }`}
               >
                 {label}

@@ -49,7 +49,7 @@ const FriendsHeader = ({ activeTopTab, activeSubTab, onSubTabChange, pendingCoun
         </div>
         {activeTopTab === 'friends' && (
           <>
-            <Separator orientation="vertical" className="h-6 bg-[#4e5058]" />
+            <Separator orientation="vertical" className="h-6 bg-discord-secondary" />
             <nav className="flex items-center gap-2">
               <TabButton
                 label="Online"

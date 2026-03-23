@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { DiscordService } from '../../services/discord.service';
+import { DiscordApiService } from '../../services/discord-api.service';
 import { emojiMap, registerEmoji, getTwemojiUrl } from '@/utils/emoji.utils';
 import { useEmojisStore } from '@/ignite/store/emojis.store';
 import emojisData from '@/assets/emojis/emojis.json';
@@ -62,6 +63,8 @@ import PasteHandlerPlugin from './plugins/PasteHandlerPlugin';
 import DiscordTypingIndicatorPlugin from './plugins/DiscordTypingIndicatorPlugin';
 import FocusPlugin from './plugins/FocusPlugin';
 import EditablePlugin from './plugins/EditablePlugin';
+import SlashCommandPlugin from './plugins/SlashCommandPlugin';
+import SlashCommandForm from './SlashCommandForm';
 
 const MAX_MESSAGE_LENGTH = 2000;
 const DISCORD_EMOJI_CDN = 'https://cdn.discordapp.com/emojis';
@@ -81,7 +84,7 @@ function formatSlowmodeDuration(seconds) {
 const MAX_FILES = 10;
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB (Discord default for non-Nitro)
 
-const FilePreview = ({ file, onRemove }) => {
+const FilePreview = ({ file, status, onRemove }) => {
   const isImage = file.type.startsWith('image/');
   const [preview, setPreview] = useState(null);
 
@@ -97,7 +100,10 @@ const FilePreview = ({ file, onRemove }) => {
     : `${(file.size / 1024).toFixed(1)} KB`;
 
   return (
-    <div className="group/file relative flex h-[200px] w-[200px] shrink-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-[#2b2d31]">
+    <div className={cn(
+      'group/file relative flex h-[200px] w-[200px] shrink-0 flex-col overflow-hidden rounded-lg border bg-[#2b2d31]',
+      status === 'error' ? 'border-red-500/50' : 'border-white/10',
+    )}>
       <button
         type="button"
         onClick={onRemove}
@@ -105,6 +111,11 @@ const FilePreview = ({ file, onRemove }) => {
       >
         <X size={12} weight="bold" />
       </button>
+      {status === 'uploading' && (
+        <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black/40">
+          <div className="size-6 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+        </div>
+      )}
       {isImage && preview ? (
         <img src={preview} alt={file.name} className="h-[140px] w-full object-contain" />
       ) : (
@@ -114,7 +125,9 @@ const FilePreview = ({ file, onRemove }) => {
       )}
       <div className="flex flex-1 flex-col justify-center px-2">
         <p className="truncate text-xs font-medium text-gray-200">{file.name}</p>
-        <p className="text-[10px] text-gray-500">{sizeStr}</p>
+        <p className="text-[10px] text-gray-500">
+          {status === 'uploading' ? 'Uploading...' : status === 'error' ? 'Upload failed' : sizeStr}
+        </p>
       </div>
     </div>
   );
@@ -124,6 +137,8 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   const [inputMessage, setInputMessage] = useState('');
   const [stagedFiles, setStagedFiles] = useState([]);
   const [silentTyping, setSilentTyping] = useState(() => localStorage.getItem('silentTyping') === 'true');
+  const [activeCommand, setActiveCommand] = useState(null);
+  const [activeCommandApp, setActiveCommandApp] = useState(null);
   const editorRef = useRef(null);
   const menuContainerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -244,6 +259,23 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
     [membersMap, guildRoles, guildId]
   );
 
+  /* ---------------- slash commands ---------------- */
+  const handleStartCommand = useCallback((cmd, app) => {
+    setActiveCommand(cmd);
+    setActiveCommandApp(app);
+  }, []);
+
+  const handleCloseCommand = useCallback(() => {
+    setActiveCommand(null);
+    setActiveCommandApp(null);
+  }, []);
+
+  // Clear active command when channel changes
+  useEffect(() => {
+    setActiveCommand(null);
+    setActiveCommandApp(null);
+  }, [channelId]);
+
   /* ---------------- emojis ---------------- */
   const { recentEmojis, addRecentEmoji } = useEmojisStore();
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -254,6 +286,7 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   const [emojiSearch, setEmojiSearch] = useState('');
 
   /* ---------------- file attachments ---------------- */
+  // stagedFiles: { file: File, status: 'uploading'|'ready'|'error', uploaded_filename?: string }[]
 
   const addFiles = useCallback((files) => {
     const newFiles = Array.from(files).filter((f) => {
@@ -263,8 +296,33 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
       }
       return true;
     });
-    setStagedFiles((prev) => [...prev, ...newFiles].slice(0, MAX_FILES));
-  }, []);
+    if (newFiles.length === 0) return;
+
+    const entries = newFiles.map((file) => ({ file, status: 'uploading', uploaded_filename: null }));
+    setStagedFiles((prev) => [...prev, ...entries].slice(0, MAX_FILES));
+
+    // Start uploading immediately
+    const channelId = channel?.id;
+    if (!channelId) return;
+    DiscordApiService.prepareAttachments(channelId, newFiles).then((results) => {
+      setStagedFiles((prev) =>
+        prev.map((entry) => {
+          const match = results.find((r) => r.file === entry.file);
+          if (match) return { ...entry, status: 'ready', uploaded_filename: match.uploaded_filename };
+          return entry;
+        }),
+      );
+    }).catch(() => {
+      setStagedFiles((prev) =>
+        prev.map((entry) =>
+          newFiles.includes(entry.file) && entry.status === 'uploading'
+            ? { ...entry, status: 'error' }
+            : entry,
+        ),
+      );
+      toast.error('Failed to upload attachments');
+    });
+  }, [channel?.id]);
 
   const removeFile = useCallback((index) => {
     setStagedFiles((prev) => prev.filter((_, i) => i !== index));
@@ -306,7 +364,20 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
     if (!channelId || (!hasContent && !hasFiles)) return;
     if (inputMessage.length > MAX_MESSAGE_LENGTH) return;
 
-    DiscordService.sendMessage(channelId, inputMessage, replyingMessageId, hasFiles ? stagedFiles : undefined);
+    // Block send if any files are still uploading
+    if (hasFiles && stagedFiles.some((f) => f.status === 'uploading')) {
+      toast.info('Files are still uploading...');
+      return;
+    }
+    if (hasFiles && stagedFiles.some((f) => f.status === 'error')) {
+      toast.error('Some files failed to upload. Remove them and try again.');
+      return;
+    }
+
+    const uploadedAttachments = hasFiles
+      ? stagedFiles.map((f) => ({ file: f.file, uploaded_filename: f.uploaded_filename }))
+      : undefined;
+    DiscordService.sendMessage(channelId, inputMessage, replyingMessageId, uploadedAttachments);
     setInputMessage('');
     setStagedFiles([]);
     clearReply();
@@ -455,14 +526,26 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
       />
 
       <div ref={menuContainerRef} className="relative">
+        {/* Slash command form */}
+        {activeCommand && (
+          <SlashCommandForm
+            command={activeCommand}
+            application={activeCommandApp}
+            channelId={channelId}
+            guildId={guildId}
+            onClose={handleCloseCommand}
+            onSwitchCommand={handleStartCommand}
+          />
+        )}
+
         {/* Staged file previews */}
         {stagedFiles.length > 0 && (
           <div className={cn(
             'flex gap-2 overflow-x-auto border border-b-0 border-white/5 bg-[#2b2d31] p-3',
             replyingMessage ? 'rounded-t-none' : 'rounded-t-md'
           )}>
-            {stagedFiles.map((file, i) => (
-              <FilePreview key={`${file.name}-${i}`} file={file} onRemove={() => removeFile(i)} />
+            {stagedFiles.map((entry, i) => (
+              <FilePreview key={`${entry.file.name}-${i}`} file={entry.file} status={entry.status} onRemove={() => removeFile(i)} />
             ))}
           </div>
         )}
@@ -538,6 +621,12 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
               />
               <DiscordTypingIndicatorPlugin channelId={channelId} silentTyping={silentTyping} />
               <FocusPlugin channelId={channelId} replyingMessageId={replyingMessageId} />
+              <SlashCommandPlugin
+                channelId={channelId}
+                guildId={guildId}
+                menuContainer={menuContainerRef}
+                onStartCommand={handleStartCommand}
+              />
             </div>
           </LexicalComposer>
 

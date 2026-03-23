@@ -415,6 +415,7 @@ export function LoginAuthContent({
   // MFA state
   const [mfaTicket, setMfaTicket] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState('');
+  const [loginInstanceId, setLoginInstanceId] = useState<string | null>(null);
 
   // Captcha state
   const [captcha, setCaptcha] = useState<{
@@ -440,12 +441,19 @@ export function LoginAuthContent({
 
         const res = await axios.post(
           'https://discord.com/api/v9/auth/login',
-          { login: login.trim(), password },
+          {
+            login: login.trim(),
+            password,
+            undelete: false,
+            login_source: null,
+            gift_code_sku_id: null,
+          },
           { headers },
         );
 
         if (res.data.mfa) {
           setMfaTicket(res.data.ticket);
+          setLoginInstanceId(res.data.login_instance_id || null);
           setCaptcha(null);
           setCaptchaToken(null);
         } else if (res.data.token) {
@@ -493,6 +501,9 @@ export function LoginAuthContent({
       const res = await axios.post('https://discord.com/api/v9/auth/mfa/totp', {
         code: mfaCode.replace(/\s/g, ''),
         ticket: mfaTicket,
+        login_source: null,
+        gift_code_sku_id: null,
+        login_instance_id: loginInstanceId,
       });
 
       if (res.data.token) {
@@ -505,7 +516,7 @@ export function LoginAuthContent({
     } finally {
       setLoading(false);
     }
-  }, [mfaTicket, mfaCode, onAuthenticated]);
+  }, [mfaTicket, mfaCode, loginInstanceId, onAuthenticated]);
 
   // When captcha is solved, retry login with the token
   useEffect(() => {

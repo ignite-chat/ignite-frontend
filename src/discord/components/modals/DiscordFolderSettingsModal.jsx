@@ -86,11 +86,8 @@ const DiscordFolderSettingsModal = ({ modalId, folder }) => {
                   onClick={() => handleColorSelect(c)}
                   className={`size-8 rounded-full border-2 transition-all ${
                     color === c ? 'scale-110 border-white' : 'border-transparent hover:border-white/30'
-                  }`}
-                  style={{
-                    backgroundColor:
-                      c != null ? `#${c.toString(16).padStart(6, '0')}` : '#4e5058',
-                  }}
+                  } ${c == null ? 'bg-discord-secondary' : ''}`}
+                  style={c != null ? { backgroundColor: `#${c.toString(16).padStart(6, '0')}` } : undefined}
                   title={c === null ? 'Default' : undefined}
                 >
                   {c === null && (
