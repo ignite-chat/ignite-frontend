@@ -138,18 +138,18 @@ const isVoiceType = (type) =>
   type === DiscordChannelType.GUILD_VOICE || type === DiscordChannelType.GUILD_STAGE_VOICE;
 
 const ChannelIcon = ({ type, isRules, isLocked, className }) => {
-  if (isRules) return <CheckSquare className={className} weight='fill' />;
+  // if (isRules) return <CheckSquare className={className} weight='fill' />;
   switch (type) {
     case DiscordChannelType.GUILD_VOICE:
       return <SpeakerHigh className={className} weight='fill' />;
     case DiscordChannelType.GUILD_STAGE_VOICE:
       return <MicrophoneStage className={className} weight='fill' />;
-    case DiscordChannelType.GUILD_ANNOUNCEMENT:
-      return <Megaphone className={`${className} -scale-x-100`} weight='fill' />;
+    // case DiscordChannelType.GUILD_ANNOUNCEMENT:
+    //   return <Megaphone className={`${className} -scale-x-100`} weight='fill' />;
     case DiscordChannelType.GUILD_FORUM:
       return <ChatsTeardrop className={className} weight='fill' />;
     default:
-      return <Hash className={className} />;
+      return <Hash className={className} weight="bold" />;
   }
 };
 
@@ -334,7 +334,7 @@ const TextChannelRow = memo(({ channel, isActive, joinedAtMs, rulesChannelId }) 
         className={`size-5 shrink-0 ${!canView ? 'text-gray-600' : isActive ? 'text-gray-200' : isUnread ? 'text-white' : 'text-gray-500'}`}
       />
       <p
-        className={`ml-1 select-none truncate text-base ${showTyping ? '' : 'flex-1'} ${!canView ? 'font-medium' : isActive ? 'font-semibold text-white' : isUnread ? 'font-semibold' : 'font-medium'}`}
+        className={`ml-1 select-none truncate text-base font-medium ${showTyping ? '' : 'flex-1'} ${!canView ? '' : isActive ? 'text-white' : isUnread ? '' : ''}`}
       >
         {channel.name}
       </p>
