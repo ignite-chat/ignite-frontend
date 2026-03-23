@@ -13,8 +13,18 @@ import {
   Flag,
 } from 'lucide-react';
 import * as React from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { cn } from '../../lib/utils';
-import { getTwemojiUrl } from '../../utils/emoji.utils';
+import {
+  getTwemojiUrl,
+  getEmojiSpritePosition,
+  SPRITE_SHEET_BG,
+} from '../../utils/emoji.utils';
+import {
+  SPRITE_EMOJI_SIZE,
+  SPRITE_COLS,
+  SPRITE_ROWS,
+} from '../../assets/emoji-sprites/constants';
 import { useContextMenuStore } from '@/store/context-menu.store';
 import EmojiContextMenu from './EmojiContextMenu';
 
@@ -95,9 +105,8 @@ type GuildEmojiGroup = {
   emojis: { id: string; name: string; url: string }[];
 };
 
-// Custom props for the Content to include custom and standard emojis
-interface EmojiPickerContentProps
-  extends React.ComponentProps<typeof EmojiPickerPrimitive.Viewport> {
+interface EmojiPickerContentProps {
+  className?: string;
   guildEmojis?: GuildEmojiGroup[];
   standardEmojis?: Record<string, { names: string[]; surrogates: string }[]>;
   onEmojiSelect?: (emoji: { id?: string; label: string; emoji: any; url?: string }) => void;
@@ -108,37 +117,117 @@ interface EmojiPickerContentProps
   activeCategory?: string;
 }
 
-const EmojiButton = React.memo(
-  ({
-    label,
-    surrogates,
-    onClick,
-    onHover,
-  }: {
-    label: string;
-    surrogates: string;
-    onClick: () => void;
-    onHover: (hover: boolean) => void;
-  }) => (
-    <button
-      className="flex size-9 items-center justify-center rounded-md transition-colors hover:bg-[#35373c]"
-      onClick={onClick}
-      onMouseEnter={() => onHover(true)}
-    >
-      <img
-        src={getTwemojiUrl(surrogates)}
-        alt={surrogates}
-        className="size-6 object-contain"
-        loading="lazy"
-        decoding="async"
-        onError={(e) => {
-          e.currentTarget.style.display = 'none';
-        }}
-      />
-    </button>
-  )
-);
-EmojiButton.displayName = 'EmojiButton';
+// Renders a unicode emoji via CSS sprite sheet — single image, zero per-emoji requests.
+// Sprite cells are SPRITE_EMOJI_SIZE (32px), displayed at DISPLAY_SIZE (24px).
+const DISPLAY_SIZE = 24;
+const SCALE = DISPLAY_SIZE / SPRITE_EMOJI_SIZE;
+const SCALED_SHEET_SIZE = `${SPRITE_EMOJI_SIZE * SPRITE_COLS * SCALE}px ${SPRITE_EMOJI_SIZE * SPRITE_ROWS * SCALE}px`;
+
+const SpriteEmoji = React.memo(({ surrogates }: { surrogates: string }) => {
+  const pos = getEmojiSpritePosition(surrogates);
+  if (!pos) return null;
+  return (
+    <div
+      className="size-6"
+      style={{
+        backgroundImage: SPRITE_SHEET_BG,
+        backgroundSize: SCALED_SHEET_SIZE,
+        backgroundPosition: `${pos.x * SCALE}px ${pos.y * SCALE}px`,
+      }}
+    />
+  );
+});
+SpriteEmoji.displayName = 'SpriteEmoji';
+
+const COLS = 9;
+const ROW_HEIGHT = 36; // size-9 = 36px
+const HEADER_HEIGHT = 40; // pt-4 pb-2 + text
+
+type VirtualRow =
+  | {
+      type: 'header';
+      categoryId: string;
+      label: string;
+      icon?: string;
+    }
+  | {
+      type: 'emoji-row';
+      categoryId: string;
+      emojis: Array<{
+        kind: 'standard' | 'custom' | 'recent';
+        id?: string;
+        label: string;
+        surrogates?: string;
+        url?: string;
+        isCustom: boolean;
+      }>;
+    };
+
+function buildVirtualRows(
+  recentEmojis: EmojiPickerContentProps['recentEmojis'],
+  filteredGuildEmojis: GuildEmojiGroup[],
+  filteredStandardEmojis: Record<string, { names: string[]; surrogates: string }[]>,
+  searchValue: string
+): VirtualRow[] {
+  const rows: VirtualRow[] = [];
+
+  // Recent emojis
+  if (recentEmojis && recentEmojis.length > 0 && !searchValue) {
+    rows.push({ type: 'header', categoryId: 'recent', label: 'Frequently Used' });
+    for (let i = 0; i < recentEmojis.length; i += COLS) {
+      rows.push({
+        type: 'emoji-row',
+        categoryId: 'recent',
+        emojis: recentEmojis.slice(i, i + COLS).map((e) => ({
+          kind: 'recent',
+          id: e.id,
+          label: e.label,
+          surrogates: e.surrogates,
+          url: e.url,
+          isCustom: e.isCustom,
+        })),
+      });
+    }
+  }
+
+  // Guild emojis
+  for (const guild of filteredGuildEmojis) {
+    const catId = `guild-${guild.id}`;
+    rows.push({ type: 'header', categoryId: catId, label: guild.name, icon: guild.icon });
+    for (let i = 0; i < guild.emojis.length; i += COLS) {
+      rows.push({
+        type: 'emoji-row',
+        categoryId: catId,
+        emojis: guild.emojis.slice(i, i + COLS).map((e) => ({
+          kind: 'custom',
+          id: e.id,
+          label: e.name,
+          url: e.url,
+          isCustom: true,
+        })),
+      });
+    }
+  }
+
+  // Standard emojis
+  for (const [category, emojis] of Object.entries(filteredStandardEmojis)) {
+    rows.push({ type: 'header', categoryId: category, label: category.replace(/_/g, ' ') });
+    for (let i = 0; i < emojis.length; i += COLS) {
+      rows.push({
+        type: 'emoji-row',
+        categoryId: category,
+        emojis: emojis.slice(i, i + COLS).map((e) => ({
+          kind: 'standard',
+          label: e.names[0],
+          surrogates: e.surrogates,
+          isCustom: false,
+        })),
+      });
+    }
+  }
+
+  return rows;
+}
 
 function EmojiPickerContent({
   className,
@@ -150,34 +239,9 @@ function EmojiPickerContent({
   recentEmojis = [],
   onCategoryVisible,
   activeCategory,
-  ...props
 }: EmojiPickerContentProps) {
   const searchLower = searchValue.toLowerCase();
-
-  // Handle intersection observer to detect active category
-  React.useEffect(() => {
-    if (searchValue || !onCategoryVisible) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.find((e) => e.isIntersecting);
-        if (visible) {
-          const id = visible.target.id.replace('category-', '');
-          onCategoryVisible(id);
-        }
-      },
-      {
-        root: document.querySelector('[data-slot="emoji-picker-viewport"]'),
-        threshold: 0,
-        rootMargin: '-50% 0px -50% 0px',
-      }
-    );
-
-    const categories = document.querySelectorAll('[id^="category-"]');
-    categories.forEach((cat) => observer.observe(cat));
-
-    return () => observer.disconnect();
-  }, [onCategoryVisible, searchValue]);
+  const parentRef = React.useRef<HTMLDivElement>(null);
 
   // Clear hover state when leaving the viewport
   const handleMouseLeave = React.useCallback(() => {
@@ -206,148 +270,206 @@ function EmojiPickerContent({
     return { filteredGuildEmojis: fGuilds, filteredStandardEmojis: fStandard };
   }, [guildEmojis, standardEmojis, searchLower]);
 
+  const virtualRows = React.useMemo(
+    () => buildVirtualRows(recentEmojis, filteredGuildEmojis, filteredStandardEmojis, searchValue),
+    [recentEmojis, filteredGuildEmojis, filteredStandardEmojis, searchValue]
+  );
+
+  // Build a map from categoryId to the first row index for that category
+  const categoryRowIndexMap = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    for (let i = 0; i < virtualRows.length; i++) {
+      const row = virtualRows[i];
+      if (row.type === 'header' && !(row.categoryId in map)) {
+        map[row.categoryId] = i;
+      }
+    }
+    return map;
+  }, [virtualRows]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: virtualRows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index) => (virtualRows[index].type === 'header' ? HEADER_HEIGHT : ROW_HEIGHT),
+    overscan: 8,
+  });
+
+  // Detect active category from visible virtual items
+  React.useEffect(() => {
+    if (searchValue || !onCategoryVisible) return;
+    const items = rowVirtualizer.getVirtualItems();
+    if (items.length === 0) return;
+
+    // Find the first visible header or the category of the first visible row
+    for (const item of items) {
+      const row = virtualRows[item.index];
+      if (row) {
+        onCategoryVisible(row.categoryId);
+        return;
+      }
+    }
+  }, [rowVirtualizer.getVirtualItems(), onCategoryVisible, searchValue, virtualRows]);
+
+  // Expose a way to scroll to category (used by sidebar)
+  const scrollToCategoryRef = React.useRef<(categoryId: string) => void>();
+  scrollToCategoryRef.current = (categoryId: string) => {
+    const rowIndex = categoryRowIndexMap[categoryId];
+    if (rowIndex !== undefined) {
+      rowVirtualizer.scrollToIndex(rowIndex, { align: 'start' });
+    }
+  };
+
+  // Attach scrollToCategory to the parent DOM element so the sidebar can call it
+  React.useEffect(() => {
+    const el = parentRef.current;
+    if (el) {
+      (el as any).__scrollToCategory = (categoryId: string) => {
+        scrollToCategoryRef.current?.(categoryId);
+      };
+    }
+  }, [categoryRowIndexMap]);
+
   const hasCustom = filteredGuildEmojis.length > 0;
   const hasStandard = Object.keys(filteredStandardEmojis).length > 0;
-  const isEmpty = !hasCustom && !hasStandard;
+  const hasRecent = recentEmojis.length > 0 && !searchValue;
+  const isEmpty = !hasCustom && !hasStandard && !hasRecent;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#2b2d31]">
-      <EmojiPickerPrimitive.Viewport
+      <div
+        ref={parentRef}
         className={cn(
-          'relative flex-1 scrollbar-thin scrollbar-thumb-[#1a1b1e] scrollbar-track-transparent hover:scrollbar-thumb-[#1a1b1e]/80',
+          'relative flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#1a1b1e] scrollbar-track-transparent hover:scrollbar-thumb-[#1a1b1e]/80',
           className
         )}
         onMouseLeave={handleMouseLeave}
         data-slot="emoji-picker-viewport"
-        {...props}
       >
-        {/* Recent Emojis Section */}
-        {recentEmojis.length > 0 && !searchValue && (
-          <div className="pb-2" id="category-recent">
-            <div
-              className={cn(
-                'sticky top-0 z-10 bg-[#2b2d31] px-2 pt-4 pb-2 text-[12px] font-semibold uppercase transition-colors',
-                activeCategory === 'recent' ? 'text-[#dbdee1]' : 'text-[#949ba4]'
-              )}
-            >
-              Frequently Used
-            </div>
-            <div className="grid grid-cols-9 gap-0.5 px-2">
-              {recentEmojis.map((emoji, index) => (
-                <button
-                  key={`recent-${index}`}
-                  className="flex size-9 items-center justify-center rounded-md transition-colors hover:bg-[#35373c]"
-                  onClick={() =>
-                    onEmojiSelect?.({
-                      label: emoji.label,
-                      emoji: emoji.surrogates,
-                      url: emoji.url,
-                    })
-                  }
-                  onMouseEnter={() =>
-                    onHoverEmojiChange?.({
-                      label: emoji.label,
-                      url: emoji.url || getTwemojiUrl(emoji.surrogates || ''),
-                      isCustom: emoji.isCustom,
-                    })
-                  }
-                >
-                  <img
-                    src={emoji.url || getTwemojiUrl(emoji.surrogates || '')}
-                    alt={emoji.label}
-                    className="size-6 object-contain"
-                    loading="lazy"
-                    decoding="async"
-                    onContextMenu={emoji.isCustom ? (e: React.MouseEvent) => {
-                      useContextMenuStore.getState().open(EmojiContextMenu, { emojiId: emoji.id }, e);
-                    } : undefined}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Helper for empty state */}
         {isEmpty && (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-500">
             No emoji found.
           </div>
         )}
 
-        {/* Guild Emoji Sections */}
-        {filteredGuildEmojis.map((guild) => (
-          <div key={guild.id} className="pb-2" id={`category-guild-${guild.id}`}>
-            <div
-              className={cn(
-                'sticky top-0 z-10 flex items-center gap-2 bg-[#2b2d31] px-2 pt-4 pb-2 text-[12px] font-semibold uppercase transition-colors',
-                activeCategory === `guild-${guild.id}` ? 'text-[#dbdee1]' : 'text-[#949ba4]'
-              )}
-            >
-              {guild.icon && <img src={guild.icon} className="size-4 rounded-full" />}
-              {guild.name}
-            </div>
-            <div className="grid grid-cols-9 gap-0.5 px-2">
-              {guild.emojis.map((emoji) => (
-                <button
-                  key={emoji.id}
-                  className="flex size-9 items-center justify-center rounded-md transition-colors hover:bg-[#35373c]"
-                  onClick={() =>
-                    onEmojiSelect?.({ id: emoji.id, label: emoji.name, emoji: null, url: emoji.url })
-                  }
-                  onMouseEnter={() =>
-                    onHoverEmojiChange?.({ label: emoji.name, url: emoji.url, isCustom: true })
-                  }
-                >
-                  <img
-                    src={emoji.url}
-                    alt={emoji.name}
-                    className="size-6 object-contain"
-                    loading="lazy"
-                    decoding="async"
-                    onContextMenu={(e: React.MouseEvent) => {
-                      useContextMenuStore.getState().open(EmojiContextMenu, { emojiId: emoji.id }, e);
-                    }}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
+        {!isEmpty && (
+          <div
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+              const row = virtualRows[virtualItem.index];
+              if (!row) return null;
 
-        {/* Standard Emojis Section */}
-        {Object.entries(filteredStandardEmojis).map(([category, emojis]) => (
-          <div key={category} id={`category-${category}`} className="pb-2">
-            <div
-              className={cn(
-                'sticky top-0 z-10 bg-[#2b2d31] px-2 pt-4 pb-2 text-[12px] font-semibold uppercase transition-colors',
-                activeCategory === category ? 'text-[#dbdee1]' : 'text-[#949ba4]'
-              )}
-            >
-              {category.replace(/_/g, ' ')}
-            </div>
-            <div className="grid grid-cols-9 gap-0.5 px-2">
-              {emojis.map((emoji, index) => (
-                <EmojiButton
-                  key={`${category}-${index}`}
-                  label={emoji.names[0]}
-                  surrogates={emoji.surrogates}
-                  onClick={() => onEmojiSelect?.({ label: emoji.names[0], emoji: emoji.surrogates })}
-                  onHover={(isHovering) => {
-                    if (isHovering) {
-                      onHoverEmojiChange?.({
-                        label: emoji.names[0],
-                        url: getTwemojiUrl(emoji.surrogates),
-                        isCustom: false,
-                      });
-                    }
+              if (row.type === 'header') {
+                return (
+                  <div
+                    key={virtualItem.key}
+                    data-index={virtualItem.index}
+                    ref={rowVirtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualItem.start}px)`,
+                    }}
+                  >
+                    <div
+                      className={cn(
+                        'flex items-center gap-2 bg-[#2b2d31] px-2 pt-4 pb-2 text-[12px] font-semibold uppercase transition-colors',
+                        activeCategory === row.categoryId
+                          ? 'text-[#dbdee1]'
+                          : 'text-[#949ba4]'
+                      )}
+                    >
+                      {row.icon && (
+                        <img src={row.icon} className="size-4 rounded-full" />
+                      )}
+                      {row.label}
+                    </div>
+                  </div>
+                );
+              }
+
+              // emoji-row
+              return (
+                <div
+                  key={virtualItem.key}
+                  data-index={virtualItem.index}
+                  ref={rowVirtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualItem.start}px)`,
                   }}
-                />
-              ))}
-            </div>
+                >
+                  <div className="flex gap-0.5 px-2">
+                    {row.emojis.map((emoji, colIdx) => (
+                      <button
+                        key={`${emoji.label}-${colIdx}`}
+                        className="flex size-9 items-center justify-center rounded-md transition-colors hover:bg-[#35373c]"
+                        onClick={() => {
+                          if (emoji.kind === 'custom') {
+                            onEmojiSelect?.({
+                              id: emoji.id,
+                              label: emoji.label,
+                              emoji: null,
+                              url: emoji.url,
+                            });
+                          } else {
+                            onEmojiSelect?.({
+                              id: emoji.id,
+                              label: emoji.label,
+                              emoji: emoji.surrogates,
+                              url: emoji.url,
+                            });
+                          }
+                        }}
+                        onMouseEnter={() =>
+                          onHoverEmojiChange?.({
+                            label: emoji.label,
+                            url:
+                              emoji.url ||
+                              (emoji.surrogates ? getTwemojiUrl(emoji.surrogates) : '') ||
+                              '',
+                            isCustom: emoji.isCustom,
+                          })
+                        }
+                        onContextMenu={
+                          emoji.isCustom
+                            ? (e: React.MouseEvent) => {
+                                useContextMenuStore
+                                  .getState()
+                                  .open(EmojiContextMenu, { emojiId: emoji.id }, e);
+                              }
+                            : undefined
+                        }
+                      >
+                        {emoji.surrogates ? (
+                          <SpriteEmoji surrogates={emoji.surrogates} />
+                        ) : (
+                          <img
+                            src={emoji.url}
+                            alt={emoji.label}
+                            className="size-6 object-contain"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        ))}
-      </EmojiPickerPrimitive.Viewport>
+        )}
+      </div>
     </div>
   );
 }

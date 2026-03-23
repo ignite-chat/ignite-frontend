@@ -105,7 +105,8 @@ export const DiscordService = {
       const existing = channelMessages[channelId] || [];
 
       // Merge and deduplicate by ID, sort chronologically
-      const merged = [...existing, ...messages];
+      // Put API messages first so existing (gateway-updated) versions take priority
+      const merged = [...messages, ...existing];
       const unique = Array.from(new Map(merged.map((m) => [m.id, m])).values()).sort((a, b) =>
         a.id.localeCompare(b.id)
       );

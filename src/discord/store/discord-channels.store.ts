@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import type { DiscordMessage, PendingMessage, DiscordChannel } from '../types';
 
-/** Max messages kept in memory per channel. Oldest are evicted when exceeded. */
-const MAX_MESSAGES_PER_CHANNEL = 100;
 
 type DiscordChannelsStore = {
   channels: DiscordChannel[];
@@ -68,31 +66,18 @@ export const useDiscordChannelsStore = create<DiscordChannelsStore>((set) => ({
     }),
 
   setChannelMessages: (channelId, messages) =>
-    set((state) => {
-      // Keep only the most recent messages to limit memory usage
-      const capped =
-        messages.length > MAX_MESSAGES_PER_CHANNEL
-          ? messages.slice(-MAX_MESSAGES_PER_CHANNEL)
-          : messages;
-      return {
-        channelMessages: { ...state.channelMessages, [channelId]: capped },
-      };
-    }),
+    set((state) => ({
+      channelMessages: { ...state.channelMessages, [channelId]: messages },
+    })),
 
   appendMessage: (channelId, message) =>
     set((state) => {
       const existing = state.channelMessages[channelId] || [];
       if (existing.some((m) => m.id === message.id)) return state;
-      const updated = [...existing, message];
-      // Evict oldest messages when over the limit
-      const capped =
-        updated.length > MAX_MESSAGES_PER_CHANNEL
-          ? updated.slice(-MAX_MESSAGES_PER_CHANNEL)
-          : updated;
       return {
         channelMessages: {
           ...state.channelMessages,
-          [channelId]: capped,
+          [channelId]: [...existing, message],
         },
       };
     }),

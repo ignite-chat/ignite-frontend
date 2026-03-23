@@ -690,16 +690,8 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
                       onCategorySelect={(id) => {
                         setActiveCategory(id);
                         const viewport = document.querySelector('[data-slot="emoji-picker-viewport"]');
-                        if (!viewport) return;
-
-                        if (id === 'recent') {
-                          viewport.scrollTo({ top: 0, behavior: 'smooth' });
-                          return;
-                        }
-
-                        const el = document.getElementById(`category-${id}`);
-                        if (el) {
-                          viewport.scrollTo({ top: el.offsetTop, behavior: 'smooth' });
+                        if (viewport?.__scrollToCategory) {
+                          viewport.__scrollToCategory(id);
                         }
                       }}
                       categories={[

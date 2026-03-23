@@ -673,8 +673,10 @@ const ReactionEmojiPicker = ({ channelId, messageId, guildId, open, onOpenChange
               activeCategory={activeCategory}
               onCategorySelect={(id) => {
                 setActiveCategory(id);
-                const el = document.getElementById(`category-${id}`);
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
+                const viewport = document.querySelector('[data-slot="emoji-picker-viewport"]');
+                if (viewport?.__scrollToCategory) {
+                  viewport.__scrollToCategory(id);
+                }
               }}
               categories={categories}
             />

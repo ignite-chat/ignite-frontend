@@ -30,6 +30,142 @@ function syncActivities(presences: { user_id: string; activities?: any[] }[]) {
   }
 }
 
+/**
+ * Handle MESSAGE_REACTION_ADD — a single reaction was added to a message.
+ */
+function handleReactionAdd(data: any) {
+  const { channel_id, message_id, user_id, emoji, burst } = data;
+  if (!channel_id || !message_id || !emoji) return;
+
+  const messages = useDiscordChannelsStore.getState().channelMessages[channel_id];
+  const msg = messages?.find((m: any) => m.id === message_id);
+  const threadFirstMsg = useDiscordThreadsStore.getState().findFirstMessage(channel_id);
+  const sourceMsg = msg || threadFirstMsg;
+  if (!sourceMsg) return;
+
+  const existing = [...(sourceMsg.reactions || [])];
+  const idx = existing.findIndex((e: any) =>
+    emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
+  );
+  const currentUserId = useDiscordStore.getState().user?.id;
+  const isMe = user_id === currentUserId;
+
+  if (idx >= 0) {
+    existing[idx] = {
+      ...existing[idx],
+      count: existing[idx].count + 1,
+      count_details: {
+        burst: (existing[idx].count_details?.burst || 0) + (burst ? 1 : 0),
+        normal: (existing[idx].count_details?.normal || 0) + (burst ? 0 : 1),
+      },
+      me: isMe ? true : existing[idx].me,
+      me_burst: isMe && burst ? true : existing[idx].me_burst,
+    };
+  } else {
+    existing.push({
+      emoji,
+      count: 1,
+      count_details: { burst: burst ? 1 : 0, normal: burst ? 0 : 1 },
+      me: isMe,
+      me_burst: isMe && !!burst,
+    });
+  }
+
+  if (msg) useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: existing });
+  if (threadFirstMsg) useDiscordThreadsStore.getState().updateFirstMessage(channel_id, { reactions: existing });
+}
+
+/**
+ * Handle MESSAGE_REACTION_ADD_MANY — authoritative batch of reactions for a message.
+ * This replaces existing reaction counts (not a delta).
+ */
+function handleReactionAddMany(data: any) {
+  const { channel_id, message_id, reactions: incomingReactions } = data;
+  if (!channel_id || !message_id || !incomingReactions) return;
+
+  const messages = useDiscordChannelsStore.getState().channelMessages[channel_id];
+  const msg = messages?.find((m: any) => m.id === message_id);
+  const threadFirstMsg = useDiscordThreadsStore.getState().findFirstMessage(channel_id);
+  const sourceMsg = msg || threadFirstMsg;
+  if (!sourceMsg) return;
+
+  // MESSAGE_REACTION_ADD_MANY has a `users` array per reaction, not count fields
+  const currentUserId = useDiscordStore.getState().user?.id;
+  const existingReactions = [...(sourceMsg.reactions || [])];
+
+  for (const r of incomingReactions) {
+    const users: string[] = r.users || [];
+    const idx = existingReactions.findIndex((e: any) =>
+      r.emoji.id ? e.emoji.id === r.emoji.id : e.emoji.name === r.emoji.name
+    );
+    if (idx >= 0) {
+      existingReactions[idx] = {
+        ...existingReactions[idx],
+        count: users.length,
+        count_details: {
+          burst: existingReactions[idx].count_details?.burst || 0,
+          normal: users.length,
+        },
+        me: users.includes(currentUserId!),
+      };
+    } else {
+      existingReactions.push({
+        emoji: r.emoji,
+        count: users.length,
+        count_details: { burst: 0, normal: users.length },
+        me: users.includes(currentUserId!),
+        me_burst: false,
+      });
+    }
+  }
+  const reactions = existingReactions;
+
+  if (msg) useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions });
+  if (threadFirstMsg) useDiscordThreadsStore.getState().updateFirstMessage(channel_id, { reactions });
+}
+
+/**
+ * Handle MESSAGE_REACTION_REMOVE — a single reaction was removed from a message.
+ */
+function handleReactionRemove(data: any) {
+  const { channel_id, message_id, user_id, emoji, burst } = data;
+  if (!channel_id || !message_id || !emoji) return;
+
+  const messages = useDiscordChannelsStore.getState().channelMessages[channel_id];
+  const msg = messages?.find((m: any) => m.id === message_id);
+  const threadFirstMsg = useDiscordThreadsStore.getState().findFirstMessage(channel_id);
+  const sourceMsg = msg || threadFirstMsg;
+  if (!sourceMsg) return;
+
+  const existing = [...(sourceMsg.reactions || [])];
+  const idx = existing.findIndex((e: any) =>
+    emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
+  );
+  if (idx < 0) return;
+
+  const currentUserId = useDiscordStore.getState().user?.id;
+  const isMe = user_id === currentUserId;
+  const newCount = existing[idx].count - 1;
+
+  if (newCount <= 0) {
+    existing.splice(idx, 1);
+  } else {
+    existing[idx] = {
+      ...existing[idx],
+      count: newCount,
+      count_details: {
+        burst: Math.max(0, (existing[idx].count_details?.burst || 0) - (burst ? 1 : 0)),
+        normal: Math.max(0, (existing[idx].count_details?.normal || 0) - (burst ? 0 : 1)),
+      },
+      me: isMe ? false : existing[idx].me,
+      me_burst: isMe && burst ? false : existing[idx].me_burst,
+    };
+  }
+
+  if (msg) useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: existing });
+  if (threadFirstMsg) useDiscordThreadsStore.getState().updateFirstMessage(channel_id, { reactions: existing });
+}
+
 export const DiscordGatewayService = {
   // The web worker that manages the WebSocket + heartbeat
   _worker: null as Worker | null,
@@ -270,118 +406,15 @@ export const DiscordGatewayService = {
       case 'GUILD_MEMBER_LIST_UPDATE':
         this._handleGuildMemberListUpdate(data);
         break;
-      case 'MESSAGE_REACTION_ADD_MANY': {
-        const { channel_id, message_id, reactions: incomingReactions } = data;
-        if (!channel_id || !message_id || !incomingReactions) break;
-        const messages = useDiscordChannelsStore.getState().channelMessages[channel_id];
-        const msg = messages?.find((m: any) => m.id === message_id);
-        const threadFirstMsg = useDiscordThreadsStore.getState().findFirstMessage(channel_id);
-        const sourceMsg = msg || threadFirstMsg;
-        if (!sourceMsg) break;
-        const existing = [...(sourceMsg.reactions || [])];
-        for (const r of incomingReactions) {
-          const emoji = r.emoji;
-          const idx = existing.findIndex((e: any) =>
-            emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
-          );
-          if (idx >= 0) {
-            existing[idx] = {
-              ...existing[idx],
-              count: existing[idx].count + r.count,
-              count_details: {
-                burst: (existing[idx].count_details?.burst || 0) + (r.burst_count || 0),
-                normal: (existing[idx].count_details?.normal || 0) + (r.normal_count || r.count),
-              },
-            };
-          } else {
-            existing.push({
-              emoji,
-              count: r.count,
-              count_details: {
-                burst: r.burst_count || 0,
-                normal: r.normal_count || r.count,
-              },
-              me: false,
-              me_burst: false,
-            });
-          }
-        }
-        if (msg) useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: existing });
-        if (threadFirstMsg) useDiscordThreadsStore.getState().updateFirstMessage(channel_id, { reactions: existing });
+      case 'MESSAGE_REACTION_ADD_MANY':
+        handleReactionAddMany(data);
         break;
-      }
-      case 'MESSAGE_REACTION_ADD': {
-        const { channel_id, message_id, user_id, emoji, burst } = data;
-        if (!channel_id || !message_id || !emoji) break;
-        const raMessages = useDiscordChannelsStore.getState().channelMessages[channel_id];
-        const raMsg = raMessages?.find((m: any) => m.id === message_id);
-        const raThreadFirstMsg = useDiscordThreadsStore.getState().findFirstMessage(channel_id);
-        const raSourceMsg = raMsg || raThreadFirstMsg;
-        if (!raSourceMsg) break;
-        const raExisting = [...(raSourceMsg.reactions || [])];
-        const raIdx = raExisting.findIndex((e: any) =>
-          emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
-        );
-        const currentUserId = useDiscordStore.getState().user?.id;
-        const isMe = user_id === currentUserId;
-        if (raIdx >= 0) {
-          raExisting[raIdx] = {
-            ...raExisting[raIdx],
-            count: raExisting[raIdx].count + 1,
-            count_details: {
-              burst: (raExisting[raIdx].count_details?.burst || 0) + (burst ? 1 : 0),
-              normal: (raExisting[raIdx].count_details?.normal || 0) + (burst ? 0 : 1),
-            },
-            me: isMe ? true : raExisting[raIdx].me,
-            me_burst: isMe && burst ? true : raExisting[raIdx].me_burst,
-          };
-        } else {
-          raExisting.push({
-            emoji,
-            count: 1,
-            count_details: { burst: burst ? 1 : 0, normal: burst ? 0 : 1 },
-            me: isMe,
-            me_burst: isMe && !!burst,
-          });
-        }
-        if (raMsg) useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: raExisting });
-        if (raThreadFirstMsg) useDiscordThreadsStore.getState().updateFirstMessage(channel_id, { reactions: raExisting });
+      case 'MESSAGE_REACTION_ADD':
+        handleReactionAdd(data);
         break;
-      }
-      case 'MESSAGE_REACTION_REMOVE': {
-        const { channel_id, message_id, user_id, emoji, burst } = data;
-        if (!channel_id || !message_id || !emoji) break;
-        const rrMessages = useDiscordChannelsStore.getState().channelMessages[channel_id];
-        const rrMsg = rrMessages?.find((m: any) => m.id === message_id);
-        const rrThreadFirstMsg = useDiscordThreadsStore.getState().findFirstMessage(channel_id);
-        const rrSourceMsg = rrMsg || rrThreadFirstMsg;
-        if (!rrSourceMsg) break;
-        let rrExisting = [...(rrSourceMsg.reactions || [])];
-        const rrIdx = rrExisting.findIndex((e: any) =>
-          emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
-        );
-        if (rrIdx < 0) break;
-        const rrCurrentUserId = useDiscordStore.getState().user?.id;
-        const rrIsMe = user_id === rrCurrentUserId;
-        const updated = {
-          ...rrExisting[rrIdx],
-          count: rrExisting[rrIdx].count - 1,
-          count_details: {
-            burst: Math.max(0, (rrExisting[rrIdx].count_details?.burst || 0) - (burst ? 1 : 0)),
-            normal: Math.max(0, (rrExisting[rrIdx].count_details?.normal || 0) - (burst ? 0 : 1)),
-          },
-          me: rrIsMe && !burst ? false : rrExisting[rrIdx].me,
-          me_burst: rrIsMe && burst ? false : rrExisting[rrIdx].me_burst,
-        };
-        if (updated.count <= 0) {
-          rrExisting.splice(rrIdx, 1);
-        } else {
-          rrExisting[rrIdx] = updated;
-        }
-        if (rrMsg) useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: rrExisting });
-        if (rrThreadFirstMsg) useDiscordThreadsStore.getState().updateFirstMessage(channel_id, { reactions: rrExisting });
+      case 'MESSAGE_REACTION_REMOVE':
+        handleReactionRemove(data);
         break;
-      }
       case 'VOICE_STATE_UPDATE':
         if (data.guild_id) {
           useDiscordVoiceStatesStore.getState().updateVoiceState(data);
