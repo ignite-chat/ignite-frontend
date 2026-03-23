@@ -1,20 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useUsersStore } from '../../store/users.store';
+import { useUsersStore } from '@/ignite/store/users.store';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import Avatar from '../Avatar';
+import Avatar from '@/ignite/components/Avatar';
 import { Button } from '@/components/ui/button';
 import { SheetDescription } from '@/components/ui/sheet';
 import { User, UserCircle, Mic, Bot, LogOut, X, Menu, Bell, Activity, MessageSquare } from 'lucide-react';
-import { useAuthStore } from '../../store/auth.store';
+import { useAuthStore } from '@/ignite/store/auth.store';
 import { useModalStore } from '@/ignite/store/modal.store';
 import { cn } from '@/lib/utils';
-import TabMyAccount from '../user-settings/tabs/TabMyAccount';
-import TabProfiles from '../user-settings/tabs/TabProfiles';
-import TabVoiceAudio from '../user-settings/tabs/TabVoiceAudio';
-import TabNotificationSounds from '../user-settings/tabs/TabNotificationSounds';
-import TabBots from '../user-settings/tabs/TabBots';
-import TabPerformance from '../user-settings/tabs/TabPerformance';
-import TabDiscord from '../user-settings/tabs/TabDiscord';
+import TabMyAccount from '@/ignite/components/user-settings/tabs/TabMyAccount';
+import TabProfiles from '@/ignite/components/user-settings/tabs/TabProfiles';
+import TabVoiceAudio from '@/ignite/components/user-settings/tabs/TabVoiceAudio';
+import TabNotificationSounds from '@/ignite/components/user-settings/tabs/TabNotificationSounds';
+import TabBots from '@/ignite/components/user-settings/tabs/TabBots';
+import TabPerformance from '@/ignite/components/user-settings/tabs/TabPerformance';
+import TabDiscord from '@/ignite/components/user-settings/tabs/TabDiscord';
 
 const navigationSections = [
   {

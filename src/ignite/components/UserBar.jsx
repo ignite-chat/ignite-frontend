@@ -20,7 +20,7 @@ import {
   Check,
 } from '@phosphor-icons/react';
 import { useAuthStore } from '@/ignite/store/auth.store';
-import UserSettingsModal from '@/ignite/components/modals/UserSettingsModal';
+import UserSettingsModal from '@/components/modals/UserSettingsModal';
 import UserProfileModal from '@/ignite/components/modals/UserProfileModal';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
