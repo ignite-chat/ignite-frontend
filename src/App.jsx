@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useMountEffect } from './hooks/useMountEffect';
 import { Navigate, Outlet, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from './ignite/store/auth.store';
 import PageTitle from './ignite/components/PageTitle';
@@ -129,7 +130,7 @@ const GuestRoute = ({ children }) => {
 };
 
 const PublicRoute = ({ children }) => {
-  useEffect(() => {
+  useMountEffect(() => {
     const init = async () => {
       try {
         await InitializationService.initialize();
@@ -140,7 +141,7 @@ const PublicRoute = ({ children }) => {
     };
 
     init();
-  }, []);
+  });
 
   return children ? children : <Outlet />;
 };
