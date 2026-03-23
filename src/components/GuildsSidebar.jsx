@@ -309,11 +309,6 @@ const DiscordFolderIcon = ({ folder, guilds, isExpanded, onToggle, totalMentions
               >
                 <FolderSimple size={24} weight="fill" style={{ color: folderColor }} />
               </button>
-              {totalMentions > 0 && (
-                <div className="absolute -bottom-1 -right-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#1a1a1e] bg-destructive px-1 text-[11px] font-bold text-white">
-                  {totalMentions > 99 ? '99+' : totalMentions}
-                </div>
-              )}
             </div>
           </div>
         </TooltipTrigger>
