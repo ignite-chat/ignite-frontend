@@ -1,4 +1,5 @@
-import { Monitor, DeviceMobile, Globe, GameController } from '@phosphor-icons/react';
+import { useState, useEffect } from 'react';
+import { Monitor, DeviceMobile, Globe, GameController, EyeSlash } from '@phosphor-icons/react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 const statusFills = {
@@ -46,9 +47,36 @@ const sizeConfig = {
   lg: { icon: 28, badge: 26, badgeFont: 15 },
 };
 
+const formatElapsed = (ms) => {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return 'Just now';
+};
+
+const useElapsed = (timestamp) => {
+  const [elapsed, setElapsed] = useState(() => (timestamp ? Date.now() - timestamp : null));
+
+  useEffect(() => {
+    if (!timestamp) return;
+    setElapsed(Date.now() - timestamp);
+    const interval = setInterval(() => setElapsed(Date.now() - timestamp), 60000);
+    return () => clearInterval(interval);
+  }, [timestamp]);
+
+  return elapsed;
+};
+
 const DiscordStatusIndicator = ({
   status = 'offline',
   clientStatus,
+  processedAt,
+  invisible = false,
   size = 'xs',
   borderColor = '#1a1a1e',
   className = '',
@@ -57,8 +85,9 @@ const DiscordStatusIndicator = ({
   const platforms = getPlatforms(clientStatus);
   const fill = statusFills[status] || statusFills.offline;
   const multiDevice = platforms.length > 1;
+  const elapsed = useElapsed(processedAt);
 
-  const statusLabel = statusLabels[status] || 'Offline';
+  const statusLabel = invisible ? 'Invisible' : (statusLabels[status] || 'Offline');
 
   // Pick the primary platform icon, fallback to desktop if no client_status
   const primaryPlatform =
@@ -69,7 +98,20 @@ const DiscordStatusIndicator = ({
   const isOffline = status === 'offline';
 
   let indicator;
-  if (isOffline) {
+  if (invisible) {
+    indicator = (
+      <div
+        className="flex items-center justify-center rounded-md"
+        style={{
+          width: config.icon,
+          height: config.icon,
+          backgroundColor: borderColor,
+        }}
+      >
+        <EyeSlash size={config.icon * 0.65} weight="fill" color={statusFills.offline} />
+      </div>
+    );
+  } else if (isOffline) {
     // Hollow circle for offline
     const circleSize = config.icon * 0.65;
     indicator = (
@@ -134,7 +176,12 @@ const DiscordStatusIndicator = ({
       </TooltipTrigger>
       <TooltipContent side="bottom" className="bg-black px-2.5 py-2 text-xs font-medium text-white">
         <div className="flex flex-col gap-1.5">
-          <span className="font-semibold">{statusLabel}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold">{statusLabel}</span>
+            {elapsed != null && elapsed > 0 && (
+              <span className="text-gray-400">· {formatElapsed(elapsed)}</span>
+            )}
+          </div>
           {platforms.length > 0 && (
             <div className="flex flex-col gap-1">
               {platforms.map((p) => {

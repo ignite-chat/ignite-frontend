@@ -73,7 +73,7 @@ const MemberItem = ({ member: rawMember, guildId, ownerId, popoverOpen, setPopov
               alt=""
               className="size-8 rounded-full object-cover"
             />
-            <DiscordStatusIndicator status={status} clientStatus={storeUser?.client_status} size="xs" borderColor="#1a1a1e" />
+            <DiscordStatusIndicator status={status} clientStatus={storeUser?.client_status} processedAt={storeUser?.processed_at_timestamp} invisible={storeUser?.invisible} size="xs" borderColor="#1a1a1e" />
           </div>
           <div className="flex min-w-0 flex-1 items-center gap-1">
             <span

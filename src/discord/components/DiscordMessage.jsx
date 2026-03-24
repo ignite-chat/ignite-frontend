@@ -26,7 +26,7 @@ import {
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
 import DiscordClanTag from './DiscordClanTag';
-import { ArrowBendUpLeft, Smiley, Plus, ArrowSquareOut, ArrowClockwise, Trash, WarningCircle, Eye } from '@phosphor-icons/react';
+import { ArrowBendUpLeft, Smiley, Plus, ArrowSquareOut, ArrowClockwise, Trash, WarningCircle, Eye, Play } from '@phosphor-icons/react';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { generateNonce } from '../utils/snowflake';
 import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
@@ -251,6 +251,52 @@ const EmbedMarkdown = ({ content, guildId }) => {
   return <DiscordMarkdownRenderer nodes={ast} guildId={guildId} />;
 };
 
+const VideoPreview = ({ thumbnail, video, url, fitDimensions }) => {
+  const [playing, setPlaying] = useState(false);
+  const { width, height } = fitDimensions(thumbnail.width, thumbnail.height, 400, 400);
+  const videoUrl = video?.url || video?.proxy_url;
+
+  if (playing && videoUrl) {
+    return (
+      <iframe
+        src={videoUrl}
+        width={width}
+        height={height}
+        className="mt-2 rounded"
+        allowFullScreen
+      />
+    );
+  }
+
+  return (
+    <div className="group/video relative mt-2 inline-block" style={{ width, height }}>
+      <img
+        src={thumbnail.proxy_url || thumbnail.url}
+        alt=""
+        className="rounded"
+        width={width}
+        height={height}
+      />
+      <button
+        onClick={() => setPlaying(true)}
+        className="absolute inset-0 flex items-center justify-center"
+      >
+        <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white transition-colors group-hover/video:bg-black/80">
+          <Play size={24} weight="fill" />
+        </div>
+      </button>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute right-2 top-2 flex size-8 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity hover:bg-black/80 group-hover/video:opacity-100"
+      >
+        <ArrowSquareOut size={16} weight="bold" />
+      </a>
+    </div>
+  );
+};
+
 const DiscordEmbeds = ({ embeds, guildId }) => {
   if (!embeds || embeds.length === 0) return null;
 
@@ -271,7 +317,8 @@ const DiscordEmbeds = ({ embeds, guildId }) => {
             className="max-w-[520px] overflow-hidden rounded border border-[#313137] bg-[#242429] border-l-4"
             style={{ borderLeftColor: borderColor }}
           >
-            <div className="p-3">
+            <div className="flex gap-4 p-3">
+              <div className="min-w-0 flex-1">
               {embed.provider && (
                 <div className="mb-1 text-xs text-gray-400">{embed.provider.name}</div>
               )}
@@ -301,7 +348,7 @@ const DiscordEmbeds = ({ embeds, guildId }) => {
                   )}
                 </div>
               )}
-              {embed.description && (
+              {embed.description && embed.provider?.name !== 'YouTube' && (
                 <div className="text-sm text-gray-300">
                   <EmbedMarkdown content={embed.description} guildId={guildId} />
                 </div>
@@ -349,22 +396,50 @@ const DiscordEmbeds = ({ embeds, guildId }) => {
                   />
                 );
               })()}
-              {embed.thumbnail && !embed.image && !isIframeProvider && (() => {
-                const { width, height } = fitDimensions(embed.thumbnail.width, embed.thumbnail.height, 400, 400);
-                return (
-                  <img
-                    src={embed.thumbnail.proxy_url || embed.thumbnail.url}
-                    alt=""
-                    className="mt-2 rounded"
-                    width={width}
-                    height={height}
-                  />
-                );
-              })()}
-              {embed.footer && (
-                <div className="mt-2 text-xs text-gray-500">{embed.footer.text}</div>
+              {embed.thumbnail && !embed.image && !isIframeProvider && hasVideo && (
+                <VideoPreview
+                  thumbnail={embed.thumbnail}
+                  video={embed.video}
+                  url={embed.url}
+                  fitDimensions={fitDimensions}
+                />
+              )}
+              </div>
+              {embed.thumbnail && !embed.image && !isIframeProvider && !hasVideo && (
+                <img
+                  src={embed.thumbnail.proxy_url || embed.thumbnail.url}
+                  alt=""
+                  className="shrink-0 self-start rounded object-contain"
+                  style={{ maxWidth: 80, maxHeight: 80 }}
+                />
               )}
             </div>
+            {(embed.footer || embed.timestamp) && (
+              <div className="flex items-center gap-1.5 px-3 pb-3 pt-1 text-xs text-gray-300">
+                {embed.footer?.icon_url && (
+                  <img
+                    src={embed.footer.proxy_icon_url || embed.footer.icon_url}
+                    alt=""
+                    className="size-5 rounded-full"
+                  />
+                )}
+                {embed.footer?.text}
+                {embed.footer?.text && embed.timestamp && <span>•</span>}
+                {embed.timestamp && (
+                  <span>
+                    {new Date(embed.timestamp).toLocaleDateString(undefined, {
+                      month: 'numeric',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}{' '}
+                    {new Date(embed.timestamp).toLocaleTimeString(undefined, {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         );
       })}

@@ -260,7 +260,7 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
                     draggable="false"
                   />
                 )} */}
-                <DiscordStatusIndicator status={user.status} clientStatus={user.client_status} size="lg" borderColor="#111214" />
+                <DiscordStatusIndicator status={user.status} clientStatus={user.client_status} processedAt={user.processed_at_timestamp} invisible={user.invisible} size="lg" borderColor="#111214" />
               </div>
             </div>
 

@@ -114,7 +114,7 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
                 View Profile
               </span>
             </div>
-            <DiscordStatusIndicator status={user.status} clientStatus={user.client_status} size="md" borderColor="#111214" />
+            <DiscordStatusIndicator status={user.status} clientStatus={user.client_status} processedAt={user.processed_at_timestamp} invisible={user.invisible} size="md" borderColor="#111214" />
           </button>
         </div>
       </div>

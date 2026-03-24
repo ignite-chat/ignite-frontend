@@ -9,7 +9,6 @@ import { useDiscordMemberListStore } from '../store/discord-member-list.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useDiscordActivitiesStore } from '../store/discord-activities.store';
 import { useDiscordTypingStore } from '../store/discord-typing.store';
-import { useDiscordThreadsStore } from '../store/discord-threads.store';
 import { useDiscordVoiceStatesStore } from '../store/discord-voice-states.store';
 import { useDiscordGuildSettingsStore } from '../store/discord-guild-settings.store';
 import { useDiscordGuildFoldersStore } from '../store/discord-guild-folders.store';
@@ -39,11 +38,9 @@ function handleReactionAdd(data: any) {
 
   const messages = useDiscordChannelsStore.getState().channelMessages[channel_id];
   const msg = messages?.find((m: any) => m.id === message_id);
-  const threadFirstMsg = useDiscordThreadsStore.getState().findFirstMessage(channel_id);
-  const sourceMsg = msg || threadFirstMsg;
-  if (!sourceMsg) return;
+  if (!msg) return;
 
-  const existing = [...(sourceMsg.reactions || [])];
+  const existing = [...(msg.reactions || [])];
   const idx = existing.findIndex((e: any) =>
     emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
   );
@@ -71,8 +68,7 @@ function handleReactionAdd(data: any) {
     });
   }
 
-  if (msg) useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: existing });
-  if (threadFirstMsg) useDiscordThreadsStore.getState().updateFirstMessage(channel_id, { reactions: existing });
+  useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: existing });
 }
 
 /**
@@ -85,13 +81,11 @@ function handleReactionAddMany(data: any) {
 
   const messages = useDiscordChannelsStore.getState().channelMessages[channel_id];
   const msg = messages?.find((m: any) => m.id === message_id);
-  const threadFirstMsg = useDiscordThreadsStore.getState().findFirstMessage(channel_id);
-  const sourceMsg = msg || threadFirstMsg;
-  if (!sourceMsg) return;
+  if (!msg) return;
 
   // MESSAGE_REACTION_ADD_MANY has a `users` array per reaction, not count fields
   const currentUserId = useDiscordStore.getState().user?.id;
-  const existingReactions = [...(sourceMsg.reactions || [])];
+  const existingReactions = [...(msg.reactions || [])];
 
   for (const r of incomingReactions) {
     const users: string[] = r.users || [];
@@ -118,10 +112,8 @@ function handleReactionAddMany(data: any) {
       });
     }
   }
-  const reactions = existingReactions;
 
-  if (msg) useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions });
-  if (threadFirstMsg) useDiscordThreadsStore.getState().updateFirstMessage(channel_id, { reactions });
+  useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: existingReactions });
 }
 
 /**
@@ -133,11 +125,9 @@ function handleReactionRemove(data: any) {
 
   const messages = useDiscordChannelsStore.getState().channelMessages[channel_id];
   const msg = messages?.find((m: any) => m.id === message_id);
-  const threadFirstMsg = useDiscordThreadsStore.getState().findFirstMessage(channel_id);
-  const sourceMsg = msg || threadFirstMsg;
-  if (!sourceMsg) return;
+  if (!msg) return;
 
-  const existing = [...(sourceMsg.reactions || [])];
+  const existing = [...(msg.reactions || [])];
   const idx = existing.findIndex((e: any) =>
     emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
   );
@@ -162,8 +152,7 @@ function handleReactionRemove(data: any) {
     };
   }
 
-  if (msg) useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: existing });
-  if (threadFirstMsg) useDiscordThreadsStore.getState().updateFirstMessage(channel_id, { reactions: existing });
+  useDiscordChannelsStore.getState().updateMessage(channel_id, message_id, { reactions: existing });
 }
 
 export const DiscordGatewayService = {
@@ -249,7 +238,7 @@ export const DiscordGatewayService = {
     };
 
     // Check for fast-connect WebSocket and adopt it
-    let bufferedMessages: string[] | undefined;
+    let bufferedMessages: ArrayBuffer[] | undefined;
     const fastWs = (window as any)._ws;
     if (fastWs && fastWs.ws.readyState === WebSocket.OPEN) {
       console.log(`[Discord Gateway] Fast-connect: ${fastWs.state.messages.length} buffered messages`);
@@ -258,7 +247,7 @@ export const DiscordGatewayService = {
       // Keep the WS alive — proxy new messages to the worker
       this._fastWs = fastWs.ws;
       fastWs.ws.onmessage = (event: MessageEvent) => {
-        this._worker?.postMessage({ type: 'wsMessage', data: event.data });
+        this._worker?.postMessage({ type: 'wsMessage', data: event.data }, [event.data]);
       };
       fastWs.ws.onclose = () => {
         console.log('[Discord Gateway] Fast-connect WS closed');
@@ -268,7 +257,9 @@ export const DiscordGatewayService = {
       (window as any)._ws = null;
     }
 
-    this._worker.postMessage({ type: 'connect', token, bufferedMessages });
+    // Transfer ArrayBuffers to avoid copying
+    const transfer = bufferedMessages ? [...bufferedMessages] : [];
+    this._worker.postMessage({ type: 'connect', token, bufferedMessages }, transfer);
   },
 
   /**
@@ -460,13 +451,16 @@ export const DiscordGatewayService = {
         const typingUserId = data.user_id;
         const currentUserId = useDiscordStore.getState().user?.id;
         if (typingUserId && typingUserId !== currentUserId) {
-          const username = data.member?.user?.global_name || data.member?.user?.username || data.member?.nick || 'Someone';
-          const avatar = data.member?.user?.avatar || null;
+          const storeUser = useDiscordUsersStore.getState().users[typingUserId];
+          const username = data.member?.user?.global_name || data.member?.user?.username || data.member?.nick || storeUser?.global_name || storeUser?.username || 'Someone';
+          const avatar = data.member?.user?.avatar || storeUser?.avatar || null;
           useDiscordTypingStore.getState().addTypingUser(data.channel_id, { user_id: typingUserId, username, avatar });
         }
         break;
       }
       case 'PRESENCE_UPDATE': {
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
+
         const presenceUserId = data.user?.id || data.user_id;
         if (presenceUserId) {
           const presence = {
@@ -474,6 +468,7 @@ export const DiscordGatewayService = {
             status: data.status,
             activities: data.activities,
             client_status: data.client_status,
+            processed_at_timestamp: data.processed_at_timestamp,
           };
           useDiscordUsersStore.getState().updatePresence(presence);
           syncActivities([presence]);
@@ -506,6 +501,8 @@ export const DiscordGatewayService = {
         break;
       }
       case 'PASSIVE_UPDATE_V2':
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
+        
         this._handlePassiveUpdateV2(data);
         break;
       case 'USER_GUILD_SETTINGS_UPDATE':
@@ -656,6 +653,7 @@ export const DiscordGatewayService = {
         status: p.status,
         activities: p.activities,
         client_status: p.client_status,
+        processed_at_timestamp: p.processed_at_timestamp,
       }));
       useDiscordUsersStore.getState().setPresences(mapped);
       syncActivities(mapped);
@@ -703,6 +701,7 @@ export const DiscordGatewayService = {
             status: p.status,
             activities: p.activities,
             client_status: p.client_status,
+            processed_at_timestamp: p.processed_at_timestamp,
           }));
           useDiscordUsersStore.getState().setPresences(mapped);
           syncActivities(mapped);
@@ -716,6 +715,7 @@ export const DiscordGatewayService = {
         status: p.status,
         activities: p.activities,
         client_status: p.client_status,
+        processed_at_timestamp: p.processed_at_timestamp,
       }));
       useDiscordUsersStore.getState().setPresences(mapped);
       syncActivities(mapped);
@@ -953,6 +953,7 @@ export const DiscordGatewayService = {
         status: p.status,
         activities: p.activities,
         client_status: p.client_status,
+        processed_at_timestamp: p.processed_at_timestamp,
       }));
       useDiscordUsersStore.getState().setPresences(mapped);
       syncActivities(mapped);
@@ -1007,6 +1008,7 @@ export const DiscordGatewayService = {
               status: m.presence.status,
               activities: m.presence.activities,
               client_status: m.presence.client_status,
+              processed_at_timestamp: m.presence.processed_at_timestamp,
             }))
             .filter((p: any) => p.user_id);
           if (presences.length > 0) {

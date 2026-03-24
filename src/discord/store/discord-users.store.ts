@@ -62,6 +62,10 @@ export const useDiscordUsersStore = create<DiscordUsersStore>((set, get) => ({
             status: presence.status,
             activities: presence.activities,
             client_status: presence.client_status,
+            processed_at_timestamp: presence.processed_at_timestamp,
+            // Live updates: if they go offline, clear invisible flag (they actually went offline).
+            // If they come online, also clear it.
+            invisible: presence.status !== 'offline' ? false : existing.invisible,
           },
         },
       };
@@ -77,6 +81,8 @@ export const useDiscordUsersStore = create<DiscordUsersStore>((set, get) => ({
             status: p.status,
             activities: p.activities,
             client_status: p.client_status,
+            processed_at_timestamp: p.processed_at_timestamp,
+            invisible: p.status === 'offline',
           };
         }
       }

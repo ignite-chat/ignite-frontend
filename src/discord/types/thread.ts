@@ -10,7 +10,8 @@ export type FirstMessage = {
 
 export type ChannelThreadData = {
   threads: ForumThread[];
-  firstMessages: { [threadId: string]: FirstMessage };
+  /** Maps threadId → messageId (the actual message lives in discord-channels.store) */
+  firstMessageIds: { [threadId: string]: string };
   hasMore: boolean;
   offset: number;
 };

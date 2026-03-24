@@ -171,19 +171,17 @@ const VoiceChannelView = ({ channel }) => {
   const addWatchingScreen = useVoiceStore((s) => s.addWatchingScreen);
   const removeWatchingScreen = useVoiceStore((s) => s.removeWatchingScreen);
   const screenSharers = useMemo(() => channelVoiceStates.filter((vs) => vs.self_stream), [channelVoiceStates]);
-  const [focusedScreen, setFocusedScreen] = useState(null);
+  const [focusedScreenRaw, setFocusedScreen] = useState(null);
+
+  // Auto-clear if the focused participant stops sharing
+  const focusedScreen = focusedScreenRaw && screenSharers.some((vs) => vs.user_id === focusedScreenRaw)
+    ? focusedScreenRaw
+    : null;
 
   const focusedSharer = useMemo(
     () => (focusedScreen ? screenSharers.find((vs) => vs.user_id === focusedScreen) : null),
     [focusedScreen, screenSharers]
   );
-
-  // Clear focused screen if that participant stops sharing
-  useEffect(() => {
-    if (focusedScreen && !screenSharers.some((vs) => vs.user_id === focusedScreen)) {
-      setFocusedScreen(null);
-    }
-  }, [focusedScreen, screenSharers]);
 
   const stopWatching = () => {
     if (focusedScreen) {

@@ -15,7 +15,7 @@ const DMRowBase = ({
       onClick={onClick}
       onContextMenu={onContextMenu}
       className={cn(
-        'dm-row group relative flex min-h-[40px] w-full items-center gap-3 rounded px-2 text-sm transition-all',
+        'dm-row group relative flex h-[42px] w-full items-center gap-3 rounded px-2 text-sm transition-all',
         isActive
           ? 'bg-[#1c1c1e] text-[#fbfbfb] active:bg-[#2c2c30]'
           : isUnread

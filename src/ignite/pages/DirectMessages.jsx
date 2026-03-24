@@ -35,13 +35,8 @@ const DirectMessagesPage = () => {
   const isSpecialView = isFriendsView || isMessageRequestsView;
 
   // Tab state for friends/message-requests views
-  const [activeTopTab, setActiveTopTab] = useState(isMessageRequestsView ? 'message_requests' : 'friends');
+  const activeTopTab = isMessageRequestsView ? 'message_requests' : 'friends';
   const [activeSubTab, setActiveSubTab] = useState('online');
-
-  // Sync top tab when URL changes
-  useEffect(() => {
-    setActiveTopTab(isMessageRequestsView ? 'message_requests' : 'friends');
-  }, [isMessageRequestsView]);
 
   // Pending count for badge
   const { requests } = useFriendsStore();

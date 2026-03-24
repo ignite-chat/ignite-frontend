@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { arrayMove } from '@dnd-kit/sortable';
 import type { GuildFolder } from '../utils/proto-decode';
 import { encodeGuildFolders } from '../utils/proto-decode';
 import { DiscordApiService } from '../services/discord-api.service';
@@ -17,7 +18,7 @@ type DiscordGuildFoldersStore = {
    * Add a guild (dragged) into an existing folder.
    * Removes the guild from its current folder entry first.
    */
-  addGuildToFolder: (guildId: string, targetFolderId: string) => void;
+  addGuildToFolder: (guildId: string, targetFolderId: string, nearGuildId?: string, position?: 'before' | 'after') => void;
 
   /**
    * Merge two standalone guilds into a new folder.
@@ -32,7 +33,7 @@ type DiscordGuildFoldersStore = {
   removeGuildFromFolder: (guildId: string, insertAtIndex: number) => void;
 
   /** Reorder guilds within a folder. */
-  reorderWithinFolder: (folderId: string, fromGuildId: string, toGuildId: string) => void;
+  reorderWithinFolder: (folderId: string, fromGuildId: string, toGuildId: string, position?: 'before' | 'after') => void;
 
   /** Update a folder's name/color and persist. */
   updateFolder: (folderId: string, updates: { name?: string | null; color?: number | null }) => void;
@@ -87,16 +88,15 @@ export const useDiscordGuildFoldersStore = create<DiscordGuildFoldersStore>((set
   setFolders: (folders) => set({ folders }),
 
   reorderFolders: (fromIndex, toIndex) => {
-    const folders = [...get().folders];
+    const folders = get().folders;
     if (fromIndex < 0 || fromIndex >= folders.length || toIndex < 0 || toIndex >= folders.length) return;
     if (fromIndex === toIndex) return;
-    const [moved] = folders.splice(fromIndex, 1);
-    folders.splice(toIndex, 0, moved);
-    set({ folders });
-    persistFolders(folders);
+    const newFolders = arrayMove(folders, fromIndex, toIndex);
+    set({ folders: newFolders });
+    persistFolders(newFolders);
   },
 
-  addGuildToFolder: (guildId, targetFolderId) => {
+  addGuildToFolder: (guildId, targetFolderId, nearGuildId?, position?) => {
     const folders = get().folders.map((f) => ({ ...f, guild_ids: [...f.guild_ids] }));
 
     // Don't add if already in that folder
@@ -104,7 +104,18 @@ export const useDiscordGuildFoldersStore = create<DiscordGuildFoldersStore>((set
     if (!targetFolder || targetFolder.guild_ids.includes(guildId)) return;
 
     removeGuildFromFolders(folders, guildId);
-    targetFolder.guild_ids.push(guildId);
+
+    if (nearGuildId) {
+      const nearIdx = targetFolder.guild_ids.indexOf(nearGuildId);
+      if (nearIdx !== -1) {
+        const insertIdx = position === 'after' ? nearIdx + 1 : nearIdx;
+        targetFolder.guild_ids.splice(insertIdx, 0, guildId);
+      } else {
+        targetFolder.guild_ids.push(guildId);
+      }
+    } else {
+      targetFolder.guild_ids.push(guildId);
+    }
 
     set({ folders });
     persistFolders(folders);
@@ -141,15 +152,18 @@ export const useDiscordGuildFoldersStore = create<DiscordGuildFoldersStore>((set
     persistFolders(folders);
   },
 
-  reorderWithinFolder: (folderId, fromGuildId, toGuildId) => {
+  reorderWithinFolder: (folderId, fromGuildId, toGuildId, position = 'after') => {
     const folders = get().folders.map((f) => {
       if (f.id !== folderId) return f;
       const guildIds = [...f.guild_ids];
       const fromIdx = guildIds.indexOf(fromGuildId);
       const toIdx = guildIds.indexOf(toGuildId);
       if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return f;
-      const [moved] = guildIds.splice(fromIdx, 1);
-      guildIds.splice(toIdx, 0, moved);
+      guildIds.splice(fromIdx, 1);
+      const newToIdx = guildIds.indexOf(toGuildId);
+      const insertIdx = position === 'after' ? newToIdx + 1 : newToIdx;
+      if (insertIdx === fromIdx) return f;
+      guildIds.splice(insertIdx, 0, fromGuildId);
       return { ...f, guild_ids: guildIds };
     });
     set({ folders });

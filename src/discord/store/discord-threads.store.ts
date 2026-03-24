@@ -7,14 +7,14 @@ type DiscordThreadsStore = {
   upsertThreads: (channelId: string, threads: ForumThread[]) => void;
   setThreads: (channelId: string, threads: ForumThread[]) => void;
 
-  upsertFirstMessages: (channelId: string, messages: FirstMessage[]) => void;
-  setFirstMessages: (channelId: string, messages: FirstMessage[]) => void;
+  upsertFirstMessageIds: (channelId: string, messages: FirstMessage[]) => void;
+  setFirstMessageIds: (channelId: string, messages: FirstMessage[]) => void;
 
   setHasMore: (channelId: string, hasMore: boolean) => void;
   setOffset: (channelId: string, offset: number) => void;
 
-  findFirstMessage: (threadId: string) => FirstMessage | undefined;
-  updateFirstMessage: (threadId: string, updates: Partial<FirstMessage>) => void;
+  /** Get the first message ID for a thread */
+  getFirstMessageId: (threadId: string) => string | undefined;
 
   clearChannel: (channelId: string) => void;
   clear: () => void;
@@ -22,7 +22,7 @@ type DiscordThreadsStore = {
 
 const emptyChannel: ChannelThreadData = {
   threads: [],
-  firstMessages: {},
+  firstMessageIds: {},
   hasMore: false,
   offset: 0,
 };
@@ -56,31 +56,31 @@ export const useDiscordThreadsStore = create<DiscordThreadsStore>((set) => ({
       };
     }),
 
-  setFirstMessages: (channelId, messages) =>
+  setFirstMessageIds: (channelId, messages) =>
     set((state) => {
-      const msgMap: Record<string, FirstMessage> = {};
+      const idMap: Record<string, string> = {};
       for (const msg of messages) {
-        msgMap[msg.channel_id] = msg;
+        if (msg.id) idMap[msg.channel_id] = msg.id;
       }
       return {
         channels: {
           ...state.channels,
-          [channelId]: { ...getChannel(state, channelId), firstMessages: msgMap },
+          [channelId]: { ...getChannel(state, channelId), firstMessageIds: idMap },
         },
       };
     }),
 
-  upsertFirstMessages: (channelId, messages) =>
+  upsertFirstMessageIds: (channelId, messages) =>
     set((state) => {
       const channel = getChannel(state, channelId);
-      const merged = { ...channel.firstMessages };
+      const merged = { ...channel.firstMessageIds };
       for (const msg of messages) {
-        merged[msg.channel_id] = { ...merged[msg.channel_id], ...msg };
+        if (msg.id) merged[msg.channel_id] = msg.id;
       }
       return {
         channels: {
           ...state.channels,
-          [channelId]: { ...channel, firstMessages: merged },
+          [channelId]: { ...channel, firstMessageIds: merged },
         },
       };
     }),
@@ -101,33 +101,13 @@ export const useDiscordThreadsStore = create<DiscordThreadsStore>((set) => ({
       },
     })),
 
-  findFirstMessage: (threadId) => {
-    for (const channelData of Object.values(useDiscordThreadsStore.getState().channels)) {
-      if (channelData.firstMessages[threadId]) return channelData.firstMessages[threadId];
+  getFirstMessageId: (threadId) => {
+    const channels = useDiscordThreadsStore.getState().channels;
+    for (const channelData of Object.values(channels) as ChannelThreadData[]) {
+      if (channelData.firstMessageIds[threadId]) return channelData.firstMessageIds[threadId];
     }
     return undefined;
   },
-
-  updateFirstMessage: (threadId, updates) =>
-    set((state) => {
-      for (const [channelId, channelData] of Object.entries(state.channels)) {
-        if (channelData.firstMessages[threadId]) {
-          return {
-            channels: {
-              ...state.channels,
-              [channelId]: {
-                ...channelData,
-                firstMessages: {
-                  ...channelData.firstMessages,
-                  [threadId]: { ...channelData.firstMessages[threadId], ...updates },
-                },
-              },
-            },
-          };
-        }
-      }
-      return state;
-    }),
 
   clearChannel: (channelId) =>
     set((state) => {

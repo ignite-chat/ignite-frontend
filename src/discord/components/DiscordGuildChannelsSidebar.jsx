@@ -68,7 +68,9 @@ const DiscordGuildHeader = memo(({ guild }) => {
   const features = props.features || guild?.features || [];
   const isVerified = features.includes('VERIFIED');
   const isPartnered = features.includes('PARTNERED');
-  const bannerHash = props.banner || props.splash;
+  const premiumFeatures = props.premium_features?.features || [];
+  const hasBannerFeature = premiumFeatures.includes('BANNER');
+  const bannerHash = hasBannerFeature ? (props.banner || props.splash) : null;
   const bannerUrl = bannerHash
     ? `https://cdn.discordapp.com/banners/${guild?.id}/${bannerHash}.${bannerHash.startsWith('a_') ? 'gif' : 'png'}?size=480`
     : null;
@@ -94,7 +96,7 @@ const DiscordGuildHeader = memo(({ guild }) => {
             <div className="flex min-w-0 items-center gap-1.5">
               {isVerified && <VerifiedIcon />}
               {!isVerified && isPartnered && <PartneredIcon />}
-              <span className="truncate text-sm font-medium text-white drop-shadow-sm">
+              <span className="truncate text-[16px] font-medium text-white drop-shadow-sm">
                 {name}
               </span>
             </div>
@@ -109,7 +111,7 @@ const DiscordGuildHeader = memo(({ guild }) => {
           <div className="flex min-w-0 items-center gap-1.5">
             {isVerified && <VerifiedIcon />}
             {!isVerified && isPartnered && <PartneredIcon />}
-            <span className="truncate text-sm font-medium text-white">
+            <span className="truncate text-[16px] font-medium text-white">
               {name}
             </span>
           </div>

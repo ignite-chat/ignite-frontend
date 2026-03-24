@@ -105,7 +105,7 @@ const ActiveUserCard = ({ userId, activities }) => {
       <div className="flex items-center gap-2.5">
         <div className="relative shrink-0">
           <img src={avatarUrl} alt="" className="size-8 rounded-full object-cover" />
-          <DiscordStatusIndicator status={status} clientStatus={user.client_status} size="xs" borderColor="#111214" />
+          <DiscordStatusIndicator status={status} clientStatus={user.client_status} processedAt={user.processed_at_timestamp} invisible={user.invisible} size="xs" borderColor="#111214" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-white">

@@ -77,9 +77,6 @@ const MemberList = ({ guildId }) => {
   const { memberListOpen } = useChannelContext();
   const { guildMembers, guilds } = useGuildsStore();
   const users = useUsersStore((state) => state.users);
-  const [membersByRole, setMembersByRole] = useState({});
-  const [membersWithoutRoles, setMembersWithoutRoles] = useState([]);
-  const [offlineMembers, setOfflineMembers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [collapsedRoles, setCollapsedRoles] = useState({});
   const [openPopoverUserId, setOpenPopoverUserId] = useState(null);
@@ -110,7 +107,7 @@ const MemberList = ({ guildId }) => {
     }));
   }, []);
 
-  useEffect(() => {
+  const { membersByRole, membersWithoutRoles, offlineMembers } = useMemo(() => {
     const tempMembersByRole = {};
     const tempMembersWithoutRoles = [];
     const tempOfflineMembers = [];
@@ -118,14 +115,12 @@ const MemberList = ({ guildId }) => {
 
     activeGuildMembers?.forEach((member) => {
       const userStatus = users[member.user.id]?.status ?? member.user.status;
-      // Offline members
       if (userStatus === 'offline') {
         tempOfflineMembers.push(member);
         return;
       }
 
       if (member.roles && member.roles.length > 0) {
-        // Map member's role ids to role objects, filter out missing, sort by position
         const firstRole = member.roles.sort((a, b) => b.position - a.position)[0];
         if (firstRole && !assignedMemberIds.has(member.user.id)) {
           if (!tempMembersByRole[firstRole.id]) tempMembersByRole[firstRole.id] = [];
@@ -137,20 +132,24 @@ const MemberList = ({ guildId }) => {
       }
     });
 
-    setMembersByRole(tempMembersByRole);
-    setMembersWithoutRoles(tempMembersWithoutRoles);
-    setOfflineMembers((activeGuild?.member_count ?? 0) < 500 ? tempOfflineMembers : []);
+    return {
+      membersByRole: tempMembersByRole,
+      membersWithoutRoles: tempMembersWithoutRoles,
+      offlineMembers: (activeGuild?.member_count ?? 0) < 500 ? tempOfflineMembers : [],
+    };
+  }, [activeGuildMembers, activeGuild?.member_count, users]);
 
-    // Auto-collapse groups with more than 100 members
+  // Auto-collapse groups with more than 100 members
+  useEffect(() => {
     const autoCollapsed = {};
-    for (const [roleId, members] of Object.entries(tempMembersByRole)) {
+    for (const [roleId, members] of Object.entries(membersByRole)) {
       if (members.length > 100) autoCollapsed[roleId] = true;
     }
-    if (tempMembersWithoutRoles.length > 100) autoCollapsed['no-role'] = true;
+    if (membersWithoutRoles.length > 100) autoCollapsed['no-role'] = true;
     if (Object.keys(autoCollapsed).length > 0) {
       setCollapsedRoles((prev) => ({ ...autoCollapsed, ...prev }));
     }
-  }, [activeGuildMembers, activeGuild, roles, users]);
+  }, [membersByRole, membersWithoutRoles]);
 
   return (
     <div

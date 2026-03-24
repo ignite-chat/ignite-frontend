@@ -443,18 +443,17 @@ const DiscordGuildFolderGroup = ({ folder, guilds, activeGuildPath, renderGuildI
 
 /**
  * Custom drag-and-drop for Discord guilds/folders.
- * No SortableContext — items stay static. Visual indicators show drop targets:
+ * Items stay static. Visual indicators show drop targets:
  * - Green line between items = insert here
- * - Green dot on folder = drop into folder
+ * - Green dot on folder/guild = merge into folder
  */
 const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
   const [draggingGuildId, setDraggingGuildId] = useState(null);
-  // dropTarget: { type: 'between', entryIndex } or { type: 'folder', folderId } or { type: 'within-folder', folderId, afterGuildId } or null
   const [dropTarget, setDropTarget] = useState(null);
   const containerRef = useRef(null);
   const itemRefsMap = useRef({});
+  const dragTimerRef = useRef(null);
 
-  // Build a flat list of all rendered items with their refs and metadata
   const flatItems = useMemo(() => {
     const items = [];
     for (let ei = 0; ei < entries.length; ei++) {
@@ -480,8 +479,8 @@ const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
     if (!draggingGuildId || !containerRef.current) return;
 
     const mouseY = e.clientY;
+    const draggedMeta = flatItems.find((i) => i.kind === 'guild' && i.guildId === draggingGuildId);
 
-    // Find the closest item the pointer is over
     let bestTarget = null;
     let bestDist = Infinity;
 
@@ -498,12 +497,9 @@ const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
 
       if (dist < bestDist) {
         bestDist = dist;
-        const h = rect.height;
-        // How far from center (0 = center, 1 = edge)
-        const fromCenter = Math.abs(mouseY - center) / (h / 2);
+        const fromCenter = Math.abs(mouseY - center) / (rect.height / 2);
 
         if (item.kind === 'folder-header') {
-          // Folder header: inner 50% = merge into folder, outer = insert before/after
           if (fromCenter <= 0.5) {
             bestTarget = { type: 'folder', folderId: item.folderId, key };
           } else if (mouseY < center) {
@@ -512,20 +508,17 @@ const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
             bestTarget = { type: 'between', entryIndex: item.entryIndex, position: 'after', key };
           }
         } else if (item.folderId) {
-          // Guild inside a folder: inner 50% = stay in folder (reorder), outer = insert before/after in folder
           if (mouseY < center) {
             bestTarget = { type: 'within-folder', folderId: item.folderId, beforeGuildId: item.guildId, key };
           } else {
             bestTarget = { type: 'within-folder', folderId: item.folderId, afterGuildId: item.guildId, key };
           }
         } else {
-          // Standalone guild: inner 50% = create folder together, outer = insert before/after
-          if (fromCenter <= 0.5) {
+          if (fromCenter <= 0.3) {
             bestTarget = { type: 'merge-guild', targetGuildId: item.guildId, entryIndex: item.entryIndex, key };
-          } else if (mouseY < center) {
-            bestTarget = { type: 'between', entryIndex: item.entryIndex, position: 'before', key };
           } else {
-            bestTarget = { type: 'between', entryIndex: item.entryIndex, position: 'after', key };
+            let position = mouseY < center ? 'before' : 'after';
+            bestTarget = { type: 'between', entryIndex: item.entryIndex, position, key };
           }
         }
       }
@@ -543,38 +536,35 @@ const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
 
     const store = useDiscordGuildFoldersStore.getState();
     const draggedMeta = flatItems.find((i) => i.kind === 'guild' && i.guildId === draggingGuildId);
+      console.log(dropTarget);
 
     if (dropTarget.type === 'merge-guild') {
-      // Merge two guilds into a new folder
       store.createFolderFromGuilds(draggingGuildId, dropTarget.targetGuildId);
     } else if (dropTarget.type === 'folder') {
-      // Drop into existing folder
       if (draggedMeta?.folderId !== dropTarget.folderId) {
         store.addGuildToFolder(draggingGuildId, dropTarget.folderId);
       }
     } else if (dropTarget.type === 'within-folder') {
+      const targetGuildId = dropTarget.afterGuildId || dropTarget.beforeGuildId;
+      const position = dropTarget.afterGuildId ? 'after' : 'before';
       if (draggedMeta?.folderId === dropTarget.folderId) {
-        // Reorder within same folder
-        const targetGuildId = dropTarget.afterGuildId || dropTarget.beforeGuildId;
         if (targetGuildId && targetGuildId !== draggingGuildId) {
-          store.reorderWithinFolder(dropTarget.folderId, draggingGuildId, targetGuildId);
+          store.reorderWithinFolder(dropTarget.folderId, draggingGuildId, targetGuildId, position);
         }
       } else {
-        // Move into this folder
-        store.addGuildToFolder(draggingGuildId, dropTarget.folderId);
+        store.addGuildToFolder(draggingGuildId, dropTarget.folderId, targetGuildId, position);
       }
     } else if (dropTarget.type === 'between') {
       let insertIdx = dropTarget.position === 'after' ? dropTarget.entryIndex + 1 : dropTarget.entryIndex;
       if (draggedMeta?.folderId) {
-        // Pull out of folder — adjust if dragged item's folder is before the insert point
         store.removeGuildFromFolder(draggingGuildId, insertIdx);
       } else if (draggedMeta) {
-        // Reorder standalone — convert insert position to a move target
-        // After removing from `fromIndex`, indices shift, so adjust
         const fromIdx = draggedMeta.entryIndex;
-        if (fromIdx < insertIdx) insertIdx--;
-        if (fromIdx !== insertIdx) {
-          store.reorderFolders(fromIdx, insertIdx);
+        // Compute where the item would actually end up
+        let finalIdx = insertIdx;
+        if (fromIdx < insertIdx) finalIdx--;
+        if (fromIdx !== finalIdx) {
+          store.reorderFolders(fromIdx, finalIdx);
         }
       }
     }
@@ -597,15 +587,24 @@ const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
 
   const startDrag = useCallback((guildId, e) => {
     e.preventDefault();
-    setDraggingGuildId(guildId);
-    setDropTarget(null);
+    dragTimerRef.current = setTimeout(() => {
+      setDraggingGuildId(guildId);
+      setDropTarget(null);
+    }, 200);
+
+    const cancelDrag = () => {
+      clearTimeout(dragTimerRef.current);
+      window.removeEventListener('pointerup', cancelDrag);
+      window.removeEventListener('pointercancel', cancelDrag);
+    };
+    window.addEventListener('pointerup', cancelDrag, { once: true });
+    window.addEventListener('pointercancel', cancelDrag, { once: true });
   }, []);
 
-  // Determine indicator for a standalone guild: 'before', 'after', 'merge', or null
   const getIndicator = (guildId) => {
     if (!dropTarget || !draggingGuildId) return null;
     if (dropTarget.type === 'between' && dropTarget.key === `gi-${guildId}`) {
-      return dropTarget.position; // 'before' or 'after'
+      return dropTarget.position;
     }
     if (dropTarget.type === 'merge-guild' && dropTarget.targetGuildId === guildId) {
       return 'merge';
@@ -614,9 +613,7 @@ const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
   };
 
   const isFolderMergeTarget = (folderId) => {
-    if (!dropTarget || !draggingGuildId) return false;
-    if (dropTarget.type === 'folder' && dropTarget.folderId === folderId) return true;
-    return false;
+    return dropTarget?.type === 'folder' && dropTarget.folderId === folderId;
   };
 
   const getWithinFolderIndicator = (guildId, folderId) => {
@@ -627,7 +624,6 @@ const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
     return null;
   };
 
-  // Indicator for folder entries (before/after the whole folder)
   const getFolderIndicator = (folderId) => {
     if (!dropTarget || !draggingGuildId) return null;
     if (dropTarget.type === 'between' && dropTarget.key === `fh-${folderId}`) {
@@ -644,7 +640,7 @@ const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
 
   return (
     <div ref={containerRef}>
-      {entries.map((entry, ei) => {
+      {entries.map((entry) => {
         if (entry.type === 'guild') {
           const isDragging = draggingGuildId === entry.guild.id;
           const indicator = getIndicator(entry.guild.id);
@@ -670,7 +666,6 @@ const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
           );
         }
 
-        // Folder
         const folderMerge = isFolderMergeTarget(entry.folder.id);
         const folderIndicator = getFolderIndicator(entry.folder.id);
         return (
@@ -794,7 +789,7 @@ const GuildsSidebar = () => {
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
+      activationConstraint: { delay: 2000, tolerance: 5 },
     })
   );
 

@@ -1,9 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
-import { ShieldWarning } from '@phosphor-icons/react';
+import { ShieldWarning, X } from '@phosphor-icons/react';
 import ResizableSidebar from '@/components/ResizableSidebar';
 import DiscordGuildChannelsSidebar from '../components/DiscordGuildChannelsSidebar';
 
 const IncidentBanner = ({ incidents, guildId }) => {
+  const [dismissed, setDismissed] = useState(false);
+
   const details = useMemo(() => {
     const items = [];
     if (incidents.raid_detected_at) items.push('Raid detected');
@@ -21,7 +23,7 @@ const IncidentBanner = ({ incidents, guildId }) => {
     return items;
   }, [incidents]);
 
-  if (details.length === 0) return null;
+  if (dismissed || details.length === 0) return null;
 
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-yellow-500/20 bg-yellow-500/10 px-4 py-2">
@@ -35,6 +37,14 @@ const IncidentBanner = ({ incidents, guildId }) => {
         onClick={() => window.open(`https://discord.com/channels/${guildId}/guild-settings/safety`, '_blank')}
       >
         Edit Security Actions
+      </button>
+      <button
+        type="button"
+        className="shrink-0 rounded p-1 text-yellow-300/60 transition hover:text-yellow-200"
+        onClick={() => setDismissed(true)}
+        aria-label="Dismiss"
+      >
+        <X size={16} weight="bold" />
       </button>
     </div>
   );

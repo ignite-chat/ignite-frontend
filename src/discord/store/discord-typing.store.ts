@@ -8,7 +8,7 @@ type DiscordTypingStore = {
   clearExpired: () => void;
 };
 
-const TYPING_DURATION = 8000;
+const TYPING_DURATION = 5000;
 
 export const useDiscordTypingStore = create<DiscordTypingStore>((set) => ({
   typing: {},

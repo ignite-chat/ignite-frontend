@@ -8,16 +8,17 @@
  * Communication with main thread via postMessage.
  */
 
+import * as pako from 'pako';
 import { GatewayOp } from '../constants/gateway-opcodes';
 
 // ─── Types ─────────────────────────────────────────────────────
 
 /** Messages the main thread sends to this worker */
 type MainToWorker =
-  | { type: 'connect'; token: string; bufferedMessages?: string[] }
+  | { type: 'connect'; token: string; bufferedMessages?: ArrayBuffer[] }
   | { type: 'disconnect' }
   | { type: 'send'; data: any }
-  | { type: 'wsMessage'; data: string }; // forwarded from fast-connect WS on main thread
+  | { type: 'wsMessage'; data: ArrayBuffer }; // forwarded from fast-connect WS on main thread
 
 /** Messages this worker sends to the main thread */
 type WorkerToMain =
@@ -32,7 +33,10 @@ type WorkerToMain =
 
 // ─── Constants ─────────────────────────────────────────────────
 
-const GATEWAY_URL = 'wss://gateway.discord.gg/?encoding=json&v=9&compress=none';
+const GATEWAY_URL = 'wss://gateway.discord.gg/?encoding=json&v=9&compress=zlib-stream';
+
+// zlib flush suffix: 0x00 0x00 0xFF 0xFF
+const ZLIB_SUFFIX = new Uint8Array([0x00, 0x00, 0xff, 0xff]);
 
 const IDENTIFY_PROPERTIES = {
   os: 'Windows',
@@ -72,6 +76,111 @@ let token = '';
 // When true, the WS lives on the main thread and we proxy messages via postMessage
 let proxied = false;
 
+// zlib-stream inflate context — persists across messages for the entire connection
+let inflate: pako.Inflate | null = null;
+let zlibChunks: Uint8Array[] = [];
+
+const Z_SYNC_FLUSH = (pako as any).constants?.Z_SYNC_FLUSH ?? 2;
+const textDecoder = new TextDecoder();
+
+function resetInflate() {
+  inflate = new pako.Inflate();
+  zlibChunks = [];
+}
+
+/**
+ * Check if a buffer ends with the zlib flush suffix (0x00 0x00 0xFF 0xFF).
+ */
+function endsWithFlush(data: Uint8Array): boolean {
+  const len = data.length;
+  if (len < 4) return false;
+  return (
+    data[len - 4] === 0x00 &&
+    data[len - 3] === 0x00 &&
+    data[len - 2] === 0xff &&
+    data[len - 1] === 0xff
+  );
+}
+
+/**
+ * Decompress a zlib-stream message. Buffers partial chunks and flushes
+ * when the zlib suffix is detected, returning the decoded JSON payload.
+ * Returns null if the message is incomplete (waiting for more chunks).
+ *
+ * pako v2's Inflate.push() only calls onData when the output buffer is
+ * completely full (avail_out === 0) or on Z_STREAM_END. For Z_SYNC_FLUSH
+ * messages smaller than chunkSize, onData is never called — the output
+ * sits in strm.output without being emitted. We work around this by
+ * collecting onData chunks for full-buffer flushes AND manually extracting
+ * any remaining output from strm.output/next_out after push() returns.
+ */
+function decompressMessage(data: ArrayBuffer): any | null {
+  if (!inflate) resetInflate();
+
+  const chunk = new Uint8Array(data);
+  zlibChunks.push(chunk);
+
+  if (!endsWithFlush(chunk)) {
+    return null; // partial message, wait for more
+  }
+
+  // Concatenate all buffered chunks
+  let totalLen = 0;
+  for (const c of zlibChunks) totalLen += c.length;
+  const combined = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const c of zlibChunks) {
+    combined.set(c, offset);
+    offset += c.length;
+  }
+  zlibChunks = [];
+
+  const strm = (inflate as any).strm;
+
+  // Force fresh output buffer so we don't read stale data from prior pushes
+  strm.avail_out = 0;
+
+  // Collect full-buffer flushes via onData (fires when avail_out hits 0)
+  const outputChunks: Uint8Array[] = [];
+  inflate!.onData = (chunk: Uint8Array) => {
+    // Copy the chunk — pako passes a subarray view of its internal buffer
+    outputChunks.push(chunk.slice());
+  };
+
+  inflate!.push(combined, Z_SYNC_FLUSH);
+
+  if (inflate!.err) {
+    warn('zlib inflate error:', inflate!.msg);
+    resetInflate();
+    return null;
+  }
+
+  // After push(), any remaining output (smaller than chunkSize) is still
+  // sitting in strm.output[0..next_out) without having triggered onData.
+  // Extract it manually.
+  if (strm.next_out > 0) {
+    outputChunks.push(strm.output.slice(0, strm.next_out));
+    // Reset so the next push starts with a fresh buffer
+    strm.avail_out = 0;
+  }
+
+  if (outputChunks.length === 0) return null;
+
+  if (outputChunks.length === 1) {
+    return JSON.parse(textDecoder.decode(outputChunks[0]));
+  }
+
+  let outLen = 0;
+  for (const c of outputChunks) outLen += c.length;
+  const result = new Uint8Array(outLen);
+  let pos = 0;
+  for (const c of outputChunks) {
+    result.set(c, pos);
+    pos += c.length;
+  }
+  return JSON.parse(textDecoder.decode(result));
+}
+
 // ─── Helpers ───────────────────────────────────────────────────
 
 function post(msg: WorkerToMain) {
@@ -110,7 +219,9 @@ function connect() {
   const url = resumeGatewayUrl || GATEWAY_URL;
   log(`Connecting to ${url}`);
 
+  resetInflate();
   ws = new WebSocket(url);
+  ws.binaryType = 'arraybuffer';
 
   ws.onopen = () => {
     log('WebSocket connected');
@@ -118,7 +229,8 @@ function connect() {
   };
 
   ws.onmessage = (event) => {
-    handleMessage(JSON.parse(event.data));
+    const payload = decompressMessage(event.data as ArrayBuffer);
+    if (payload) handleMessage(payload);
   };
 
   ws.onclose = (event) => {
@@ -152,6 +264,8 @@ function disconnect() {
   resumeGatewayUrl = null;
   sessionId = null;
   reconnectAttempts = 0;
+  inflate = null;
+  zlibChunks = [];
   post({ type: 'connectionState', connected: false });
 }
 
@@ -326,10 +440,12 @@ self.onmessage = (event: MessageEvent<MainToWorker>) => {
       if (msg.bufferedMessages && msg.bufferedMessages.length > 0) {
         // Fast-connect: WS lives on the main thread, we proxy messages
         proxied = true;
+        resetInflate();
         log(`Replaying ${msg.bufferedMessages.length} fast-connect messages`);
         for (const raw of msg.bufferedMessages) {
           try {
-            const payload = JSON.parse(raw);
+            const payload = decompressMessage(raw);
+            if (!payload) continue; // partial chunk
             // Skip HELLO — the fast-connect script already handled it and sent IDENTIFY
             if (payload.op === GatewayOp.HELLO) {
               // Still need to start heartbeat from the HELLO interval
@@ -349,9 +465,10 @@ self.onmessage = (event: MessageEvent<MainToWorker>) => {
       break;
 
     case 'wsMessage':
-      // Forwarded message from the fast-connect WS on the main thread
+      // Forwarded binary message from the fast-connect WS on the main thread
       try {
-        handleMessage(JSON.parse(msg.data));
+        const payload = decompressMessage(msg.data);
+        if (payload) handleMessage(payload);
       } catch (e) {
         warn('Failed to parse proxied WS message:', e);
       }

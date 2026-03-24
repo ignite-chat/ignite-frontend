@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { UserStarIcon, MailIcon } from 'lucide-react';
-import { DiscordLogo, GameController, MusicNote, Broadcast, Eye, Trophy } from '@phosphor-icons/react';
+import { DiscordLogo, GameController, MusicNote, Broadcast, Eye, Trophy, Check } from '@phosphor-icons/react';
 import { useDiscordActivitiesStore, ActivityType } from '@/discord/store/discord-activities.store';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -73,7 +73,21 @@ const DMActivityIcon = ({ type, size = 12 }) => {
   }
 };
 
-const DiscordDMChannelInfo = ({ info, isUnread }) => {
+const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onClick, onClose }) => {
+  const readStates = useDiscordReadStatesStore((s) => s.readStates);
+  const entry = readStates[channel.id];
+
+  const isUnread =
+    !isActive &&
+    !!channel.last_message_id &&
+    (!entry?.last_message_id || channel.last_message_id > entry.last_message_id);
+  const mentionCount = entry?.mention_count ?? 0;
+
+  const info = useMemo(
+    () => getDMDisplayInfo(channel, currentUserId, usersMap),
+    [channel, currentUserId, usersMap]
+  );
+
   const activities = useDiscordActivitiesStore((s) => info.user ? s.activities[info.user.id] : undefined);
 
   const nonCustomActivities = useMemo(
@@ -92,94 +106,6 @@ const DiscordDMChannelInfo = ({ info, isUnread }) => {
 
   const primaryActivity = nonCustomActivities[0];
   const extraCount = nonCustomActivities.length - 1;
-
-  return (
-    <div className="flex min-w-0 flex-1 flex-col">
-      <div className="flex items-center gap-1.5">
-        <span className={cn('truncate text-sm', isUnread ? 'font-bold text-gray-100' : 'font-medium')}>
-          {info.name}
-        </span>
-        {info.user?.id === '643945264868098049' && (
-          <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
-            <svg width="10" height="10" viewBox="0 0 16 15.2" fill="currentColor">
-              <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
-            </svg>
-            OFFICIAL
-          </span>
-        )}
-        {!info.isGroup && info.user && <DiscordClanTag userId={info.user.id} size="sm" />}
-        {info.isGroup && (
-          <span className="shrink-0 text-xs text-gray-500">({info.recipientCount})</span>
-        )}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DiscordLogo size={14} weight="fill" className="ml-auto shrink-0 text-[#5865f2]" />
-          </TooltipTrigger>
-          <TooltipContent side="top">Discord</TooltipContent>
-        </Tooltip>
-      </div>
-      {info.user?.id === '643945264868098049' && (
-        <div className="truncate text-left text-[11px] text-gray-400">Official Discord Message</div>
-      )}
-      {info.user?.id !== '643945264868098049' && (primaryActivity || customStatus?.state) && (
-        <div className="flex items-center gap-1 truncate text-[11px] text-gray-400">
-          {primaryActivity && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex shrink-0 items-center gap-0.5 text-green-500">
-                  <DMActivityIcon type={primaryActivity.type} size={12} />
-                  {extraCount > 0 && (
-                    <span className="text-[10px] font-medium text-green-500">+{extraCount}</span>
-                  )}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="p-2">
-                <div className="flex flex-col gap-1.5">
-                  {nonCustomActivities.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs">
-                      <span className="shrink-0 text-green-500">
-                        <DMActivityIcon type={a.type} size={14} />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-gray-200">{a.name}</div>
-                        {a.details && (
-                          <div className="text-[11px] text-gray-400">{a.details}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          )}
-          {primaryActivity && (customStatus?.state || primaryActivity.details) && (
-            <span className="text-gray-600">·</span>
-          )}
-          {primaryActivity?.type === ActivityType.LISTENING && primaryActivity.details ? (
-            <span className="truncate">{primaryActivity.details}</span>
-          ) : customStatus?.state ? (
-            <span className="truncate">{customStatus.state}</span>
-          ) : null}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const DiscordDMChannelItem = ({ channel, isActive, currentUserId, usersMap, onClick, onClose }) => {
-  const readStates = useDiscordReadStatesStore((s) => s.readStates);
-  const entry = readStates[channel.id];
-
-  const isUnread =
-    !isActive &&
-    !!channel.last_message_id &&
-    (!entry?.last_message_id || channel.last_message_id > entry.last_message_id);
-  const mentionCount = entry?.mention_count ?? 0;
-
-  const info = useMemo(
-    () => getDMDisplayInfo(channel, currentUserId, usersMap),
-    [channel, currentUserId, usersMap]
-  );
 
   const handleContextMenu = (e) => {
     if (!info.user || info.isGroup) return;
@@ -204,17 +130,85 @@ const DiscordDMChannelItem = ({ channel, isActive, currentUserId, usersMap, onCl
             {info.isGroup ? info.recipientCount : info.name.charAt(0).toUpperCase()}
           </div>
         )}
-        {!info.isGroup && info.user && (
+        {!info.isGroup && info.user && !info.user.bot && info.user.id !== '643945264868098049' && (
           <DiscordStatusIndicator
             status={info.user.status}
             clientStatus={info.user.client_status}
+            processedAt={info.user.processed_at_timestamp}
+            invisible={info.user.invisible}
             size="xs"
             borderColor="#121214"
           />
         )}
       </div>
 
-      <DiscordDMChannelInfo info={info} isUnread={isUnread} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center gap-1.5">
+          <span className={cn('truncate text-[16px]', isUnread ? 'font-bold text-gray-100' : 'font-[450]')}>
+            {info.name}
+          </span>
+          {info.user?.id === '643945264868098049' && (
+            <span className="inline-flex h-3.5 shrink-0 items-center gap-0.5 rounded bg-[#5865f2] px-1 text-[12px] font-medium leading-none text-white">
+              <Check size={13} weight="bold" color="white" />
+              OFFICIAL
+            </span>
+          )}
+          {!info.isGroup && info.user && <DiscordClanTag userId={info.user.id} size="sm" />}
+          {info.isGroup && (
+            <span className="shrink-0 text-xs text-gray-500">({info.recipientCount})</span>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DiscordLogo size={14} weight="fill" className="ml-auto shrink-0 text-[#5865f2]" />
+            </TooltipTrigger>
+            <TooltipContent side="top">Discord</TooltipContent>
+          </Tooltip>
+        </div>
+        {info.user?.id === '643945264868098049' && (
+          <div className="truncate text-left text-[12px] text-gray-400/60">Official Discord Message</div>
+        )}
+        {info.user?.id !== '643945264868098049' && (primaryActivity || customStatus?.state) && (
+          <div className="flex items-center gap-1 truncate text-[11px] text-gray-400">
+            {primaryActivity && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex shrink-0 items-center gap-0.5 text-green-500">
+                    <DMActivityIcon type={primaryActivity.type} size={12} />
+                    {extraCount > 0 && (
+                      <span className="text-[10px] font-medium text-green-500">+{extraCount}</span>
+                    )}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="p-2">
+                  <div className="flex flex-col gap-1.5">
+                    {nonCustomActivities.map((a, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        <span className="shrink-0 text-green-500">
+                          <DMActivityIcon type={a.type} size={14} />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-gray-200">{a.name}</div>
+                          {a.details && (
+                            <div className="text-[11px] text-gray-400">{a.details}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {primaryActivity && (customStatus?.state || primaryActivity.details) && (
+              <span className="text-gray-600">·</span>
+            )}
+            {primaryActivity?.type === ActivityType.LISTENING && primaryActivity.details ? (
+              <span className="truncate">{primaryActivity.details}</span>
+            ) : customStatus?.state ? (
+              <span className="truncate">{customStatus.state}</span>
+            ) : null}
+          </div>
+        )}
+      </div>
 
       {mentionCount > 0 && (
         <div className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-bold text-white">
@@ -271,7 +265,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
     // Tag Discord channels with real timestamps (exclude message requests)
     const discordItems = discordConnected
       ? discordChannels
-          .filter((c) => (c.type === 1 || c.type === 3) && !c.is_message_request && !c.is_message_request_timestamp)
+          .filter((c) => (c.type === 1 || c.type === 3) && !c.is_message_request)
           .map((c) => ({
             _source: 'discord',
             _id: c.id,
@@ -389,7 +383,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
           <div className="mt-2 space-y-0.5">
             {mergedDms.map((item) =>
               item._source === 'discord' ? (
-                <DiscordDMChannelItem
+                <DiscordDMChannelRow
                   key={`discord-${item._id}`}
                   channel={item.data}
                   isActive={activeChannelId === item._id}

@@ -21,6 +21,7 @@ import { useDiscordRelationshipsStore } from '@/discord/store/discord-relationsh
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useDiscordActivitiesStore, ActivityType } from '@/discord/store/discord-activities.store';
 import DiscordClanTag from '@/discord/components/DiscordClanTag';
+import DiscordStatusIndicator from '@/discord/components/DiscordStatusIndicator';
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -148,12 +149,6 @@ const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
   const friendsSinceAgo = relationship?.since ? timeAgo(relationship.since) : null;
   const friendsSinceExact = relationship?.since ? formatExactDate(relationship.since) : null;
 
-  const statusColors: Record<string, string> = {
-    online: 'bg-green-500',
-    idle: 'bg-yellow-500',
-    dnd: 'bg-red-500',
-    offline: 'bg-gray-500',
-  };
 
   const messageUser = () => {
     const existingChannel = channels.find(
@@ -176,7 +171,11 @@ const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
             alt={user.global_name || user.username}
             className="size-8 rounded-full object-cover"
           />
-          <div className={`absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full border-2 border-[#1a1a1e] ${statusColors[status] || statusColors.offline}`} />
+          <DiscordStatusIndicator
+            status={status}
+            clientStatus={user.client_status}
+            processedAt={user.processed_at_timestamp}
+          />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-sm font-bold text-white">

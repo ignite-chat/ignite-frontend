@@ -19,8 +19,38 @@ import type {
 import { useDiscordStore } from '../store/discord.store';
 import { requestCaptchaSolution } from './discord-captcha-bridge';
 
+const buildSuperProperties = () => {
+  const ua = navigator.userAgent;
+  const electronMatch = ua.match(/Electron\/([\d.]+)/);
+  const chromeMatch = ua.match(/Chrome\/([\d.]+)/);
+  const appMatch = ua.match(/discord\/([\d.]+)/i) || ua.match(/Ignite\/([\d.]+)/i);
+
+  const props = {
+    os: 'Windows',
+    browser: 'Discord Client',
+    release_channel: 'stable',
+    client_version: appMatch?.[1] || '1.0.9229',
+    os_version: '10.0.19045',
+    os_arch: 'x64',
+    app_arch: 'x64',
+    system_locale: navigator.language || 'en-US',
+    has_client_mods: false,
+    browser_user_agent: ua,
+    browser_version: electronMatch?.[1] || chromeMatch?.[1] || '',
+    client_build_number: 514705,
+    native_build_number: 77563,
+    client_event_source: null,
+  };
+  return btoa(JSON.stringify(props));
+};
+
+const superProperties = buildSuperProperties();
+
 const discordApi = axios.create({
   baseURL: 'https://discord.com/api/v9',
+  headers: {
+    Accept: '*/*',
+  },
 });
 
 discordApi.interceptors.request.use((config) => {
@@ -28,6 +58,10 @@ discordApi.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = token;
   }
+  config.headers['X-Super-Properties'] = superProperties;
+  config.headers['X-Discord-Locale'] = navigator.language || 'en-US';
+  config.headers['X-Discord-Timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  config.headers['X-Debug-Options'] = 'bugReporterEnabled';
   return config;
 });
 

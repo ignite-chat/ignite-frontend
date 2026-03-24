@@ -15,7 +15,6 @@ const ExternalLink = ({ href, children }) => {
       className="inline-flex cursor-pointer items-center gap-1 text-blue-400 underline-offset-2 hover:text-blue-300"
     >
       {children}
-      <ArrowSquareOut className="inline h-3 w-3 opacity-60" />
     </a>
   );
 };

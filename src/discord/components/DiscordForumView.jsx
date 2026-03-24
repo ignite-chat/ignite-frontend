@@ -4,6 +4,7 @@ import { DiscordApiService } from '../services/discord-api.service';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useDiscordThreadsStore } from '../store/discord-threads.store';
+import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import ForumGalleryView from './forum/ForumGalleryView';
 import ForumListView from './forum/ForumListView';
 import ForumSortPopover from './forum/ForumSortPopover';
@@ -14,9 +15,23 @@ const PINNED_FLAG = 2;
 const DiscordForumView = ({ channel }) => {
   const forumData = useDiscordThreadsStore((s) => s.channels[channel.id]);
   const threads = forumData?.threads || [];
-  const firstMessages = forumData?.firstMessages || {};
+  const firstMessageIds = forumData?.firstMessageIds || {};
+  const channelMessages = useDiscordChannelsStore((s) => s.channelMessages);
   const hasMore = forumData?.hasMore || false;
   const offset = forumData?.offset || 0;
+
+  // Build firstMessages lookup by resolving IDs from channels store
+  const firstMessages = useMemo(() => {
+    const map = {};
+    for (const [threadId, messageId] of Object.entries(firstMessageIds)) {
+      const messages = channelMessages[threadId];
+      if (messages) {
+        const msg = messages.find((m) => m.id === messageId);
+        if (msg) map[threadId] = msg;
+      }
+    }
+    return map;
+  }, [firstMessageIds, channelMessages]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -52,12 +67,20 @@ const DiscordForumView = ({ channel }) => {
           }
         }
 
+        // Store first messages in channels store (keyed by thread ID = channel_id)
+        const channelsStore = useDiscordChannelsStore.getState();
+        for (const msg of data.first_messages || []) {
+          if (msg?.id) {
+            channelsStore.setChannelMessages(msg.channel_id, [msg]);
+          }
+        }
+
         if (append) {
           threadsStore.upsertThreads(channelId, data.threads || []);
-          threadsStore.upsertFirstMessages(channelId, data.first_messages || []);
+          threadsStore.upsertFirstMessageIds(channelId, data.first_messages || []);
         } else {
           threadsStore.setThreads(channelId, data.threads || []);
-          threadsStore.setFirstMessages(channelId, data.first_messages || []);
+          threadsStore.setFirstMessageIds(channelId, data.first_messages || []);
         }
 
         threadsStore.setHasMore(channelId, data.has_more || false);

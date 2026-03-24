@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { arrayMove } from '@dnd-kit/sortable';
 
 const STORAGE_KEY = 'ignite:guild-order';
 
@@ -67,11 +68,7 @@ export function useGuildOrder(guilds) {
 
       if (activeIndex === -1 || overIndex === -1) return;
 
-      const newOrder = [...currentOrder];
-      const [moved] = newOrder.splice(activeIndex, 1);
-      newOrder.splice(overIndex, 0, moved);
-
-      setOrderMap(newOrder);
+      setOrderMap(arrayMove(currentOrder, activeIndex, overIndex));
     },
     [orderedGuilds]
   );
