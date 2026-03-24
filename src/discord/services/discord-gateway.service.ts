@@ -170,6 +170,9 @@ export const DiscordGatewayService = {
   // The web worker that manages the WebSocket + heartbeat
   _worker: null as Worker | null,
 
+  // Fast-connect WebSocket (lives on main thread, proxied to worker)
+  _fastWs: null as WebSocket | null,
+
   // External event handler for the orchestration service
   onDispatch: null as GatewayEventHandler | null,
 
@@ -179,14 +182,7 @@ export const DiscordGatewayService = {
    * on a separate thread so main-thread lag cannot cause missed heartbeats.
    */
   connect(token: string) {
-    if (this._worker) {
-      console.log('[Discord Gateway] Already connected, disconnecting first');
-      this.disconnect();
-    }
-
-    // // TODO: Remove artificial delay (testing skeletons)
-    // setTimeout(() => this._doConnect(token), 10000);
-
+    if (this._worker) return;
     this._doConnect(token);
   },
 
@@ -231,6 +227,13 @@ export const DiscordGatewayService = {
           });
           break;
 
+        case 'wsSend':
+          // Worker wants to send data over the proxied fast-connect WS
+          if (this._fastWs && this._fastWs.readyState === WebSocket.OPEN) {
+            this._fastWs.send(msg.data);
+          }
+          break;
+
         case 'log':
           if (msg.level === 'warn') {
             console.warn(...msg.args);
@@ -245,13 +248,37 @@ export const DiscordGatewayService = {
       console.error('[Discord Gateway] Worker error:', err);
     };
 
-    this._worker.postMessage({ type: 'connect', token });
+    // Check for fast-connect WebSocket and adopt it
+    let bufferedMessages: string[] | undefined;
+    const fastWs = (window as any)._ws;
+    if (fastWs && fastWs.ws.readyState === WebSocket.OPEN) {
+      console.log(`[Discord Gateway] Fast-connect: ${fastWs.state.messages.length} buffered messages`);
+      bufferedMessages = fastWs.state.messages;
+
+      // Keep the WS alive — proxy new messages to the worker
+      this._fastWs = fastWs.ws;
+      fastWs.ws.onmessage = (event: MessageEvent) => {
+        this._worker?.postMessage({ type: 'wsMessage', data: event.data });
+      };
+      fastWs.ws.onclose = () => {
+        console.log('[Discord Gateway] Fast-connect WS closed');
+        this._fastWs = null;
+      };
+      fastWs.ws.onerror = null;
+      (window as any)._ws = null;
+    }
+
+    this._worker.postMessage({ type: 'connect', token, bufferedMessages });
   },
 
   /**
    * Disconnect from the gateway.
    */
   disconnect() {
+    if (this._fastWs) {
+      try { this._fastWs.close(); } catch {}
+      this._fastWs = null;
+    }
     if (this._worker) {
       this._worker.postMessage({ type: 'disconnect' });
       this._worker.terminate();

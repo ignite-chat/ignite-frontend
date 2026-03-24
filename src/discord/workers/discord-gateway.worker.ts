@@ -14,9 +14,10 @@ import { GatewayOp } from '../constants/gateway-opcodes';
 
 /** Messages the main thread sends to this worker */
 type MainToWorker =
-  | { type: 'connect'; token: string }
+  | { type: 'connect'; token: string; bufferedMessages?: string[] }
   | { type: 'disconnect' }
-  | { type: 'send'; data: any };
+  | { type: 'send'; data: any }
+  | { type: 'wsMessage'; data: string }; // forwarded from fast-connect WS on main thread
 
 /** Messages this worker sends to the main thread */
 type WorkerToMain =
@@ -26,6 +27,7 @@ type WorkerToMain =
   | { type: 'invalidSession'; resumable: boolean }
   | { type: 'authFailed' }
   | { type: 'maxReconnect' }
+  | { type: 'wsSend'; data: string } // ask main thread to send over the proxied WS
   | { type: 'log'; level: string; args: any[] };
 
 // ─── Constants ─────────────────────────────────────────────────
@@ -67,6 +69,8 @@ let reconnectAttempts = 0;
 const maxReconnectAttempts = 10;
 let intentionalClose = false;
 let token = '';
+// When true, the WS lives on the main thread and we proxy messages via postMessage
+let proxied = false;
 
 // ─── Helpers ───────────────────────────────────────────────────
 
@@ -83,8 +87,14 @@ function warn(...args: any[]) {
 }
 
 function send(data: any) {
+  const json = JSON.stringify(data);
+  if (proxied) {
+    // Ask the main thread to send over the fast-connect WS
+    post({ type: 'wsSend', data: json } as any);
+    return;
+  }
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(data));
+    ws.send(json);
   }
 }
 
@@ -313,10 +323,42 @@ self.onmessage = (event: MessageEvent<MainToWorker>) => {
   switch (msg.type) {
     case 'connect':
       token = msg.token;
-      connect();
+      if (msg.bufferedMessages && msg.bufferedMessages.length > 0) {
+        // Fast-connect: WS lives on the main thread, we proxy messages
+        proxied = true;
+        log(`Replaying ${msg.bufferedMessages.length} fast-connect messages`);
+        for (const raw of msg.bufferedMessages) {
+          try {
+            const payload = JSON.parse(raw);
+            // Skip HELLO — the fast-connect script already handled it and sent IDENTIFY
+            if (payload.op === GatewayOp.HELLO) {
+              // Still need to start heartbeat from the HELLO interval
+              startHeartbeat(payload.d.heartbeat_interval);
+              continue;
+            }
+            handleMessage(payload);
+          } catch (e) {
+            warn('Failed to parse fast-connect message:', e);
+          }
+        }
+        post({ type: 'connectionState', connected: true });
+        log('Fast-connect replay done, proxying via main thread WS');
+      } else {
+        connect();
+      }
+      break;
+
+    case 'wsMessage':
+      // Forwarded message from the fast-connect WS on the main thread
+      try {
+        handleMessage(JSON.parse(msg.data));
+      } catch (e) {
+        warn('Failed to parse proxied WS message:', e);
+      }
       break;
 
     case 'disconnect':
+      proxied = false;
       disconnect();
       break;
 

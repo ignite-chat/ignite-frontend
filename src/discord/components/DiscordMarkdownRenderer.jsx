@@ -6,6 +6,7 @@ import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import ExternalLink from '@/components/message/components/ExternalLink';
 import SpoilerText from '@/components/message/markdown/SpoilerText';
 import TimestampDisplay from '@/components/message/markdown/TimestampDisplay';
+import DiscordEmoji from './DiscordEmoji';
 import { Info, Lightbulb, AlertTriangle, AlertOctagon, Flame } from 'lucide-react';
 
 const DISCORD_EMOJI_CDN = 'https://cdn.discordapp.com/emojis';
@@ -166,28 +167,23 @@ function renderInlineNode(node, index, guildId) {
         const ext = node.kind.animated ? 'gif' : 'webp';
         const src = `${DISCORD_EMOJI_CDN}/${node.kind.id}.${ext}?size=48`;
         return (
-          <img
+          <DiscordEmoji
             key={key}
             src={src}
-            alt={node.kind.name}
-            title={`:${node.kind.name}:`}
-            className="inline size-6 object-contain align-text-bottom"
-            draggable="false"
-            loading="lazy"
-            decoding="async"
+            name={node.kind.name}
+            emojiId={node.kind.id}
+            animated={node.kind.animated}
+            isUnicode={false}
           />
         );
       }
       // Unicode emoji
       return (
-        <img
+        <DiscordEmoji
           key={key}
           src={getTwemojiUrl(node.kind.surrogates)}
-          alt={node.kind.name}
-          className="inline size-5 object-contain align-text-bottom"
-          draggable="false"
-          loading="lazy"
-          decoding="async"
+          name={node.kind.name}
+          isUnicode
         />
       );
     }
