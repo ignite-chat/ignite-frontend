@@ -1,6 +1,7 @@
-// eslint-disable-next-line no-unused-vars
 import Pusher from 'pusher-js';
 import Echo from 'laravel-echo';
+
+window.Pusher = Pusher;
 import api from '@/ignite/api';
 import { useAuthStore } from '../store/auth.store';
 import {
