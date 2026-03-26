@@ -26,9 +26,16 @@ const DiscordGuildPage = () => {
     return channels.filter((c) => c.guild_id === guildId);
   }, [channels, guildId]);
 
-  // Redirect if not connected and no token
+  // Set active account based on which account owns this guild
   useEffect(() => {
-    if (!isConnected && !useDiscordStore.getState().token) {
+    if (guild?._accountId) {
+      useDiscordStore.getState().setActiveAccount(guild._accountId);
+    }
+  }, [guild?._accountId]);
+
+  // Redirect if not connected and no accounts
+  useEffect(() => {
+    if (!isConnected && useDiscordStore.getState().accounts.length === 0) {
       const hasIgniteToken = !!localStorage.getItem('token');
       navigate(hasIgniteToken ? '/channels/@me' : '/login', { replace: true });
     }

@@ -1,8 +1,11 @@
 import { useState, useMemo } from 'react';
-import { At, ChatsTeardrop, Hash, MagnifyingGlass, Users } from '@phosphor-icons/react';
+import { At, ChatsTeardrop, Hash, MagnifyingGlass, Users, ClockCounterClockwise, GearSix } from '@phosphor-icons/react';
 import { GUILD_FORUM } from '../constants/channel-types';
 import { parseMarkdown } from '@/components/message/markdown/parser';
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
+import { useDiscordMessageLogStore } from '../store/discord-message-log.store';
+import { useModalStore } from '@/store/modal.store';
+import MessageLogSettingsModal from './modals/MessageLogSettingsModal';
 
 const TopicRenderer = ({ topic, guildId }) => {
   const ast = useMemo(() => parseMarkdown(topic), [topic]);
@@ -13,9 +16,11 @@ const TopicRenderer = ({ topic, guildId }) => {
   );
 };
 
-const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, guildName, memberListOpen, onToggleMemberList, searchOpen, onSearch }) => {
+const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, guildName, memberListOpen, onToggleMemberList, searchOpen, onSearch, messageLogOpen, onToggleMessageLog }) => {
   const isForum = channel?.type === GUILD_FORUM;
   const [searchValue, setSearchValue] = useState('');
+  const logEnabled = useDiscordMessageLogStore((s) => s.settings.enabled);
+  const logCount = useDiscordMessageLogStore((s) => (s.logs[channel?.id] || []).length);
 
   const icon = isDM ? (
     dmInfo?.properties?.icon ? (
@@ -54,6 +59,35 @@ const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, guildName, m
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
+        {/* Message Log toggle */}
+        {logEnabled && onToggleMessageLog && (
+          <button
+            type="button"
+            onClick={onToggleMessageLog}
+            className={`relative rounded p-1.5 transition hover:bg-white/10 ${messageLogOpen ? 'text-white' : 'text-gray-400'}`}
+            aria-label="Toggle message log"
+            title="Message Log"
+          >
+            <ClockCounterClockwise size={20} weight={messageLogOpen ? 'fill' : 'regular'} />
+            {logCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex size-3.5 items-center justify-center rounded-full bg-[#f23f42] text-[8px] font-bold text-white">
+                {logCount > 99 ? '99' : logCount}
+              </span>
+            )}
+          </button>
+        )}
+
+        {/* Message Log settings */}
+        <button
+          type="button"
+          onClick={() => useModalStore.getState().push(MessageLogSettingsModal)}
+          className="rounded p-1.5 text-gray-400 transition hover:bg-white/10 hover:text-white"
+          aria-label="Message Logger settings"
+          title="Message Logger Settings"
+        >
+          <GearSix size={20} />
+        </button>
+
         {onToggleMemberList && (
           <button
             type="button"

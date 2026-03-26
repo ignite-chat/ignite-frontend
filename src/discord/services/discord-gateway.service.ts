@@ -16,8 +16,9 @@ import { useDiscordInteractionsStore } from '../store/discord-interactions.store
 import { decodeGuildFolders, decodeUserSettings } from '../utils/proto-decode';
 import { DiscordVoiceService } from './discord-voice.service';
 import { GatewayOp } from '../constants/gateway-opcodes';
+import { DiscordMessageLogService } from './discord-message-log.service';
 
-import type { GatewayEventHandler } from '../types';
+// GatewayEventHandler type kept for reference but onDispatch signature is inline now
 
 /** Sync activities to the dedicated store from a list of presences */
 function syncActivities(presences: { user_id: string; activities?: any[] }[]) {
@@ -30,9 +31,16 @@ function syncActivities(presences: { user_id: string; activities?: any[] }[]) {
 }
 
 /**
+ * Get the user ID for a specific account token.
+ */
+function getAccountUserId(accountToken: string): string | undefined {
+  return useDiscordStore.getState().getAccountByToken(accountToken)?.user?.id;
+}
+
+/**
  * Handle MESSAGE_REACTION_ADD — a single reaction was added to a message.
  */
-function handleReactionAdd(data: any) {
+function handleReactionAdd(data: any, accountToken: string) {
   const { channel_id, message_id, user_id, emoji, burst } = data;
   if (!channel_id || !message_id || !emoji) return;
 
@@ -44,7 +52,7 @@ function handleReactionAdd(data: any) {
   const idx = existing.findIndex((e: any) =>
     emoji.id ? e.emoji.id === emoji.id : e.emoji.name === emoji.name
   );
-  const currentUserId = useDiscordStore.getState().user?.id;
+  const currentUserId = getAccountUserId(accountToken);
   const isMe = user_id === currentUserId;
 
   if (idx >= 0) {
@@ -75,7 +83,7 @@ function handleReactionAdd(data: any) {
  * Handle MESSAGE_REACTION_ADD_MANY — authoritative batch of reactions for a message.
  * This replaces existing reaction counts (not a delta).
  */
-function handleReactionAddMany(data: any) {
+function handleReactionAddMany(data: any, accountToken: string) {
   const { channel_id, message_id, reactions: incomingReactions } = data;
   if (!channel_id || !message_id || !incomingReactions) return;
 
@@ -83,8 +91,7 @@ function handleReactionAddMany(data: any) {
   const msg = messages?.find((m: any) => m.id === message_id);
   if (!msg) return;
 
-  // MESSAGE_REACTION_ADD_MANY has a `users` array per reaction, not count fields
-  const currentUserId = useDiscordStore.getState().user?.id;
+  const currentUserId = getAccountUserId(accountToken);
   const existingReactions = [...(msg.reactions || [])];
 
   for (const r of incomingReactions) {
@@ -119,7 +126,7 @@ function handleReactionAddMany(data: any) {
 /**
  * Handle MESSAGE_REACTION_REMOVE — a single reaction was removed from a message.
  */
-function handleReactionRemove(data: any) {
+function handleReactionRemove(data: any, accountToken: string) {
   const { channel_id, message_id, user_id, emoji, burst } = data;
   if (!channel_id || !message_id || !emoji) return;
 
@@ -133,7 +140,7 @@ function handleReactionRemove(data: any) {
   );
   if (idx < 0) return;
 
-  const currentUserId = useDiscordStore.getState().user?.id;
+  const currentUserId = getAccountUserId(accountToken);
   const isMe = user_id === currentUserId;
   const newCount = existing[idx].count - 1;
 
@@ -156,51 +163,50 @@ function handleReactionRemove(data: any) {
 }
 
 export const DiscordGatewayService = {
-  // The web worker that manages the WebSocket + heartbeat
-  _worker: null as Worker | null,
+  // Web workers keyed by account token
+  _workers: {} as Record<string, Worker>,
 
-  // Fast-connect WebSocket (lives on main thread, proxied to worker)
+  // Fast-connect WebSocket (only used for the first account)
   _fastWs: null as WebSocket | null,
+  _fastWsToken: null as string | null,
 
   // External event handler for the orchestration service
-  onDispatch: null as GatewayEventHandler | null,
+  onDispatch: null as ((accountToken: string, payload: { event: string; data: any }) => void) | null,
 
   /**
-   * Connect to the Discord gateway via a Web Worker.
-   * The worker handles the WebSocket, heartbeat, identify/resume, and reconnection
-   * on a separate thread so main-thread lag cannot cause missed heartbeats.
+   * Connect to the Discord gateway via a Web Worker for a specific account.
    */
   connect(token: string) {
-    if (this._worker) return;
+    if (this._workers[token]) return;
     this._doConnect(token);
   },
 
   _doConnect(token: string) {
-    this._worker = new Worker(
+    const worker = new Worker(
       new URL('../workers/discord-gateway.worker.ts', import.meta.url),
       { type: 'module' },
     );
 
-    this._worker.onmessage = (event) => {
+    this._workers[token] = worker;
+
+    worker.onmessage = (event) => {
       const msg = event.data;
 
       switch (msg.type) {
         case 'dispatch':
-          this._handleDispatch(msg.eventName, msg.data);
+          this._handleDispatch(token, msg.eventName, msg.data);
           break;
 
         case 'connectionState':
-          useDiscordStore.getState().setConnected(msg.connected);
+          useDiscordStore.getState().updateAccount(token, { isConnected: msg.connected });
           break;
 
         case 'sessionInfo':
-          // Worker extracted session info from READY — no action needed,
-          // the READY dispatch event handles store updates
           break;
 
         case 'invalidSession':
           if (!msg.resumable) {
-            useDiscordStore.getState().setSessionId(null);
+            useDiscordStore.getState().updateAccount(token, { sessionId: null });
           }
           break;
 
@@ -217,8 +223,7 @@ export const DiscordGatewayService = {
           break;
 
         case 'wsSend':
-          // Worker wants to send data over the proxied fast-connect WS
-          if (this._fastWs && this._fastWs.readyState === WebSocket.OPEN) {
+          if (this._fastWsToken === token && this._fastWs && this._fastWs.readyState === WebSocket.OPEN) {
             this._fastWs.send(msg.data);
           }
           break;
@@ -233,66 +238,111 @@ export const DiscordGatewayService = {
       }
     };
 
-    this._worker.onerror = (err) => {
+    worker.onerror = (err) => {
       console.error('[Discord Gateway] Worker error:', err);
     };
 
-    // Check for fast-connect WebSocket and adopt it
+    // Check for fast-connect WebSocket and adopt it (only for first connection)
     let bufferedMessages: ArrayBuffer[] | undefined;
     const fastWs = (window as any)._ws;
-    if (fastWs && fastWs.ws.readyState === WebSocket.OPEN) {
+    if (fastWs && fastWs.ws.readyState === WebSocket.OPEN && Object.keys(this._workers).length === 1) {
       console.log(`[Discord Gateway] Fast-connect: ${fastWs.state.messages.length} buffered messages`);
       bufferedMessages = fastWs.state.messages;
 
-      // Keep the WS alive — proxy new messages to the worker
       this._fastWs = fastWs.ws;
+      this._fastWsToken = token;
       fastWs.ws.onmessage = (event: MessageEvent) => {
-        this._worker?.postMessage({ type: 'wsMessage', data: event.data }, [event.data]);
+        worker.postMessage({ type: 'wsMessage', data: event.data }, [event.data]);
       };
       fastWs.ws.onclose = () => {
         console.log('[Discord Gateway] Fast-connect WS closed');
         this._fastWs = null;
+        this._fastWsToken = null;
       };
       fastWs.ws.onerror = null;
       (window as any)._ws = null;
     }
 
-    // Transfer ArrayBuffers to avoid copying
     const transfer = bufferedMessages ? [...bufferedMessages] : [];
-    this._worker.postMessage({ type: 'connect', token, bufferedMessages }, transfer);
+    worker.postMessage({ type: 'connect', token, bufferedMessages }, transfer);
   },
 
   /**
-   * Disconnect from the gateway.
+   * Disconnect a specific account's gateway connection.
    */
-  disconnect() {
+  disconnect(token?: string) {
+    if (token) {
+      this._disconnectOne(token);
+    } else {
+      this.disconnectAll();
+    }
+  },
+
+  _disconnectOne(token: string) {
+    if (this._fastWsToken === token && this._fastWs) {
+      try { this._fastWs.close(); } catch {}
+      this._fastWs = null;
+      this._fastWsToken = null;
+    }
+    const worker = this._workers[token];
+    if (worker) {
+      worker.postMessage({ type: 'disconnect' });
+      worker.terminate();
+      delete this._workers[token];
+    }
+    useDiscordStore.getState().updateAccount(token, { isConnected: false });
+  },
+
+  /**
+   * Disconnect all gateway connections.
+   */
+  disconnectAll() {
     if (this._fastWs) {
       try { this._fastWs.close(); } catch {}
       this._fastWs = null;
+      this._fastWsToken = null;
     }
-    if (this._worker) {
-      this._worker.postMessage({ type: 'disconnect' });
-      this._worker.terminate();
-      this._worker = null;
+    for (const key of Object.keys(this._workers)) {
+      this._workers[key].postMessage({ type: 'disconnect' });
+      this._workers[key].terminate();
     }
-    useDiscordStore.getState().setConnected(false);
+    this._workers = {};
+    // Mark all accounts disconnected
+    for (const account of useDiscordStore.getState().accounts) {
+      useDiscordStore.getState().updateAccount(account.token, { isConnected: false });
+    }
   },
 
   /**
-   * Send a payload to the gateway via the worker.
+   * Send a payload to a specific account's gateway worker.
+   * If no token provided, sends to the active account's worker.
    */
-  send(data: any) {
-    if (this._worker) {
-      this._worker.postMessage({ type: 'send', data });
+  send(data: any, token?: string) {
+    const resolvedToken = token ?? useDiscordStore.getState().token;
+    if (resolvedToken && this._workers[resolvedToken]) {
+      this._workers[resolvedToken].postMessage({ type: 'send', data });
     }
   },
 
   /**
-   * Send a full guild subscription for a channel — requests member sidebar,
-   * typing indicators, threads, activities, and optionally specific member IDs.
+   * Get the worker token for a guild (by looking up the guild's _accountId).
+   */
+  _getTokenForGuild(guildId: string): string | undefined {
+    const guild = useDiscordGuildsStore.getState().guilds.find((g) => g.id === guildId);
+    const accountId = guild?._accountId;
+    if (accountId) {
+      const account = useDiscordStore.getState().getAccountByUserId(accountId);
+      return account?.token;
+    }
+    return useDiscordStore.getState().token ?? undefined;
+  },
+
+  /**
+   * Send a full guild subscription for a channel.
    */
   subscribeGuild(guildId: string, channelId: string, memberIds: string[] = [], range: [number, number] = [0, 99]) {
     useDiscordMemberListStore.getState().markPendingSync(guildId);
+    const token = this._getTokenForGuild(guildId);
     this.send({
       op: GatewayOp.GUILD_SUBSCRIPTIONS,
       d: {
@@ -310,7 +360,7 @@ export const DiscordGatewayService = {
           },
         },
       },
-    });
+    }, token);
   },
 
   /**
@@ -318,6 +368,7 @@ export const DiscordGatewayService = {
    */
   requestGuildMembers(guildId: string, userIds: string[]) {
     if (!userIds.length) return;
+    const token = this._getTokenForGuild(guildId);
     for (let i = 0; i < userIds.length; i += 100) {
       this.send({
         op: GatewayOp.REQUEST_GUILD_MEMBERS,
@@ -325,7 +376,7 @@ export const DiscordGatewayService = {
           guild_id: guildId,
           user_ids: userIds.slice(i, i + 100),
         },
-      });
+      }, token);
     }
   },
 
@@ -333,6 +384,7 @@ export const DiscordGatewayService = {
    * Update the member list range for a channel.
    */
   updateMemberListRange(guildId: string, channelId: string, ranges: [number, number][]) {
+    const token = this._getTokenForGuild(guildId);
     this.send({
       op: GatewayOp.GUILD_SUBSCRIPTIONS,
       d: {
@@ -350,29 +402,29 @@ export const DiscordGatewayService = {
           },
         },
       },
-    });
+    }, token);
   },
 
   // ─── Dispatch Event Handling (runs on main thread) ───────────
 
   /**
-   * Handle DISPATCH events received from the worker.
-   * All store updates happen here on the main thread.
+   * Handle DISPATCH events received from a worker.
+   * accountToken identifies which account the event belongs to.
    */
-  _handleDispatch(eventName: string, data: any) {
+  _handleDispatch(accountToken: string, eventName: string, data: any) {
     switch (eventName) {
       case 'READY':
-        this._handleReady(data);
+        this._handleReady(accountToken, data);
         break;
       case 'READY_SUPPLEMENTAL':
-        this._handleReadySupplemental(data);
+        this._handleReadySupplemental(accountToken, data);
         break;
       case 'RESUMED':
-        useDiscordStore.getState().setConnected(true);
+        useDiscordStore.getState().updateAccount(accountToken, { isConnected: true });
         console.log('[Discord Gateway] Successfully resumed');
         break;
       case 'GUILD_CREATE':
-        this._handleGuildCreate(data);
+        this._handleGuildCreate(accountToken, data);
         break;
       case 'GUILD_UPDATE':
         this._handleGuildUpdate(data);
@@ -390,13 +442,16 @@ export const DiscordGatewayService = {
         this._handleChannelDelete(data);
         break;
       case 'MESSAGE_CREATE':
-        this._handleMessageCreate(data);
+        this._handleMessageCreate(accountToken, data);
         break;
       case 'MESSAGE_UPDATE':
         this._handleMessageUpdate(data);
         break;
       case 'MESSAGE_DELETE':
         this._handleMessageDelete(data);
+        break;
+      case 'MESSAGE_DELETE_BULK':
+        this._handleMessageDeleteBulk(data);
         break;
       case 'MESSAGE_ACK':
         this._handleMessageAck(data);
@@ -425,13 +480,13 @@ export const DiscordGatewayService = {
         this._handleGuildMemberListUpdate(data);
         break;
       case 'MESSAGE_REACTION_ADD_MANY':
-        handleReactionAddMany(data);
+        handleReactionAddMany(data, accountToken);
         break;
       case 'MESSAGE_REACTION_ADD':
-        handleReactionAdd(data);
+        handleReactionAdd(data, accountToken);
         break;
       case 'MESSAGE_REACTION_REMOVE':
-        handleReactionRemove(data);
+        handleReactionRemove(data, accountToken);
         break;
       case 'VOICE_STATE_UPDATE':
         if (data.guild_id) {
@@ -449,7 +504,7 @@ export const DiscordGatewayService = {
         break;
       case 'TYPING_START': {
         const typingUserId = data.user_id;
-        const currentUserId = useDiscordStore.getState().user?.id;
+        const currentUserId = getAccountUserId(accountToken);
         if (typingUserId && typingUserId !== currentUserId) {
           const storeUser = useDiscordUsersStore.getState().users[typingUserId];
           const username = data.member?.user?.global_name || data.member?.user?.username || data.member?.nick || storeUser?.global_name || storeUser?.username || 'Someone';
@@ -476,7 +531,7 @@ export const DiscordGatewayService = {
         break;
       }
       case 'SESSIONS_REPLACE': {
-        const currentUserId = useDiscordStore.getState().user?.id;
+        const currentUserId = getAccountUserId(accountToken);
         if (currentUserId && Array.isArray(data) && data.length > 0) {
           const statusPriority: Record<string, number> = { online: 3, dnd: 2, idle: 1, offline: 0 };
           let bestStatus = 'offline';
@@ -502,18 +557,18 @@ export const DiscordGatewayService = {
       }
       case 'PASSIVE_UPDATE_V2':
         console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
-        
+
         this._handlePassiveUpdateV2(data);
         break;
       case 'USER_GUILD_SETTINGS_UPDATE':
         this._handleUserGuildSettingsUpdate(data);
         break;
       case 'USER_SETTINGS_PROTO_UPDATE': {
-        // Partial update — only re-decode if the guild_folders field (type 3) changed
         if (data.settings?.proto) {
+          const accountUserId = getAccountUserId(accountToken);
           const folders = decodeGuildFolders(data.settings.proto);
           if (folders.length > 0) {
-            useDiscordGuildFoldersStore.getState().setFolders(folders);
+            useDiscordGuildFoldersStore.getState().setFolders(folders, accountUserId);
           }
         }
         break;
@@ -551,25 +606,30 @@ export const DiscordGatewayService = {
 
     // Always call the external dispatch handler if set
     if (this.onDispatch) {
-      this.onDispatch({ event: eventName, data });
+      this.onDispatch(accountToken, { event: eventName, data });
     }
   },
 
   // ─── Dispatch Event Handlers ──────────────────────────────────────
 
-  _handleReady(data: any) {
+  _handleReady(accountToken: string, data: any) {
     const { user, guilds, session_id, resume_gateway_url, private_channels, users, read_state, merged_members, relationships, presences } = data;
 
+    const accountUserId = user.id;
     console.log(`[Discord Gateway] READY as ${user.username}#${user.discriminator} (${user.id})`, data);
     console.log(`[Discord Gateway] ${guilds.length} guilds, ${private_channels?.length || 0} DMs, ${users?.length || 0} users`);
 
-    useDiscordStore.getState().setUser(user);
-    useDiscordStore.getState().setSessionId(session_id);
-    useDiscordStore.getState().setConnected(true);
+    // Update this account in the store
+    useDiscordStore.getState().updateAccount(accountToken, {
+      user,
+      sessionId: session_id,
+      isConnected: true,
+    });
 
     useDiscordUsersStore.getState().addUser({ ...user, status: 'online' });
 
-    useDiscordGuildsStore.getState().setGuilds(guilds);
+    // Tag guilds with this account's user ID and set them
+    useDiscordGuildsStore.getState().setGuilds(guilds, accountUserId);
 
     const allGuildChannels: any[] = [];
     for (let i = 0; i < guilds.length; i++) {
@@ -615,7 +675,7 @@ export const DiscordGatewayService = {
       useDiscordGuildSettingsStore.getState().setAllSettings(guildSettingsEntries);
     }
 
-    // Decode guild folders from protobuf user settings (field 14 of PreloadedUserSettings)
+    // Decode guild folders from protobuf user settings
     if (data.user_settings_proto) {
       const decoded = decodeUserSettings(data.user_settings_proto);
       console.log('[Discord Gateway] Decoded user_settings_proto:', decoded);
@@ -623,7 +683,7 @@ export const DiscordGatewayService = {
       const folders = decodeGuildFolders(data.user_settings_proto);
       console.log(`[Discord Gateway] Decoded ${folders.length} guild folders:`, folders);
       if (folders.length > 0) {
-        useDiscordGuildFoldersStore.getState().setFolders(folders);
+        useDiscordGuildFoldersStore.getState().setFolders(folders, accountUserId);
       }
     } else {
       console.log('[Discord Gateway] No user_settings_proto in READY payload');
@@ -660,12 +720,12 @@ export const DiscordGatewayService = {
     }
   },
 
-  _handleReadySupplemental(data: any) {
+  _handleReadySupplemental(accountToken: string, data: any) {
     console.log('[Discord Gateway] READY_SUPPLEMENTAL received', data);
 
     const { guilds, merged_members, merged_presences } = data;
 
-    const currentUserId = useDiscordStore.getState().user?.id;
+    const currentUserId = getAccountUserId(accountToken);
     if (guilds && merged_members) {
       for (let i = 0; i < guilds.length; i++) {
         const guildId = guilds[i].id;
@@ -757,10 +817,15 @@ export const DiscordGatewayService = {
     }
   },
 
-  _handleGuildCreate(data: any) {
+  _handleGuildCreate(accountToken: string, data: any) {
+    // Tag the guild with the account's user ID
+    const accountUserId = getAccountUserId(accountToken);
+    if (accountUserId) {
+      data._accountId = accountUserId;
+    }
     useDiscordGuildsStore.getState().addGuild(data);
 
-    const currentUserId = useDiscordStore.getState().user?.id;
+    const currentUserId = accountUserId;
     if (currentUserId) {
       const mergedMembers = data.merged_members || [];
       const members = data.members || [];
@@ -825,7 +890,7 @@ export const DiscordGatewayService = {
     useDiscordChannelsStore.getState().removeChannel(data.id);
   },
 
-  _handleMessageCreate(data: any) {
+  _handleMessageCreate(accountToken: string, data: any) {
     if (data.nonce) {
       useDiscordChannelsStore.getState().removePendingByNonce(data.channel_id, data.nonce);
     }
@@ -846,8 +911,8 @@ export const DiscordGatewayService = {
       });
     }
 
-    const currentUser = useDiscordStore.getState().user;
-    const isOwnMessage = currentUser && data.author?.id === currentUser.id;
+    const currentUserId = getAccountUserId(accountToken);
+    const isOwnMessage = currentUserId && data.author?.id === currentUserId;
 
     useDiscordChannelsStore.getState().updateChannel(data.channel_id, {
       last_message_id: data.id,
@@ -858,7 +923,7 @@ export const DiscordGatewayService = {
       return;
     }
 
-    if (!currentUser) return;
+    if (!currentUserId) return;
 
     const guildId = data.guild_id;
     const channelId = data.channel_id;
@@ -877,14 +942,14 @@ export const DiscordGatewayService = {
       if (notifLevel === 3) notifLevel = guildSettings?.message_notifications ?? 1;
       if (notifLevel === 2) return;
 
-      const isDirectMention = data.mentions?.some((m: any) => m.id === currentUser.id);
+      const isDirectMention = data.mentions?.some((m: any) => m.id === currentUserId);
       const isEveryoneMention =
         data.mention_everyone && !guildSettings?.suppress_everyone;
       const isRoleMention =
         !guildSettings?.suppress_roles &&
         data.mention_roles?.length > 0 &&
         (() => {
-          const memberData = useDiscordMembersStore.getState().members[guildId]?.[currentUser.id];
+          const memberData = useDiscordMembersStore.getState().members[guildId]?.[currentUserId];
           const roles: string[] = memberData?.roles || [];
           return data.mention_roles.some((r: string) => roles.includes(r));
         })();
@@ -901,6 +966,12 @@ export const DiscordGatewayService = {
 
   _handleMessageUpdate(data: any) {
     if (data.id && data.channel_id) {
+      // Capture old version before overwriting
+      const guildId = data.guild_id || useDiscordChannelsStore.getState().channels.find(
+        (c) => c.id === data.channel_id,
+      )?.guild_id || null;
+      DiscordMessageLogService.onMessageUpdate(data.channel_id, data.id, data, guildId);
+
       useDiscordChannelsStore.getState().updateMessage(data.channel_id, data.id, data);
     }
   },
@@ -909,6 +980,9 @@ export const DiscordGatewayService = {
     if (data.id && data.channel_id) {
       const store = useDiscordChannelsStore.getState();
       const channel = store.channels.find((c) => c.id === data.channel_id);
+
+      // Capture message before removal
+      DiscordMessageLogService.onMessageDelete(data.channel_id, data.id, data.guild_id || channel?.guild_id || null);
 
       store.removeMessage(data.channel_id, data.id);
 
@@ -919,6 +993,28 @@ export const DiscordGatewayService = {
           last_message_id: lastMsg?.id || null,
         });
       }
+    }
+  },
+
+  _handleMessageDeleteBulk(data: any) {
+    const { ids, channel_id } = data;
+    if (!channel_id || !ids?.length) return;
+
+    const store = useDiscordChannelsStore.getState();
+
+    // Capture messages before bulk removal
+    const channel = store.channels.find((c) => c.id === channel_id);
+    DiscordMessageLogService.onMessageDeleteBulk(channel_id, ids, channel?.guild_id || null);
+
+    store.removeMessages(channel_id, ids);
+
+    // Update last_message_id if it was among the deleted messages
+    if (channel && ids.includes(channel.last_message_id)) {
+      const messages = useDiscordChannelsStore.getState().channelMessages[channel_id] || [];
+      const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+      store.updateChannel(channel_id, {
+        last_message_id: lastMsg?.id || null,
+      });
     }
   },
 

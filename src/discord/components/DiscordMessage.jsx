@@ -26,7 +26,8 @@ import {
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
 import DiscordClanTag from './DiscordClanTag';
-import { ArrowBendUpLeft, Smiley, Plus, ArrowSquareOut, ArrowClockwise, Trash, WarningCircle, Eye, Play } from '@phosphor-icons/react';
+import { openAttachmentViewModal } from '@/components/modals/AttachmentViewModal';
+import { ArrowBendUpLeft, Smiley, Plus, ArrowSquareOut, ArrowClockwise, Trash, WarningCircle, Eye, Play, DownloadSimple, File } from '@phosphor-icons/react';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { generateNonce } from '../utils/snowflake';
 import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
@@ -81,6 +82,33 @@ function useNameColor(guildId, member) {
   }, [guildId, guilds, member?.roles]);
 }
 
+/** Resolve a member's top role icon (custom image or unicode emoji). */
+function useRoleIcon(guildId, member) {
+  const guilds = useDiscordGuildsStore((s) => s.guilds);
+  return useMemo(() => {
+    if (!guildId || !member?.roles) return null;
+    const guild = guilds.find((g) => g.id === guildId);
+    const guildRoles = guild?.roles || guild?.properties?.roles;
+    if (!guildRoles) return null;
+    const iconRole = guildRoles
+      .filter((r) => member.roles.includes(r.id) && r.id !== guildId)
+      .sort((a, b) => (b.position || 0) - (a.position || 0))
+      .find((r) => r.icon || r.unicode_emoji);
+    if (!iconRole) return null;
+    if (iconRole.icon) {
+      return {
+        type: 'image',
+        url: `https://cdn.discordapp.com/role-icons/${iconRole.id}/${iconRole.icon}.webp?size=20`,
+        name: iconRole.name,
+      };
+    }
+    if (iconRole.unicode_emoji) {
+      return { type: 'emoji', emoji: iconRole.unicode_emoji, name: iconRole.name };
+    }
+    return null;
+  }, [guildId, guilds, member?.roles]);
+}
+
 /**
  * Clickable username with member role color, underline on hover, and opens profile on click.
  * @param {object} props
@@ -119,6 +147,7 @@ const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
   );
 
   const member = message.member || storeMember;
+  const roleIcon = useRoleIcon(guildId, member);
 
   const formattedDateTime = useMemo(() => {
     const date = new Date(message.timestamp);
@@ -134,8 +163,8 @@ const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
       : isYesterday
         ? 'Yesterday'
         : date.toLocaleDateString('en-US', {
-            month: '2-digit',
-            day: '2-digit',
+            month: 'numeric',
+            day: 'numeric',
             year: 'numeric',
           });
     const time = date.toLocaleTimeString('en-US', {
@@ -147,7 +176,7 @@ const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
   }, [message.timestamp]);
 
   return (
-    <header className="relative mb-1 flex items-baseline gap-2 leading-none">
+    <header className="relative mb-1 flex items-center gap-2 leading-none">
       <DiscordUserName author={message.author} member={member} guildId={guildId} />
       {message.author.bot && (
         <span className="inline-flex items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
@@ -161,6 +190,18 @@ const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
       )}
       {!message.author.bot && (
         <DiscordClanTag userId={message.author.id} size="sm" />
+      )}
+      {roleIcon && (
+        roleIcon.type === 'image' ? (
+          <img
+            src={roleIcon.url}
+            alt={roleIcon.name}
+            title={roleIcon.name}
+            className="inline-block size-4 object-contain"
+          />
+        ) : (
+          <span title={roleIcon.name} className="text-sm leading-none">{roleIcon.emoji}</span>
+        )
       )}
       <time className="cursor-default text-xs font-medium text-gray-500" dateTime={message.timestamp}>{formattedDateTime}</time>
     </header>
@@ -191,11 +232,11 @@ const DiscordAttachments = ({ attachments }) => {
         if (isImage) {
           const { width, height } = fitDimensions(att.width, att.height, 400, 300);
           return (
-            <a
+            <button
               key={att.id}
-              href={att.url}
-              target="_blank"
-              rel="noopener noreferrer"
+              type="button"
+              className="block cursor-pointer"
+              onClick={() => openAttachmentViewModal(att.url)}
             >
               <img
                 src={att.proxy_url || att.url}
@@ -204,7 +245,7 @@ const DiscordAttachments = ({ attachments }) => {
                 width={width}
                 height={height}
               />
-            </a>
+            </button>
           );
         }
 
@@ -222,21 +263,40 @@ const DiscordAttachments = ({ attachments }) => {
           );
         }
 
+        const fileSize =
+          att.size >= 1048576
+            ? `${(att.size / 1048576).toFixed(att.size >= 10485760 ? 1 : 2)} MB`
+            : att.size >= 1024
+              ? `${(att.size / 1024).toFixed(1)} KB`
+              : `${att.size} B`;
+
         return (
-          <a
+          <div
             key={att.id}
-            href={att.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded bg-[#2b2d31] px-3 py-2 text-sm text-blue-400 hover:underline"
+            className="flex max-w-[432px] items-center gap-2 overflow-hidden rounded-lg border border-white/5 bg-[#2b2d31] p-2.5"
           >
-            <span>{att.filename}</span>
-            <span className="text-xs text-gray-500">
-              {att.size > 1048576
-                ? `${(att.size / 1048576).toFixed(1)} MB`
-                : `${(att.size / 1024).toFixed(1)} KB`}
-            </span>
-          </a>
+            <File size={40} weight="fill" className="shrink-0 text-gray-400" />
+            <div className="min-w-0 flex-1">
+              <a
+                href={att.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block truncate text-sm font-medium text-[#00a8fc] hover:underline"
+              >
+                {att.filename}
+              </a>
+              <span className="text-xs text-gray-500">{fileSize}</span>
+            </div>
+            <a
+              href={att.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              download={att.filename}
+              className="flex size-6 shrink-0 items-center justify-center rounded text-gray-400 transition hover:text-gray-200"
+            >
+              <DownloadSimple size={20} weight="bold" />
+            </a>
+          </div>
         );
       })}
     </div>
@@ -303,6 +363,37 @@ const DiscordEmbeds = ({ embeds, guildId }) => {
   return (
     <div className="mt-1.5 flex flex-col gap-1.5">
       {embeds.map((embed, i) => {
+        // gifv embeds (tenor, giphy, imgur gifv) — render as inline auto-playing gif
+        if (embed.type === 'gifv' && embed.video) {
+          const gifVideoUrl = embed.video.proxy_url || embed.video.url;
+          const { width, height } = fitDimensions(
+            embed.video.width || embed.thumbnail?.width || 400,
+            embed.video.height || embed.thumbnail?.height || 300,
+            400,
+            300,
+          );
+          return (
+            <a
+              key={i}
+              href={embed.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+            >
+              <video
+                src={gifVideoUrl}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="rounded-lg"
+                width={width}
+                height={height}
+              />
+            </a>
+          );
+        }
+
         const borderColor = embed.color
           ? `#${embed.color.toString(16).padStart(6, '0')}`
           : '#202225';
@@ -387,13 +478,19 @@ const DiscordEmbeds = ({ embeds, guildId }) => {
               {embed.image && !isIframeProvider && (() => {
                 const { width, height } = fitDimensions(embed.image.width, embed.image.height, 400, 400);
                 return (
-                  <img
-                    src={embed.image.proxy_url || embed.image.url}
-                    alt=""
-                    className="mt-2 rounded"
-                    width={width}
-                    height={height}
-                  />
+                  <button
+                    type="button"
+                    className="mt-2 block cursor-pointer"
+                    onClick={() => openAttachmentViewModal(embed.image.url)}
+                  >
+                    <img
+                      src={embed.image.proxy_url || embed.image.url}
+                      alt=""
+                      className="rounded"
+                      width={width}
+                      height={height}
+                    />
+                  </button>
                 );
               })()}
               {embed.thumbnail && !embed.image && !isIframeProvider && hasVideo && (
@@ -924,7 +1021,7 @@ const DiscordSystemMessage = memo(({ message, prevMessage, guildId }) => {
     yesterday.setDate(yesterday.getDate() - 1);
     const isToday = date.toDateString() === today.toDateString();
     const isYesterday = date.toDateString() === yesterday.toDateString();
-    const day = isToday ? 'Today' : isYesterday ? 'Yesterday' : date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    const day = isToday ? 'Today' : isYesterday ? 'Yesterday' : date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
     const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     return `${day} at ${time}`;
   }, [message.timestamp]);
@@ -1031,6 +1128,24 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
   const interaction = message.interaction || message.interaction_metadata;
   const hasInteractionBar = !!(interaction && (interaction.name || interaction.user));
   const hasReply = !!message.referenced_message || !!message.message_reference;
+
+  // Hide message text when the content is just a single URL that produced an embed
+  // (e.g. tenor/giphy GIFs, image links, YouTube). Discord suppresses the text in this case.
+  const hideContent = useMemo(() => {
+    const content = message.content?.trim();
+    if (!content || !message.embeds?.length) return false;
+    // Must be a single URL with no other text
+    if (/\s/.test(content)) return false;
+    try {
+      new URL(content);
+    } catch {
+      return false;
+    }
+    // Check if any embed's url matches the message content
+    return message.embeds.some(
+      (e) => e.url === content || e.url === content.replace(/\/$/, ''),
+    );
+  }, [message.content, message.embeds]);
 
   const shouldStack = useMemo(() => {
     if (hasInteractionBar) return false;
@@ -1220,12 +1335,14 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
             </div>
           )}
 
-          <div className={cn('select-text whitespace-pre-wrap [overflow-wrap:anywhere]', isFailed ? 'text-red-400' : 'text-gray-400')} style={{ fontSize: chatFontSize, lineHeight: `${Math.round(chatFontSize * 1.375)}px` }}>
-            <DiscordMessageContent content={message.content} guildId={guildId} />
-            {message.edited_timestamp && (
-              <span className="ml-1 text-[0.65rem] text-gray-500">(edited)</span>
-            )}
-          </div>
+          {!hideContent && (
+            <div className={cn('select-text whitespace-pre-wrap [overflow-wrap:anywhere]', isFailed ? 'text-red-400' : 'text-gray-400')} style={{ fontSize: chatFontSize, lineHeight: `${Math.round(chatFontSize * 1.375)}px` }}>
+              <DiscordMessageContent content={message.content} guildId={guildId} />
+              {message.edited_timestamp && (
+                <span className="ml-1 text-[0.65rem] text-gray-500">(edited)</span>
+              )}
+            </div>
+          )}
 
           <DiscordAttachments attachments={message.attachments} />
           <DiscordEmbeds embeds={message.embeds} guildId={guildId} />

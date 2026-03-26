@@ -19,7 +19,7 @@ export type ReadStateEntry = {
   id: string; // channel or guild ID
   last_message_id?: string;
   mention_count?: number;
-  last_viewed?: number;
+  last_viewed?: number; // number of days since discord epoch
   last_pin_timestamp?: string;
   flags?: number;
   // Type 2/4 entries (notification/guild read states)

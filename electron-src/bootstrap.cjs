@@ -346,6 +346,46 @@ const startCore = () => {
     return results.flat();
   });
 
+  // ── Message Log: file-based storage for attachments ──────────────
+  const msgLogDir = join(app.getPath('userData'), 'message-log');
+
+  ipcMain.handle('msglog:saveAttachment', async (_event, channelId, messageId, filename, data) => {
+    const dir = join(msgLogDir, 'attachments', channelId, messageId);
+    await fs.promises.mkdir(dir, { recursive: true });
+    const filePath = join(dir, filename);
+    await fs.promises.writeFile(filePath, Buffer.from(data));
+    return filePath;
+  });
+
+  ipcMain.handle('msglog:loadAttachment', async (_event, channelId, messageId, filename) => {
+    const filePath = join(msgLogDir, 'attachments', channelId, messageId, filename);
+    try {
+      const buffer = await fs.promises.readFile(filePath);
+      return buffer;
+    } catch {
+      return null;
+    }
+  });
+
+  ipcMain.handle('msglog:saveMessages', async (_event, channelId, jsonData) => {
+    const dir = join(msgLogDir, 'channels');
+    await fs.promises.mkdir(dir, { recursive: true });
+    const filePath = join(dir, `${channelId}.json`);
+    await fs.promises.writeFile(filePath, jsonData, 'utf-8');
+    return filePath;
+  });
+
+  ipcMain.handle('msglog:loadMessages', async (_event, channelId) => {
+    const filePath = join(msgLogDir, 'channels', `${channelId}.json`);
+    try {
+      return await fs.promises.readFile(filePath, 'utf-8');
+    } catch {
+      return null;
+    }
+  });
+
+  ipcMain.handle('msglog:getBasePath', () => msgLogDir);
+
   ipcMain.handle('desktop:getSources', async () => {
     const sources = await desktopCapturer.getSources({
       types: ['window', 'screen'],

@@ -7,15 +7,17 @@ import PageTitle from '@/ignite/components/PageTitle';
 
 const DiscordLandingPage = () => {
   const navigate = useNavigate();
-  const { token, isConnected } = useDiscordStore();
+  const accounts = useDiscordStore((s) => s.accounts);
+  const isConnected = useDiscordStore((s) => s.isConnected);
   const { guilds } = useDiscordGuildsStore();
 
-  // Auto-connect if token exists but not connected
+  // Auto-connect all accounts if any have tokens but aren't connected
   useEffect(() => {
-    if (token && !isConnected) {
-      DiscordService.connect();
+    const hasUnconnected = accounts.some((a) => !a.isConnected);
+    if (accounts.length > 0 && hasUnconnected) {
+      DiscordService.connectAll();
     }
-  }, [token, isConnected]);
+  }, [accounts.length]);
 
   // Redirect to first guild once guilds are loaded
   useEffect(() => {
@@ -24,8 +26,8 @@ const DiscordLandingPage = () => {
     }
   }, [isConnected, guilds, navigate]);
 
-  // No token at all
-  if (!token) {
+  // No accounts at all
+  if (accounts.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-gray-500">
         <p className="text-sm">No Discord account connected.</p>

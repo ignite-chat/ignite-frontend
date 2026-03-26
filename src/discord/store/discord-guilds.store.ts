@@ -5,12 +5,13 @@ type DiscordGuildsStore = {
   guilds: DiscordGuild[];
   guildMembers: { [guildId: string]: DiscordMember[] };
 
-  setGuilds: (guilds: DiscordGuild[]) => void;
+  setGuilds: (guilds: DiscordGuild[], accountId?: string) => void;
   addGuild: (guild: DiscordGuild) => void;
   updateGuild: (guildId: string, updates: Partial<DiscordGuild>) => void;
   removeGuild: (guildId: string) => void;
   setGuildMembers: (guildId: string, members: DiscordMember[]) => void;
   addGuildMembers: (guildId: string, members: DiscordMember[]) => void;
+  clearAccount: (accountId: string) => void;
   clear: () => void;
 };
 
@@ -18,7 +19,17 @@ export const useDiscordGuildsStore = create<DiscordGuildsStore>((set) => ({
   guilds: [],
   guildMembers: {},
 
-  setGuilds: (guilds) => set({ guilds }),
+  setGuilds: (guilds, accountId) => {
+    if (accountId) {
+      // Replace only this account's guilds, keep others
+      const tagged = guilds.map((g) => ({ ...g, _accountId: accountId }));
+      set((state) => ({
+        guilds: [...state.guilds.filter((g) => g._accountId !== accountId), ...tagged],
+      }));
+    } else {
+      set({ guilds });
+    }
+  },
 
   addGuild: (guild) =>
     set((state) => {
@@ -40,7 +51,7 @@ export const useDiscordGuildsStore = create<DiscordGuildsStore>((set) => ({
     set((state) => ({
       guilds: state.guilds.filter((g) => g.id !== guildId),
       guildMembers: Object.fromEntries(
-        Object.entries(state.guildMembers).filter(([id]) => id !== guildId)
+        Object.entries(state.guildMembers).filter(([id]) => id !== guildId),
       ),
     })),
 
@@ -64,6 +75,19 @@ export const useDiscordGuildsStore = create<DiscordGuildsStore>((set) => ({
         }
       }
       return { guildMembers: { ...state.guildMembers, [guildId]: merged } };
+    }),
+
+  clearAccount: (accountId) =>
+    set((state) => {
+      const removedGuildIds = new Set(
+        state.guilds.filter((g) => g._accountId === accountId).map((g) => g.id),
+      );
+      return {
+        guilds: state.guilds.filter((g) => g._accountId !== accountId),
+        guildMembers: Object.fromEntries(
+          Object.entries(state.guildMembers).filter(([id]) => !removedGuildIds.has(id)),
+        ),
+      };
     }),
 
   clear: () => set({ guilds: [], guildMembers: {} }),

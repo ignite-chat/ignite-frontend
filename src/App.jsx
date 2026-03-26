@@ -27,7 +27,7 @@ const AuthRoute = ({ children }) => {
   const [failed, setFailed] = useState(false);
 
   const hasIgniteToken = !!localStorage.getItem('token');
-  const hasDiscordToken = !!localStorage.getItem('discord_token');
+  const hasDiscordToken = !!localStorage.getItem('discord_accounts') || !!localStorage.getItem('discord_accounts') || localStorage.getItem('discord_token');
   const discordOnly = !hasIgniteToken && hasDiscordToken;
 
   // Sync taskbar badge with unread/mention state (Electron only)
@@ -122,7 +122,7 @@ const GuestRoute = ({ children }) => {
     return <Navigate to="/channels/@me" replace />;
   }
 
-  if (localStorage.getItem('discord_token')) {
+  if (localStorage.getItem('discord_accounts') || localStorage.getItem('discord_token')) {
     return <Navigate to="/discord" replace />;
   }
 
@@ -163,7 +163,7 @@ function App() {
           element={
             userId ? (
               <Navigate to="/channels/@me" replace />
-            ) : localStorage.getItem('discord_token') ? (
+            ) : localStorage.getItem('discord_accounts') || localStorage.getItem('discord_token') ? (
               <Navigate to="/discord" replace />
             ) : (
               <Navigate to="/login" replace />

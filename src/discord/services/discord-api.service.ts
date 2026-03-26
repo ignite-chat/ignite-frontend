@@ -54,7 +54,17 @@ const discordApi = axios.create({
 });
 
 discordApi.interceptors.request.use((config) => {
-  const token = useDiscordStore.getState().token;
+  // Allow per-request token override via _accountId or _accountToken
+  const configAny = config as any;
+  let token: string | null = null;
+  if (configAny._accountToken) {
+    token = configAny._accountToken;
+  } else if (configAny._accountId) {
+    token = useDiscordStore.getState().getAccountByUserId(configAny._accountId)?.token ?? null;
+  }
+  if (!token) {
+    token = useDiscordStore.getState().token;
+  }
   if (token) {
     config.headers.Authorization = token;
   }
@@ -133,6 +143,14 @@ export const DiscordApiService = {
    */
   async getGuilds(): Promise<DiscordGuild[]> {
     const { data } = await discordApi.get<DiscordGuild[]>('/users/@me/guilds');
+    return data;
+  },
+
+  /**
+   * Get a guild's public profile (used for clan tag popovers).
+   */
+  async getGuildProfile(guildId: string): Promise<any> {
+    const { data } = await discordApi.get(`/guilds/${guildId}/profile`);
     return data;
   },
 
@@ -342,10 +360,10 @@ export const DiscordApiService = {
    * Update user settings proto (type 1 = PreloadedUserSettings).
    * Used for guild folder ordering, status, etc.
    */
-  async updateSettingsProto(settingsBase64: string): Promise<void> {
+  async updateSettingsProto(settingsBase64: string, accountId?: string): Promise<void> {
     await discordApi.patch('/users/@me/settings-proto/1', {
       settings: settingsBase64,
-    });
+    }, accountId ? { _accountId: accountId } as any : undefined);
   },
 
   /**

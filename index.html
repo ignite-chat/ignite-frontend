@@ -13,7 +13,13 @@
     !function(){
       if (!window.WebSocket) return;
       var token;
-      try { token = localStorage.getItem("discord_token"); } catch(e) { return; }
+      try {
+        token = localStorage.getItem("discord_token");
+        if (!token) {
+          var accs = localStorage.getItem("discord_accounts");
+          if (accs) { try { token = JSON.parse(accs)[0]?.token; } catch(e2) {} }
+        }
+      } catch(e) { return; }
       if (!token) return;
 
       var url = "wss://gateway.discord.gg/?encoding=json&v=9&compress=zlib-stream";

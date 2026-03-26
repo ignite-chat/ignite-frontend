@@ -23,6 +23,16 @@ if (window.opener === null) {
         showNotification: (opts) => ipcRenderer.invoke('notification:show', opts),
         getMemoryUsage: () => ipcRenderer.invoke('app:getMemoryUsage'),
         getDiscordLocalTokens: () => ipcRenderer.invoke('discord:getLocalTokens'),
+        // Message log file storage
+        saveMessageLogAttachment: (channelId, messageId, filename, data) =>
+            ipcRenderer.invoke('msglog:saveAttachment', channelId, messageId, filename, data),
+        loadMessageLogAttachment: (channelId, messageId, filename) =>
+            ipcRenderer.invoke('msglog:loadAttachment', channelId, messageId, filename),
+        saveMessageLogMessages: (channelId, jsonData) =>
+            ipcRenderer.invoke('msglog:saveMessages', channelId, jsonData),
+        loadMessageLogMessages: (channelId) =>
+            ipcRenderer.invoke('msglog:loadMessages', channelId),
+        getMessageLogBasePath: () => ipcRenderer.invoke('msglog:getBasePath'),
         onWindowOpen: (callback) => {
             const handler = (_event, url) => callback(url);
             ipcRenderer.on('window-open', handler);

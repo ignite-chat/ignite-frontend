@@ -17,6 +17,7 @@ type DiscordChannelsStore = {
   appendMessage: (channelId: string, message: DiscordMessage) => void;
   updateMessage: (channelId: string, messageId: string, updates: Partial<DiscordMessage>) => void;
   removeMessage: (channelId: string, messageId: string) => void;
+  removeMessages: (channelId: string, messageIds: string[]) => void;
 
   addPendingMessage: (channelId: string, pending: PendingMessage) => void;
   removePendingByNonce: (channelId: string, nonce: string) => void;
@@ -102,6 +103,19 @@ export const useDiscordChannelsStore = create<DiscordChannelsStore>((set) => ({
         channelMessages: {
           ...state.channelMessages,
           [channelId]: messages.filter((m) => m.id !== messageId),
+        },
+      };
+    }),
+
+  removeMessages: (channelId, messageIds) =>
+    set((state) => {
+      const messages = state.channelMessages[channelId];
+      if (!messages) return state;
+      const idSet = new Set(messageIds);
+      return {
+        channelMessages: {
+          ...state.channelMessages,
+          [channelId]: messages.filter((m) => !idSet.has(m.id)),
         },
       };
     }),

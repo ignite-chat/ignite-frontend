@@ -56,6 +56,7 @@ import { useDiscordGuildFoldersStore } from '../discord/store/discord-guild-fold
 import { useLastChannelStore } from '@/store/last-channel.store';
 import { ChannelType } from '@/ignite/constants/ChannelType';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { SpeakerSimpleHigh, Monitor, FolderSimple } from '@phosphor-icons/react';
 import GuildIcon from '@/ignite/components/GuildIcon';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -225,7 +226,7 @@ const DiscordGuildIcon = ({ guild, isActive }) => {
     return { unread: hasUnread, mentions: totalMentions };
   }, [channels, guild.id, readStates, joinedAtMs]);
 
-  const currentDiscordUserId = useDiscordStore((s) => s.user?.id);
+  const currentDiscordUserId = guild._accountId || useDiscordStore.getState().user?.id;
 
   const voiceMembers = useMemo(() => {
     if (!guildVoiceStates) return [];
@@ -706,6 +707,74 @@ const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
   );
 };
 
+const DiscordAccountPopover = ({ account, onDisconnect }) => {
+  const discordUser = account?.user;
+  const avatarUrl = discordUser
+    ? DiscordService.getUserAvatarUrl(discordUser.id, discordUser.avatar, 128)
+    : null;
+  const displayName = discordUser?.global_name || discordUser?.username || 'Discord';
+
+  return (
+    <Popover>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <button type="button" className="group relative mb-2 min-w-min px-3">
+              <div className="relative mx-auto h-12 w-12">
+                <div className="absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden rounded-full transition-all duration-300 ease-out ring-2 ring-transparent hover:ring-[#5865f2]">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={displayName} className="size-full object-cover" draggable="false" />
+                  ) : (
+                    <div className="flex size-full items-center justify-center bg-[#5865f2] text-white">
+                      <DiscordLogo className="size-6" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="font-bold">
+          {displayName}
+        </TooltipContent>
+      </Tooltip>
+      <PopoverContent
+        side="right"
+        align="end"
+        sideOffset={8}
+        className="w-56 rounded-lg border-white/10 bg-[#111214] p-1.5"
+      >
+        <div className="mb-1.5 flex items-center gap-2.5 rounded-md px-2 py-2">
+          <div className="size-8 shrink-0 overflow-hidden rounded-full">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={displayName} className="size-full object-cover" draggable="false" />
+            ) : (
+              <div className="flex size-full items-center justify-center bg-[#5865f2] text-white">
+                <DiscordLogo className="size-4" />
+              </div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-white">{displayName}</div>
+            {discordUser?.username && discordUser.global_name && (
+              <div className="truncate text-xs text-gray-400">{discordUser.username}</div>
+            )}
+          </div>
+        </div>
+        <div className="h-px bg-white/10" />
+        <button
+          type="button"
+          onClick={onDisconnect}
+          className="mt-1.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-red-400 hover:bg-white/5 hover:text-red-300"
+        >
+          <SignOut className="size-4" />
+          Disconnect
+        </button>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 const GuildsSidebar = () => {
   const { guildId, channelId } = useParams();
   const navigate = useNavigate();
@@ -719,71 +788,79 @@ const GuildsSidebar = () => {
   const [activeId, setActiveId] = useState(null);
   const [leaveGuild, setLeaveGuild] = useState(null);
   const [isDiscordDialogOpen, setIsDiscordDialogOpen] = useState(false);
-  const [isDiscordLogoutOpen, setIsDiscordLogoutOpen] = useState(false);
+  const [disconnectingAccount, setDisconnectingAccount] = useState(null);
   const lastDmChannelId = useLastChannelStore((s) => s.lastChannels['@me']);
 
-  // Discord state
-  const { token: discordToken, isConnected: discordConnected, user: discordUser } = useDiscordStore();
+  // Discord state — multi-account
+  const discordAccounts = useDiscordStore((s) => s.accounts);
+  const discordConnected = useDiscordStore((s) => s.isConnected);
   const { guilds: discordGuilds } = useDiscordGuildsStore();
-  const discordGuildFolders = useDiscordGuildFoldersStore((s) => s.folders);
+  const discordFoldersByAccount = useDiscordGuildFoldersStore((s) => s.foldersByAccount);
   const discordUsersMap = useDiscordUsersStore((s) => s.users);
   const discordChannels = useDiscordChannelsStore((s) => s.channels);
   const discordChannelMessages = useDiscordChannelsStore((s) => s.channelMessages);
   const discordReadStates = useDiscordReadStatesStore((s) => s.readStates);
 
-  // Build ordered Discord sidebar entries from guild folders
-  const discordSidebarEntries = useMemo(() => {
-    if (!discordConnected || discordGuilds.length === 0) return [];
+  // Build ordered Discord sidebar entries per account
+  const discordAccountSections = useMemo(() => {
+    if (discordAccounts.length === 0) return [];
 
     const guildsById = {};
     for (const g of discordGuilds) {
       guildsById[g.id] = g;
     }
 
-    // If we have folder data, use it for ordering
-    if (discordGuildFolders.length > 0) {
-      const entries = [];
-      const placed = new Set();
+    return discordAccounts.map((account) => {
+      const accountUserId = account.user?.id;
+      const accountGuilds = discordGuilds.filter((g) => g._accountId === accountUserId);
+      const accountFolders = accountUserId ? (discordFoldersByAccount[accountUserId] || []) : [];
 
-      for (const folder of discordGuildFolders) {
-        const folderGuilds = folder.guild_ids
-          .map((id) => guildsById[id])
-          .filter(Boolean);
+      let entries = [];
 
-        for (const g of folderGuilds) placed.add(g.id);
+      if (accountFolders.length > 0) {
+        const placed = new Set();
 
-        if (folderGuilds.length === 0) continue;
+        for (const folder of accountFolders) {
+          const folderGuilds = folder.guild_ids
+            .map((id) => guildsById[id])
+            .filter(Boolean);
 
-        // id !== null = real folder, id === null = standalone guild
-        if (folder.id != null) {
-          entries.push({ type: 'folder', folder, guilds: folderGuilds });
-        } else {
-          for (const g of folderGuilds) {
+          for (const g of folderGuilds) placed.add(g.id);
+
+          if (folderGuilds.length === 0) continue;
+
+          if (folder.id != null) {
+            entries.push({ type: 'folder', folder, guilds: folderGuilds });
+          } else {
+            for (const g of folderGuilds) {
+              entries.push({ type: 'guild', guild: g });
+            }
+          }
+        }
+
+        // Any guilds not in folders
+        for (const g of accountGuilds) {
+          if (!placed.has(g.id)) {
             entries.push({ type: 'guild', guild: g });
           }
         }
+      } else {
+        entries = accountGuilds.map((g) => ({ type: 'guild', guild: g }));
       }
 
-      // Any guilds not in folders (shouldn't happen but be safe)
-      for (const g of discordGuilds) {
-        if (!placed.has(g.id)) {
-          entries.push({ type: 'guild', guild: g });
-        }
-      }
+      return { account, entries, folders: accountFolders };
+    });
+  }, [discordAccounts, discordGuilds, discordFoldersByAccount]);
 
-      return entries;
-    }
-
-    // No folder data — render guilds in original order
-    return discordGuilds.map((g) => ({ type: 'guild', guild: g }));
-  }, [discordConnected, discordGuilds, discordGuildFolders]);
-
-  // Auto-connect to Discord if token exists
+  // Auto-connect all Discord accounts
   useEffect(() => {
-    if (discordToken && !discordConnected) {
-      DiscordService.connect();
+    if (discordAccounts.length > 0) {
+      const hasUnconnected = discordAccounts.some((a) => !a.isConnected);
+      if (hasUnconnected) {
+        DiscordService.connectAll();
+      }
     }
-  }, [discordToken, discordConnected]);
+  }, [discordAccounts.length]);
 
   const { orderedGuilds, reorder } = useGuildOrder(guilds);
 
@@ -897,8 +974,10 @@ const GuildsSidebar = () => {
       });
   }, [channelUnreadsLoaded, channels, channelUnreads, channelMessages, user]);
 
+  const discordUserIds = useMemo(() => new Set(discordAccounts.map((a) => a.user?.id).filter(Boolean)), [discordAccounts]);
+
   const unreadDiscordDmChannels = useMemo(() => {
-    if (!discordConnected || !discordUser) return [];
+    if (!discordConnected || discordUserIds.size === 0) return [];
 
     return discordChannels
       .filter((c) => (c.type === 1 || c.type === 3) && c.last_message_id)
@@ -926,7 +1005,7 @@ const GuildsSidebar = () => {
             ? `https://cdn.discordapp.com/channel-icons/${channel.id}/${channel.icon}.png?size=64`
             : null;
         } else {
-          const otherId = recipientIds.find((id) => id !== discordUser.id) || recipientIds[0];
+          const otherId = recipientIds.find((id) => !discordUserIds.has(id)) || recipientIds[0];
           const other = otherId ? discordUsersMap[otherId] : null;
           name = other?.global_name || other?.username || 'Unknown User';
           icon = other ? DiscordService.getUserAvatarUrl(other.id, other.avatar, 64) : null;
@@ -934,7 +1013,7 @@ const GuildsSidebar = () => {
 
         return { id: channel.id, name, icon, mentionCount: unreadCount };
       });
-  }, [discordConnected, discordUser, discordChannels, discordReadStates, discordUsersMap, discordChannelMessages]);
+  }, [discordConnected, discordUserIds, discordChannels, discordReadStates, discordUsersMap, discordChannelMessages]);
 
   const confirmLeave = async () => {
     if (!leaveGuild?.id) return;
@@ -1044,15 +1123,21 @@ const GuildsSidebar = () => {
 
         <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
 
-        {/* Discord */}
-        {discordToken && (
-          <>
-            {discordConnected ? (
-              <DiscordGuildsDnd
-                entries={discordSidebarEntries}
-                folders={discordGuildFolders}
-                pathname={location.pathname}
-              />
+        {/* Discord accounts */}
+        {discordAccountSections.map(({ account, entries, folders: accountFolders }) => (
+          <div key={account.token}>
+            <DiscordAccountPopover
+              account={account}
+              onDisconnect={() => setDisconnectingAccount(account)}
+            />
+            {account.isConnected ? (
+              entries.length > 0 && (
+                <DiscordGuildsDnd
+                  entries={entries}
+                  folders={accountFolders}
+                  pathname={location.pathname}
+                />
+              )
             ) : (
               Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="mb-2 flex justify-center px-3">
@@ -1060,31 +1145,19 @@ const GuildsSidebar = () => {
                 </div>
               ))
             )}
-            <button
-              type="button"
-              onClick={() => setIsDiscordLogoutOpen(true)}
-            >
-              <SidebarIcon
-                icon={<SignOut className="size-5" />}
-                text="Disconnect Discord"
-              />
-            </button>
-          </>
-        )}
+          </div>
+        ))}
 
-        {!discordToken && (
-          <>
-            <button
-              type="button"
-              onClick={() => setIsDiscordDialogOpen(true)}
-            >
-              <SidebarIcon
-                icon={<DiscordLogo className="size-6" />}
-                text="Connect Discord"
-              />
-            </button>
-          </>
-        )}
+        {/* Connect Discord button */}
+        <button
+          type="button"
+          onClick={() => setIsDiscordDialogOpen(true)}
+        >
+          <SidebarIcon
+            icon={<DiscordLogo className="size-6" />}
+            text="Connect Discord"
+          />
+        </button>
 
         {hasIgniteToken && (
           <>
@@ -1103,20 +1176,33 @@ const GuildsSidebar = () => {
         onOpenChange={setIsDiscordDialogOpen}
       />
 
-      <AlertDialog open={isDiscordLogoutOpen} onOpenChange={setIsDiscordLogoutOpen}>
+      <AlertDialog open={!!disconnectingAccount} onOpenChange={(open) => !open && setDisconnectingAccount(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Disconnect Discord</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to disconnect your Discord account?
+              Are you sure you want to disconnect{' '}
+              <span className="font-bold text-white">
+                {disconnectingAccount?.user?.global_name || disconnectingAccount?.user?.username || 'this Discord account'}
+              </span>
+              ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                DiscordService.logout();
-                navigate(hasIgniteToken ? '/channels/@me' : '/login');
+                if (disconnectingAccount) {
+                  DiscordService.logoutAccount(disconnectingAccount.token);
+                  // If no accounts left and no ignite token, redirect
+                  const remaining = useDiscordStore.getState().accounts;
+                  if (remaining.length === 0 && !hasIgniteToken) {
+                    navigate('/login');
+                  } else if (location.pathname.startsWith('/discord')) {
+                    navigate(hasIgniteToken ? '/channels/@me' : '/discord');
+                  }
+                }
+                setDisconnectingAccount(null);
               }}
               className="bg-red-500 text-white hover:bg-red-600"
             >

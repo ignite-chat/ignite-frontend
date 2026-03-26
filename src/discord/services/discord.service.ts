@@ -14,24 +14,51 @@ import { generateNonce } from '../utils/snowflake';
 
 export const DiscordService = {
   /**
-   * Connect to Discord using the stored token.
-   * Opens the gateway WebSocket and fetches initial data.
+   * Connect all stored Discord accounts to the gateway.
    */
-  async connect() {
-    const token = useDiscordStore.getState().token;
-    if (!token) {
+  async connectAll() {
+    const { accounts } = useDiscordStore.getState();
+    if (accounts.length === 0) {
+      toast.error('No Discord accounts configured.');
+      return false;
+    }
+
+    // Set up the dispatch handler once
+    DiscordGatewayService.onDispatch = (accountToken, payload) => {
+      this._handleGatewayDispatch(payload.event, payload.data);
+    };
+
+    for (const account of accounts) {
+      if (!account.isConnected) {
+        try {
+          DiscordGatewayService.connect(account.token);
+        } catch (error) {
+          console.error('[Discord] Failed to connect account:', error);
+        }
+      }
+    }
+    return true;
+  },
+
+  /**
+   * Connect a single Discord account by token.
+   */
+  async connect(token?: string) {
+    const resolvedToken = token ?? useDiscordStore.getState().token;
+    if (!resolvedToken) {
       toast.error('No Discord token configured.');
       return false;
     }
 
     try {
-      // Set up the dispatch handler for gateway events
-      DiscordGatewayService.onDispatch = (payload) => {
-        this._handleGatewayDispatch(payload.event, payload.data);
-      };
+      // Ensure dispatch handler is set up
+      if (!DiscordGatewayService.onDispatch) {
+        DiscordGatewayService.onDispatch = (accountToken, payload) => {
+          this._handleGatewayDispatch(payload.event, payload.data);
+        };
+      }
 
-      // Connect to the gateway
-      DiscordGatewayService.connect(token);
+      DiscordGatewayService.connect(resolvedToken);
       return true;
     } catch (error) {
       console.error('[Discord] Failed to connect:', error);
@@ -41,30 +68,53 @@ export const DiscordService = {
   },
 
   /**
-   * Disconnect from Discord and clear all stores.
+   * Disconnect all accounts and clear all stores.
    */
-  disconnect() {
-    DiscordGatewayService.disconnect();
+  disconnectAll() {
+    DiscordGatewayService.disconnectAll();
     DiscordGatewayService.onDispatch = null;
-    useDiscordStore.getState().setConnected(false);
-    useDiscordStore.getState().setUser(null);
-    useDiscordStore.getState().setSessionId(null);
     useDiscordGuildsStore.getState().clear();
     useDiscordChannelsStore.getState().clear();
     useDiscordUsersStore.getState().clear();
     useDiscordReadStatesStore.getState().clear();
     useDiscordRelationshipsStore.getState().clear();
     useDiscordGuildFoldersStore.getState().clear();
-    console.log('[Discord] Disconnected and stores cleared');
+    console.log('[Discord] All accounts disconnected and stores cleared');
   },
 
   /**
-   * Fully disconnect and remove the stored token.
+   * Disconnect a single account by token and clear its data from stores.
+   */
+  disconnectAccount(token: string) {
+    const account = useDiscordStore.getState().getAccountByToken(token);
+    const accountUserId = account?.user?.id;
+
+    DiscordGatewayService.disconnect(token);
+
+    if (accountUserId) {
+      useDiscordGuildsStore.getState().clearAccount(accountUserId);
+      useDiscordGuildFoldersStore.getState().clearAccount(accountUserId);
+    }
+
+    console.log(`[Discord] Account disconnected: ${accountUserId || token}`);
+  },
+
+  /**
+   * Fully disconnect and remove all stored accounts.
    */
   logout() {
-    this.disconnect();
+    this.disconnectAll();
     useDiscordStore.getState().disconnect();
     toast.success('Disconnected from Discord.');
+  },
+
+  /**
+   * Fully disconnect and remove a single account.
+   */
+  logoutAccount(token: string) {
+    this.disconnectAccount(token);
+    useDiscordStore.getState().removeAccountByToken(token);
+    toast.success('Discord account disconnected.');
   },
 
   /**

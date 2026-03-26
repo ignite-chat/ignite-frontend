@@ -10,6 +10,7 @@ import DiscordChannelHeader from './DiscordChannelHeader';
 import DiscordMemberList from './DiscordMemberList';
 import DiscordSearchPanel from './DiscordSearchPanel';
 import DiscordForumView from './DiscordForumView';
+import MessageLogViewer from './MessageLogViewer';
 
 const DiscordChannel = ({ channel }) => {
   const currentUser = useDiscordStore((s) => s.user);
@@ -25,8 +26,15 @@ const DiscordChannel = ({ channel }) => {
   const [memberListOpen, setMemberListOpen] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [messageLogOpen, setMessageLogOpen] = useState(false);
 
   const toggleMemberList = useCallback(() => setMemberListOpen((v) => !v), []);
+  const toggleMessageLog = useCallback(() => {
+    setMessageLogOpen((v) => {
+      if (!v) setSearchOpen(false);
+      return !v;
+    });
+  }, []);
   const handleSearch = useCallback((query) => {
     setSearchQuery(query);
     setSearchOpen(true);
@@ -87,6 +95,8 @@ const DiscordChannel = ({ channel }) => {
         onToggleMemberList={!isDM ? toggleMemberList : undefined}
         searchOpen={searchOpen}
         onSearch={!isDM ? handleSearch : undefined}
+        messageLogOpen={messageLogOpen}
+        onToggleMessageLog={toggleMessageLog}
       />
 
       <div className="flex min-w-0 flex-1 overflow-hidden">
@@ -104,9 +114,18 @@ const DiscordChannel = ({ channel }) => {
           )}
         </div>
 
-        {guildId && memberListOpen && !searchOpen && !isDM && <DiscordMemberList guildId={guildId} />}
-        {guildId && searchOpen && !isDM && (
+        {guildId && memberListOpen && !searchOpen && !messageLogOpen && !isDM && <DiscordMemberList guildId={guildId} />}
+        {guildId && searchOpen && !messageLogOpen && !isDM && (
           <DiscordSearchPanel key={searchQuery} guildId={guildId} initialQuery={searchQuery} onClose={closeSearch} />
+        )}
+        {messageLogOpen && (
+          <div className="w-80 shrink-0 border-l border-white/5">
+            <MessageLogViewer
+              channelId={channel.id}
+              guildId={guildId}
+              onClose={() => setMessageLogOpen(false)}
+            />
+          </div>
         )}
       </div>
     </div>

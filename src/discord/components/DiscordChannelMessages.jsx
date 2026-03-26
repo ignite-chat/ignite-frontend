@@ -296,6 +296,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [forceScrollDown, setForceScrollDown] = useState(false);
   const scrollTopOnRenderRef = useRef(false);
+  const scrollToUnreadRef = useRef(false);
   const [newMessagesSeparatorId, setNewMessagesSeparatorId] = useState(null);
 
   const messagesRef = useRef();
@@ -430,12 +431,13 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     // Read imperatively — avoids re-running this effect when messages populate mid-load
     const cached = useDiscordChannelsStore.getState().channelMessages[channelId];
     if (cached != null) {
-      // Already loaded — restore saved scroll position or position at top
+      // Already loaded — restore saved scroll position or scroll to unread
       if (messagesRef.current) {
         const saved = scrollPositions.getMessage(channelId);
         if (saved != null) {
           messagesRef.current.scrollTop = saved;
         } else {
+          scrollToUnreadRef.current = true;
           scrollTopOnRenderRef.current = true;
         }
       }
@@ -444,6 +446,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
 
     setIsLoading(true);
     setHasMore(true);
+    scrollToUnreadRef.current = true;
     scrollTopOnRenderRef.current = true;
     DiscordService.loadChannelMessages(channelId)
       .then((data) => {
@@ -473,13 +476,49 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     }
   }, [messageSentCount]);
 
-  // Scroll to top after initial load, or auto-scroll on new messages when near bottom
+  // Scroll to first unread message after initial load, or bottom if all read.
+  // Also auto-scroll on new messages when user is near the bottom.
   useEffect(() => {
     if (!messagesRef.current || isLoading) return;
     if (scrollTopOnRenderRef.current && messages.length > 0) {
-      messagesRef.current.scrollTop = 200;
       scrollTopOnRenderRef.current = false;
-      wasNearBottomRef.current = false;
+
+      if (scrollToUnreadRef.current) {
+        scrollToUnreadRef.current = false;
+
+        // Find the first unread message element using the separator ID
+        const separatorId = newMessagesSeparatorId;
+        if (separatorId) {
+          // Find the first message after the read state
+          const firstUnreadMsg = messages.find((m) => m.id > separatorId);
+          if (firstUnreadMsg) {
+            const el = messagesRef.current.querySelector(
+              `[data-message-id="${firstUnreadMsg.id}"]`,
+            );
+            if (el) {
+              // Scroll so the unread message is near the top of the viewport
+              el.scrollIntoView({ block: 'start' });
+              // Offset slightly so the "NEW" separator is visible above
+              messagesRef.current.scrollTop = Math.max(
+                0,
+                messagesRef.current.scrollTop - 200,
+              );
+              wasNearBottomRef.current = false;
+              return;
+            }
+          }
+        }
+
+        // No unread messages — scroll to bottom
+        messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+        wasNearBottomRef.current = true;
+        ackIfAtBottom();
+        return;
+      }
+
+      // Fallback: scroll to bottom
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+      wasNearBottomRef.current = true;
       return;
     }
     const el = messagesRef.current;
@@ -489,7 +528,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
       if (forceScrollDown) setForceScrollDown(false);
       ackIfAtBottom();
     }
-  }, [messages, forceScrollDown, ackIfAtBottom, isLoading]);
+  }, [messages, forceScrollDown, ackIfAtBottom, isLoading, newMessagesSeparatorId]);
 
   // Always scroll to bottom when pending messages appear (user just sent a message)
   useEffect(() => {

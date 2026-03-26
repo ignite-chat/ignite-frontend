@@ -669,7 +669,8 @@ export default function ConnectDiscordDialog({
   const [activeTab, setActiveTab] = useState(defaultTab);
 
   const handleAuthenticated = useCallback((token: string) => {
-    useDiscordStore.getState().setToken(token);
+    useDiscordStore.getState().addAccount(token);
+    DiscordService.connect(token);
     onOpenChange(false);
   }, [onOpenChange]);
 
