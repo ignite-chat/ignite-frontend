@@ -179,6 +179,12 @@ function hex(d: Uint8Array): string {
     .join('');
 }
 
+function uint8ToB64Url(buf: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 function concatBytes(...arrays: Uint8Array[]): Uint8Array {
   const total = arrays.reduce((s, a) => s + a.length, 0);
   const result = new Uint8Array(total);
@@ -792,6 +798,9 @@ export class DaveSession {
   // Debug counter for decryptFrame logging
   _decryptLogCount: number = 0;
 
+  // Private keys for parent nodes derived from UpdatePath processing (node_index → CryptoKey)
+  private nodePrivateKeys: Map<number, CryptoKey> = new Map();
+
   // Transition state
   transitioning: boolean = false;
   pendingTransitionId: number = 0;
@@ -1299,6 +1308,11 @@ export class DaveSession {
         if (pathSecret) {
           commitSecret = await this._deriveCommitSecret(pathSecret, senderLeafIndex);
           console.log('[DAVE] Derived commit_secret from UpdatePath:', hex(commitSecret.subarray(0, 8)) + '...');
+
+          // RFC 9420 Section 7.5: derive and store node private keys for nodes on the
+          // sender's filtered direct path. These are needed when a future sender encrypts
+          // to the resolution of a node we're "merged" into (not in unmergedLeaves).
+          await this._storePathNodeKeys(pathSecret, senderLeafIndex);
         } else {
           console.warn('[DAVE] Could not decrypt path secret from UpdatePath');
         }
@@ -1760,63 +1774,66 @@ export class DaveSession {
           ', encKeyLen=' + upNode.encryptionKey.length);
       }
 
-      // Find our leaf in this resolution
+      // Find our leaf OR a stored parent node key in this resolution
       const myResPos = resolution.indexOf(myNodeIdx);
-      if (myResPos < 0) continue; // we're not in this subtree
 
-      // Check if our tree's public key matches our actual key pair
-      const treeLeaf = this.tree[myNodeIdx];
-      const treeKey = treeLeaf && treeLeaf.type === 'leaf' ? treeLeaf.encryptionKey : null;
-      const keyMatch = treeKey && this.encryptionPublicRaw
-        ? treeKey.length === this.encryptionPublicRaw.length && treeKey.every((b, j) => b === this.encryptionPublicRaw![j])
-        : false;
+      // Also check if any stored node private key matches a node in the resolution
+      let nodeKeyResPos = -1;
+      let nodeKeyIdx = -1;
+      let nodeKeyPriv: CryptoKey | null = null;
+      let nodeKeyPubRaw: Uint8Array | null = null;
+      if (myResPos < 0) {
+        for (let ri = 0; ri < resolution.length; ri++) {
+          const resNodeIdx = resolution[ri];
+          if (this.nodePrivateKeys.has(resNodeIdx)) {
+            nodeKeyResPos = ri;
+            nodeKeyIdx = resNodeIdx;
+            nodeKeyPriv = this.nodePrivateKeys.get(resNodeIdx)!;
+            // Get the public key from the tree node
+            const treeNode = resNodeIdx < this.tree.length ? this.tree[resNodeIdx] : null;
+            if (treeNode) {
+              nodeKeyPubRaw = treeNode.type === 'parent' ? treeNode.publicKey : treeNode.encryptionKey;
+            }
+            break;
+          }
+        }
+      }
+
+      if (myResPos < 0 && nodeKeyResPos < 0) continue; // we're not in this subtree
+
+      const resPos = myResPos >= 0 ? myResPos : nodeKeyResPos;
+      const decryptPrivKey = myResPos >= 0 ? this.encryptionKeyPair.privateKey : nodeKeyPriv!;
+      const decryptPubRaw = myResPos >= 0 ? this.encryptionPublicRaw! : nodeKeyPubRaw!;
+      const decryptSource = myResPos >= 0 ? 'leaf' : 'node-' + nodeKeyIdx;
+
       console.log('[DAVE] _decryptPathSecret: found at filteredDP[' + i + ']=' + filteredDP[i] +
         ', copathNode=' + copathNode + ', resolution=[' + resolution.join(',') +
-        '], myResPos=' + myResPos + ', eps=' + upNode.encryptedPathSecrets.length +
-        ', treeKeyMatchesOurKey=' + keyMatch);
+        '], resPos=' + resPos + ', source=' + decryptSource +
+        ', eps=' + upNode.encryptedPathSecrets.length);
 
-      if (myResPos >= upNode.encryptedPathSecrets.length) {
-        console.log('[DAVE] _decryptPathSecret: myResPos', myResPos, '>= eps.length', upNode.encryptedPathSecrets.length);
+      if (resPos >= upNode.encryptedPathSecrets.length) {
+        console.log('[DAVE] _decryptPathSecret: resPos', resPos, '>= eps.length', upNode.encryptedPathSecrets.length);
         continue;
       }
 
-      const eps = upNode.encryptedPathSecrets[myResPos];
-      console.log('[DAVE] _decryptPathSecret: trying HPKE decrypt at filteredDP[' + i + '], myResPos=' + myResPos +
-        ', kem=' + eps.kemOutput.length + 'B, ct=' + eps.ciphertext.length + 'B');
+      const eps = upNode.encryptedPathSecrets[resPos];
 
       try {
         const pathSecret = await hpkeBaseOpen(
           eps.kemOutput,
-          this.encryptionKeyPair.privateKey,
-          this.encryptionPublicRaw!,
+          decryptPrivKey,
+          decryptPubRaw,
           hpkeInfo,
           new Uint8Array(0),
           eps.ciphertext,
           'UpdatePath[' + i + ']',
         );
-        console.log('[DAVE] Decrypted path secret at filteredDP[' + i + ']:', pathSecret.length, 'B');
-        // Store overlap index relative to filtered path for _deriveCommitSecret
+        console.log('[DAVE] Decrypted path secret at filteredDP[' + i + '] via ' + decryptSource + ':', pathSecret.length, 'B');
         this._lastFilteredOverlapIndex = i;
         this._lastFilteredDPLength = filteredDP.length;
         return pathSecret;
       } catch (err) {
-        console.log('[DAVE] HPKE decrypt failed at filteredDP[' + i + '] pos=' + myResPos);
-        // Try ALL other positions to check if the issue is resolution mismatch
-        for (let tryPos = 0; tryPos < upNode.encryptedPathSecrets.length; tryPos++) {
-          if (tryPos === myResPos) continue;
-          try {
-            const tryEps = upNode.encryptedPathSecrets[tryPos];
-            const trySecret = await hpkeBaseOpen(
-              tryEps.kemOutput, this.encryptionKeyPair.privateKey,
-              this.encryptionPublicRaw!, hpkeInfo, new Uint8Array(0),
-              tryEps.ciphertext, 'TryPos[' + tryPos + ']',
-            );
-            console.log('[DAVE] *** POSITION MISMATCH: succeeded at pos=' + tryPos + ' instead of ' + myResPos + ', pathSecret=' + trySecret.length + 'B');
-            this._lastFilteredOverlapIndex = i;
-            this._lastFilteredDPLength = filteredDP.length;
-            return trySecret;
-          } catch { /* continue trying */ }
-        }
+        console.log('[DAVE] HPKE decrypt failed at filteredDP[' + i + '] pos=' + resPos + ' via ' + decryptSource);
         continue;
       }
     }
@@ -1862,6 +1879,86 @@ export class DaveSession {
    * with the new public keys from the UpdatePath, computing parent_hash
    * values per RFC 9420 Section 7.9.
    */
+  /**
+   * After decrypting a path secret from an UpdatePath, derive and store
+   * node private keys for each node on the sender's filtered direct path
+   * from the overlap point to the root.
+   *
+   * Per RFC 9420 Section 7.5:
+   *   node_secret[n] = DeriveSecret(path_secret[n], "node")
+   *   node_priv[n]   = DeriveKeyPair(node_secret[n]).privateKey
+   *
+   * These stored keys allow _decryptPathSecret to decrypt when a future
+   * sender encrypts to the resolution of a node we have a private key for
+   * (i.e., when our leaf is "merged" into that node and not in unmergedLeaves).
+   */
+  private async _storePathNodeKeys(
+    pathSecret: Uint8Array,
+    senderLeafIndex: number,
+  ) {
+    const numLeaves = Math.ceil((this.tree.length + 1) / 2);
+    const senderNodeIdx = senderLeafIndex * 2;
+    const senderDP = treeDirectPath(senderNodeIdx, numLeaves);
+    const senderCopath = treeCopath(senderNodeIdx, numLeaves);
+
+    // Compute filtered direct path (same logic as in _decryptPathSecret)
+    const filteredDP: number[] = [];
+    for (let i = 0; i < senderDP.length && i < senderCopath.length; i++) {
+      const copathRes = treeResolution(this.tree, senderCopath[i], numLeaves);
+      if (copathRes.length > 0) filteredDP.push(senderDP[i]);
+    }
+
+    // path_secret[overlapIndex] = pathSecret (the decrypted value)
+    // path_secret[n+1] = DeriveSecret(path_secret[n], "path")
+    // We start at the overlap and iterate to the root.
+    let secret = pathSecret;
+    for (let i = this._lastFilteredOverlapIndex; i < filteredDP.length; i++) {
+      const nodeIdx = filteredDP[i];
+      try {
+        // node_secret = ExpandWithLabel(path_secret, "node", "", 32)
+        const nodeSecret = await mlsExpandWithLabel(secret, 'node', new Uint8Array(0), 32);
+
+        // DHKEM(P-256) DeriveKeyPair (RFC 9180 Section 7.1.3):
+        //   dkp_prk = LabeledExtract("", "dkp_prk", nodeSecret)
+        //   sk = LabeledExpand(dkp_prk, "sk", "", Nsk=32)  [may need modular reduction]
+        //
+        // We know the correct public key from the UpdatePath (stored in tree).
+        // Use it to build a valid JWK for WebCrypto import.
+        const treeNode = nodeIdx < this.tree.length ? this.tree[nodeIdx] : null;
+        if (treeNode && treeNode.type === 'parent') {
+          // RFC 9180 Section 7.1.3 DeriveKeyPair:
+          //   dkp_prk = LabeledExtract("", "dkp_prk", ikm)
+          //   sk = LabeledExpand(dkp_prk, "candidate", I2OSP(counter, 1), Nsk)
+          //   counter starts at 0, label is "candidate" not "sk"
+          const prk = await hpkeLabeledExtract(new Uint8Array(0), 'dkp_prk', nodeSecret, KEM_SUITE_ID);
+          const skBytes = await hpkeLabeledExpand(prk, 'candidate', new Uint8Array([0]), 32, KEM_SUITE_ID);
+
+          // P-256 requires scalar < order. RFC 9180 Section 7.1.3 says to reduce mod order.
+          // The tree already has the matching public key from the UpdatePath.
+          const pubRaw = treeNode.publicKey; // 65-byte uncompressed P-256
+          const x = pubRaw.subarray(1, 33);
+          const y = pubRaw.subarray(33, 65);
+          const privKey = await crypto.subtle.importKey(
+            'jwk',
+            { kty: 'EC', crv: 'P-256', d: uint8ToB64Url(skBytes), x: uint8ToB64Url(x), y: uint8ToB64Url(y) },
+            { name: 'ECDH', namedCurve: 'P-256' },
+            true,
+            ['deriveBits'],
+          );
+          this.nodePrivateKeys.set(nodeIdx, privKey);
+        }
+      } catch (err) {
+        console.warn('[DAVE] Failed to derive node key for node', nodeIdx, ':', err);
+      }
+
+      // Advance to next path secret
+      if (i < filteredDP.length - 1) {
+        secret = await mlsExpandWithLabel(secret, 'path', new Uint8Array(0), 32);
+      }
+    }
+    console.log('[DAVE] Stored', this.nodePrivateKeys.size, 'node private keys');
+  }
+
   private async _applyUpdatePath(
     updatePath: {
       leafNode: Uint8Array;
@@ -2071,7 +2168,7 @@ export class DaveSession {
     this._lastExecutedTransitionId = transitionId;
 
     if (pendingState) {
-      // Reset decrypt log count so we can see errors after each transition
+      // Reset decrypt counters so we resume decryption with new keys
       this._decryptLogCount = 0;
 
       // Move current ratchets to old epoch stack before switching
@@ -2135,6 +2232,7 @@ export class DaveSession {
     this.tree = [];
     this.leafIndex = -1;
     this.pendingProposals = [];
+    this.nodePrivateKeys.clear();
     this._pendingCommitQueue = [];
     this._pendingExporterSecret = null;
     this._pendingInitSecret = null;
@@ -2585,6 +2683,8 @@ export class DaveSession {
     }
 
     this.state = 'ready';
+    this._consecutiveDecryptFailures = 0;
+    this._decryptLogCount = 0;
 
     // Dump post-welcome state for test fixture generation
     {
@@ -2703,7 +2803,7 @@ export class DaveSession {
    * Output: [encrypted_data][8-byte truncated auth tag][ULEB128 nonce][0 suppl_size][0xFAFA]
    */
   async encryptFrame(plaintext: Uint8Array): Promise<Uint8Array> {
-    if (!this.senderRatchet) return plaintext;
+    if (!this.senderRatchet || this.transitioning || this.pendingEpochSecret) return plaintext;
 
     const nonce32 = Number(this.sendCounter++ & 0xffffffffn);
     const generation = (nonce32 >>> 24) & 0xff;
@@ -2755,13 +2855,9 @@ export class DaveSession {
    * old epoch ratchets (newest-first) for graceful epoch transitions.
    */
   async decryptFrame(frame: Uint8Array, ssrc?: number): Promise<Uint8Array> {
-    // No keys yet — drop frame (silence instead of garbage)
-    if (this.receiverRatchets.size === 0 && !this.senderRatchet) {
-      if (this._decryptLogCount < 5) {
-        this._decryptLogCount++;
-        const userId = ssrc !== undefined ? this.ssrcToUserId.get(ssrc) : undefined;
-        console.log(`[DAVE] decryptFrame: NO KEYS available. ssrc=${ssrc}, user=${userId}, receiverRatchets=${this.receiverRatchets.size}, ssrcMap size=${this.ssrcToUserId.size}, ssrcMap keys=[${[...this.ssrcToUserId.entries()].map(([s,u]) => s+'->'+u).join(', ')}]`);
-      }
+    // Only attempt decryption when we have valid keys and aren't mid-epoch-change.
+    // Calling crypto.subtle.decrypt with wrong-epoch keys causes STATUS_ACCESS_VIOLATION.
+    if (this.state !== 'ready' || this.transitioning || this.pendingEpochSecret) {
       return new Uint8Array(0);
     }
 
@@ -2883,7 +2979,7 @@ export class DaveSession {
           combined,
         );
 
-        if (unencryptedRanges.length === 0) {
+          if (unencryptedRanges.length === 0) {
           // Audio: return decrypted directly
           return new Uint8Array(plaintext);
         }
@@ -3129,6 +3225,7 @@ export class DaveSession {
     this.tree = [];
     this.leafIndex = -1;
     this.pendingProposals = [];
+    this.nodePrivateKeys.clear();
     this._pendingExporterSecret = null;
     this._pendingInitSecret = null;
     this._pendingConfirmedTranscriptHash = null;
