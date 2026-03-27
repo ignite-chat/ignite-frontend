@@ -2,6 +2,8 @@ import { useDiscordStore } from '../store/discord.store';
 import { useDiscordVoiceStore } from '../store/discord-voice.store';
 import { DiscordGatewayService } from './discord-gateway.service';
 import { GatewayOp, VoiceOp } from '../constants/gateway-opcodes';
+import { DiscordStreamService } from './discord-stream.service';
+import { useDiscordUserVolumeStore } from '../store/discord-user-volume.store';
 
 export const DiscordVoiceService = {
   // Voice worker that manages WebSocket + heartbeat + DAVE crypto
@@ -21,6 +23,8 @@ export const DiscordVoiceService = {
 
   // Remote audio elements for playback
   remoteAudioElements: new Map<string, HTMLAudioElement>(),
+  // Track ID → userId mapping for per-user volume
+  trackIdToUserId: new Map<string, string>(),
 
   // Audio level monitoring for speaking indicators
   audioContext: null as AudioContext | null,
@@ -30,6 +34,8 @@ export const DiscordVoiceService = {
 
   // SSRC → userId mappings from SPEAKING messages (needed for SDP construction)
   remoteSsrcs: new Map<number, string>(),
+  // SSRCs that are video (from VIDEO opcode) — everything else is audio
+  remoteVideoSsrcs: new Set<number>(),
 
   // Number of recvonly audio transceivers created (for SDP renegotiation)
   numAudioReceivers: 10,
@@ -97,7 +103,7 @@ export const DiscordVoiceService = {
       DiscordGatewayService.send({
         op: GatewayOp.VOICE_STATE_UPDATE,
         d: {
-          guild_id: guildId,
+          guild_id: null,
           channel_id: null,
           self_mute: false,
           self_deaf: false,
@@ -106,6 +112,7 @@ export const DiscordVoiceService = {
     }
 
     this._cleanup();
+    DiscordStreamService.disconnectAll();
     store.reset();
   },
 
@@ -207,6 +214,21 @@ export const DiscordVoiceService = {
     }
   },
 
+  /**
+   * Apply per-user volume/mute settings to all active audio elements for a user.
+   */
+  applyUserVolume(userId: string) {
+    const gain = useDiscordUserVolumeStore.getState().getEffectiveGain(userId);
+    const isDeafened = useDiscordVoiceStore.getState().isDeafened;
+    for (const [trackId, audio] of this.remoteAudioElements) {
+      const trackUserId = this.trackIdToUserId.get(trackId);
+      if (trackUserId === userId) {
+        audio.volume = Math.min(1, gain);
+        audio.muted = isDeafened || gain === 0;
+      }
+    }
+  },
+
   // ─── Gateway Event Handlers ──────────────────────────────────────
 
   handleVoiceStateUpdate(data: any) {
@@ -297,6 +319,70 @@ export const DiscordVoiceService = {
           }
           break;
 
+        case 'video': {
+          // VIDEO opcode (op 12): a user started/stopped their camera or screen share
+          console.log('[Discord Voice] VIDEO:', msg.data);
+          const videoSsrc = msg.data?.video_ssrc;
+          const audioSsrc = msg.data?.audio_ssrc;
+          const videoUserId = msg.data?.user_id;
+
+          if (this._worker && videoUserId) {
+            // Register SSRC → userId for DAVE decryption
+            if (videoSsrc) {
+              this._worker.postMessage({ type: 'registerSsrc', ssrc: videoSsrc, userId: videoUserId });
+              this.remoteSsrcs.set(videoSsrc, videoUserId);
+              this.remoteVideoSsrcs.add(videoSsrc);
+            }
+            if (audioSsrc) {
+              this._worker.postMessage({ type: 'registerSsrc', ssrc: audioSsrc, userId: videoUserId });
+            }
+            if (msg.data?.streams) {
+              for (const s of msg.data.streams) {
+                if (s.rtx_ssrc) {
+                  this._worker.postMessage({ type: 'registerSsrc', ssrc: s.rtx_ssrc, userId: videoUserId });
+                  this.remoteVideoSsrcs.add(s.rtx_ssrc);
+                }
+                if (s.ssrc) {
+                  this._worker.postMessage({ type: 'registerSsrc', ssrc: s.ssrc, userId: videoUserId });
+                  this.remoteSsrcs.set(s.ssrc, videoUserId);
+                  this.remoteVideoSsrcs.add(s.ssrc);
+                }
+              }
+            }
+
+            // Send MEDIA_SINK_WANTS to request video for all known video SSRCs
+            if (videoSsrc) {
+              const sinkData: any = { any: 100 };
+              // Include specific SSRCs with pixel counts
+              const allVideoSsrcs: number[] = [];
+              if (msg.data?.streams) {
+                for (const s of msg.data.streams) {
+                  if (s.ssrc) allVideoSsrcs.push(s.ssrc);
+                }
+              }
+              if (allVideoSsrcs.length === 0) allVideoSsrcs.push(videoSsrc);
+              sinkData.pixelCounts = {};
+              for (const ssrc of allVideoSsrcs) {
+                sinkData[String(ssrc)] = 100;
+                sinkData.pixelCounts[String(ssrc)] = 921600; // 1280x720
+              }
+              console.log('[Discord Voice] Sending MEDIA_SINK_WANTS:', sinkData);
+              this._worker.postMessage({
+                type: 'send',
+                op: VoiceOp.MEDIA_SINK_WANTS,
+                data: sinkData,
+              });
+            }
+
+            // Renegotiate SDP to include the new video SSRCs
+            if (this.serverSdpInfo) {
+              this._renegotiateSdp();
+            }
+            this._updateTrackUserMappings();
+          }
+          break;
+        }
+
         case 'clientsConnect':
           console.log('[Discord Voice] Worker CLIENTS_CONNECT:', msg.data?.user_ids);
           break;
@@ -380,7 +466,7 @@ export const DiscordVoiceService = {
         encodedInsertableStreams: true,
       });
 
-      // Handle remote tracks (incoming audio from other users)
+      // Handle remote tracks (incoming audio/video from other users)
       this.peerConnection.ontrack = (event) => {
         console.log('[Discord Voice] Remote track received:', event.track.kind, 'mid:', event.transceiver?.mid);
         if (event.track.kind === 'audio') {
@@ -390,6 +476,16 @@ export const DiscordVoiceService = {
           audio.autoplay = true;
           audio.muted = store.isDeafened;
           this.remoteAudioElements.set(event.track.id, audio);
+
+          // Map trackId → userId for per-user volume
+          const mid = event.transceiver?.mid != null ? parseInt(event.transceiver.mid, 10) : null;
+          const userId = mid != null ? this.midToUserId.get(mid) : null;
+          if (userId) {
+            this.trackIdToUserId.set(event.track.id, userId);
+            const gain = useDiscordUserVolumeStore.getState().getEffectiveGain(userId);
+            audio.volume = Math.min(1, gain);
+            audio.muted = store.isDeafened || gain === 0;
+          }
 
           audio.play().then(() => {
             console.log('[Discord Voice] Remote audio playing, trackId:', event.track.id);
@@ -403,9 +499,55 @@ export const DiscordVoiceService = {
             const el = this.remoteAudioElements.get(event.track.id);
             if (el) { el.pause(); el.srcObject = null; }
             this.remoteAudioElements.delete(event.track.id);
+            this.trackIdToUserId.delete(event.track.id);
             this._removeAudioAnalyser(event.track.id);
           };
           event.track.onunmute = () => console.log('[Discord Voice] Remote track unmuted:', event.track.id, 'mid:', event.transceiver?.mid);
+        } else if (event.track.kind === 'video') {
+          const mid = event.transceiver?.mid != null ? parseInt(event.transceiver.mid, 10) : null;
+          let userId = mid != null ? this.midToUserId.get(mid) : null;
+          console.log('[Discord Voice] Video track received, mid:', mid, 'userId:', userId, 'readyState:', event.track.readyState, 'muted:', event.track.muted, 'midToUserId:', Object.fromEntries(this.midToUserId));
+
+          const stream = event.streams[0] || new MediaStream([event.track]);
+          const trackId = event.track.id;
+
+          // Store a reference so we can map it later when userId becomes available
+          if (!userId) {
+            // Try again after a short delay — the VIDEO opcode might arrive shortly after
+            setTimeout(() => {
+              const resolvedUserId = mid != null ? this.midToUserId.get(mid) : null;
+              if (resolvedUserId && event.track.readyState === 'live') {
+                console.log('[Discord Voice] Late video userId resolved:', resolvedUserId, 'mid:', mid);
+                useDiscordVoiceStore.getState().setRemoteVideoStream(resolvedUserId, stream);
+                this.trackIdToUserId.set(trackId, resolvedUserId);
+              }
+            }, 500);
+          }
+
+          if (userId) {
+            useDiscordVoiceStore.getState().setRemoteVideoStream(userId, stream);
+            this.trackIdToUserId.set(trackId, userId);
+          }
+
+          event.track.onended = () => {
+            const uid = userId || this.trackIdToUserId.get(trackId);
+            if (uid) {
+              useDiscordVoiceStore.getState().setRemoteVideoStream(uid, null);
+            }
+            this.trackIdToUserId.delete(trackId);
+          };
+          event.track.onmute = () => {
+            const uid = userId || this.trackIdToUserId.get(trackId);
+            if (uid) {
+              useDiscordVoiceStore.getState().setRemoteVideoStream(uid, null);
+            }
+          };
+          event.track.onunmute = () => {
+            const uid = userId || this.trackIdToUserId.get(trackId);
+            if (uid) {
+              useDiscordVoiceStore.getState().setRemoteVideoStream(uid, stream);
+            }
+          };
         }
       };
 
@@ -589,18 +731,16 @@ export const DiscordVoiceService = {
       }
     }
 
-    // Receiver transforms (incoming audio from other users)
+    // Receiver transforms (incoming audio + video from other users)
     for (const receiver of this.peerConnection.getReceivers()) {
-      if (receiver.track?.kind === 'audio') {
-        // @ts-ignore - custom flag to prevent double createEncodedStreams()
-        if (receiver._daveTransformSetUp) continue;
-        this._transferReceiverTransform(receiver);
-      }
+      // @ts-ignore - custom flag to prevent double createEncodedStreams()
+      if (receiver._daveTransformSetUp) continue;
+      this._transferReceiverTransform(receiver);
     }
 
     // Handle future tracks (renegotiation adds new receivers)
     this.peerConnection.addEventListener('track', (event) => {
-      if (event.track.kind === 'audio' && event.receiver) {
+      if (event.receiver) {
         // @ts-ignore
         if (!event.receiver._daveTransformSetUp) {
           this._transferReceiverTransform(event.receiver);
@@ -637,16 +777,35 @@ export const DiscordVoiceService = {
     const mids = transceivers.map((_, i) => i).join(' ');
 
     const ssrcToMid = new Map<number, number>();
-    const assignedMids = new Set<number>();
-    let nextAudioMid = 2;
+    const assignedAudioMids = new Set<number>();
+    const assignedVideoMids = new Set<number>();
+    const audioMidStart = 2;
+    const videoMidStart = 2 + this.numAudioReceivers; // mids 12-21
+
+    let nextAudioMid = audioMidStart;
+    let nextVideoMid = videoMidStart;
+
     for (const [ssrc] of this.remoteSsrcs) {
-      while (nextAudioMid < 2 + this.numAudioReceivers && assignedMids.has(nextAudioMid)) {
-        nextAudioMid++;
-      }
-      if (nextAudioMid < 2 + this.numAudioReceivers) {
-        ssrcToMid.set(ssrc, nextAudioMid);
-        assignedMids.add(nextAudioMid);
-        nextAudioMid++;
+      if (this.remoteVideoSsrcs.has(ssrc)) {
+        // Assign to a video mid
+        while (nextVideoMid < videoMidStart + this.numVideoReceivers && assignedVideoMids.has(nextVideoMid)) {
+          nextVideoMid++;
+        }
+        if (nextVideoMid < videoMidStart + this.numVideoReceivers) {
+          ssrcToMid.set(ssrc, nextVideoMid);
+          assignedVideoMids.add(nextVideoMid);
+          nextVideoMid++;
+        }
+      } else {
+        // Assign to an audio mid
+        while (nextAudioMid < audioMidStart + this.numAudioReceivers && assignedAudioMids.has(nextAudioMid)) {
+          nextAudioMid++;
+        }
+        if (nextAudioMid < audioMidStart + this.numAudioReceivers) {
+          ssrcToMid.set(ssrc, nextAudioMid);
+          assignedAudioMids.add(nextAudioMid);
+          nextAudioMid++;
+        }
       }
     }
     if (ssrcToMid.size > 0) {
@@ -727,6 +886,17 @@ export const DiscordVoiceService = {
         }
         lines.push('a=rtcp-mux');
       } else {
+        // Check if this video mid has an active SSRC assigned
+        let videoActiveSsrc: number | undefined;
+        let videoActiveUserId: string | undefined;
+        for (const [ssrc, mid] of ssrcToMid) {
+          if (mid === i) {
+            videoActiveSsrc = ssrc;
+            videoActiveUserId = this.remoteSsrcs.get(ssrc);
+            break;
+          }
+        }
+        const videoDirection = videoActiveSsrc ? 'sendonly' : 'inactive';
         lines.push(
           `m=video ${port} UDP/TLS/RTP/SAVPF 103 104`,
           connectionLine,
@@ -743,8 +913,16 @@ export const DiscordVoiceService = {
           ...videoExtmaps,
           'a=setup:passive',
           `a=mid:${i}`,
-          'a=inactive',
+          `a=${videoDirection}`,
           ...iceBlock,
+        );
+        if (videoActiveSsrc && videoActiveUserId) {
+          lines.push(
+            `a=msid:${videoActiveUserId}-${videoActiveSsrc} v${videoActiveUserId}-${videoActiveSsrc}`,
+            `a=ssrc:${videoActiveSsrc} cname:${videoActiveUserId}-${videoActiveSsrc}`,
+          );
+        }
+        lines.push(
           'a=rtcp-mux',
         );
       }
@@ -819,6 +997,33 @@ export const DiscordVoiceService = {
       if (t?.mid != null) {
         const userId = this.midToUserId.get(parseInt(t.mid, 10));
         if (userId) entry.userId = userId;
+      }
+    }
+    // Update trackId → userId and apply per-user volume / video streams
+    for (const t of transceivers) {
+      if (t.mid == null) continue;
+      const userId = this.midToUserId.get(parseInt(t.mid, 10));
+      if (!userId) continue;
+      const trackId = t.receiver.track.id;
+
+      if (t.receiver.track.kind === 'audio') {
+        if (!this.trackIdToUserId.has(trackId)) {
+          this.trackIdToUserId.set(trackId, userId);
+          const audio = this.remoteAudioElements.get(trackId);
+          if (audio) {
+            const gain = useDiscordUserVolumeStore.getState().getEffectiveGain(userId);
+            audio.volume = Math.min(1, gain);
+            if (gain === 0) audio.muted = true;
+          }
+        }
+      } else if (t.receiver.track.kind === 'video') {
+        if (!this.trackIdToUserId.has(trackId)) {
+          this.trackIdToUserId.set(trackId, userId);
+          if (t.receiver.track.readyState === 'live' && !t.receiver.track.muted) {
+            const stream = new MediaStream([t.receiver.track]);
+            useDiscordVoiceStore.getState().setRemoteVideoStream(userId, stream);
+          }
+        }
       }
     }
   },
@@ -966,12 +1171,14 @@ export const DiscordVoiceService = {
       el.srcObject = null;
     });
     this.remoteAudioElements.clear();
+    this.trackIdToUserId.clear();
 
     this.pendingVoiceState = null;
     this.pendingVoiceServer = null;
     this.ssrc = 0;
 
     this.remoteSsrcs.clear();
+    this.remoteVideoSsrcs.clear();
     this.midToUserId.clear();
     this.serverSdpInfo = null;
   },

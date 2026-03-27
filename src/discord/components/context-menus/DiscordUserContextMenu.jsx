@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -9,16 +10,23 @@ import {
   UserPlus,
   Prohibit,
   Timer,
+  SpeakerHigh,
+  SpeakerSlash,
 } from '@phosphor-icons/react';
 import {
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuCheckboxItem,
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
 import { DiscordApiService } from '../../services/discord-api.service';
 import { useDiscordStore } from '../../store/discord.store';
 import { useDiscordRelationshipsStore, RelationshipType } from '../../store/discord-relationships.store';
 import { useDiscordMembersStore } from '../../store/discord-members.store';
+import { useDiscordVoiceStore } from '../../store/discord-voice.store';
+import { useDiscordVoiceStatesStore } from '../../store/discord-voice-states.store';
+import { useDiscordUserVolumeStore } from '../../store/discord-user-volume.store';
+import { DiscordVoiceService } from '../../services/discord-voice.service';
 import { useModalStore } from '@/store/modal.store';
 import DiscordTimeoutModal from '../modals/DiscordTimeoutModal';
 
@@ -40,6 +48,16 @@ const DiscordUserContextMenu = ({
   );
   const displayName = author.global_name || author.username;
   const isSelf = currentUser?.id === author.id;
+
+  // Check if this user is in voice with us
+  const connectedGuildId = useDiscordVoiceStore((s) => s.guildId);
+  const connectedChannelId = useDiscordVoiceStore((s) => s.channelId);
+  const guildVoiceStates = useDiscordVoiceStatesStore((s) => connectedGuildId ? s.voiceStates[connectedGuildId] || {} : {});
+  const isInVoiceWithUs = !isSelf && connectedChannelId && guildVoiceStates[author.id]?.channel_id === connectedChannelId;
+
+  const userVolume = useDiscordUserVolumeStore((s) => s.getUserVolume(author.id));
+  const userMuted = useDiscordUserVolumeStore((s) => s.isUserMuted(author.id));
+  const [localVolume, setLocalVolume] = useState(userVolume);
 
   const relationship = relationships.find((r) => r.id === author.id);
   const isFriend = relationship?.type === RelationshipType.FRIEND;
@@ -219,6 +237,43 @@ const DiscordUserContextMenu = ({
               <Gavel className="ml-auto size-[18px]" weight="fill" />
             </ContextMenuItem>
           )}
+        </>
+      )}
+
+      {isInVoiceWithUs && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuCheckboxItem
+            checked={userMuted}
+            onCheckedChange={(checked) => {
+              useDiscordUserVolumeStore.getState().setUserMuted(author.id, checked);
+              DiscordVoiceService.applyUserVolume(author.id);
+            }}
+            onSelect={(e) => e.preventDefault()}
+          >
+            Mute
+          </ContextMenuCheckboxItem>
+          <div className="px-2 py-1.5">
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-400">User Volume</span>
+              <span className="text-xs tabular-nums text-gray-500">{localVolume}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={localVolume}
+              onChange={(e) => {
+                e.stopPropagation();
+                const val = Number(e.target.value);
+                setLocalVolume(val);
+                useDiscordUserVolumeStore.getState().setUserVolume(author.id, val);
+                DiscordVoiceService.applyUserVolume(author.id);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="h-1 w-full cursor-pointer appearance-none rounded-full bg-[#4e5058] accent-[#5865f2] [&::-webkit-slider-thumb]:size-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+            />
+          </div>
         </>
       )}
 

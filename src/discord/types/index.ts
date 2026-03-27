@@ -51,4 +51,13 @@ export type {
   InteractionPayload,
   AckBulkEntry,
   UserGuildSettingsResponse,
+  GuildProfile,
+  GuildProfileGameActivity,
+  GuildTopEmojiItem,
+  GuildTopEmojisResponse,
+  ApplicationIdentityImage,
+  ApplicationIdentityProfileData,
+  ApplicationIdentityProfile,
+  ApplicationIdentity,
+  ApplicationIdentitiesResponse,
 } from './api';

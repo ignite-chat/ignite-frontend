@@ -3,7 +3,7 @@ import { useDiscordStore } from '../store/discord.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { DiscordService } from '../services/discord.service';
-import { GUILD_FORUM, DM, GROUP_DM } from '../constants/channel-types';
+import { GUILD_FORUM, GUILD_VOICE, GUILD_STAGE_VOICE, DM, GROUP_DM } from '../constants/channel-types';
 import DiscordChannelMessages from './DiscordChannelMessages';
 import DiscordChannelInput from './DiscordChannelInput';
 import DiscordChannelHeader from './DiscordChannelHeader';
@@ -11,6 +11,7 @@ import DiscordMemberList from './DiscordMemberList';
 import DiscordSearchPanel from './DiscordSearchPanel';
 import DiscordForumView from './DiscordForumView';
 import MessageLogViewer from './MessageLogViewer';
+import DiscordVoiceChannelView from './DiscordVoiceChannelView';
 
 const DiscordChannel = ({ channel }) => {
   const currentUser = useDiscordStore((s) => s.user);
@@ -18,6 +19,7 @@ const DiscordChannel = ({ channel }) => {
   const guilds = useDiscordGuildsStore((s) => s.guilds);
 
   const isForum = channel?.type === GUILD_FORUM;
+  const isVoice = channel?.type === GUILD_VOICE || channel?.type === GUILD_STAGE_VOICE;
   const isDM = channel?.type === DM || channel?.type === GROUP_DM;
   const guildId = channel?.guild_id;
   const guild = useMemo(() => guilds.find((g) => g.id === guildId), [guilds, guildId]);
@@ -78,6 +80,10 @@ const DiscordChannel = ({ channel }) => {
 
   if (isForum) {
     return <DiscordForumView channel={channel} />;
+  }
+
+  if (isVoice) {
+    return <DiscordVoiceChannelView channel={channel} />;
   }
 
   const displayName = isDM ? dmInfo?.name : channel.name;

@@ -13,6 +13,14 @@ type DiscordVoiceStore = {
   isFakeMuted: boolean;
   isFakeDeafened: boolean;
   speakingUsers: Set<string>;
+  /** Remote video/stream tracks keyed by userId */
+  remoteVideoStreams: Map<string, MediaStream>;
+  /** Currently watching stream key (null if not watching) */
+  watchingStreamKey: string | null;
+  /** Stream connection state */
+  streamConnectionState: 'disconnected' | 'connecting' | 'connected';
+  /** The MediaStream for the stream being watched */
+  watchingStreamMedia: MediaStream | null;
 
   setConnectionState: (state: DiscordVoiceConnectionState) => void;
   setChannel: (guildId: string, channelId: string, channelName: string, guildName: string) => void;
@@ -21,6 +29,10 @@ type DiscordVoiceStore = {
   setFakeMuted: (fakeMuted: boolean) => void;
   setFakeDeafened: (fakeDeafened: boolean) => void;
   setSpeaking: (userId: string, speaking: boolean) => void;
+  setRemoteVideoStream: (userId: string, stream: MediaStream | null) => void;
+  setWatchingStream: (streamKey: string | null) => void;
+  setStreamConnectionState: (state: 'disconnected' | 'connecting' | 'connected') => void;
+  setWatchingStreamMedia: (stream: MediaStream | null) => void;
   reset: () => void;
 };
 
@@ -35,6 +47,10 @@ export const useDiscordVoiceStore = create<DiscordVoiceStore>((set) => ({
   isFakeMuted: false,
   isFakeDeafened: false,
   speakingUsers: new Set<string>(),
+  remoteVideoStreams: new Map<string, MediaStream>(),
+  watchingStreamKey: null,
+  streamConnectionState: 'disconnected',
+  watchingStreamMedia: null,
 
   setConnectionState: (connectionState) => set({ connectionState }),
   setChannel: (guildId, channelId, channelName, guildName) =>
@@ -50,6 +66,16 @@ export const useDiscordVoiceStore = create<DiscordVoiceStore>((set) => ({
       else next.delete(userId);
       return { speakingUsers: next };
     }),
+  setRemoteVideoStream: (userId, stream) =>
+    set((state) => {
+      const next = new Map(state.remoteVideoStreams);
+      if (stream) next.set(userId, stream);
+      else next.delete(userId);
+      return { remoteVideoStreams: next };
+    }),
+  setWatchingStream: (streamKey) => set({ watchingStreamKey: streamKey }),
+  setStreamConnectionState: (streamConnectionState) => set({ streamConnectionState }),
+  setWatchingStreamMedia: (watchingStreamMedia) => set({ watchingStreamMedia }),
   reset: () =>
     set({
       connectionState: 'disconnected',
@@ -62,5 +88,9 @@ export const useDiscordVoiceStore = create<DiscordVoiceStore>((set) => ({
       isFakeMuted: false,
       isFakeDeafened: false,
       speakingUsers: new Set<string>(),
+      remoteVideoStreams: new Map<string, MediaStream>(),
+      watchingStreamKey: null,
+      streamConnectionState: 'disconnected',
+      watchingStreamMedia: null,
     }),
 }));

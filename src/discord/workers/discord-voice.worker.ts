@@ -24,6 +24,7 @@ type MainToWorker =
       userId: string;
       sessionId: string;
       token: string;
+      maxDaveVersion?: number;
     }
   | { type: 'disconnect' }
   | { type: 'send'; op: number; data: any }
@@ -47,6 +48,7 @@ type WorkerToMain =
   | { type: 'speaking'; data: any }
   | { type: 'clientsConnect'; data: any }
   | { type: 'clientDisconnect'; data: any }
+  | { type: 'video'; data: any }
   | { type: 'connectionState'; state: string }
   | { type: 'daveReady' }
   | { type: 'log'; level: string; args: any[] };
@@ -67,6 +69,7 @@ let channelId = '';
 let userId = '';
 let sessionId = '';
 let voiceToken = '';
+let maxDaveVersion = 1;
 
 // Frame counters for logging
 let senderFrameCount = 0;
@@ -127,6 +130,19 @@ function connect(
 
   voiceWs.onopen = () => {
     log('Voice gateway connected');
+    sendVoice(VoiceOp.IDENTIFY, {
+      server_id: serverId,
+      user_id: userId,
+      session_id: sessionId,
+      channel_id: channelId,
+      token: voiceToken,
+      video: true,
+      streams: [
+        { type: 'video', rid: '100', quality: 100 },
+        { type: 'video', rid: '50', quality: 50 },
+      ],
+      max_dave_protocol_version: maxDaveVersion,
+    });
   };
 
   voiceWs.onmessage = (event) => {
@@ -202,16 +218,6 @@ async function handleVoiceMessage(payload: any) {
   switch (op) {
     case VoiceOp.HELLO:
       log('HELLO received');
-      sendVoice(VoiceOp.IDENTIFY, {
-        server_id: serverId,
-        user_id: userId,
-        session_id: sessionId,
-        channel_id: channelId,
-        token: voiceToken,
-        video: true,
-        streams: [{ type: 'video', rid: '100', quality: 100 }],
-        max_dave_protocol_version: 1,
-      });
       sendVoice(VoiceOp.CLIENT_FLAGS, {});
       startHeartbeat(d.heartbeat_interval);
       break;
@@ -273,6 +279,11 @@ async function handleVoiceMessage(payload: any) {
       post({ type: 'clientDisconnect', data: d });
       break;
 
+    case VoiceOp.VIDEO:
+      log('VIDEO:', JSON.stringify(d));
+      post({ type: 'video', data: d });
+      break;
+
     case VoiceOp.CLIENT_FLAGS:
     case VoiceOp.CLIENT_PLATFORM:
     case VoiceOp.MEDIA_SINK_WANTS:
@@ -330,7 +341,7 @@ async function handleVoiceMessage(payload: any) {
       break;
 
     default:
-      log(`Unhandled voice opcode: ${op}`);
+      log(`Unhandled voice opcode: ${op}`, d);
   }
 }
 
@@ -492,18 +503,27 @@ function setupReceiverTransform(readable: ReadableStream, writable: WritableStre
       // }
 
       if (!session || session.state !== 'ready') {
+        if (localReceiverFrameCount <= 3) {
+          log(`Receiver frame #${localReceiverFrameCount}: DAVE not ready (state: ${session?.state}), passing through. ssrc: ${ssrc}`);
+        }
         controller.enqueue(chunk);
         return;
       }
 
       try {
         const data = new Uint8Array(chunk.data);
+        if (localReceiverFrameCount <= 5) {
+          const userId = ssrc ? session.ssrcToUserId.get(ssrc) : undefined;
+          log(
+            `Receiver frame #${localReceiverFrameCount}, ssrc: ${ssrc}, user: ${userId}, size: ${data.byteLength}, ratchets: ${session.receiverRatchets.size}, senderRatchet: ${!!session.senderRatchet}`,
+          );
+        }
         const decrypted = await session.decryptFrame(data, ssrc);
-        // if (localReceiverFrameCount <= 5) {
-        //   log(
-        //     `Receiver decrypted #${localReceiverFrameCount}, ssrc: ${ssrc}, in: ${data.byteLength}, out: ${decrypted.byteLength}`,
-        //   );
-        // }
+        if (localReceiverFrameCount <= 5) {
+          log(
+            `Receiver decrypted #${localReceiverFrameCount}, ssrc: ${ssrc}, in: ${data.byteLength}, out: ${decrypted.byteLength}`,
+          );
+        }
         chunk.data = decrypted.buffer;
         controller.enqueue(chunk);
       } catch (err) {
@@ -527,6 +547,7 @@ self.onmessage = (event: MessageEvent<MainToWorker>) => {
 
   switch (msg.type) {
     case 'connect':
+      maxDaveVersion = msg.maxDaveVersion ?? 1;
       connect(msg.endpoint, msg.serverId, msg.channelId, msg.userId, msg.sessionId, msg.token);
       break;
 

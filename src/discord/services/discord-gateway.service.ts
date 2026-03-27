@@ -17,6 +17,8 @@ import { decodeGuildFolders, decodeUserSettings } from '../utils/proto-decode';
 import { DiscordVoiceService } from './discord-voice.service';
 import { GatewayOp } from '../constants/gateway-opcodes';
 import { DiscordMessageLogService } from './discord-message-log.service';
+import { DiscordStreamService } from './discord-stream.service';
+import { GatewayConnection } from './discord-gateway-connection';
 
 // GatewayEventHandler type kept for reference but onDispatch signature is inline now
 
@@ -163,49 +165,36 @@ function handleReactionRemove(data: any, accountToken: string) {
 }
 
 export const DiscordGatewayService = {
-  // Web workers keyed by account token
-  _workers: {} as Record<string, Worker>,
-
-  // Fast-connect WebSocket (only used for the first account)
-  _fastWs: null as WebSocket | null,
-  _fastWsToken: null as string | null,
+  // Gateway connections keyed by account token
+  _connections: {} as Record<string, GatewayConnection>,
 
   // External event handler for the orchestration service
   onDispatch: null as ((accountToken: string, payload: { event: string; data: any }) => void) | null,
 
   /**
-   * Connect to the Discord gateway via a Web Worker for a specific account.
+   * Connect to the Discord gateway for a specific account.
    */
   connect(token: string) {
-    if (this._workers[token]) return;
+    if (this._connections[token]) return;
     this._doConnect(token);
   },
 
   _doConnect(token: string) {
-    const worker = new Worker(
-      new URL('../workers/discord-gateway.worker.ts', import.meta.url),
-      { type: 'module' },
-    );
-
-    this._workers[token] = worker;
-
-    worker.onmessage = (event) => {
-      const msg = event.data;
-
-      switch (msg.type) {
+    const connection = new GatewayConnection(token, (event) => {
+      switch (event.type) {
         case 'dispatch':
-          this._handleDispatch(token, msg.eventName, msg.data);
+          this._handleDispatch(token, event.eventName, event.data);
           break;
 
         case 'connectionState':
-          useDiscordStore.getState().updateAccount(token, { isConnected: msg.connected });
+          useDiscordStore.getState().updateAccount(token, { isConnected: event.connected });
           break;
 
         case 'sessionInfo':
           break;
 
         case 'invalidSession':
-          if (!msg.resumable) {
+          if (!event.resumable) {
             useDiscordStore.getState().updateAccount(token, { sessionId: null });
           }
           break;
@@ -221,50 +210,19 @@ export const DiscordGatewayService = {
             duration: Infinity,
           });
           break;
-
-        case 'wsSend':
-          if (this._fastWsToken === token && this._fastWs && this._fastWs.readyState === WebSocket.OPEN) {
-            this._fastWs.send(msg.data);
-          }
-          break;
-
-        case 'log':
-          if (msg.level === 'warn') {
-            console.warn(...msg.args);
-          } else {
-            console.log(...msg.args);
-          }
-          break;
       }
-    };
+    });
 
-    worker.onerror = (err) => {
-      console.error('[Discord Gateway] Worker error:', err);
-    };
+    this._connections[token] = connection;
 
     // Check for fast-connect WebSocket and adopt it (only for first connection)
-    let bufferedMessages: ArrayBuffer[] | undefined;
     const fastWs = (window as any)._ws;
-    if (fastWs && fastWs.ws.readyState === WebSocket.OPEN && Object.keys(this._workers).length === 1) {
-      console.log(`[Discord Gateway] Fast-connect: ${fastWs.state.messages.length} buffered messages`);
-      bufferedMessages = fastWs.state.messages;
-
-      this._fastWs = fastWs.ws;
-      this._fastWsToken = token;
-      fastWs.ws.onmessage = (event: MessageEvent) => {
-        worker.postMessage({ type: 'wsMessage', data: event.data }, [event.data]);
-      };
-      fastWs.ws.onclose = () => {
-        console.log('[Discord Gateway] Fast-connect WS closed');
-        this._fastWs = null;
-        this._fastWsToken = null;
-      };
-      fastWs.ws.onerror = null;
+    if (fastWs && fastWs.ws.readyState === WebSocket.OPEN && Object.keys(this._connections).length === 1) {
+      connection.adoptFastConnect(fastWs.ws, fastWs.state.messages);
       (window as any)._ws = null;
+    } else {
+      connection.connect();
     }
-
-    const transfer = bufferedMessages ? [...bufferedMessages] : [];
-    worker.postMessage({ type: 'connect', token, bufferedMessages }, transfer);
   },
 
   /**
@@ -279,16 +237,10 @@ export const DiscordGatewayService = {
   },
 
   _disconnectOne(token: string) {
-    if (this._fastWsToken === token && this._fastWs) {
-      try { this._fastWs.close(); } catch {}
-      this._fastWs = null;
-      this._fastWsToken = null;
-    }
-    const worker = this._workers[token];
-    if (worker) {
-      worker.postMessage({ type: 'disconnect' });
-      worker.terminate();
-      delete this._workers[token];
+    const connection = this._connections[token];
+    if (connection) {
+      connection.disconnect();
+      delete this._connections[token];
     }
     useDiscordStore.getState().updateAccount(token, { isConnected: false });
   },
@@ -297,30 +249,25 @@ export const DiscordGatewayService = {
    * Disconnect all gateway connections.
    */
   disconnectAll() {
-    if (this._fastWs) {
-      try { this._fastWs.close(); } catch {}
-      this._fastWs = null;
-      this._fastWsToken = null;
+    for (const key of Object.keys(this._connections)) {
+      this._connections[key].disconnect();
     }
-    for (const key of Object.keys(this._workers)) {
-      this._workers[key].postMessage({ type: 'disconnect' });
-      this._workers[key].terminate();
-    }
-    this._workers = {};
-    // Mark all accounts disconnected
+    this._connections = {};
     for (const account of useDiscordStore.getState().accounts) {
       useDiscordStore.getState().updateAccount(account.token, { isConnected: false });
     }
   },
 
   /**
-   * Send a payload to a specific account's gateway worker.
-   * If no token provided, sends to the active account's worker.
+   * Send a payload to a specific account's gateway connection.
+   * If no token provided, sends to the active account's connection.
    */
   send(data: any, token?: string) {
+    const opName = Object.entries(GatewayOp).find(([, v]) => v === data.op)?.[0] || data.op;
+    console.log(`[Discord Gateway] SEND ${opName}:`, data.d);
     const resolvedToken = token ?? useDiscordStore.getState().token;
-    if (resolvedToken && this._workers[resolvedToken]) {
-      this._workers[resolvedToken].postMessage({ type: 'send', data });
+    if (resolvedToken && this._connections[resolvedToken]) {
+      this._connections[resolvedToken].send(data);
     }
   },
 
@@ -343,12 +290,14 @@ export const DiscordGatewayService = {
   subscribeGuild(guildId: string, channelId: string, memberIds: string[] = [], range: [number, number] = [0, 99]) {
     useDiscordMemberListStore.getState().markPendingSync(guildId);
     const token = this._getTokenForGuild(guildId);
+    const guild = useDiscordGuildsStore.getState().guilds.find((g) => g.id === guildId);
+    const isLarge = !!guild?.large;
     this.send({
       op: GatewayOp.GUILD_SUBSCRIPTIONS,
       d: {
         subscriptions: {
           [guildId]: {
-            typing: true,
+            typing: !isLarge,
             threads: true,
             activities: true,
             members: memberIds,
@@ -385,12 +334,14 @@ export const DiscordGatewayService = {
    */
   updateMemberListRange(guildId: string, channelId: string, ranges: [number, number][]) {
     const token = this._getTokenForGuild(guildId);
+    const guild = useDiscordGuildsStore.getState().guilds.find((g) => g.id === guildId);
+    const isLarge = !!guild?.large;
     this.send({
       op: GatewayOp.GUILD_SUBSCRIPTIONS,
       d: {
         subscriptions: {
           [guildId]: {
-            typing: true,
+            typing: !isLarge,
             threads: true,
             activities: true,
             members: [],
@@ -469,11 +420,9 @@ export const DiscordGatewayService = {
         useDiscordRelationshipsStore.getState().updateRelationship(data.id, { type: data.type, nickname: data.nickname });
         break;
       case 'GUILD_MEMBERS_CHUNK':
-        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleGuildMembersChunk(data);
         break;
       case 'GUILD_MEMBER_UPDATE':
-        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleGuildMemberUpdate(data);
         break;
       case 'GUILD_MEMBER_LIST_UPDATE':
@@ -489,6 +438,9 @@ export const DiscordGatewayService = {
         handleReactionRemove(data, accountToken);
         break;
       case 'VOICE_STATE_UPDATE':
+        if (data.user_id === getAccountUserId(accountToken)) {
+          console.log('[Discord Gateway] VOICE_STATE_UPDATE (self):', data);
+        }
         if (data.guild_id) {
           useDiscordVoiceStatesStore.getState().updateVoiceState(data);
         }
@@ -500,7 +452,20 @@ export const DiscordGatewayService = {
         }
         break;
       case 'VOICE_SERVER_UPDATE':
+        console.log('[Discord Gateway] VOICE_SERVER_UPDATE:', data);
         DiscordVoiceService.handleVoiceServerUpdate(data);
+        break;
+      case 'STREAM_SERVER_UPDATE':
+        console.log('[Discord Gateway] STREAM_SERVER_UPDATE:', data);
+        DiscordStreamService.handleStreamServerUpdate(data);
+        break;
+      case 'STREAM_CREATE':
+        console.log('[Discord Gateway] STREAM_CREATE:', data);
+        DiscordStreamService.handleStreamCreate(data);
+        break;
+      case 'STREAM_DELETE':
+        console.log('[Discord Gateway] STREAM_DELETE:', data);
+        DiscordStreamService.handleStreamDelete(data);
         break;
       case 'TYPING_START': {
         const typingUserId = data.user_id;
@@ -514,8 +479,6 @@ export const DiscordGatewayService = {
         break;
       }
       case 'PRESENCE_UPDATE': {
-        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
-
         const presenceUserId = data.user?.id || data.user_id;
         if (presenceUserId) {
           const presence = {
@@ -556,8 +519,6 @@ export const DiscordGatewayService = {
         break;
       }
       case 'PASSIVE_UPDATE_V2':
-        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
-
         this._handlePassiveUpdateV2(data);
         break;
       case 'USER_GUILD_SETTINGS_UPDATE':

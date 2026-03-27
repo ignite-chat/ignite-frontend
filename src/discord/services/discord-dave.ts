@@ -2756,7 +2756,14 @@ export class DaveSession {
    */
   async decryptFrame(frame: Uint8Array, ssrc?: number): Promise<Uint8Array> {
     // No keys yet — drop frame (silence instead of garbage)
-    if (this.receiverRatchets.size === 0 && !this.senderRatchet) return new Uint8Array(0);
+    if (this.receiverRatchets.size === 0 && !this.senderRatchet) {
+      if (this._decryptLogCount < 5) {
+        this._decryptLogCount++;
+        const userId = ssrc !== undefined ? this.ssrcToUserId.get(ssrc) : undefined;
+        console.log(`[DAVE] decryptFrame: NO KEYS available. ssrc=${ssrc}, user=${userId}, receiverRatchets=${this.receiverRatchets.size}, ssrcMap size=${this.ssrcToUserId.size}, ssrcMap keys=[${[...this.ssrcToUserId.entries()].map(([s,u]) => s+'->'+u).join(', ')}]`);
+      }
+      return new Uint8Array(0);
+    }
 
     // Check for Opus silence packet — passthrough (per libdave common.h kOpusSilencePacket)
     if (frame.length === 3 && frame[0] === 0xf8 && frame[1] === 0xff && frame[2] === 0xfe) {
@@ -2780,16 +2787,35 @@ export class DaveSession {
       return frame;
     }
 
-    // Parse supplemental data from the end
+    // Parse supplemental data from the end:
+    // [...media...][8B tag][ULEB128 nonce][ULEB128 unencrypted ranges...][1B supplSize][0xFAFA]
     const supplSize = frame[frame.length - 3];
     const supplStart = frame.length - supplSize;
     if (supplStart < 0) return frame;
 
+    const mediaData = frame.subarray(0, supplStart);
     const supplData = frame.subarray(supplStart);
     const truncatedTag = supplData.subarray(0, 8);
-    const nonceArea = supplData.subarray(8, supplData.length - 3);
-    const { value: nonce32 } = uleb128Decode(nonceArea);
+
+    // Parse nonce (ULEB128) after the tag
+    let supplPos = 8;
+    const { value: nonce32, bytesRead: nonceBytes } = uleb128Decode(supplData.subarray(supplPos));
+    supplPos += nonceBytes;
     const generation = (nonce32 >>> 24) & 0xff;
+
+    // Parse unencrypted ranges (pairs of ULEB128 offset + length) from remaining suppl data
+    // (everything between nonce and the 3-byte footer: supplSize + 0xFAFA)
+    const rangesArea = supplData.subarray(supplPos, supplData.length - 3);
+    const unencryptedRanges: { offset: number; length: number }[] = [];
+    let rangePos = 0;
+    while (rangePos < rangesArea.length) {
+      const { value: offset, bytesRead: ob } = uleb128Decode(rangesArea.subarray(rangePos));
+      rangePos += ob;
+      if (rangePos >= rangesArea.length) break;
+      const { value: length, bytesRead: lb } = uleb128Decode(rangesArea.subarray(rangePos));
+      rangePos += lb;
+      unencryptedRanges.push({ offset, length });
+    }
 
     // Build expanded frame nonce: 8 zero bytes + 4-byte LE truncated nonce
     const iv = new Uint8Array(12);
@@ -2798,7 +2824,38 @@ export class DaveSession {
     iv[10] = (nonce32 >>> 16) & 0xff;
     iv[11] = (nonce32 >>> 24) & 0xff;
 
-    const ciphertext = frame.subarray(0, supplStart);
+    // Separate encrypted and unencrypted bytes from the media data
+    let ciphertext: Uint8Array;
+    let aad: Uint8Array;
+
+    if (unencryptedRanges.length === 0) {
+      // Audio: entire frame is encrypted, no AAD
+      ciphertext = mediaData;
+      aad = new Uint8Array(0);
+    } else {
+      // Video: extract unencrypted (AAD) and encrypted (ciphertext) ranges
+      const unencryptedParts: Uint8Array[] = [];
+      const encryptedParts: Uint8Array[] = [];
+      let pos = 0;
+
+      for (const range of unencryptedRanges) {
+        // Encrypted bytes before this unencrypted range
+        if (range.offset > pos) {
+          encryptedParts.push(mediaData.subarray(pos, range.offset));
+        }
+        // Unencrypted bytes
+        unencryptedParts.push(mediaData.subarray(range.offset, range.offset + range.length));
+        pos = range.offset + range.length;
+      }
+      // Remaining encrypted bytes after last unencrypted range
+      if (pos < mediaData.length) {
+        encryptedParts.push(mediaData.subarray(pos));
+      }
+
+      ciphertext = concatBytes(...encryptedParts);
+      aad = concatBytes(...unencryptedParts);
+    }
+
     const combined = concatBytes(ciphertext, truncatedTag);
 
     // Resolve userId for this SSRC
@@ -2821,11 +2878,43 @@ export class DaveSession {
       try {
         const key = await ratchet.getKey(generation);
         const plaintext = await crypto.subtle.decrypt(
-          { name: 'AES-GCM', iv, tagLength: 64 },
+          { name: 'AES-GCM', iv, additionalData: aad, tagLength: 64 },
           key,
           combined,
         );
-        return new Uint8Array(plaintext);
+
+        if (unencryptedRanges.length === 0) {
+          // Audio: return decrypted directly
+          return new Uint8Array(plaintext);
+        }
+
+        // Video: reassemble frame with unencrypted ranges in place + decrypted ranges
+        const decryptedBytes = new Uint8Array(plaintext);
+        const result = new Uint8Array(mediaData.length - ciphertext.length + decryptedBytes.length);
+        let outPos = 0;
+        let decPos = 0;
+        let srcPos = 0;
+
+        for (const range of unencryptedRanges) {
+          // Copy decrypted bytes before this unencrypted range
+          const encLen = range.offset - srcPos;
+          if (encLen > 0) {
+            result.set(decryptedBytes.subarray(decPos, decPos + encLen), outPos);
+            outPos += encLen;
+            decPos += encLen;
+          }
+          // Copy unencrypted bytes
+          result.set(mediaData.subarray(range.offset, range.offset + range.length), outPos);
+          outPos += range.length;
+          srcPos = range.offset + range.length;
+        }
+        // Copy remaining decrypted bytes
+        const remaining = decryptedBytes.length - decPos;
+        if (remaining > 0) {
+          result.set(decryptedBytes.subarray(decPos), outPos);
+        }
+
+        return result;
       } catch {
         // Try next epoch's ratchets
         continue;
@@ -2836,7 +2925,7 @@ export class DaveSession {
     if (this._decryptLogCount < 10) {
       this._decryptLogCount++;
       console.error(
-        `[DAVE] AES-GCM decrypt failed (all epochs): nonce=${nonce32}, gen=${generation}, ctLen=${ciphertext.length}, supplSize=${supplSize}, user=${userId}`,
+        `[DAVE] AES-GCM decrypt failed (all epochs): nonce=${nonce32}, gen=${generation}, ctLen=${ciphertext.length}, supplSize=${supplSize}, user=${userId}, ranges=${unencryptedRanges.length}`,
       );
     }
     return new Uint8Array(0);

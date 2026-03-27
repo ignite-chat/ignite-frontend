@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Hash, SpeakerHigh, CaretDown, CaretRight, Megaphone, BookBookmark, MicrophoneStage, ChatsTeardrop, CheckSquare, LockKey, MicrophoneSlash, SpeakerSlash, VideoCamera } from '@phosphor-icons/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
@@ -385,6 +385,7 @@ const useElapsedTime = (unixSeconds) => {
 };
 
 const VoiceChannelRow = memo(({ channel, guildName }) => {
+  const navigate = useNavigate();
   const canView = channel._canView !== false;
   const canConnect = useDiscordHasPermission(channel.guild_id, channel, CONNECT);
   const guildVoiceStates = useDiscordVoiceStatesStore((s) => s.voiceStates[channel.guild_id] || {});
@@ -399,11 +400,12 @@ const VoiceChannelRow = memo(({ channel, guildName }) => {
   const elapsed = useElapsedTime(voiceUserCount > 0 ? startTime : null);
 
   const handleVoiceClick = () => {
-    if (!canConnect || !canView) return;
-    DiscordVoiceService.joinVoiceChannel(channel.guild_id, channel.id, channel.name, guildName || '');
+    if (!canView) return;
+    // Navigate to the voice channel view
+    navigate(`/discord/${channel.guild_id}/${channel.id}`);
   };
 
-  const isClickable = canView && canConnect;
+  const isClickable = canView;
 
   return (
     <div

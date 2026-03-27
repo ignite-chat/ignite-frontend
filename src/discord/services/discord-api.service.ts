@@ -15,6 +15,9 @@ import type {
   InteractionPayload,
   AckBulkEntry,
   UserGuildSettingsResponse,
+  GuildProfile,
+  GuildTopEmojisResponse,
+  ApplicationIdentitiesResponse,
 } from '../types';
 import { useDiscordStore } from '../store/discord.store';
 import { requestCaptchaSolution } from './discord-captcha-bridge';
@@ -149,8 +152,27 @@ export const DiscordApiService = {
   /**
    * Get a guild's public profile (used for clan tag popovers).
    */
-  async getGuildProfile(guildId: string): Promise<any> {
-    const { data } = await discordApi.get(`/guilds/${guildId}/profile`);
+  async getGuildProfile(guildId: string): Promise<GuildProfile> {
+    const { data } = await discordApi.get<GuildProfile>(`/guilds/${guildId}/profile`);
+    return data;
+  },
+
+  /**
+   * Get a guild's top emojis by usage.
+   */
+  async getGuildTopEmojis(guildId: string): Promise<GuildTopEmojisResponse> {
+    const { data } = await discordApi.get<GuildTopEmojisResponse>(`/guilds/${guildId}/top-emojis`);
+    return data;
+  },
+
+  /**
+   * Get a user's application identities (linked game profiles).
+   */
+  async getUserApplicationIdentities(userId: string, withProfiles = true): Promise<ApplicationIdentitiesResponse> {
+    const { data } = await discordApi.get<ApplicationIdentitiesResponse>(
+      `/users/${userId}/application-identities`,
+      { params: { with_profiles: withProfiles } },
+    );
     return data;
   },
 

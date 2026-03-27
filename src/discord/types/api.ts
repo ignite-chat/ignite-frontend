@@ -98,3 +98,82 @@ export type UserGuildSettingsResponse = {
   partial: boolean;
   version: number;
 };
+
+// ── Guild Profile (/guilds/:id/profile) ────────────────────────────
+
+export type GuildProfileGameActivity = {
+  activity_level: number;
+  activity_score: number;
+};
+
+export type GuildProfile = {
+  id: string;
+  name: string;
+  icon_hash: string | null;
+  member_count: number;
+  online_count: number;
+  description: string | null;
+  banner_hash: string | null;
+  custom_banner_hash: string | null;
+  game_application_ids: string[];
+  game_activity: { [applicationId: string]: GuildProfileGameActivity };
+  tag: string;
+  badge: number;
+  badge_color_primary: string | null;
+  badge_color_secondary: string | null;
+  badge_hash: string | null;
+  traits: string[];
+  features: string[];
+  visibility: number;
+  premium_subscription_count: number;
+  premium_tier: number;
+};
+
+// ── Guild Top Emojis (/guilds/:id/top-emojis) ─────────────────────
+
+export type GuildTopEmojiItem = {
+  emoji_id: string;
+  emoji_rank: number;
+};
+
+export type GuildTopEmojisResponse = {
+  items: GuildTopEmojiItem[];
+};
+
+// ── Application Identities (/users/:id/application-identities) ────
+
+export type ApplicationIdentityImage = {
+  id: string;
+  url: string;
+  proxy_url: string;
+  width: number;
+  height: number;
+  placeholder: string;
+  placeholder_version: number;
+  content_type: string;
+  loading_state: number;
+  flags: number;
+};
+
+export type ApplicationIdentityProfileData = {
+  [key: string]: any;
+};
+
+export type ApplicationIdentityProfile = {
+  username: string;
+  metadata: string;
+  data: ApplicationIdentityProfileData;
+  data_trusted: boolean;
+  connection_visible: boolean;
+};
+
+export type ApplicationIdentity = {
+  application_id: string;
+  provider_issued_user_id: string;
+  profile: ApplicationIdentityProfile;
+  profiles: ApplicationIdentityProfile[];
+};
+
+export type ApplicationIdentitiesResponse = {
+  identities: ApplicationIdentity[];
+};
