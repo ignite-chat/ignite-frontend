@@ -7,11 +7,12 @@ import { useDiscordProfilesStore } from '../store/discord-profiles.store';
 import { useDiscordRelationshipsStore, RelationshipType } from '../store/discord-relationships.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordHasPermission } from '../hooks/useDiscordPermission';
-import { MANAGE_MESSAGES, KICK_MEMBERS, BAN_MEMBERS, READ_MESSAGE_HISTORY, MANAGE_NICKNAMES, MODERATE_MEMBERS, ADD_REACTIONS, SEND_MESSAGES } from '../constants/permissions';
+import { MANAGE_MESSAGES, KICK_MEMBERS, BAN_MEMBERS, READ_MESSAGE_HISTORY, ADD_REACTIONS, SEND_MESSAGES } from '../constants/permissions';
 import { scrollPositions } from '@/store/last-channel.store';
 import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
 import { Check, Hash, Megaphone, SpeakerHigh, MicrophoneStage, ChatsTeardrop, At } from '@phosphor-icons/react';
+
 import * as DiscordChannelType from '../constants/channel-types';
 import { snowflakeToTimestamp } from '../utils/snowflake';
 import DiscordMessage from './DiscordMessage';
@@ -242,10 +243,60 @@ function formatSinceTime(date) {
   return `${date.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })} at ${time}`;
 }
 
+const UnreadBar = ({ channelId, messages, hasMore, joinedAtMs, onMarkAsRead }) => {
+  const readStateLastMessageId = useDiscordReadStatesStore(
+    (s) => s.readStates[channelId]?.last_message_id
+  );
+
+  const data = useMemo(() => {
+    if (messages.length === 0) return null;
+
+    const oldestLoadedId = messages[0].id;
+    if (!readStateLastMessageId) {
+      if (!joinedAtMs) return null;
+      const unreadCount = messages.filter((m) => snowflakeToTimestamp(m.id) > joinedAtMs).length;
+      if (unreadCount === 0) return null;
+      return {
+        count: unreadCount,
+        isExact: !hasMore || snowflakeToTimestamp(oldestLoadedId) <= joinedAtMs,
+        sinceText: formatSinceTime(new Date(joinedAtMs)),
+      };
+    }
+
+    const unreadCount = messages.filter((m) => m.id > readStateLastMessageId).length;
+    if (unreadCount === 0) return null;
+
+    return {
+      count: unreadCount,
+      isExact: !hasMore || oldestLoadedId <= readStateLastMessageId,
+      sinceText: formatSinceTime(new Date(snowflakeToTimestamp(readStateLastMessageId))),
+    };
+  }, [messages, readStateLastMessageId, hasMore, joinedAtMs]);
+
+  if (!data) return null;
+
+  return (
+    <div className="absolute left-2 right-2 top-0 z-10 flex items-center justify-between rounded-b-lg bg-[#5865f2] px-4 py-2 text-sm">
+      <span className="font-medium text-white">
+        {data.count}
+        {!data.isExact && '+'} new message{data.count !== 1 ? 's' : ''} since {data.sinceText}
+      </span>
+      <button
+        type="button"
+        onClick={onMarkAsRead}
+        className="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold text-white transition-colors hover:text-white/80"
+      >
+        Mark as Read
+        <Check size={14} weight="bold" />
+      </button>
+    </div>
+  );
+};
+
 const NewMessagesSeparator = () => (
-  <div className="flex items-center gap-1 pl-4 pr-3.5 mt-1.5 mb-0.5">
-    <div className="flex-1 h-px bg-destructive" />
-    <span className="text-[11px] font-bold text-destructive leading-none">NEW</span>
+  <div className="mb-0.5 mt-1.5 flex items-center gap-1 pl-4 pr-3.5">
+    <div className="h-px flex-1 bg-destructive" />
+    <span className="text-[11px] font-bold leading-none text-destructive">NEW</span>
   </div>
 );
 
@@ -272,8 +323,6 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const hasManageMessages = useDiscordHasPermission(guildId, channel, MANAGE_MESSAGES);
   const hasKickMembers = useDiscordHasPermission(guildId, channel, KICK_MEMBERS);
   const hasBanMembers = useDiscordHasPermission(guildId, channel, BAN_MEMBERS);
-  const hasManageNicknames = useDiscordHasPermission(guildId, channel, BAN_MEMBERS);
-  const hasModerateMembers = useDiscordHasPermission(guildId, channel, BAN_MEMBERS);
   const hasAddReactions = useDiscordHasPermission(guildId, channel, ADD_REACTIONS);
   const hasSendMessages = useDiscordHasPermission(guildId, channel, SEND_MESSAGES);
   const _hasReadMessageHistory = useDiscordHasPermission(guildId, channel, READ_MESSAGE_HISTORY);
@@ -297,14 +346,13 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const scrollTopOnRenderRef = useRef(false);
   // ID of the first unread message — snapshotted once per channel visit, drives separator + scroll.
   const [firstUnreadId, setFirstUnreadId] = useState(null);
-  const firstUnreadIdRef = useRef(null);
+
 
   const messagesRef = useRef();
   const contentRef = useRef();
   const ackTimerRef = useRef(null);
   const lastAckedRef = useRef(null);
   const wasNearBottomRef = useRef(true);
-  const unreadCountRef = useRef(0);
   const scrollAnchorRef = useRef(null);
   const scrollAnchorDesiredTopRef = useRef(0);
   const isProgrammaticScrollRef = useRef(false);
@@ -313,10 +361,6 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const lastMessageId = useMemo(
     () => channels.find((c) => c.id === channelId)?.last_message_id,
     [channels, channelId]
-  );
-
-  const readStateLastMessageId = useDiscordReadStatesStore(
-    (s) => s.readStates[channelId]?.last_message_id
   );
 
   const guilds = useDiscordGuildsStore((s) => s.guilds);
@@ -330,38 +374,6 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     return raw ? new Date(raw).getTime() : null;
   }, [guildId, guilds, guildMembers, currentUser?.id]);
 
-  const unreadBarData = useMemo(() => {
-    if (messages.length === 0) return null;
-
-    const oldestLoadedId = messages[0].id;
-    if (!readStateLastMessageId) {
-      // No read state — use join date as the "last read" point
-      if (!joinedAtMs) return null;
-
-      const unreadCount = messages.filter(
-        (m) => snowflakeToTimestamp(m.id) > joinedAtMs
-      ).length;
-      if (unreadCount === 0) return null;
-
-      return {
-        count: unreadCount,
-        isExact: !hasMore || snowflakeToTimestamp(oldestLoadedId) <= joinedAtMs,
-        sinceText: formatSinceTime(new Date(joinedAtMs)),
-      };
-    }
-
-    const unreadCount = messages.filter((m) => m.id > readStateLastMessageId).length;
-    if (unreadCount === 0) return null;
-
-    const isExact = !hasMore || oldestLoadedId <= readStateLastMessageId;
-
-    const sinceText = formatSinceTime(new Date(snowflakeToTimestamp(readStateLastMessageId)));
-
-    return { count: unreadCount, isExact, sinceText };
-  }, [messages, readStateLastMessageId, hasMore, joinedAtMs]);
-
-  unreadCountRef.current = unreadBarData?.count ?? 0;
-
   // Mirror joinedAtMs in a ref so the scroll effect can read it without depending on it
   const joinedAtMsRef = useRef(joinedAtMs);
   joinedAtMsRef.current = joinedAtMs;
@@ -370,7 +382,6 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     if (!lastMessageId) return;
     useDiscordReadStatesStore.getState().ackChannel(channelId, lastMessageId);
     DiscordApiService.ackMessage(channelId, lastMessageId).catch(() => { });
-    firstUnreadIdRef.current = null;
     setFirstUnreadId(null);
   }, [channelId, lastMessageId]);
 
@@ -386,7 +397,6 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
       lastAckedRef.current = lastMessageId;
       useDiscordReadStatesStore.getState().ackChannel(channelId, lastMessageId);
       DiscordApiService.ackMessage(channelId, lastMessageId).catch(() => { });
-      firstUnreadIdRef.current = null;
       setFirstUnreadId(null);
     }, 500);
   }, [channelId, lastMessageId]);
@@ -395,7 +405,6 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   useEffect(() => {
     lastAckedRef.current = null;
     initialScrollDoneRef.current = false;
-    firstUnreadIdRef.current = null;
     setFirstUnreadId(null);
     return () => {
       if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
@@ -412,22 +421,6 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   // Load initial messages or restore scroll position (only on channel switch)
   useEffect(() => {
     if (!channelId || !hasReadMessageHistory) return;
-
-    // Read imperatively — avoids re-running this effect when messages populate mid-load
-    const cached = useDiscordChannelsStore.getState().channelMessages[channelId];
-    if (cached != null) {
-      // Already loaded — restore saved scroll position or trigger scroll-to-unread
-      if (messagesRef.current) {
-        const saved = scrollPositions.getMessage(channelId);
-        if (saved != null) {
-          messagesRef.current.scrollTop = saved;
-          initialScrollDoneRef.current = true;
-        } else {
-          scrollTopOnRenderRef.current = true;
-        }
-      }
-      return;
-    }
 
     setIsLoading(true);
     setHasMore(true);
@@ -456,7 +449,6 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   // Clear separator when the current user sends a message
   useEffect(() => {
     if (messageSentCount > 0) {
-      firstUnreadIdRef.current = null;
       setFirstUnreadId(null);
     }
   }, [messageSentCount]);
@@ -477,8 +469,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
         firstUnreadMsg = messages.find((m) => snowflakeToTimestamp(m.id) > joinedAtMsRef.current) ?? null;
       }
 
-      // Snapshot it — this is the single ID used by the separator and unread bar
-      firstUnreadIdRef.current = firstUnreadMsg?.id ?? null;
+      // Snapshot it — this is the single ID used by the separator
       setFirstUnreadId(firstUnreadMsg?.id ?? null);
 
       if (firstUnreadMsg) {
@@ -518,6 +509,8 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     }
   }, [messages, forceScrollDown, ackIfAtBottom, isLoading, channelId, lastMessageId]);
 
+  // FIXME: This will also re-scroll if pending messages decreases.
+  // TODO: The DiscordChannelInput should signal DiscordChannelMessages to scroll to the bottom when a message is sent.
   // Always scroll to bottom when pending messages appear (user just sent a message)
   useEffect(() => {
     if (!messagesRef.current || !pendingMessages.length) return;
@@ -591,100 +584,96 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   }, []);
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-y-auto" ref={messagesRef} onScroll={onScroll}>
-      {hasReadMessageHistory && unreadBarData && (
-        <div className="sticky top-0 z-10 flex items-center justify-between bg-[#5865f2] px-4 py-0.5 text-sm">
-          <span className="font-medium text-white">
-            {unreadBarData.count}{!unreadBarData.isExact && '+'} new message{unreadBarData.count !== 1 ? 's' : ''} since {unreadBarData.sinceText}
-          </span>
-          <button
-            type="button"
-            onClick={handleMarkAsRead}
-            className="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold text-white transition-colors hover:text-white/80"
-          >
-            Mark as Read
-            <Check size={14} weight="bold" />
-          </button>
-        </div>
+    <div className="relative min-h-0 flex-1">
+      {hasReadMessageHistory && (
+        <UnreadBar
+          channelId={channelId}
+          messages={messages}
+          hasMore={hasMore}
+          joinedAtMs={joinedAtMs}
+          onMarkAsRead={handleMarkAsRead}
+        />
       )}
-      <div ref={contentRef} className="flex min-h-full flex-col justify-end">
-        {!hasReadMessageHistory && (
-          <div className="px-4 pb-4 pt-8">
-            <p className="text-sm text-gray-400">
-              You do not have permission to view the message history of #{channel.name}
-            </p>
-          </div>
-        )}
+      <div className="absolute inset-0 overflow-y-auto" ref={messagesRef} onScroll={onScroll}>
+        <div ref={contentRef} className="flex min-h-full flex-col justify-end">
+          {!hasReadMessageHistory && (
+            <div className="px-4 pb-4 pt-8">
+              <p className="text-sm text-gray-400">
+                You do not have permission to view the message history of #{channel.name}
+              </p>
+            </div>
+          )}
 
-        {loadingMore && (
-          <div className="flex justify-center py-3">
-            <div className="size-6 animate-spin rounded-full border-2 border-solid border-primary border-t-transparent" />
-          </div>
-        )}
+          {loadingMore && (
+            <div className="flex justify-center py-3">
+              <div className="size-6 animate-spin rounded-full border-2 border-solid border-primary border-t-transparent" />
+            </div>
+          )}
 
-        {isLoading ? (
-          <MessageSkeletonList />
-        ) : (
-          <ol className="list-none pb-4">
-            {!hasMore && (
-              <li>
-                <ChannelWelcome channel={channel} />
-              </li>
-            )}
-            {messages.map((msg, i) => {
-              const prevMessage = i > 0 ? messages[i - 1] : null;
-              const showNewSeparator = firstUnreadId != null && msg.id === firstUnreadId;
-
-              const msgTs = snowflakeToTimestamp(msg.id);
-              const prevTs = prevMessage ? snowflakeToTimestamp(prevMessage.id) : null;
-              const showDateSeparator = prevTs == null ||
-                new Date(msgTs).toDateString() !== new Date(prevTs).toDateString();
-
-              return (
-                <li key={msg.id} data-message-id={msg.id}>
-                  {showDateSeparator && <DateSeparator timestamp={msgTs} />}
-                  {showNewSeparator && <NewMessagesSeparator />}
-                  <DiscordMessage
-                    message={msg}
-                    prevMessage={prevMessage}
-                    currentUserId={currentUser?.id}
-                    channelId={channelId}
-                    guildId={guildId}
-                    hasManageMessages={hasManageMessages}
-                    hasKickMembers={hasKickMembers}
-                    hasBanMembers={hasBanMembers}
-                    hasManageNicknames={true}
-                    hasModerateMembers={true}
-                    hasAddReactions={hasAddReactions}
-                    hasSendMessages={hasSendMessages}
-                  />
+          {isLoading ? (
+            <MessageSkeletonList />
+          ) : (
+            <ol className="list-none pb-4">
+              {!hasMore && (
+                <li>
+                  <ChannelWelcome channel={channel} />
                 </li>
-              );
-            })}
-            {pendingMessages.map((msg, i) => {
-              const prevMessage = i === 0
-                ? messages[messages.length - 1] || null
-                : pendingMessages[i - 1];
-              return (
-                <li key={msg.nonce}>
-                  <DiscordMessage
-                    message={msg}
-                    prevMessage={prevMessage}
-                    currentUserId={currentUser?.id}
-                    channelId={channelId}
-                    guildId={guildId}
-                    pending
-                  />
+              )}
+              {messages.map((msg, i) => {
+                const prevMessage = i > 0 ? messages[i - 1] : null;
+                const showNewSeparator = firstUnreadId != null && msg.id === firstUnreadId;
+
+                const msgTs = snowflakeToTimestamp(msg.id);
+                const prevTs = prevMessage ? snowflakeToTimestamp(prevMessage.id) : null;
+                const showDateSeparator = prevTs == null ||
+                  new Date(msgTs).toDateString() !== new Date(prevTs).toDateString();
+
+                return (
+                  <li key={msg.id} data-message-id={msg.id}>
+                    {showDateSeparator && <DateSeparator timestamp={msgTs} />}
+                    {showNewSeparator && <NewMessagesSeparator />}
+                    <DiscordMessage
+                      message={msg}
+                      prevMessage={prevMessage}
+                      currentUserId={currentUser?.id}
+                      channelId={channelId}
+                      guildId={guildId}
+                      hasManageMessages={hasManageMessages}
+                      hasKickMembers={hasKickMembers}
+                      hasBanMembers={hasBanMembers}
+                      hasManageNicknames={true}
+                      hasModerateMembers={true}
+                      hasAddReactions={hasAddReactions}
+                      hasSendMessages={hasSendMessages}
+                    />
+                  </li>
+                );
+              })}
+              {pendingMessages.map((msg, i) => {
+                const prevMessage = i === 0
+                  ? messages[messages.length - 1] || null
+                  : pendingMessages[i - 1];
+                return (
+                  <li key={msg.nonce}>
+                    <DiscordMessage
+                      message={msg}
+                      prevMessage={prevMessage}
+                      currentUserId={currentUser?.id}
+                      channelId={channelId}
+                      guildId={guildId}
+                      pending
+                    />
+                  </li>
+                );
+              })}
+              {pendingInteractions.map((pi) => (
+                <li key={pi.nonce}>
+                  <PendingInteractionIndicator interaction={pi} />
                 </li>
-              );
-            })}
-            {pendingInteractions.map((pi) => (
-              <li key={pi.nonce}>
-                <PendingInteractionIndicator interaction={pi} />
-              </li>
-            ))}
-          </ol>
-        )}
+              ))}
+            </ol>
+          )}
+        </div>
       </div>
     </div>
   );

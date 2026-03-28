@@ -76,6 +76,13 @@ const DiscordChannel = ({ channel }) => {
     return recipientIds.includes('643945264868098049');
   }, [channel, isDM]);
 
+  const dmRecipient = useMemo(() => {
+    if (!isDM || channel?.type !== DM) return null;
+    const recipientIds = channel.recipient_ids || [];
+    const other = recipientIds.find((id) => id !== currentUser?.id) || recipientIds[0];
+    return other ? usersMap[other] : null;
+  }, [channel, currentUser?.id, isDM, usersMap]);
+
   if (!channel) return null;
 
   if (isForum) {
@@ -88,13 +95,6 @@ const DiscordChannel = ({ channel }) => {
 
   const displayName = isDM ? dmInfo?.name : channel.name;
   const placeholderName = isDM ? `@${dmInfo?.name}` : `#${channel.name}`;
-
-  const dmRecipient = useMemo(() => {
-    if (!isDM || channel?.type !== DM) return null;
-    const recipientIds = channel.recipient_ids || [];
-    const other = recipientIds.find((id) => id !== currentUser?.id) || recipientIds[0];
-    return other ? usersMap[other] : null;
-  }, [channel, currentUser?.id, isDM, usersMap]);
 
   return (
     <div className="flex h-full flex-col">
