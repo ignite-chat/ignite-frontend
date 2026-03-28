@@ -65,9 +65,9 @@ import FocusPlugin from './plugins/FocusPlugin';
 import EditablePlugin from './plugins/EditablePlugin';
 import SlashCommandPlugin from './plugins/SlashCommandPlugin';
 import SlashCommandForm from './SlashCommandForm';
+import { DISCORD_EMOJI_CDN } from '../../constants/cdn';
 
 const MAX_MESSAGE_LENGTH = 2000;
-const DISCORD_EMOJI_CDN = 'https://cdn.discordapp.com/emojis';
 
 function formatSlowmodeDuration(seconds) {
   if (seconds >= 3600) {

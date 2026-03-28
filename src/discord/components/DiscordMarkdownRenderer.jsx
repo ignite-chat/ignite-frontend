@@ -8,8 +8,7 @@ import SpoilerText from '@/components/message/markdown/SpoilerText';
 import TimestampDisplay from '@/components/message/markdown/TimestampDisplay';
 import DiscordEmoji from './DiscordEmoji';
 import { Info, Lightbulb, AlertTriangle, AlertOctagon, Flame } from 'lucide-react';
-
-const DISCORD_EMOJI_CDN = 'https://cdn.discordapp.com/emojis';
+import { DISCORD_EMOJI_CDN } from '../constants/cdn';
 
 const HEADING_CLASSES = [
   'text-2xl font-bold',

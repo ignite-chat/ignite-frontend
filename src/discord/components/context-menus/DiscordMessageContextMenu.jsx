@@ -20,8 +20,7 @@ import { getTwemojiUrl } from '@/utils/emoji.utils';
 import { useEmojisStore } from '@/ignite/store/emojis.store';
 import DeleteMessageModal from '@/components/modals/DeleteMessageModal';
 import DiscordDebugInfoModal from '../modals/DiscordDebugInfoModal';
-
-const DISCORD_EMOJI_CDN = 'https://cdn.discordapp.com/emojis';
+import { DISCORD_EMOJI_CDN } from '../../constants/cdn';
 
 const COMMON_REACTION_EMOJIS = [
   '👍', '👎', '😂', '❤️', '😮', '😢',

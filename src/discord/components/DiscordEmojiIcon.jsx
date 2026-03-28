@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { getTwemojiUrl } from '@/utils/emoji.utils';
-
-const DISCORD_EMOJI_CDN = 'https://cdn.discordapp.com/emojis';
+import { DISCORD_EMOJI_CDN } from '../constants/cdn';
 
 export const getDiscordEmojiUrl = (emoji, size = 48) => {
   if (emoji.id) {

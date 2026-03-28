@@ -13,6 +13,7 @@ import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
 import { Check, Hash, Megaphone, SpeakerHigh, MicrophoneStage, ChatsTeardrop, At } from '@phosphor-icons/react';
 import * as DiscordChannelType from '../constants/channel-types';
+import { snowflakeToTimestamp } from '../utils/snowflake';
 import DiscordMessage from './DiscordMessage';
 import MessageSkeletonList from '@/components/message/MessageSkeleton';
 import { useDiscordInteractionsStore } from '../store/discord-interactions.store';
@@ -226,8 +227,6 @@ const PendingInteractionIndicator = ({ interaction }) => {
   );
 };
 
-const DISCORD_EPOCH = 1420070400000;
-const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
 
 function formatSinceTime(date) {
   const now = new Date();

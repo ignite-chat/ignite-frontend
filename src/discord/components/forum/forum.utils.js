@@ -1,9 +1,8 @@
 import { getTwemojiUrl } from '@/utils/emoji.utils';
+import { snowflakeToTimestamp, DISCORD_EPOCH } from '@/discord/utils/snowflake';
+import { DISCORD_EMOJI_CDN } from '@/discord/constants/cdn';
 
-export const DISCORD_EPOCH = 1420070400000;
-export const DISCORD_EMOJI_CDN = 'https://cdn.discordapp.com/emojis';
-
-export const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
+export { snowflakeToTimestamp, DISCORD_EPOCH, DISCORD_EMOJI_CDN };
 
 export const formatRelativeTime = (timestamp) => {
   const now = Date.now();

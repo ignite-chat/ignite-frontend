@@ -10,6 +10,7 @@ import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useDiscordReplyStore } from '../store/discord-reply.store';
 import { getTwemojiUrl } from '@/utils/emoji.utils';
+import { DISCORD_EMOJI_CDN } from '../constants/cdn';
 import { useEmojisStore } from '@/ignite/store/emojis.store';
 import emojisData from '@/assets/emojis/emojis.json';
 import { parseMarkdown } from '@/components/message/markdown/parser';
@@ -763,8 +764,6 @@ const DiscordReplyBar = ({ referencedMessage, guildId }) => {
     </div>
   );
 };
-
-const DISCORD_EMOJI_CDN = 'https://cdn.discordapp.com/emojis';
 
 const SIDEBAR_CATEGORIES = [
   { id: 'recent', icon: <Clock className="size-full" />, label: 'Recently Used' },

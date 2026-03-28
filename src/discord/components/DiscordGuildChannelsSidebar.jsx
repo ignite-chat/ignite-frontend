@@ -19,6 +19,7 @@ import { useDiscordVoiceStore } from '../store/discord-voice.store';
 import { DiscordVoiceService } from '../services/discord-voice.service';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
+import { snowflakeToTimestamp } from '../utils/snowflake';
 import { useModalStore } from '@/store/modal.store';
 import DiscordUserProfileModal from './DiscordUserProfileModal';
 import DiscordUserContextMenu from './context-menus/DiscordUserContextMenu';
@@ -29,8 +30,6 @@ import { openAttachmentViewModal } from '@/components/modals/AttachmentViewModal
 import AvatarStack from '@/components/ui/avatar-stack';
 import TypingDots from '@/components/ui/typing-dots';
 
-const DISCORD_EPOCH = 1420070400000;
-const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
 
 const VerifiedIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 15.2" className="shrink-0">

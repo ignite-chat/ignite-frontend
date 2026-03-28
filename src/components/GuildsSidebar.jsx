@@ -53,6 +53,7 @@ import { useDiscordRelationshipsStore, RelationshipType } from '../discord/store
 import { useDiscordUsersStore } from '../discord/store/discord-users.store';
 import { useDiscordVoiceStatesStore } from '../discord/store/discord-voice-states.store';
 import { useDiscordGuildFoldersStore } from '../discord/store/discord-guild-folders.store';
+import { snowflakeToTimestamp } from '../discord/utils/snowflake';
 import { useLastChannelStore } from '@/store/last-channel.store';
 import { ChannelType } from '@/ignite/constants/ChannelType';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -158,8 +159,6 @@ const SortableGuildIcon = ({ guild, isActive, isUnread, mentionCount, isDragging
   );
 };
 
-const DISCORD_EPOCH = 1420070400000;
-const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
 
 const VoiceAvatarStack = ({ voiceMembers }) => {
   const usersMap = useDiscordUsersStore((s) => s.users);

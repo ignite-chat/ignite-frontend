@@ -8,9 +8,9 @@ import { $createTextNode, $getSelection, $isRangeSelection } from 'lexical';
 import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { emojiMap, getTwemojiUrl } from '@/utils/emoji.utils';
+import { DISCORD_EMOJI_CDN } from '../../../constants/cdn';
 
 const SUGGESTIONS_LIMIT = 10;
-const DISCORD_EMOJI_CDN = 'https://cdn.discordapp.com/emojis';
 
 class EmojiMenuOption extends MenuOption {
   shortcode;

@@ -25,9 +25,9 @@ import DMChannelItem from './DMChannelItem';
 import DMRowBase from './DMRowBase';
 import NewDMModal from '@/ignite/components/modals/NewDMModal';
 import { useModalStore } from '@/ignite/store/modal.store';
+import { DISCORD_EPOCH } from '@/discord/utils/snowflake';
 
 const IGNITE_EPOCH = 1444521600000; // Oct 10, 2015
-const DISCORD_EPOCH = 1420070400000; // Jan 1, 2015
 
 const snowflakeToTimestamp = (id, epoch) =>
   Number(BigInt(id) >> 22n) + epoch;
