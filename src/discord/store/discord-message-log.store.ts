@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { DiscordMessage } from '../types';
+import { useDiscordGuildsStore } from './discord-guilds.store';
 
 export type LoggedMessage = {
   /** The original message snapshot at the time of deletion/edit */
@@ -34,6 +35,8 @@ export type MessageLogSettings = {
   permanentStorage: boolean;
   /** Whether to download and store images/attachments (Electron only) */
   storeImages: boolean;
+  /** Exclude channels from guilds marked as large (250+ members) */
+  excludeLargeGuilds: boolean;
 };
 
 type DiscordMessageLogStore = {
@@ -46,6 +49,7 @@ type DiscordMessageLogStore = {
   setLogAllChannels: (logAll: boolean) => void;
   setPermanentStorage: (permanent: boolean) => void;
   setStoreImages: (store: boolean) => void;
+  setExcludeLargeGuilds: (exclude: boolean) => void;
   setChannelConfig: (config: ChannelLogConfig) => void;
   removeChannelConfig: (channelId: string) => void;
 
@@ -57,7 +61,7 @@ type DiscordMessageLogStore = {
   clearAllLogs: () => void;
 
   /** Check if a channel should be logged */
-  isChannelLogged: (channelId: string) => boolean;
+  isChannelLogged: (channelId: string, guildId?: string | null) => boolean;
 
   clear: () => void;
 };
@@ -78,10 +82,11 @@ function loadSettings(): MessageLogSettings {
 function defaultSettings(): MessageLogSettings {
   return {
     enabled: false,
-    logAllChannels: true,
+    logAllChannels: false,
     channelConfigs: {},
     permanentStorage: false,
     storeImages: false,
+    excludeLargeGuilds: true,
   };
 }
 
@@ -115,6 +120,12 @@ export const useDiscordMessageLogStore = create<DiscordMessageLogStore>((set, ge
 
   setStoreImages: (store) => {
     const settings = { ...get().settings, storeImages: store };
+    set({ settings });
+    saveSettings(settings);
+  },
+
+  setExcludeLargeGuilds: (exclude) => {
+    const settings = { ...get().settings, excludeLargeGuilds: exclude };
     set({ settings });
     saveSettings(settings);
   },
@@ -175,9 +186,17 @@ export const useDiscordMessageLogStore = create<DiscordMessageLogStore>((set, ge
     set({ logs: {} });
   },
 
-  isChannelLogged: (channelId) => {
+  isChannelLogged: (channelId, guildId) => {
     const { settings } = get();
     if (!settings.enabled) return false;
+    if (!window.IgniteNative) return false;
+
+    // Check large guild exclusion before per-channel overrides
+    if (guildId && settings.excludeLargeGuilds) {
+      const guild = useDiscordGuildsStore.getState().guilds.find((g) => g.id === guildId);
+      if (guild?.large) return false;
+    }
+
     const config = settings.channelConfigs[channelId];
     if (config) return config.enabled;
     return settings.logAllChannels;

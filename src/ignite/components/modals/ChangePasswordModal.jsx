@@ -30,7 +30,6 @@ const ChangePasswordModal = ({ modalId }) => {
   const onSubmit = useCallback(
     async (data) => {
       try {
-        console.log('User Password Data:', data);
         // await api.patch('/users/@me/password', data);
         useModalStore.getState().close(modalId);
         form.reset();

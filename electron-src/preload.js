@@ -23,6 +23,7 @@ if (window.opener === null) {
         showNotification: (opts) => ipcRenderer.invoke('notification:show', opts),
         getMemoryUsage: () => ipcRenderer.invoke('app:getMemoryUsage'),
         getDiscordLocalTokens: () => ipcRenderer.invoke('discord:getLocalTokens'),
+        setDiscordActiveChannel: (guildId, channelId) => ipcRenderer.invoke('discord:setActiveChannel', guildId, channelId),
         // Message log file storage
         saveMessageLogAttachment: (channelId, messageId, filename, data) =>
             ipcRenderer.invoke('msglog:saveAttachment', channelId, messageId, filename, data),

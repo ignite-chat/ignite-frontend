@@ -68,7 +68,6 @@ const DiscordMessageContextMenu = ({ message, canDelete, guildId, hasAddReaction
       isCustom: !!emoji.id,
     });
     const emojiString = emoji.id ? `${emoji.name}:${emoji.id}` : emoji.name;
-    console.log('[Reaction] addReaction called with:', emoji, '-> emojiString:', emojiString);
     DiscordApiService.addReaction(message.channel_id, message.id, emojiString);
   }, [message.channel_id, message.id, addRecentEmoji]);
 

@@ -1,11 +1,9 @@
 import { useState, useMemo, useCallback } from 'react';
-import { At, ChatsTeardrop, Hash, MagnifyingGlass, Users, ClockCounterClockwise, GearSix } from '@phosphor-icons/react';
+import { At, ChatsTeardrop, Hash, MagnifyingGlass, Users, ClockCounterClockwise } from '@phosphor-icons/react';
 import { GUILD_FORUM } from '../constants/channel-types';
 import { parseMarkdown } from '@/components/message/markdown/parser';
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
 import { useDiscordMessageLogStore } from '../store/discord-message-log.store';
-import { useModalStore } from '@/store/modal.store';
-import MessageLogSettingsModal from './modals/MessageLogSettingsModal';
 import DiscordUserProfileModal from './DiscordUserProfileModal';
 
 const TopicRenderer = ({ topic, guildId }) => {
@@ -80,17 +78,6 @@ const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, dmRecipient,
             )}
           </button>
         )}
-
-        {/* Message Log settings */}
-        <button
-          type="button"
-          onClick={() => useModalStore.getState().push(MessageLogSettingsModal)}
-          className="rounded p-1.5 text-gray-400 transition hover:bg-white/10 hover:text-white"
-          aria-label="Message Logger settings"
-          title="Message Logger Settings"
-        >
-          <GearSix size={20} />
-        </button>
 
         {onToggleMemberList && (
           <button

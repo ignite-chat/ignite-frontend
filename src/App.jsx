@@ -27,8 +27,7 @@ const AuthRoute = ({ children }) => {
   const [failed, setFailed] = useState(false);
 
   const hasIgniteToken = !!localStorage.getItem('token');
-  const hasDiscordToken = !!localStorage.getItem('discord_accounts') || !!localStorage.getItem('discord_accounts') || localStorage.getItem('discord_token');
-  const discordOnly = !hasIgniteToken && hasDiscordToken;
+  const hasDiscordToken = !!localStorage.getItem('discord_accounts') || !!localStorage.getItem('discord_token');
 
   // Sync taskbar badge with unread/mention state (Electron only)
   useElectronBadge();
@@ -37,8 +36,8 @@ const AuthRoute = ({ children }) => {
   useWindowOpenHandler();
 
   // Initialize app on mount
-  useEffect(() => {
-    if (discordOnly) {
+  useMountEffect(() => {
+    if (!hasIgniteToken) {
       setInitialized(true);
       return;
     }
@@ -54,11 +53,11 @@ const AuthRoute = ({ children }) => {
     };
 
     init();
-  }, [discordOnly]);
+  });
 
   // Subscribe to user private channel via Echo
   useEffect(() => {
-    if (!initialized || !userId || discordOnly) return;
+    if (!initialized || !userId || !hasIgniteToken) return;
 
     EchoService.subscribeToUserChannel(userId);
 
@@ -67,14 +66,14 @@ const AuthRoute = ({ children }) => {
         EchoService.unsubscribeFromUserChannel(userId);
       }
     };
-  }, [initialized, userId, discordOnly]);
+  }, [initialized, userId]);
 
   // Subscribe to guild channels via Echo
   useEffect(() => {
-    if (!initialized || !userId || guilds.length === 0 || discordOnly) return;
+    if (!initialized || !userId || guilds.length === 0 || !hasIgniteToken) return;
 
     EchoService.subscribeToGuilds(guilds);
-  }, [guilds, initialized, userId, discordOnly]);
+  }, [guilds, initialized, userId]);
 
   if (failed) {
     return (
@@ -100,17 +99,12 @@ const AuthRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  // Discord-only: skip Ignite init requirements, just render
-  if (discordOnly) {
-    return children ? children : <Outlet />;
-  }
-
   // While initializing, render the app layout so skeletons show instead of a spinner
-  if (!initialized) {
+  if (hasIgniteToken && !initialized) {
     return children ? children : <Outlet />;
   }
 
-  if (!userId) {
+  if (hasIgniteToken && !userId) {
     return <Navigate to="/login" replace />;
   }
 

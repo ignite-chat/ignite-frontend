@@ -5,7 +5,7 @@ import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
-import { Users, Circle } from '@phosphor-icons/react';
+import { Circle } from '@phosphor-icons/react';
 
 // Simple in-memory cache for guild profiles
 const profileCache = new Map();

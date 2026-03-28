@@ -46,7 +46,7 @@ export const DiscordMessageLogService = {
    */
   onMessageDelete(channelId: string, messageId: string, guildId: string | null) {
     const store = useDiscordMessageLogStore.getState();
-    if (!store.isChannelLogged(channelId)) return;
+    if (!store.isChannelLogged(channelId, guildId)) return;
 
     const messages = useDiscordChannelsStore.getState().channelMessages[channelId];
     const message = messages?.find((m: DiscordMessage) => m.id === messageId);
@@ -69,7 +69,7 @@ export const DiscordMessageLogService = {
    */
   onMessageDeleteBulk(channelId: string, messageIds: string[], guildId: string | null) {
     const store = useDiscordMessageLogStore.getState();
-    if (!store.isChannelLogged(channelId)) return;
+    if (!store.isChannelLogged(channelId, guildId)) return;
 
     const messages = useDiscordChannelsStore.getState().channelMessages[channelId];
     if (!messages) return;
@@ -104,7 +104,7 @@ export const DiscordMessageLogService = {
    */
   onMessageUpdate(channelId: string, messageId: string, newData: any, guildId: string | null) {
     const store = useDiscordMessageLogStore.getState();
-    if (!store.isChannelLogged(channelId)) return;
+    if (!store.isChannelLogged(channelId, guildId)) return;
 
     // Only log if content actually changed
     if (!newData.content && newData.content !== '') return;

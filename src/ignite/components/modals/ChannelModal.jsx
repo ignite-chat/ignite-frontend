@@ -106,15 +106,13 @@ const ChannelModal = ({ modalId }) => {
           granted: grantedPermissionBits,
           revoked: revokedPermissionBits,
         })
-        .then((response) => {
-          console.log(response.data);
+        .then(() => {
         })
         .catch((error) => {
           console.error(error);
         });
     }
 
-    console.log(permissions);
   };
 
   return (

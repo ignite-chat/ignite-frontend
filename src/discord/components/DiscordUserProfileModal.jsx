@@ -13,6 +13,7 @@ import { useDiscordActivitiesStore, ActivityType } from '../store/discord-activi
 import { useDiscordProfilesStore } from '../store/discord-profiles.store';
 import { parseMarkdown } from '@/components/message/markdown/parser';
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
+import { getConnectionIconUrl } from '../constants/connection-icons';
 import DiscordStatusIndicator from './DiscordStatusIndicator';
 import DiscordClanTag from './DiscordClanTag';
 
@@ -252,14 +253,14 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
                   className="size-[94px] rounded-full object-cover select-none"
                   draggable="false"
                 />
-                {/* {user.avatar_decoration_data?.asset && (
+                {user.avatar_decoration_data?.asset && (
                   <img
                     src={`https://cdn.discordapp.com/avatar-decoration-presets/${user.avatar_decoration_data.asset}.png?size=96`}
                     alt=""
                     className="pointer-events-none absolute inset-0 size-[94px]"
                     draggable="false"
                   />
-                )} */}
+                )}
                 <DiscordStatusIndicator status={user.status} clientStatus={user.client_status} processedAt={user.processed_at_timestamp} invisible={user.invisible} size="lg" borderColor="#111214" />
               </div>
             </div>
@@ -421,7 +422,7 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
                               className="flex items-center gap-2 rounded-md bg-[#1a1a1e] px-3 py-2"
                             >
                               <img
-                                src={`https://cdn.discordapp.com/assets/connections/${account.type}/icon.png`}
+                                src={getConnectionIconUrl(account.type) ?? `https://cdn.discordapp.com/assets/connections/${account.type}/icon.png`}
                                 alt={account.type}
                                 className="size-5"
                                 onError={(e) => {

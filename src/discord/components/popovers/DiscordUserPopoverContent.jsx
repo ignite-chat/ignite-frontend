@@ -101,14 +101,14 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
               className="size-[68px] rounded-full object-cover select-none"
               draggable="false"
             />  
-            {/* {user.avatar_decoration_data?.asset && (
+            {user.avatar_decoration_data?.asset && (
               <img
                 src={`https://cdn.discordapp.com/avatar-decoration-presets/${user.avatar_decoration_data.asset}.png?size=80`}
                 alt=""
                 className="pointer-events-none absolute inset-0 size-[68px]"
                 draggable="false"
               />
-            )} */}
+            )}
             <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition group-hover:opacity-100">
               <span className="text-[10px] font-bold uppercase text-white drop-shadow-md">
                 View Profile

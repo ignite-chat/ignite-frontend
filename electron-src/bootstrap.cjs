@@ -6,6 +6,7 @@ const { execFile } = require('child_process');
 
 let tray = null;
 let mainWindow = null;
+let discordReferer = 'https://discord.com/';
 
 const createTray = () => {
   let iconPath = join(__dirname, 'tray-icon.ico');
@@ -113,7 +114,7 @@ const startCore = () => {
     ] },
     (details, callback) => {
       details.requestHeaders['Origin'] = 'https://discord.com';
-      details.requestHeaders['Referer'] = 'https://discord.com/';
+      details.requestHeaders['Referer'] = discordReferer;
       details.requestHeaders['Sec-Fetch-Dest'] = 'empty';
       details.requestHeaders['Sec-Fetch-Mode'] = 'cors';
       details.requestHeaders['Sec-Fetch-Site'] = 'same-origin';
@@ -385,6 +386,12 @@ const startCore = () => {
   });
 
   ipcMain.handle('msglog:getBasePath', () => msgLogDir);
+
+  ipcMain.handle('discord:setActiveChannel', (_event, guildId, channelId) => {
+    discordReferer = guildId && channelId
+      ? `https://discord.com/channels/${guildId}/${channelId}`
+      : 'https://discord.com/';
+  });
 
   ipcMain.handle('desktop:getSources', async () => {
     const sources = await desktopCapturer.getSources({

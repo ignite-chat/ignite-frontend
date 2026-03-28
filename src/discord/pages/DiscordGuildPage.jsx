@@ -33,6 +33,11 @@ const DiscordGuildPage = () => {
     }
   }, [guild?._accountId]);
 
+  // Keep Electron's spoofed Referer in sync with the active channel
+  useEffect(() => {
+    window.IgniteNative?.setDiscordActiveChannel?.(guildId, channelId ?? null);
+  }, [guildId, channelId]);
+
   // Redirect if not connected and no accounts
   useEffect(() => {
     if (!isConnected && useDiscordStore.getState().accounts.length === 0) {
