@@ -65,14 +65,14 @@ const ChannelWelcome = ({ channel }) => {
     if (!dmUser) return;
     try {
       await DiscordApiService.sendFriendRequest(dmUser.id);
-    } catch {}
+    } catch { }
   };
 
   const handleBlock = async () => {
     if (!dmUser) return;
     try {
       await DiscordApiService.blockUser(dmUser.id);
-    } catch {}
+    } catch { }
   };
 
   // Fetch profile for mutual guilds
@@ -99,10 +99,10 @@ const ChannelWelcome = ({ channel }) => {
           const guild = guilds.find((g) => g.id === mg.id);
           return guild
             ? {
-                id: guild.id,
-                name: guild.properties?.name || guild.name,
-                icon: DiscordService.getGuildIconUrl(guild.id, guild.properties?.icon || guild.icon, 32),
-              }
+              id: guild.id,
+              name: guild.properties?.name || guild.name,
+              icon: DiscordService.getGuildIconUrl(guild.id, guild.properties?.icon || guild.icon, 32),
+            }
             : null;
         })
         .filter(Boolean),
@@ -295,8 +295,9 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [forceScrollDown, setForceScrollDown] = useState(false);
   const scrollTopOnRenderRef = useRef(false);
-  const scrollToUnreadRef = useRef(false);
-  const [newMessagesSeparatorId, setNewMessagesSeparatorId] = useState(null);
+  // ID of the first unread message — snapshotted once per channel visit, drives separator + scroll.
+  const [firstUnreadId, setFirstUnreadId] = useState(null);
+  const firstUnreadIdRef = useRef(null);
 
   const messagesRef = useRef();
   const contentRef = useRef();
@@ -304,6 +305,10 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const lastAckedRef = useRef(null);
   const wasNearBottomRef = useRef(true);
   const unreadCountRef = useRef(0);
+  const scrollAnchorRef = useRef(null);
+  const scrollAnchorDesiredTopRef = useRef(0);
+  const isProgrammaticScrollRef = useRef(false);
+  const initialScrollDoneRef = useRef(false);
 
   const lastMessageId = useMemo(
     () => channels.find((c) => c.id === channelId)?.last_message_id,
@@ -355,65 +360,46 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     return { count: unreadCount, isExact, sinceText };
   }, [messages, readStateLastMessageId, hasMore, joinedAtMs]);
 
-  // Separator check: use read state ID when available, fall back to join date
-  const isAfterSeparator = useCallback(
-    (msgId) => {
-      if (newMessagesSeparatorId) return msgId > newMessagesSeparatorId;
-      if (!readStateLastMessageId && joinedAtMs) {
-        return snowflakeToTimestamp(msgId) > joinedAtMs;
-      }
-      return false;
-    },
-    [newMessagesSeparatorId, readStateLastMessageId, joinedAtMs]
-  );
-
   unreadCountRef.current = unreadBarData?.count ?? 0;
+
+  // Mirror joinedAtMs in a ref so the scroll effect can read it without depending on it
+  const joinedAtMsRef = useRef(joinedAtMs);
+  joinedAtMsRef.current = joinedAtMs;
 
   const handleMarkAsRead = useCallback(() => {
     if (!lastMessageId) return;
     useDiscordReadStatesStore.getState().ackChannel(channelId, lastMessageId);
-    DiscordApiService.ackMessage(channelId, lastMessageId).catch(() => {});
-    setNewMessagesSeparatorId(null);
+    DiscordApiService.ackMessage(channelId, lastMessageId).catch(() => { });
+    firstUnreadIdRef.current = null;
+    setFirstUnreadId(null);
   }, [channelId, lastMessageId]);
 
-  // Ack the channel's last_message_id if scrolled to the bottom
+  // Ack the channel's last_message_id if scrolled to the bottom.
+  // Skipped while the scroll-to-unread anchor is active to avoid marking as read
+  // before the user has actually seen the unread messages.
   const ackIfAtBottom = useCallback(() => {
     if (!lastMessageId || lastAckedRef.current === lastMessageId) return;
-    return;
+    if (!initialScrollDoneRef.current || scrollAnchorRef.current) return;
 
-    // Debounce: clear any pending ack and schedule a new one
     if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
     ackTimerRef.current = setTimeout(() => {
       lastAckedRef.current = lastMessageId;
       useDiscordReadStatesStore.getState().ackChannel(channelId, lastMessageId);
-      DiscordApiService.ackMessage(channelId, lastMessageId).catch(() => {});
+      DiscordApiService.ackMessage(channelId, lastMessageId).catch(() => { });
+      firstUnreadIdRef.current = null;
+      setFirstUnreadId(null);
     }, 500);
   }, [channelId, lastMessageId]);
 
-  // Reset ack state on channel switch, clear pending timers on unmount
+  // Reset on channel switch
   useEffect(() => {
     lastAckedRef.current = null;
+    initialScrollDoneRef.current = false;
+    firstUnreadIdRef.current = null;
+    setFirstUnreadId(null);
     return () => {
       if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
     };
-  }, [channelId]);
-
-  // Snapshot read state on channel switch to position the "NEW" separator
-  useEffect(() => {
-    if (!channelId) {
-      setNewMessagesSeparatorId(null);
-      return;
-    }
-    const entry = useDiscordReadStatesStore.getState().readStates[channelId];
-    if (
-      entry?.last_message_id &&
-      lastMessageId &&
-      lastMessageId > entry.last_message_id
-    ) {
-      setNewMessagesSeparatorId(entry.last_message_id);
-    } else {
-      setNewMessagesSeparatorId(null);
-    }
   }, [channelId]);
 
   // Clear cached messages for other channels when switching to save memory
@@ -430,13 +416,13 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     // Read imperatively — avoids re-running this effect when messages populate mid-load
     const cached = useDiscordChannelsStore.getState().channelMessages[channelId];
     if (cached != null) {
-      // Already loaded — restore saved scroll position or scroll to unread
+      // Already loaded — restore saved scroll position or trigger scroll-to-unread
       if (messagesRef.current) {
         const saved = scrollPositions.getMessage(channelId);
         if (saved != null) {
           messagesRef.current.scrollTop = saved;
+          initialScrollDoneRef.current = true;
         } else {
-          scrollToUnreadRef.current = true;
           scrollTopOnRenderRef.current = true;
         }
       }
@@ -445,7 +431,6 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
 
     setIsLoading(true);
     setHasMore(true);
-    scrollToUnreadRef.current = true;
     scrollTopOnRenderRef.current = true;
     DiscordService.loadChannelMessages(channelId)
       .then((data) => {
@@ -468,58 +453,62 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     setLoadingMore(false);
   }, [messages, loadingMore, hasMore, channelId]);
 
-  // Clear "NEW" separator when the current user sends a message
+  // Clear separator when the current user sends a message
   useEffect(() => {
     if (messageSentCount > 0) {
-      setNewMessagesSeparatorId(null);
+      firstUnreadIdRef.current = null;
+      setFirstUnreadId(null);
     }
   }, [messageSentCount]);
 
-  // Scroll to first unread message after initial load, or bottom if all read.
-  // Also auto-scroll on new messages when user is near the bottom.
+  // Initial scroll: compute firstUnreadId, scroll to it or to bottom.
+  // Also auto-scroll on new messages when near the bottom.
   useEffect(() => {
     if (!messagesRef.current || isLoading) return;
     if (scrollTopOnRenderRef.current && messages.length > 0) {
       scrollTopOnRenderRef.current = false;
 
-      if (scrollToUnreadRef.current) {
-        scrollToUnreadRef.current = false;
-
-        // Find the first unread message element using the separator ID
-        const separatorId = newMessagesSeparatorId;
-        if (separatorId) {
-          // Find the first message after the read state
-          const firstUnreadMsg = messages.find((m) => m.id > separatorId);
-          if (firstUnreadMsg) {
-            const el = messagesRef.current.querySelector(
-              `[data-message-id="${firstUnreadMsg.id}"]`,
-            );
-            if (el) {
-              // Scroll so the unread message is near the top of the viewport
-              el.scrollIntoView({ block: 'start' });
-              // Offset slightly so the "NEW" separator is visible above
-              messagesRef.current.scrollTop = Math.max(
-                0,
-                messagesRef.current.scrollTop,
-              );
-              wasNearBottomRef.current = false;
-              return;
-            }
-          }
-        }
-
-        // No unread messages — scroll to bottom
-        messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-        wasNearBottomRef.current = true;
-        ackIfAtBottom();
-        return;
+      // Compute the first unread message ID from read state or join date
+      const entry = useDiscordReadStatesStore.getState().readStates[channelId];
+      let firstUnreadMsg = null;
+      if (entry?.last_message_id && lastMessageId && lastMessageId > entry.last_message_id) {
+        firstUnreadMsg = messages.find((m) => m.id > entry.last_message_id) ?? null;
+      } else if (!entry?.last_message_id && joinedAtMsRef.current) {
+        firstUnreadMsg = messages.find((m) => snowflakeToTimestamp(m.id) > joinedAtMsRef.current) ?? null;
       }
 
-      // Fallback: scroll to bottom
+      // Snapshot it — this is the single ID used by the separator and unread bar
+      firstUnreadIdRef.current = firstUnreadMsg?.id ?? null;
+      setFirstUnreadId(firstUnreadMsg?.id ?? null);
+
+      if (firstUnreadMsg) {
+        const el = messagesRef.current.querySelector(`[data-message-id="${firstUnreadMsg.id}"]`);
+        if (el) {
+          // Leave 40px above so the "NEW" separator is visible.
+          // Pin anchor before setting scrollTop — scroll fires synchronously and would clear it.
+          const SEPARATOR_OFFSET = 40;
+          const containerRect = messagesRef.current.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          scrollAnchorRef.current = el;
+          scrollAnchorDesiredTopRef.current = SEPARATOR_OFFSET;
+          isProgrammaticScrollRef.current = true;
+          messagesRef.current.scrollTop =
+            messagesRef.current.scrollTop + (elRect.top - containerRect.top) - SEPARATOR_OFFSET;
+          requestAnimationFrame(() => { isProgrammaticScrollRef.current = false; });
+          wasNearBottomRef.current = false;
+          initialScrollDoneRef.current = true;
+          return;
+        }
+      }
+
+      // All read or element not in DOM yet — scroll to bottom
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
       wasNearBottomRef.current = true;
+      initialScrollDoneRef.current = true;
+      ackIfAtBottom();
       return;
     }
+
     const el = messagesRef.current;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
     if (forceScrollDown || nearBottom) {
@@ -527,7 +516,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
       if (forceScrollDown) setForceScrollDown(false);
       ackIfAtBottom();
     }
-  }, [messages, forceScrollDown, ackIfAtBottom, isLoading, newMessagesSeparatorId]);
+  }, [messages, forceScrollDown, ackIfAtBottom, isLoading, channelId, lastMessageId]);
 
   // Always scroll to bottom when pending messages appear (user just sent a message)
   useEffect(() => {
@@ -539,6 +528,11 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const onScroll = useCallback(() => {
     const el = messagesRef.current;
     if (!el) return;
+
+    // User took control — release the unread scroll anchor (skip programmatic scrolls)
+    if (!isProgrammaticScrollRef.current) {
+      scrollAnchorRef.current = null;
+    }
 
     // Save scroll position on every scroll
     scrollPositions.saveMessage(channelId, el.scrollTop);
@@ -576,6 +570,17 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
 
       if (wasNearBottomRef.current) {
         scrollEl.scrollTop = newScrollHeight;
+      } else if (scrollAnchorRef.current) {
+        // We scrolled to an unread anchor — maintain its visual position regardless of
+        // what loads above or below (images below the viewport were causing drift).
+        const containerTop = scrollEl.getBoundingClientRect().top;
+        const anchorTop = scrollAnchorRef.current.getBoundingClientRect().top - containerTop;
+        const drift = anchorTop - scrollAnchorDesiredTopRef.current;
+        if (Math.abs(drift) > 0.5) {
+          isProgrammaticScrollRef.current = true;
+          scrollEl.scrollTop += drift;
+          requestAnimationFrame(() => { isProgrammaticScrollRef.current = false; });
+        }
       } else if (delta > 0) {
         scrollEl.scrollTop += delta;
       }
@@ -628,9 +633,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
             )}
             {messages.map((msg, i) => {
               const prevMessage = i > 0 ? messages[i - 1] : null;
-              const showNewSeparator = unreadBarData &&
-                isAfterSeparator(msg.id) &&
-                (!prevMessage || !isAfterSeparator(prevMessage.id));
+              const showNewSeparator = firstUnreadId != null && msg.id === firstUnreadId;
 
               const msgTs = snowflakeToTimestamp(msg.id);
               const prevTs = prevMessage ? snowflakeToTimestamp(prevMessage.id) : null;
