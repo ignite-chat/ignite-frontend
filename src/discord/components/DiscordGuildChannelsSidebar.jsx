@@ -463,6 +463,30 @@ const CATEGORY_HEADER_HEIGHT = 36;
 const CHANNEL_ROW_HEIGHT = 32;
 const VOICE_MEMBER_HEIGHT = 30;
 
+const resolveVoiceMemberName = (vs, users, memberStore) => {
+  const memberUser = vs.member?.user;
+  return (
+    vs.member?.nick ||
+    memberStore[vs.user_id]?.nick ||
+    users[vs.user_id]?.global_name ||
+    memberUser?.global_name ||
+    users[vs.user_id]?.username ||
+    memberUser?.username ||
+    ''
+  ).toLowerCase();
+};
+
+const sortVoiceMembers = (members, users, memberStore) => {
+  return [...members].sort((a, b) => {
+    const aLive = a.self_stream ? 0 : 1;
+    const bLive = b.self_stream ? 0 : 1;
+    if (aLive !== bLive) return aLive - bLive;
+    return resolveVoiceMemberName(a, users, memberStore).localeCompare(
+      resolveVoiceMemberName(b, users, memberStore),
+    );
+  });
+};
+
 const sortChannels = (channels) => {
   return [...channels].sort((a, b) => {
     const aVoice = isVoiceType(a.type) ? 1 : 0;
@@ -566,7 +590,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
       if (!showHiddenChannels && channel._canView === false) continue;
       items.push({ type: 'channel', channel });
       if (isVoiceType(channel.type)) {
-        const voiceMembers = voiceMembersByChannel[channel.id] || [];
+        const voiceMembers = sortVoiceMembers(voiceMembersByChannel[channel.id] || [], users, memberStore);
         for (const vs of voiceMembers) {
           items.push({ type: 'voice-member', vs, channelId: channel.id });
         }
@@ -592,7 +616,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
           if (!showHiddenChannels && channel._canView === false) continue;
           items.push({ type: 'channel', channel });
           if (isVoiceType(channel.type)) {
-            const voiceMembers = voiceMembersByChannel[channel.id] || [];
+            const voiceMembers = sortVoiceMembers(voiceMembersByChannel[channel.id] || [], users, memberStore);
             for (const vs of voiceMembers) {
               items.push({ type: 'voice-member', vs, channelId: channel.id });
             }
@@ -602,7 +626,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
     }
 
     return items;
-  }, [rootChannels, categories, guildChannels, collapsedCategories, voiceMembersByChannel, showHiddenChannels]);
+  }, [rootChannels, categories, guildChannels, collapsedCategories, voiceMembersByChannel, showHiddenChannels, users, memberStore]);
 
   const estimateSize = useCallback((index) => {
     const item = flatItems[index];
@@ -722,7 +746,6 @@ const VoiceMemberItem = memo(({ vs, guildId, channelId, users, memberStore }) =>
   const user = vs.member?.user || users[vs.user_id];
   const displayName = vs.member?.nick || memberData?.nick || user?.global_name || user?.username || 'Unknown';
   const avatarUrl = DiscordService.getUserAvatarUrl(vs.user_id, user?.avatar, 32);
-
   const openProfile = useCallback(() => {
     if (!user) return;
     useModalStore.getState().push(DiscordUserProfileModal, {
