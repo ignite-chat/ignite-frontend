@@ -89,6 +89,13 @@ const DiscordChannel = ({ channel }) => {
   const displayName = isDM ? dmInfo?.name : channel.name;
   const placeholderName = isDM ? `@${dmInfo?.name}` : `#${channel.name}`;
 
+  const dmRecipient = useMemo(() => {
+    if (!isDM || channel?.type !== DM) return null;
+    const recipientIds = channel.recipient_ids || [];
+    const other = recipientIds.find((id) => id !== currentUser?.id) || recipientIds[0];
+    return other ? usersMap[other] : null;
+  }, [channel, currentUser?.id, isDM, usersMap]);
+
   return (
     <div className="flex h-full flex-col">
       <DiscordChannelHeader
@@ -96,6 +103,7 @@ const DiscordChannel = ({ channel }) => {
         displayName={displayName}
         isDM={isDM}
         dmInfo={isDM ? { properties: dmInfo } : undefined}
+        dmRecipient={dmRecipient}
         guildName={guildName}
         memberListOpen={memberListOpen}
         onToggleMemberList={!isDM ? toggleMemberList : undefined}

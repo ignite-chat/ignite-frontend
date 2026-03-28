@@ -815,6 +815,9 @@ export class DaveSession {
     confirmedTranscriptHash: Uint8Array;
   }> = [];
 
+  // Monotonic counter incremented on every key swap — used to detect mid-decrypt epoch races.
+  private _keyGeneration: number = 0;
+
   // Old epoch ratchets for graceful epoch transitions (newest first, like libdave's CryptorManager deque)
   oldReceiverRatchets: Map<string, KeyRatchet>[] = [];
   static readonly MAX_OLD_EPOCHS = 2;
@@ -2171,6 +2174,9 @@ export class DaveSession {
       // Reset decrypt counters so we resume decryption with new keys
       this._decryptLogCount = 0;
 
+      // Bump key generation so in-flight decryptFrame calls detect the swap
+      this._keyGeneration++;
+
       // Move current ratchets to old epoch stack before switching
       this._retireCurrentEpoch();
 
@@ -2215,6 +2221,7 @@ export class DaveSession {
 
   /** Reset group state (for epoch=1 re-creation) */
   resetGroupState() {
+    this._keyGeneration++;
     this.epoch = 0;
     this.epochSecret = null;
     this.exporterSecret = null;
@@ -2805,11 +2812,15 @@ export class DaveSession {
   async encryptFrame(plaintext: Uint8Array): Promise<Uint8Array> {
     if (!this.senderRatchet || this.transitioning || this.pendingEpochSecret) return plaintext;
 
+    const keyGenSnapshot = this._keyGeneration;
     const nonce32 = Number(this.sendCounter++ & 0xffffffffn);
     const generation = (nonce32 >>> 24) & 0xff;
 
     // Get ratcheted key for this generation
     const key = await this.senderRatchet.getKey(generation);
+
+    // Bail if an epoch transition happened while we awaited getKey
+    if (this._keyGeneration !== keyGenSnapshot) return plaintext;
 
     // Build expanded frame nonce: 8 zero bytes + 4-byte little-endian truncated nonce
     // (matches x86/ARM-LE memcpy behavior in Discord's native client)
@@ -2857,7 +2868,7 @@ export class DaveSession {
   async decryptFrame(frame: Uint8Array, ssrc?: number): Promise<Uint8Array> {
     // Only attempt decryption when we have valid keys and aren't mid-epoch-change.
     // Calling crypto.subtle.decrypt with wrong-epoch keys causes STATUS_ACCESS_VIOLATION.
-    if (this.state !== 'ready' || this.transitioning || this.pendingEpochSecret) {
+    if (this.state !== 'ready') {
       return new Uint8Array(0);
     }
 
@@ -2886,6 +2897,11 @@ export class DaveSession {
     // Parse supplemental data from the end:
     // [...media...][8B tag][ULEB128 nonce][ULEB128 unencrypted ranges...][1B supplSize][0xFAFA]
     const supplSize = frame[frame.length - 3];
+    // Minimum valid supplSize: 8 (tag) + 1 (nonce ULEB128) + 1 (supplSize) + 2 (marker) = 12.
+    // A smaller value means this isn't a real DAVE frame (random media ending in 0xFAFA).
+    // Passing < 8 bytes of "tag" to AES-GCM with tagLength 64 causes BoringSSL to
+    // over-read the buffer → STATUS_ACCESS_VIOLATION.
+    if (supplSize < 12) return frame;
     const supplStart = frame.length - supplSize;
     if (supplStart < 0) return frame;
 
@@ -2954,8 +2970,17 @@ export class DaveSession {
 
     const combined = concatBytes(ciphertext, truncatedTag);
 
+    // AES-GCM with tagLength 64 needs at least 8 bytes (the tag itself).
+    // Shorter input causes BoringSSL to read past the buffer → native crash.
+    if (combined.byteLength < 8) return frame;
+
     // Resolve userId for this SSRC
     const userId = ssrc !== undefined ? this.ssrcToUserId.get(ssrc) : undefined;
+
+    // Snapshot key generation to detect mid-decrypt epoch swaps.
+    // If the generation changes between awaits, the keys we resolved are stale
+    // and calling crypto.subtle.decrypt with them can crash Chromium (STATUS_ACCESS_VIOLATION).
+    const keyGenSnapshot = this._keyGeneration;
 
     // Try current epoch ratchets first, then old epochs (newest-first, like libdave)
     const ratchetSets: Map<string, KeyRatchet>[] = [this.receiverRatchets, ...this.oldReceiverRatchets];
@@ -2973,6 +2998,13 @@ export class DaveSession {
 
       try {
         const key = await ratchet.getKey(generation);
+
+        // Re-check: if an epoch transition happened while we awaited getKey,
+        // bail out instead of calling decrypt with mismatched keys.
+        if (this._keyGeneration !== keyGenSnapshot) {
+          return new Uint8Array(0);
+        }
+
         const plaintext = await crypto.subtle.decrypt(
           { name: 'AES-GCM', iv, additionalData: aad, tagLength: 64 },
           key,
@@ -3087,7 +3119,8 @@ export class DaveSession {
           }
 
           try {
-            const data = new Uint8Array(chunk.data);
+            // slice() to own the buffer — see receiver transform comment
+            const data = new Uint8Array(chunk.data.slice(0));
             const encrypted = await session.encryptFrame(data);
             chunk.data = encrypted.buffer;
             controller.enqueue(chunk);
@@ -3168,18 +3201,22 @@ export class DaveSession {
           }
 
           try {
-            const data = new Uint8Array(chunk.data);
+            // CRITICAL: slice() to get an owned copy. new Uint8Array(chunk.data) is
+            // only a VIEW — Chromium can recycle the underlying RTCEncodedAudioFrame
+            // buffer across await points, leaving dangling views → STATUS_ACCESS_VIOLATION.
+            const data = new Uint8Array(chunk.data.slice(0));
             const decrypted = await session.decryptFrame(data, ssrc);
             if (receiverFrameCount <= 5) {
               console.log(
                 `[DAVE] Receiver decrypted #${receiverFrameCount}, ssrc: ${ssrc}, in: ${data.byteLength}, out: ${decrypted.byteLength}`,
               );
             }
+            if (decrypted.byteLength === 0) return;
             chunk.data = decrypted.buffer;
             controller.enqueue(chunk);
           } catch (err) {
             if (receiverFrameCount <= 10) console.error('[DAVE] Receiver decrypt error:', err);
-            controller.enqueue(chunk);
+            return;
           }
         },
       });

@@ -14,7 +14,7 @@ type DiscordUsersStore = {
   addUsers: (users: DiscordUser[]) => void;
   getUser: (userId: string) => DiscordUser | undefined;
   updatePresence: (presence: Presence) => void;
-  setPresences: (presences: Presence[]) => void;
+  setPresences: (presences: Presence[], fromInitialLoad?: boolean) => void;
   clear: () => void;
 };
 
@@ -71,7 +71,7 @@ export const useDiscordUsersStore = create<DiscordUsersStore>((set, get) => ({
       };
     }),
 
-  setPresences: (presences) =>
+  setPresences: (presences, fromInitialLoad = false) =>
     set((state) => {
       const updated = { ...state.users };
       for (const p of presences) {
@@ -82,7 +82,10 @@ export const useDiscordUsersStore = create<DiscordUsersStore>((set, get) => ({
             activities: p.activities,
             client_status: p.client_status,
             processed_at_timestamp: p.processed_at_timestamp,
-            invisible: p.status === 'offline',
+            // Only flag as invisible from READY/READY_SUPPLEMENTAL — users
+            // received offline via GUILD_MEMBERS_CHUNK or member list updates
+            // are genuinely offline, not invisible.
+            invisible: fromInitialLoad ? p.status === 'offline' : updated[p.user_id].invisible,
           };
         }
       }

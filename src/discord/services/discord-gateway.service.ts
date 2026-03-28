@@ -676,7 +676,7 @@ export const DiscordGatewayService = {
         client_status: p.client_status,
         processed_at_timestamp: p.processed_at_timestamp,
       }));
-      useDiscordUsersStore.getState().setPresences(mapped);
+      useDiscordUsersStore.getState().setPresences(mapped, true);
       syncActivities(mapped);
     }
   },
@@ -724,7 +724,7 @@ export const DiscordGatewayService = {
             client_status: p.client_status,
             processed_at_timestamp: p.processed_at_timestamp,
           }));
-          useDiscordUsersStore.getState().setPresences(mapped);
+          useDiscordUsersStore.getState().setPresences(mapped, true);
           syncActivities(mapped);
         }
       }
@@ -738,7 +738,7 @@ export const DiscordGatewayService = {
         client_status: p.client_status,
         processed_at_timestamp: p.processed_at_timestamp,
       }));
-      useDiscordUsersStore.getState().setPresences(mapped);
+      useDiscordUsersStore.getState().setPresences(mapped, true);
       syncActivities(mapped);
     }
   },

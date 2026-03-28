@@ -190,8 +190,6 @@ const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
                 {user.id === '643945264868098049' ? 'OFFICIAL' : 'APP'}
               </span>
             )}
-            {/* @ts-ignore - JSX component */}
-            <DiscordClanTag userId={user.id} size="sm" />
             {user.global_name && (
               <span className="hidden shrink-0 text-xs text-gray-400 group-hover:inline">
                 {user.username}

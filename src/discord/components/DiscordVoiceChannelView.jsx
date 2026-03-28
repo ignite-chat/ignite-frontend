@@ -56,7 +56,8 @@ const FocusedParticipant = ({ vs, guildId }) => {
   const member = useDiscordMembersStore((s) =>
     guildId ? s.members[guildId]?.[vs.user_id] : undefined,
   );
-  const isSpeaking = useDiscordVoiceStore((s) => s.speakingUsers.has(vs.user_id));
+  const isMuted = vs.self_mute || vs.mute || vs.self_deaf || vs.deaf || vs.suppress;
+  const isSpeaking = useDiscordVoiceStore((s) => s.speakingUsers.has(vs.user_id)) && !isMuted;
   const videoStream = useDiscordVoiceStore((s) => s.remoteVideoStreams.get(vs.user_id));
   const vsMember = vs.member;
   const vsUser = vsMember?.user;
@@ -232,16 +233,25 @@ const DiscordVoiceChannelView = ({ channel }) => {
           </div>
         </div>
       )}
-      {focusedStream && watchingStreamMedia ? (
+      {focusedStream ? (
         /* Focused stream layout: main stream on top + participant strip at bottom */
         <div className="flex flex-1 flex-col gap-3 overflow-hidden">
           <div className="min-h-0 flex-1">
-            <FocusedStreamView
-              streamMedia={watchingStreamMedia}
-              membersVisible={membersVisible}
-              onToggleMembers={() => setMembersVisible((v) => !v)}
-              onGoBack={handleUnfocus}
-            />
+            {watchingStreamMedia ? (
+              <FocusedStreamView
+                streamMedia={watchingStreamMedia}
+                membersVisible={membersVisible}
+                onToggleMembers={() => setMembersVisible((v) => !v)}
+                onGoBack={handleUnfocus}
+              />
+            ) : (
+              <div className="flex h-full w-full cursor-pointer items-center justify-center rounded-xl bg-black" onClick={handleUnfocus}>
+                <div className="flex flex-col items-center gap-3">
+                  <div className="size-10 animate-spin rounded-full border-4 border-solid border-white/20 border-t-white" />
+                  <p className="text-sm text-gray-400">Connecting to stream...</p>
+                </div>
+              </div>
+            )}
           </div>
           {membersVisible && (
             <div className="flex h-36 shrink-0 gap-2 overflow-x-auto overflow-y-hidden">
@@ -290,12 +300,12 @@ const DiscordVoiceChannelView = ({ channel }) => {
         /* Grid layout */
         <div
           className={`grid flex-1 gap-3 ${totalTiles > 9 ? 'overflow-y-auto' : ''} ${totalTiles === 1
-              ? 'grid-cols-1'
-              : totalTiles <= 4
-                ? 'grid-cols-2'
-                : totalTiles <= 9
-                  ? 'grid-cols-3'
-                  : 'grid-cols-4'
+            ? 'grid-cols-1'
+            : totalTiles <= 4
+              ? 'grid-cols-2'
+              : totalTiles <= 9
+                ? 'grid-cols-3'
+                : 'grid-cols-4'
             }`}
           style={{ gridAutoRows: totalTiles <= 9 ? '1fr' : 'minmax(180px, auto)' }}
         >
@@ -323,16 +333,15 @@ const DiscordVoiceChannelView = ({ channel }) => {
             />
           ))}
           {/* Participant tiles */}
-          {membersVisible &&
-            voiceStates.map((vs) => (
-              <VoiceParticipantTile
-                key={vs.user_id}
-                vs={vs}
-                guildId={guildId}
-                onWatchStream={vs.self_stream ? () => handleWatchStream(vs.user_id) : undefined}
-                onFocus={() => setFocusedUserId(vs.user_id)}
-              />
-            ))}
+          {voiceStates.map((vs) => (
+            <VoiceParticipantTile
+              key={vs.user_id}
+              vs={vs}
+              guildId={guildId}
+              onWatchStream={vs.self_stream ? () => handleWatchStream(vs.user_id) : undefined}
+              onFocus={() => setFocusedUserId(vs.user_id)}
+            />
+          ))}
         </div>
       )}
 
@@ -483,7 +492,8 @@ const VoiceParticipantTile = ({ vs, guildId, onWatchStream, onFocus }) => {
   const member = useDiscordMembersStore((s) =>
     guildId ? s.members[guildId]?.[vs.user_id] : undefined,
   );
-  const isSpeaking = useDiscordVoiceStore((s) => s.speakingUsers.has(vs.user_id));
+  const isMuted = vs.self_mute || vs.mute || vs.self_deaf || vs.deaf || vs.suppress;
+  const isSpeaking = useDiscordVoiceStore((s) => s.speakingUsers.has(vs.user_id)) && !isMuted;
   const videoStream = useDiscordVoiceStore((s) => s.remoteVideoStreams.get(vs.user_id));
 
   const hasVideo = !!videoStream;

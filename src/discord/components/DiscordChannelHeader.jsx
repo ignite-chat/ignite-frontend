@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { At, ChatsTeardrop, Hash, MagnifyingGlass, Users, ClockCounterClockwise, GearSix } from '@phosphor-icons/react';
 import { GUILD_FORUM } from '../constants/channel-types';
 import { parseMarkdown } from '@/components/message/markdown/parser';
@@ -6,6 +6,7 @@ import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
 import { useDiscordMessageLogStore } from '../store/discord-message-log.store';
 import { useModalStore } from '@/store/modal.store';
 import MessageLogSettingsModal from './modals/MessageLogSettingsModal';
+import DiscordUserProfileModal from './DiscordUserProfileModal';
 
 const TopicRenderer = ({ topic, guildId }) => {
   const ast = useMemo(() => parseMarkdown(topic), [topic]);
@@ -16,7 +17,7 @@ const TopicRenderer = ({ topic, guildId }) => {
   );
 };
 
-const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, guildName, memberListOpen, onToggleMemberList, searchOpen, onSearch, messageLogOpen, onToggleMessageLog }) => {
+const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, dmRecipient, guildName, memberListOpen, onToggleMemberList, searchOpen, onSearch, messageLogOpen, onToggleMessageLog }) => {
   const isForum = channel?.type === GUILD_FORUM;
   const [searchValue, setSearchValue] = useState('');
   const logEnabled = useDiscordMessageLogStore((s) => s.settings.enabled);
@@ -46,7 +47,10 @@ const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, guildName, m
 
   return (
     <div className="flex h-12 shrink-0 items-center border-b border-white/5 px-2 shadow-sm">
-      <div className="flex min-w-0 items-center px-2">
+      <div
+        className={`flex min-w-0 items-center px-2 select-none ${dmRecipient ? 'cursor-pointer' : ''}`}
+        onClick={dmRecipient ? () => useModalStore.getState().push(DiscordUserProfileModal, { author: dmRecipient }) : undefined}
+      >
         {icon}
         <span className="truncate text-[15px] font-semibold text-white">{displayName || channel?.name}</span>
       </div>

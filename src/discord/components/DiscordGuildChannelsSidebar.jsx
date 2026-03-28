@@ -165,7 +165,8 @@ const VoiceStatusIcon = ({ icon: Icon, color, label }) => (
 );
 
 const VoiceMemberRow = memo(({ vs, guildId, channelId, user, memberData, displayName, avatarUrl, openProfile }) => {
-  const isSpeaking = useDiscordVoiceStore((s) => s.speakingUsers.has(vs.user_id));
+  const isMuted = vs.self_mute || vs.mute || vs.self_deaf || vs.deaf || vs.suppress;
+  const isSpeaking = useDiscordVoiceStore((s) => s.speakingUsers.has(vs.user_id)) && !isMuted;
   const [hovered, setHovered] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);

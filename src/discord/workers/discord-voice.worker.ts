@@ -464,7 +464,10 @@ function setupSenderTransform(readable: ReadableStream, writable: WritableStream
       }
 
       try {
-        const data = new Uint8Array(chunk.data);
+        // slice() to get an owned copy — Chromium can recycle the
+        // RTCEncodedAudioFrame's backing buffer across await points,
+        // turning Uint8Array views into dangling pointers → STATUS_ACCESS_VIOLATION.
+        const data = new Uint8Array(chunk.data.slice(0));
         const encrypted = await session.encryptFrame(data);
         chunk.data = encrypted.buffer;
         controller.enqueue(chunk);
@@ -511,7 +514,8 @@ function setupReceiverTransform(readable: ReadableStream, writable: WritableStre
       }
 
       try {
-        const data = new Uint8Array(chunk.data);
+        // slice() to get an owned copy — see sender transform comment
+        const data = new Uint8Array(chunk.data.slice(0));
         if (localReceiverFrameCount <= 5) {
           const userId = ssrc ? session.ssrcToUserId.get(ssrc) : undefined;
           log(
@@ -524,11 +528,15 @@ function setupReceiverTransform(readable: ReadableStream, writable: WritableStre
             `Receiver decrypted #${localReceiverFrameCount}, ssrc: ${ssrc}, in: ${data.byteLength}, out: ${decrypted.byteLength}`,
           );
         }
+        // Drop frames that decrypted to empty — feeding a 0-byte buffer back
+        // into WebRTC's native Opus decoder causes STATUS_ACCESS_VIOLATION.
+        if (decrypted.byteLength === 0) return;
         chunk.data = decrypted.buffer;
         controller.enqueue(chunk);
       } catch (err) {
         if (localReceiverFrameCount <= 10) warn('Receiver decrypt error:', String(err));
-        controller.enqueue(chunk);
+        // On error, drop the frame rather than enqueueing with stale/corrupt data
+        return;
       }
     },
   });
