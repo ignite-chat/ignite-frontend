@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useMemo } from 'react';
 import { getTwemojiUrl } from '@/utils/emoji.utils';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
@@ -9,6 +9,7 @@ import TimestampDisplay from '@/components/message/markdown/TimestampDisplay';
 import DiscordEmoji from './DiscordEmoji';
 import { Info, Lightbulb, AlertTriangle, AlertOctagon, Flame } from 'lucide-react';
 import { DISCORD_EMOJI_CDN } from '../constants/cdn';
+import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
 
 const HEADING_CLASSES = [
   'text-2xl font-bold',
@@ -163,7 +164,8 @@ function renderInlineNode(node, index, guildId) {
 
     case 'Emoji': {
       if (node.kind.kind === 'Custom') {
-        const ext = node.kind.animated ? 'gif' : 'webp';
+        const animate = useDiscordPreferencesStore.getState().animateEmojis;
+        const ext = node.kind.animated && animate ? 'gif' : 'webp';
         const src = `${DISCORD_EMOJI_CDN}/${node.kind.id}.${ext}?size=48`;
         return (
           <DiscordEmoji
@@ -288,6 +290,8 @@ function renderBlockNode(node, index, guildId) {
 // ─── Main renderer ───────────────────────────────────────────────
 
 const DiscordMarkdownRenderer = ({ nodes, guildId }) => {
+  // Subscribe so the component re-renders when animate preference changes
+  useDiscordPreferencesStore((s) => s.animateEmojis);
   if (!nodes || nodes.length === 0) return null;
 
   return nodes.map((node, index) => {

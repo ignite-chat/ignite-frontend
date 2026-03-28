@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { RefreshCw } from 'lucide-react';
 
 // --- Zustand store imports for memory measurement ---
@@ -163,12 +164,25 @@ const ProcessCard = ({ process: proc, totalMemory }) => {
   );
 };
 
+const SettingRow = ({ label, description, checked, onCheckedChange }) => (
+  <div className="flex items-center justify-between gap-4 border-b border-border/50 py-3 last:border-0">
+    <div className="min-w-0">
+      <p className="text-sm font-medium text-foreground">{label}</p>
+      {description && <p className="text-xs text-muted-foreground">{description}</p>}
+    </div>
+    <Switch checked={checked} onCheckedChange={onCheckedChange} />
+  </div>
+);
+
 const TabPerformance = () => {
   const [processes, setProcesses] = useState(null);
   const [jsMemory, setJsMemory] = useState(null);
   const [storeStats, setStoreStats] = useState([]);
   const [loading, setLoading] = useState(false);
   const isNative = !!window.IgniteNative;
+
+  const { animateEmojis, showAvatarDecorations, showGuildBanners, setAnimateEmojis, setShowAvatarDecorations, setShowGuildBanners } =
+    useDiscordPreferencesStore();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -211,12 +225,43 @@ const TabPerformance = () => {
 
   return (
     <div className="max-w-2xl space-y-8">
+      <div>
+        <h2 className="text-lg font-semibold text-foreground">Performance</h2>
+        <p className="text-sm text-muted-foreground">
+          Rendering settings and process memory usage.
+        </p>
+      </div>
+
+      <section className="rounded-lg border border-border p-4">
+        <h3 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Rendering
+        </h3>
+        <p className="mb-3 text-xs text-muted-foreground/70">
+          Disable visual features to reduce CPU and memory usage.
+        </p>
+        <SettingRow
+          label="Animate emojis"
+          description="Play custom emojis as GIF. Disable to always use static images."
+          checked={animateEmojis}
+          onCheckedChange={setAnimateEmojis}
+        />
+        <SettingRow
+          label="Show avatar decorations"
+          description="Display animated overlays on user avatars."
+          checked={showAvatarDecorations}
+          onCheckedChange={setShowAvatarDecorations}
+        />
+        <SettingRow
+          label="Show guild banners"
+          description="Display banner images at the top of the server sidebar."
+          checked={showGuildBanners}
+          onCheckedChange={setShowGuildBanners}
+        />
+      </section>
+
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Performance</h2>
-          <p className="text-sm text-muted-foreground">
-            Process memory usage and runtime information.
-          </p>
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Diagnostics</h3>
         </div>
         <Button
           variant="outline"
@@ -229,6 +274,7 @@ const TabPerformance = () => {
           Refresh
         </Button>
       </div>
+
 
       {/* Total memory across all processes */}
       {processes && (

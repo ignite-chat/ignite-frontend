@@ -11,6 +11,7 @@ import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useDiscordActivitiesStore, ActivityType } from '../store/discord-activities.store';
 import { useDiscordProfilesStore } from '../store/discord-profiles.store';
+import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
 import { parseMarkdown } from '@/components/message/markdown/parser';
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
 import { getConnectionIconUrl } from '../constants/connection-icons';
@@ -169,6 +170,7 @@ const ActivitySection = ({ activity }) => {
 };
 
 const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId }) => {
+  const showAvatarDecorations = useDiscordPreferencesStore((s) => s.showAvatarDecorations);
   const closeModal = () => useModalStore.getState().close(modalId);
   const guilds = useDiscordGuildsStore((s) => s.guilds);
   const storeUser = useDiscordUsersStore((s) => s.users[author?.id]);
@@ -253,7 +255,7 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
                   className="size-[94px] rounded-full object-cover select-none"
                   draggable="false"
                 />
-                {user.avatar_decoration_data?.asset && (
+                {showAvatarDecorations && user.avatar_decoration_data?.asset && (
                   <img
                     src={`https://cdn.discordapp.com/avatar-decoration-presets/${user.avatar_decoration_data.asset}.png?size=96`}
                     alt=""

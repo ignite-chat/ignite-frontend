@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { getTwemojiUrl } from '@/utils/emoji.utils';
 import { DISCORD_EMOJI_CDN } from '../constants/cdn';
+import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
 
 export const getDiscordEmojiUrl = (emoji, size = 48) => {
   if (emoji.id) {
-    const ext = emoji.animated ? 'gif' : 'webp';
+    const animate = useDiscordPreferencesStore.getState().animateEmojis;
+    const ext = emoji.animated && animate ? 'gif' : 'webp';
     return `${DISCORD_EMOJI_CDN}/${emoji.id}.${ext}?size=${size}`;
   }
   return getTwemojiUrl(emoji.name);

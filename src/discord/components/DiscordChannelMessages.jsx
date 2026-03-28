@@ -500,7 +500,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
               // Offset slightly so the "NEW" separator is visible above
               messagesRef.current.scrollTop = Math.max(
                 0,
-                messagesRef.current.scrollTop - 200,
+                messagesRef.current.scrollTop,
               );
               wasNearBottomRef.current = false;
               return;
@@ -546,7 +546,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
     wasNearBottomRef.current = nearBottom;
 
-    if (el.scrollTop < 200 && hasMore && !loadingMore) {
+    if (el.scrollTop < 20 && hasMore && !loadingMore) {
       onLoadMore();
     }
 

@@ -62,6 +62,7 @@ const PartneredIcon = () => (
 );
 
 const DiscordGuildHeader = memo(({ guild }) => {
+  const showGuildBanners = useDiscordPreferencesStore((s) => s.showGuildBanners);
   const props = guild?.properties || guild || {};
   const name = props.name || 'Discord Server';
   const features = props.features || guild?.features || [];
@@ -70,7 +71,7 @@ const DiscordGuildHeader = memo(({ guild }) => {
   const premiumFeatures = props.premium_features?.features || [];
   const hasBannerFeature = premiumFeatures.includes('BANNER');
   const bannerHash = hasBannerFeature ? (props.banner || props.splash) : null;
-  const bannerUrl = bannerHash
+  const bannerUrl = showGuildBanners && bannerHash
     ? `https://cdn.discordapp.com/banners/${guild?.id}/${bannerHash}.${bannerHash.startsWith('a_') ? 'gif' : 'png'}?size=480`
     : null;
 

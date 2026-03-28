@@ -589,11 +589,12 @@ const BUTTON_STYLE_CLASSES = {
 };
 
 const DiscordComponentEmoji = ({ emoji }) => {
+  const animateEmojis = useDiscordPreferencesStore((s) => s.animateEmojis);
   if (!emoji) return null;
   if (emoji.id) {
     return (
       <img
-        src={`${DISCORD_EMOJI_CDN}/${emoji.id}.${emoji.animated ? 'gif' : 'webp'}?size=48`}
+        src={`${DISCORD_EMOJI_CDN}/${emoji.id}.${emoji.animated && animateEmojis ? 'gif' : 'webp'}?size=48`}
         alt={emoji.name}
         className="size-[1.1em] object-contain"
         draggable="false"

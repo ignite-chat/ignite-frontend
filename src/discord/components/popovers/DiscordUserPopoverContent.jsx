@@ -13,6 +13,7 @@ import DiscordStatusIndicator from '../DiscordStatusIndicator';
 import DiscordClanTag from '../DiscordClanTag';
 import DiscordUserProfileModal from '../DiscordUserProfileModal';
 import { useModalStore } from '@/store/modal.store';
+import { useDiscordPreferencesStore } from '../../store/discord-preferences.store';
 
 const DISCORD_EPOCH = 1420070400000;
 
@@ -27,6 +28,7 @@ const getRoleColor = (color) => {
 };
 
 const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpenProfile }) => {
+  const showAvatarDecorations = useDiscordPreferencesStore((s) => s.showAvatarDecorations);
   const guilds = useDiscordGuildsStore((s) => s.guilds);
   const storeUser = useDiscordUsersStore((s) => s.users[author.id]);
   const storeMember = useDiscordMembersStore((s) => guildId ? s.members[guildId]?.[author.id] : undefined);
@@ -101,7 +103,7 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
               className="size-[68px] rounded-full object-cover select-none"
               draggable="false"
             />  
-            {user.avatar_decoration_data?.asset && (
+            {showAvatarDecorations && user.avatar_decoration_data?.asset && (
               <img
                 src={`https://cdn.discordapp.com/avatar-decoration-presets/${user.avatar_decoration_data.asset}.png?size=80`}
                 alt=""
