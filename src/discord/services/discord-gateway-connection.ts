@@ -234,6 +234,10 @@ export class GatewayConnection {
             sessionId: d.session_id,
             resumeGatewayUrl: d.resume_gateway_url || null,
           });
+          this.onEvent({ type: 'connectionState', connected: true });
+        }
+        if (t === 'RESUMED') {
+          this.onEvent({ type: 'connectionState', connected: true });
         }
         this.onEvent({ type: 'dispatch', eventName: t, data: d });
         break;

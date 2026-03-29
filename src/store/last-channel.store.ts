@@ -27,10 +27,10 @@ export const useLastChannelStore = create<LastChannelStore>((set, get) => ({
 
 /** Save/restore scroll position for message containers, keyed by channelId */
 export const scrollPositions = {
-  saveMessage: (channelId: string, scrollTop: number) => {
+  saveChannel: (channelId: string, scrollTop: number) => {
     messageScrollPositions.set(channelId, scrollTop);
   },
-  getMessage: (channelId: string) => messageScrollPositions.get(channelId),
+  getChannel: (channelId: string) => messageScrollPositions.get(channelId),
 
   saveSidebar: (guildId: string, scrollTop: number) => {
     sidebarScrollPositions.set(guildId, scrollTop);

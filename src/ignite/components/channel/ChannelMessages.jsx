@@ -87,7 +87,7 @@ const ChannelMessages = ({ channel, messageId }) => {
 
     if (!messagesRef.current) return;
     if (!messageId) {
-      const saved = scrollPositions.getMessage(channel?.channel_id);
+      const saved = scrollPositions.getChannel(channel?.channel_id);
       if (saved != null) {
         messagesRef.current.scrollTop = saved;
       } else {
@@ -236,7 +236,7 @@ const ChannelMessages = ({ channel, messageId }) => {
 
     // Save scroll position on every scroll
     if (channel?.channel_id) {
-      scrollPositions.saveMessage(channel.channel_id, el.scrollTop);
+      scrollPositions.saveChannel(channel.channel_id, el.scrollTop);
     }
 
     wasNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
