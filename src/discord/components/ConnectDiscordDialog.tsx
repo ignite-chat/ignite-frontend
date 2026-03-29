@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useDiscordStore } from '../store/discord.store';
 import { useDiscordRemoteAuth } from '../hooks/useDiscordRemoteAuth';
 import { DiscordService } from '../services/discord.service';
+import { discordApi } from '../services/discord-api.service';
 
 export function QrAuthContent({
   active,
@@ -422,33 +423,33 @@ export function LoginAuthContent({
     sitekey: string;
     rqdata?: string;
     rqtoken?: string;
+    session_id?: string;
     service?: string;
   } | null>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captchaRef = useRef<any>(null);
 
   const doLogin = useCallback(
-    async (captchaKey?: string, captchaRqtoken?: string) => {
+    async (captchaKey?: string, captchaRqtoken?: string, captchaSessionId?: string) => {
       setError('');
       setLoading(true);
 
       try {
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const headers: Record<string, string> = {};
         if (captchaKey) {
           headers['X-Captcha-Key'] = captchaKey;
           if (captchaRqtoken) headers['X-Captcha-Rqtoken'] = captchaRqtoken;
+          if (captchaSessionId) headers['X-Captcha-Session-Id'] = captchaSessionId;
         }
 
-        const res = await axios.post(
-          'https://discord.com/api/v9/auth/login',
+        const res = await discordApi.post(
+          '/auth/login',
           {
             login: login.trim(),
             password,
             undelete: false,
-            login_source: null,
-            gift_code_sku_id: null,
           },
-          { headers },
+          { headers, _captchaRetried: true, _silent: true } as any,
         );
 
         if (res.data.mfa) {
@@ -469,10 +470,41 @@ export function LoginAuthContent({
           data.captcha_key.includes('captcha-required') &&
           data.captcha_sitekey
         ) {
+          // Use native Electron captcha window (spoofs discord.com origin)
+          if (window.IgniteNative?.solveDiscordCaptcha) {
+            try {
+              console.log('[Login] Captcha required, opening native solver...');
+              console.log('[Login] sitekey:', data.captcha_sitekey);
+              console.log('[Login] rqdata:', data.captcha_rqdata ? `${data.captcha_rqdata.length} chars` : 'none');
+              console.log('[Login] rqtoken:', data.captcha_rqtoken ? 'present' : 'none');
+              console.log('[Login] session_id:', data.captcha_session_id);
+
+              const token = await window.IgniteNative.solveDiscordCaptcha({
+                sitekey: data.captcha_sitekey,
+                rqdata: data.captcha_rqdata,
+              });
+
+              console.log('[Login] Captcha solved, token length:', token.length);
+              console.log('[Login] Retrying login with captcha headers...');
+              console.log('[Login] X-Captcha-Key:', token.substring(0, 30) + '...');
+              console.log('[Login] X-Captcha-Rqtoken:', data.captcha_rqtoken ? 'present' : 'none');
+              console.log('[Login] X-Captcha-Session-Id:', data.captcha_session_id);
+
+              // Immediately retry with the solved captcha
+              await doLogin(token, data.captcha_rqtoken, data.captcha_session_id);
+              return;
+            } catch (captchaErr) {
+              console.log('[Login] Captcha failed:', captchaErr);
+              setError('Captcha verification was cancelled.');
+              return;
+            }
+          }
+          // Fallback: render HCaptcha inline (won't work on localhost)
           setCaptcha({
             sitekey: data.captcha_sitekey,
             rqdata: data.captcha_rqdata,
             rqtoken: data.captcha_rqtoken,
+            session_id: data.captcha_session_id,
             service: data.captcha_service,
           });
           setCaptchaToken(null);
@@ -498,13 +530,11 @@ export function LoginAuthContent({
     setLoading(true);
 
     try {
-      const res = await axios.post('https://discord.com/api/v9/auth/mfa/totp', {
+      const res = await discordApi.post('/auth/mfa/totp', {
         code: mfaCode.replace(/\s/g, ''),
         ticket: mfaTicket,
-        login_source: null,
-        gift_code_sku_id: null,
         login_instance_id: loginInstanceId,
-      });
+      }, { _captchaRetried: true, _silent: true } as any);
 
       if (res.data.token) {
         onAuthenticated(res.data.token);
@@ -521,7 +551,7 @@ export function LoginAuthContent({
   // When captcha is solved, retry login with the token
   useEffect(() => {
     if (captchaToken && captcha) {
-      doLogin(captchaToken, captcha.rqtoken);
+      doLogin(captchaToken, captcha.rqtoken, captcha.session_id);
     }
   }, [captchaToken]); // eslint-disable-line react-hooks/exhaustive-deps
 

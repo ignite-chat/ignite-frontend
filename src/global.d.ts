@@ -22,6 +22,7 @@ interface Window {
     setBadgeCount: (count: number) => Promise<void>;
     showNotification: (opts: { title: string; body: string }) => Promise<void>;
     getDiscordLocalTokens: () => Promise<Array<{ source: string; token: string }>>;
+    solveDiscordCaptcha: (challenge: { sitekey: string; rqdata?: string }) => Promise<string>;
     // Message log file storage (Electron only)
     saveMessageLogAttachment?: (channelId: string, messageId: string, filename: string, data: Uint8Array) => Promise<string>;
     loadMessageLogAttachment?: (channelId: string, messageId: string, filename: string) => Promise<Buffer | null>;

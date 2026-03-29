@@ -1,4 +1,4 @@
-const { app, autoUpdater, BrowserWindow, ipcMain, Tray, desktopCapturer, Menu, shell, nativeImage, Notification } = require('electron');
+const { app, autoUpdater, BrowserWindow, ipcMain, Tray, desktopCapturer, Menu, shell, nativeImage, Notification, session, net } = require('electron');
 const { join } = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -386,6 +386,142 @@ const startCore = () => {
   });
 
   ipcMain.handle('msglog:getBasePath', () => msgLogDir);
+
+  // Solve an hCaptcha challenge in a BrowserWindow whose origin is discord.com.
+  // We intercept a fake URL (https://discord.com/__ignite_captcha__) via the
+  // session protocol handler and serve our own HTML, so window.location.hostname
+  // is "discord.com" and hCaptcha accepts the sitekey.
+  // Uses the programmatic hcaptcha.render() API to ensure rqdata is passed correctly.
+  const CAPTCHA_PATH = '/__ignite_captcha__';
+
+  ipcMain.handle('discord:solveCaptcha', (_event, challenge) => {
+    return new Promise((resolve, reject) => {
+      const partition = 'captcha-' + Date.now();
+      const ses = session.fromPartition(partition);
+
+      const sitekey = JSON.stringify(challenge.sitekey);
+      const rqdata = JSON.stringify(challenge.rqdata || '');
+
+      const html = `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; display: flex; align-items: center; justify-content: center;
+         height: 100vh; background: #2b2d31; font-family: sans-serif; color: #fff;
+         flex-direction: column; }
+  #status { margin-top: 12px; font-size: 14px; text-align: center; color: #b5bac1; }
+</style>
+</head><body>
+<div id="captcha-container"></div>
+<div id="status">Loading captcha...</div>
+<script src="https://js.hcaptcha.com/1/api.js?render=explicit&onload=initCaptcha" async defer></script>
+<script>
+  var widgetId;
+  function initCaptcha() {
+    console.log('[Captcha] hCaptcha API loaded, rendering widget...');
+    console.log('[Captcha] sitekey: ' + ${sitekey});
+    console.log('[Captcha] rqdata present: ' + !!(${rqdata}));
+    console.log('[Captcha] rqdata length: ' + (${rqdata} || '').length);
+
+    widgetId = hcaptcha.render('captcha-container', {
+      sitekey: ${sitekey},
+      theme: 'dark',
+      size: 'normal',
+      callback: function(token) {
+        console.log('[Captcha] Solved! Token length: ' + token.length);
+        document.getElementById('status').textContent = 'Verified!';
+        console.log('CAPTCHA_SOLVED:' + token);
+      },
+      'expired-callback': function() {
+        console.log('[Captcha] Token expired');
+        document.getElementById('status').textContent = 'Expired, please retry';
+        hcaptcha.reset(widgetId);
+      },
+      'error-callback': function(err) {
+        console.log('[Captcha] Error: ' + String(err));
+        console.log('CAPTCHA_ERROR:' + String(err));
+      }
+    });
+    console.log('[Captcha] Widget rendered, id=' + widgetId);
+
+    // Enterprise: rqdata must be set via setData() after render, not in render config
+    var rq = ${rqdata};
+    if (rq) {
+      console.log('[Captcha] Setting rqdata via setData()...');
+      hcaptcha.setData(widgetId, { rqdata: rq });
+      console.log('[Captcha] rqdata set successfully');
+    }
+
+    document.getElementById('status').textContent = 'Complete the captcha above';
+  }
+</script>
+</body></html>`;
+
+      // Intercept our fake URL and serve the captcha HTML; pass everything else through
+      ses.protocol.handle('https', (request) => {
+        const url = new URL(request.url);
+        if (url.hostname === 'discord.com' && url.pathname === CAPTCHA_PATH) {
+          return new Response(html, {
+            headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          });
+        }
+        return net.fetch(request, { bypassCustomProtocolHandlers: true });
+      });
+
+      // Spoof Origin/Referer so hCaptcha server-side sees discord.com
+      ses.webRequest.onBeforeSendHeaders((details, callback) => {
+        details.requestHeaders['Origin'] = 'https://discord.com';
+        details.requestHeaders['Referer'] = 'https://discord.com/';
+        callback({ requestHeaders: details.requestHeaders });
+      });
+
+      const captchaWindow = new BrowserWindow({
+        width: 500,
+        height: 600,
+        show: false,
+        parent: mainWindow,
+        modal: true,
+        title: 'Verification Required',
+        webPreferences: {
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+          partition,
+        },
+      });
+
+      let settled = false;
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        if (!captchaWindow.isDestroyed()) captchaWindow.close();
+        if (result) resolve(result);
+        else reject(new Error('Captcha dismissed'));
+      };
+
+      captchaWindow.on('closed', () => finish(null));
+
+      captchaWindow.webContents.on('console-message', (_e, level, message) => {
+        // Forward all captcha window logs to main process console
+        console.log(`[CaptchaWindow] (${level}) ${message}`);
+
+        if (message.startsWith('CAPTCHA_SOLVED:')) {
+          const token = message.slice('CAPTCHA_SOLVED:'.length);
+          console.log('[CaptchaWindow] Token received, length:', token.length);
+          finish(token);
+        } else if (message.startsWith('CAPTCHA_ERROR:')) {
+          const err = message.slice('CAPTCHA_ERROR:'.length);
+          console.log('[CaptchaWindow] Error received:', err);
+          settled = true;
+          if (!captchaWindow.isDestroyed()) captchaWindow.close();
+          reject(new Error(err || 'Captcha failed'));
+        }
+      });
+
+      captchaWindow.loadURL('https://discord.com' + CAPTCHA_PATH);
+      captchaWindow.show();
+    });
+  });
 
   ipcMain.handle('discord:setActiveChannel', (_event, guildId, channelId) => {
     discordReferer = guildId && channelId

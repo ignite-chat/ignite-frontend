@@ -132,6 +132,8 @@ discordApi.interceptors.response.use(
   }
 );
 
+export { discordApi };
+
 export const DiscordApiService = {
   /**
    * Get the current authenticated Discord user.
