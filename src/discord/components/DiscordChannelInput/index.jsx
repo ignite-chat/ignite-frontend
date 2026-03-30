@@ -526,18 +526,6 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
       />
 
       <div ref={menuContainerRef} className="relative">
-        {/* Slash command form */}
-        {activeCommand && (
-          <SlashCommandForm
-            command={activeCommand}
-            application={activeCommandApp}
-            channelId={channelId}
-            guildId={guildId}
-            onClose={handleCloseCommand}
-            onSwitchCommand={handleStartCommand}
-          />
-        )}
-
         {/* Staged file previews */}
         {stagedFiles.length > 0 && (
           <div className={cn(
@@ -572,63 +560,76 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
             <TooltipContent side="top">Upload a File</TooltipContent>
           </Tooltip>
 
-          <LexicalComposer initialConfig={initialConfig} key={channelId}>
+          {/* Inline slash command form — replaces editor when active */}
+          {activeCommand ? (
             <div className="relative flex-1">
-              <PlainTextPlugin
-                contentEditable={
-                  <ContentEditable
-                    className={`max-h-[50vh] min-h-[54px] w-full overflow-y-auto px-3 py-4 text-sm outline-none [&_.channel-input-paragraph]:m-0 ${
-                      !canSendMessages || isOnCooldown ? 'cursor-not-allowed opacity-50' : ''
-                    }`}
-                  />
-                }
-                placeholder={
-                  <div className="pointer-events-none absolute left-0 top-0 px-3 py-4 text-sm font-normal text-gray-500">
-                    {placeholder}
-                  </div>
-                }
-                ErrorBoundary={LexicalErrorBoundary}
-              />
-              <HistoryPlugin />
-              <ClearEditorPlugin />
-              <EditorRefPlugin editorRef={editorRef} />
-
-              <EditablePlugin editable={canSendMessages && !isOnCooldown} />
-              <EditBridgePlugin setInputMessage={setInputMessage} />
-              {guildId && (
-                <DiscordMentionPlugin
-                  members={members}
-                  guildRoles={guildRoles}
-                  guildId={guildId}
-                  menuContainer={menuContainerRef}
-                />
-              )}
-              {guildId && (
-                <DiscordChannelMentionPlugin
-                  channels={guildChannels}
-                  menuContainer={menuContainerRef}
-                />
-              )}
-              <DiscordEmojiSuggestionPlugin
-                guildEmojis={guildEmojis}
-                menuContainer={menuContainerRef}
-              />
-              <SendMessagePlugin onSend={sendMessage} />
-              <PasteHandlerPlugin
-                members={members}
-                resolveUser={resolveUser}
-                channels={guildChannels}
-              />
-              <DiscordTypingIndicatorPlugin channelId={channelId} silentTyping={silentTyping} />
-              <FocusPlugin channelId={channelId} replyingMessageId={replyingMessageId} />
-              <SlashCommandPlugin
+              <SlashCommandForm
+                command={activeCommand}
+                application={activeCommandApp}
                 channelId={channelId}
                 guildId={guildId}
-                menuContainer={menuContainerRef}
-                onStartCommand={handleStartCommand}
+                onClose={handleCloseCommand}
               />
             </div>
-          </LexicalComposer>
+          ) : (
+            <LexicalComposer initialConfig={initialConfig} key={channelId}>
+              <div className="relative flex-1">
+                <PlainTextPlugin
+                  contentEditable={
+                    <ContentEditable
+                      className={`max-h-[50vh] min-h-[54px] w-full overflow-y-auto px-3 py-4 text-sm outline-none [&_.channel-input-paragraph]:m-0 ${
+                        !canSendMessages || isOnCooldown ? 'cursor-not-allowed opacity-50' : ''
+                      }`}
+                    />
+                  }
+                  placeholder={
+                    <div className="pointer-events-none absolute left-0 top-0 px-3 py-4 text-sm font-normal text-gray-500">
+                      {placeholder}
+                    </div>
+                  }
+                  ErrorBoundary={LexicalErrorBoundary}
+                />
+                <HistoryPlugin />
+                <ClearEditorPlugin />
+                <EditorRefPlugin editorRef={editorRef} />
+
+                <EditablePlugin editable={canSendMessages && !isOnCooldown} />
+                <EditBridgePlugin setInputMessage={setInputMessage} />
+                {guildId && (
+                  <DiscordMentionPlugin
+                    members={members}
+                    guildRoles={guildRoles}
+                    guildId={guildId}
+                    menuContainer={menuContainerRef}
+                  />
+                )}
+                {guildId && (
+                  <DiscordChannelMentionPlugin
+                    channels={guildChannels}
+                    menuContainer={menuContainerRef}
+                  />
+                )}
+                <DiscordEmojiSuggestionPlugin
+                  guildEmojis={guildEmojis}
+                  menuContainer={menuContainerRef}
+                />
+                <SendMessagePlugin onSend={sendMessage} />
+                <PasteHandlerPlugin
+                  members={members}
+                  resolveUser={resolveUser}
+                  channels={guildChannels}
+                />
+                <DiscordTypingIndicatorPlugin channelId={channelId} silentTyping={silentTyping} />
+                <FocusPlugin channelId={channelId} replyingMessageId={replyingMessageId} />
+                <SlashCommandPlugin
+                  channelId={channelId}
+                  guildId={guildId}
+                  menuContainer={menuContainerRef}
+                  onStartCommand={handleStartCommand}
+                />
+              </div>
+            </LexicalComposer>
+          )}
 
           <div className="mr-2 mt-2.5 flex items-center gap-0.5 self-start">
             <Tooltip>

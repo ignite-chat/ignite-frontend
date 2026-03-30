@@ -4,7 +4,7 @@ import {
   MenuOption,
 } from '@lexical/react/LexicalTypeaheadMenuPlugin';
 import { $getRoot, CLEAR_EDITOR_COMMAND } from 'lexical';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDiscordCommandsStore } from '@/discord/store/discord-commands.store';
 import { useDiscordUsersStore } from '@/discord/store/discord-users.store';
@@ -143,6 +143,27 @@ export default function SlashCommandPlugin({ channelId, guildId, menuContainer, 
     [editor, channelId, guildId, onStartCommand]
   );
 
+  // Handle Tab key to select the highlighted slash command option
+  // Uses a native DOM listener to avoid Lexical command priority issues
+  const tabSelectRef = useRef(null);
+
+  useEffect(() => {
+    const rootEl = editor.getRootElement();
+    if (!rootEl) return;
+
+    const handleTab = (e) => {
+      if (e.key !== 'Tab' || queryString === null || options.length === 0) return;
+      if (tabSelectRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        tabSelectRef.current();
+      }
+    };
+
+    rootEl.addEventListener('keydown', handleTab, true); // capture phase
+    return () => rootEl.removeEventListener('keydown', handleTab, true);
+  }, [editor, queryString, options]);
+
   return (
     <LexicalTypeaheadMenuPlugin
       onQueryChange={setQueryString}
@@ -150,6 +171,10 @@ export default function SlashCommandPlugin({ channelId, guildId, menuContainer, 
       triggerFn={triggerFn}
       options={options}
       menuRenderFn={(anchorElementRef, { selectedIndex, selectOptionAndCleanUp, options: opts }) => {
+        // Keep a ref to the current select function for TAB handling
+        tabSelectRef.current = opts.length > 0 && selectedIndex >= 0 && selectedIndex < opts.length
+          ? () => selectOptionAndCleanUp(opts[selectedIndex])
+          : null;
         if (opts.length === 0 || !menuContainer?.current) return null;
 
         return createPortal(
