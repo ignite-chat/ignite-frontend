@@ -14,6 +14,11 @@ export const DiscordVoiceService = {
 
   // Local microphone stream
   localStream: null as MediaStream | null,
+  // Cloned mic track for the local analyser — stays enabled even when VAD gates the real track
+  _localAnalyserTrack: null as MediaStreamTrack | null,
+  // Gated analyser — connected to the real (gated) localStream for waveform visualization
+  _localGatedAnalyser: null as AnalyserNode | null,
+  _localGatedSource: null as MediaStreamAudioSourceNode | null,
 
   // State for voice server handshake
   pendingVoiceState: null as { session_id: string } | null,
@@ -443,21 +448,24 @@ export const DiscordVoiceService = {
 
   async _setupWebRTC(_readyData: any) {
     try {
+      const store = useDiscordVoiceStore.getState();
+
       this.localStream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+          echoCancellation: store.echoCancellation,
+          noiseSuppression: store.noiseSuppression,
+          autoGainControl: store.autoGainControl,
         },
       });
-
-      const store = useDiscordVoiceStore.getState();
 
       if (store.isMuted || store.isDeafened) {
         for (const track of this.localStream.getAudioTracks()) {
           track.enabled = false;
         }
       }
+
+      // Set up local speaking analyser so the current user's speaking state is tracked
+      this._setupLocalSpeakingAnalyser();
 
       // Create peer connection with encoded insertable streams for DAVE E2EE
       this.peerConnection = new RTCPeerConnection({
@@ -1029,21 +1037,44 @@ export const DiscordVoiceService = {
   },
 
   _startSpeakingMonitor() {
-    const THRESHOLD = 1;
-    const dataArray = new Uint8Array(128);
+    const SPEAKING_THRESHOLD = 1; // threshold for remote speaking indicators — unchanged
+    const freqData = new Uint8Array(128);
+    const timeData = new Uint8Array(256);
 
     this.speakingMonitorInterval = setInterval(() => {
       const store = useDiscordVoiceStore.getState();
       const currentSpeaking = new Set<string>();
 
-      for (const [, entry] of this.audioAnalysers) {
+      for (const [key, entry] of this.audioAnalysers) {
         if (!entry.userId) continue;
-        entry.analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-        const avg = sum / dataArray.length;
-        if (avg > THRESHOLD) {
-          currentSpeaking.add(entry.userId);
+
+        if (key === '__local__') {
+          // Use time-domain RMS → dB for local VAD. This measures actual signal level
+          // regardless of which frequency bins are active, avoiding the averaging-dilution
+          // problem that made frequency-domain VAD unusable for speech.
+          entry.analyser.getByteTimeDomainData(timeData);
+          let sumSq = 0;
+          for (let i = 0; i < timeData.length; i++) {
+            const s = (timeData[i] - 128) / 128; // normalise to -1..1
+            sumSq += s * s;
+          }
+          const rms = Math.sqrt(sumSq / timeData.length);
+          const dB = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+          const aboveVad = dB > store.inputSensitivity;
+
+          if (aboveVad) currentSpeaking.add(entry.userId);
+
+          // Gate the outgoing audio track — only when not explicitly muted/deafened.
+          if (!store.isMuted && !store.isDeafened) {
+            const localTrack = this.localStream?.getAudioTracks()[0];
+            if (localTrack) localTrack.enabled = aboveVad;
+          }
+        } else {
+          // Remote speaking indicators: unchanged original fixed-threshold logic.
+          entry.analyser.getByteFrequencyData(freqData);
+          let sum = 0;
+          for (let i = 0; i < freqData.length; i++) sum += freqData[i];
+          if (sum / freqData.length > SPEAKING_THRESHOLD) currentSpeaking.add(entry.userId);
         }
       }
 
@@ -1064,10 +1095,144 @@ export const DiscordVoiceService = {
       entry.source.disconnect();
     }
     this.audioAnalysers.clear();
+    // Stop the cloned analyser track
+    if (this._localAnalyserTrack) {
+      this._localAnalyserTrack.stop();
+      this._localAnalyserTrack = null;
+    }
     if (this.audioContext) {
       this.audioContext.close().catch(() => {});
       this.audioContext = null;
     }
+  },
+
+  // ─── Local Speaking Analyser ────────────────────────────────────
+
+  /** Attach an audio analyser to the local microphone stream for self-speaking detection.
+   *  Uses a **cloned** track so the analyser always sees real audio even when
+   *  VAD gates the original track (track.enabled = false → silence). */
+  _setupLocalSpeakingAnalyser() {
+    if (!this.localStream) return;
+
+    const userId = useDiscordStore.getState().user?.id;
+    if (!userId) return;
+
+    // Remove any previous local analyser + cloned track
+    this._removeLocalAnalyser();
+
+    if (!this.audioContext) {
+      this.audioContext = new AudioContext();
+    }
+
+    try {
+      // Clone the mic track — the clone stays enabled independently of the original,
+      // so the analyser always receives real mic audio for VAD decisions.
+      const originalTrack = this.localStream.getAudioTracks()[0];
+      if (!originalTrack) return;
+
+      this._localAnalyserTrack = originalTrack.clone();
+      const analyserStream = new MediaStream([this._localAnalyserTrack]);
+
+      const source = this.audioContext.createMediaStreamSource(analyserStream);
+      const analyser = this.audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.3;
+      source.connect(analyser);
+
+      this.audioAnalysers.set('__local__', { analyser, source, userId });
+
+      // Also create a second analyser on the GATED (original) stream for waveform visualization.
+      // This one goes silent when VAD gates the track — showing what's actually being transmitted.
+      this._localGatedSource = this.audioContext.createMediaStreamSource(this.localStream);
+      this._localGatedAnalyser = this.audioContext.createAnalyser();
+      this._localGatedAnalyser.fftSize = 256;
+      this._localGatedAnalyser.smoothingTimeConstant = 0.3;
+      this._localGatedSource.connect(this._localGatedAnalyser);
+
+      if (!this.speakingMonitorInterval) {
+        this._startSpeakingMonitor();
+      }
+    } catch (err) {
+      console.error('[Discord Voice] Failed to setup local speaking analyser:', err);
+    }
+  },
+
+  /** Clean up the local analyser entry and its cloned track. */
+  _removeLocalAnalyser() {
+    this._removeAudioAnalyser('__local__');
+    if (this._localAnalyserTrack) {
+      this._localAnalyserTrack.stop();
+      this._localAnalyserTrack = null;
+    }
+    if (this._localGatedSource) {
+      this._localGatedSource.disconnect();
+      this._localGatedSource = null;
+    }
+    this._localGatedAnalyser = null;
+  },
+
+  // ─── Re-apply Audio Constraints ───────────────────────────────
+
+  /** Re-acquire the microphone with updated audio processing constraints and replace the sender track. */
+  async reapplyAudioConstraints() {
+    if (!this.peerConnection || !this.localStream) return;
+
+    const store = useDiscordVoiceStore.getState();
+
+    // Stop old tracks
+    for (const track of this.localStream.getAudioTracks()) {
+      track.stop();
+    }
+
+    // Remove old local analyser + cloned track
+    this._removeLocalAnalyser();
+
+    try {
+      this.localStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: store.echoCancellation,
+          noiseSuppression: store.noiseSuppression,
+          autoGainControl: store.autoGainControl,
+        },
+      });
+
+      // Respect mute state
+      if (store.isMuted || store.isDeafened) {
+        for (const track of this.localStream.getAudioTracks()) {
+          track.enabled = false;
+        }
+      }
+
+      // Replace the audio sender track on the peer connection
+      const newTrack = this.localStream.getAudioTracks()[0];
+      if (newTrack) {
+        const senders = this.peerConnection.getSenders();
+        const audioSender = senders.find((s) => s.track?.kind === 'audio' || s.track === null);
+        if (audioSender) {
+          await audioSender.replaceTrack(newTrack);
+        }
+      }
+
+      // Re-setup local speaking analyser with new stream
+      this._setupLocalSpeakingAnalyser();
+    } catch (err) {
+      console.error('[Discord Voice] Failed to reapply audio constraints:', err);
+    }
+  },
+
+  /** Return the AnalyserNode for a given userId, or null if not available.
+   *  For the local user, pass `gated: true` to get the analyser on the gated
+   *  (transmitted) stream — goes silent when VAD gates the track. */
+  getAnalyserForUser(userId: string, gated = false): AnalyserNode | null {
+    for (const [key, entry] of this.audioAnalysers) {
+      if (entry.userId === userId) {
+        if (key === '__local__' && gated && this._localGatedAnalyser) {
+          return this._localGatedAnalyser;
+        }
+        return entry.analyser;
+      }
+    }
+    return null;
   },
 
   // ─── Stats Monitor ──────────────────────────────────────────────

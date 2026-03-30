@@ -22,6 +22,12 @@ type DiscordVoiceStore = {
   /** The MediaStream for the stream being watched */
   watchingStreamMedia: MediaStream | null;
 
+  /** Voice audio settings (persisted to localStorage) */
+  inputSensitivity: number;
+  echoCancellation: boolean;
+  noiseSuppression: boolean;
+  autoGainControl: boolean;
+
   setConnectionState: (state: DiscordVoiceConnectionState) => void;
   setChannel: (guildId: string, channelId: string, channelName: string, guildName: string) => void;
   setMuted: (muted: boolean) => void;
@@ -33,6 +39,10 @@ type DiscordVoiceStore = {
   setWatchingStream: (streamKey: string | null) => void;
   setStreamConnectionState: (state: 'disconnected' | 'connecting' | 'connected') => void;
   setWatchingStreamMedia: (stream: MediaStream | null) => void;
+  setInputSensitivity: (value: number) => void;
+  setEchoCancellation: (enabled: boolean) => void;
+  setNoiseSuppression: (enabled: boolean) => void;
+  setAutoGainControl: (enabled: boolean) => void;
   reset: () => void;
 };
 
@@ -51,6 +61,11 @@ export const useDiscordVoiceStore = create<DiscordVoiceStore>((set) => ({
   watchingStreamKey: null,
   streamConnectionState: 'disconnected',
   watchingStreamMedia: null,
+
+  inputSensitivity: Number(localStorage.getItem('discord-inputSensitivity') ?? -60),
+  echoCancellation: localStorage.getItem('discord-echoCancellation') !== 'false',
+  noiseSuppression: localStorage.getItem('discord-noiseSuppression') !== 'false',
+  autoGainControl: localStorage.getItem('discord-autoGainControl') !== 'false',
 
   setConnectionState: (connectionState) => set({ connectionState }),
   setChannel: (guildId, channelId, channelName, guildName) =>
@@ -76,6 +91,22 @@ export const useDiscordVoiceStore = create<DiscordVoiceStore>((set) => ({
   setWatchingStream: (streamKey) => set({ watchingStreamKey: streamKey }),
   setStreamConnectionState: (streamConnectionState) => set({ streamConnectionState }),
   setWatchingStreamMedia: (watchingStreamMedia) => set({ watchingStreamMedia }),
+  setInputSensitivity: (inputSensitivity) => {
+    localStorage.setItem('discord-inputSensitivity', String(inputSensitivity));
+    set({ inputSensitivity });
+  },
+  setEchoCancellation: (echoCancellation) => {
+    localStorage.setItem('discord-echoCancellation', String(echoCancellation));
+    set({ echoCancellation });
+  },
+  setNoiseSuppression: (noiseSuppression) => {
+    localStorage.setItem('discord-noiseSuppression', String(noiseSuppression));
+    set({ noiseSuppression });
+  },
+  setAutoGainControl: (autoGainControl) => {
+    localStorage.setItem('discord-autoGainControl', String(autoGainControl));
+    set({ autoGainControl });
+  },
   reset: () =>
     set({
       connectionState: 'disconnected',

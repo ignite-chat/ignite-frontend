@@ -112,6 +112,156 @@ const FocusedParticipant = ({ vs, guildId }) => {
   );
 };
 
+// ─── Participant Waveform ─────────────────────────────────────────────────────
+
+/**
+ * Draws a smooth time-domain waveform on a canvas that fills the parent tile.
+ * Pulls audio data directly from the DiscordVoiceService analyser for this userId.
+ */
+const ParticipantWaveform = ({ userId, isSpeaking }) => {
+  const canvasRef = useRef(null);
+  const rafRef = useRef(null);
+  const currentUserId = useDiscordStore((s) => s.user?.id);
+  const isLocal = userId === currentUserId;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const bufferLength = 256;
+    const dataArray = new Uint8Array(bufferLength);
+
+    const draw = () => {
+      rafRef.current = requestAnimationFrame(draw);
+
+      // For the local user, use the gated analyser so the waveform
+      // reflects what's actually being transmitted (silent when VAD gates).
+      const analyser = DiscordVoiceService.getAnalyserForUser(userId, isLocal);
+
+      const W = canvas.offsetWidth;
+      const H = canvas.offsetHeight;
+      if (canvas.width !== W || canvas.height !== H) {
+        canvas.width = W;
+        canvas.height = H;
+      }
+
+      ctx.clearRect(0, 0, W, H);
+
+      if (!analyser) {
+        // Draw a flat idle line
+        drawWave(ctx, null, W, H, false);
+        return;
+      }
+
+      analyser.getByteTimeDomainData(dataArray);
+      drawWave(ctx, dataArray, W, H, isSpeaking);
+    };
+
+    rafRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [userId, isSpeaking, isLocal]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 size-full"
+      style={{ pointerEvents: 'none' }}
+    />
+  );
+};
+
+function drawWave(ctx, dataArray, W, H) {
+  const midY = H / 2;
+  const waveH = H * 0.28; // wave amplitude zone
+
+  // Gradient fill under the wave
+  const grad = ctx.createLinearGradient(0, midY - waveH, 0, midY + waveH);
+  grad.addColorStop(0, 'rgba(34,197,94,0.18)');
+  grad.addColorStop(0.5, 'rgba(34,197,94,0.08)');
+  grad.addColorStop(1, 'rgba(34,197,94,0.0)');
+
+  ctx.beginPath();
+
+  const pointCount = dataArray ? Math.min(dataArray.length, 128) : 64;
+
+  for (let i = 0; i <= pointCount; i++) {
+    const x = (i / pointCount) * W;
+    let y;
+
+    if (!dataArray) {
+      // Flat line when no analyser
+      y = midY;
+    } else {
+      const raw = dataArray[Math.floor((i / pointCount) * dataArray.length)];
+      const normalized = (raw / 128.0) - 1.0; // -1..1
+      y = midY + normalized * waveH;
+    }
+
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      // Catmull-Rom-like smoothing via quadratic bezier
+      const prevX = ((i - 1) / pointCount) * W;
+      const prevRaw = dataArray
+        ? dataArray[Math.floor(((i - 1) / pointCount) * dataArray.length)]
+        : 128;
+      const prevY = dataArray ? midY + ((prevRaw / 128.0) - 1.0) * waveH : midY;
+      const cpX = (prevX + x) / 2;
+      ctx.quadraticCurveTo(prevX, prevY, cpX, (prevY + y) / 2);
+    }
+  }
+
+  // Close path to bottom for gradient fill
+  ctx.lineTo(W, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Redraw just the stroke on top
+  ctx.beginPath();
+  for (let i = 0; i <= pointCount; i++) {
+    const x = (i / pointCount) * W;
+    let y;
+
+    if (!dataArray) {
+      y = midY;
+    } else {
+      const raw = dataArray[Math.floor((i / pointCount) * dataArray.length)];
+      const normalized = (raw / 128.0) - 1.0;
+      y = midY + normalized * waveH;
+    }
+
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      const prevX = ((i - 1) / pointCount) * W;
+      const prevRaw = dataArray
+        ? dataArray[Math.floor(((i - 1) / pointCount) * dataArray.length)]
+        : 128;
+      const prevY = dataArray ? midY + ((prevRaw / 128.0) - 1.0) * waveH : midY;
+      const cpX = (prevX + x) / 2;
+      ctx.quadraticCurveTo(prevX, prevY, cpX, (prevY + y) / 2);
+    }
+  }
+
+  if (dataArray) {
+    ctx.strokeStyle = 'rgba(34,197,94,0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = 'rgba(34,197,94,0.5)';
+    ctx.shadowBlur = 6;
+  } else {
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    ctx.shadowBlur = 0;
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+// ─── Main Component ────────────────────────────────────────────────────────────
+
 const DiscordVoiceChannelView = ({ channel }) => {
   const guildId = channel.guild_id;
   const channelId = channel.id;
@@ -368,7 +518,7 @@ const DiscordVoiceChannelView = ({ channel }) => {
               Stop Watching
             </button>
           )}
-          {isConnected ? (
+{isConnected ? (
             <button
               type="button"
               onClick={handleDisconnect}
@@ -552,19 +702,22 @@ const VoiceParticipantTile = ({ vs, guildId, onWatchStream, onFocus }) => {
           className="absolute inset-0 h-full w-full object-cover"
         />
       ) : (
-        /* Avatar fallback */
-        <div className="flex flex-col items-center justify-center gap-2 p-8">
-          <div
-            className={`flex size-20 items-center justify-center rounded-full ${isSpeaking ? 'ring-4 ring-green-500' : ''
-              }`}
-          >
-            <img
-              src={avatarUrl}
-              alt={displayName}
-              className="size-20 rounded-full object-cover"
-            />
+        /* Avatar fallback with waveform background */
+        <>
+          <ParticipantWaveform userId={vs.user_id} isSpeaking={isSpeaking} />
+          <div className="relative z-10 flex flex-col items-center justify-center gap-2 p-8">
+            <div
+              className={`flex size-20 items-center justify-center rounded-full ${isSpeaking ? 'ring-4 ring-green-500' : ''
+                }`}
+            >
+              <img
+                src={avatarUrl}
+                alt={displayName}
+                className="size-20 rounded-full object-cover"
+              />
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Top-right badges */}
