@@ -7,6 +7,7 @@ const INTERACTIVE_SELECTORS = 'input, textarea, [contenteditable="true"], [role=
 export default function FocusPlugin({ channelId, replyingMessageId }) {
   const [editor] = useLexicalComposerContext();
 
+  // Focus the editor when switching channels or starting a reply
   useEffect(() => {
     const delay = replyingMessageId ? 50 : 0;
     const timer = setTimeout(() => {
@@ -20,38 +21,24 @@ export default function FocusPlugin({ channelId, replyingMessageId }) {
     return () => clearTimeout(timer);
   }, [editor, channelId, replyingMessageId]);
 
+  // When the user types a printable character and no other input is focused,
+  // redirect focus to the channel input so they can type without clicking it first.
   useEffect(() => {
-    const rootEl = editor.getRootElement();
-    if (!rootEl) return;
+    const handleKeyDown = (e) => {
+      // Ignore modifier-only keys and shortcuts
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // Ignore non-printable keys
+      if (e.key.length !== 1) return;
 
-    const handleBlur = () => {
-      requestAnimationFrame(() => {
-        const active = document.activeElement;
-        if (!active || active === document.body) {
-          editor.focus();
-        }
-      });
+      const active = document.activeElement;
+      // Already focused on an input — don't steal focus
+      if (active && active.closest(INTERACTIVE_SELECTORS)) return;
+
+      editor.focus();
     };
 
-    rootEl.addEventListener('focusout', handleBlur);
-    return () => rootEl.removeEventListener('focusout', handleBlur);
-  }, [editor]);
-
-  useEffect(() => {
-    const handleClick = (e) => {
-      if (e.target.closest(INTERACTIVE_SELECTORS)) return;
-      if (e.target.closest('button, [role="menuitem"], [role="option"], a')) return;
-
-      requestAnimationFrame(() => {
-        const active = document.activeElement;
-        if (!active || active === document.body) {
-          editor.focus();
-        }
-      });
-    };
-
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [editor]);
 
   return null;
