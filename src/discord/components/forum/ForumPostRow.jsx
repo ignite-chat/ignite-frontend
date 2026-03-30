@@ -61,8 +61,7 @@ const ForumPostRow = ({ thread, firstMessage, guildId, availableTags }) => {
     e.stopPropagation();
     if (!author) return;
     useModalStore.getState().push(DiscordUserProfileModal, {
-      author,
-      member,
+      userId: author.id,
       guildId,
     });
   };

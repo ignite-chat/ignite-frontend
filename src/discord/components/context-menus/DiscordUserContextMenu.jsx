@@ -29,6 +29,7 @@ import { useDiscordUserVolumeStore } from '../../store/discord-user-volume.store
 import { DiscordVoiceService } from '../../services/discord-voice.service';
 import { useModalStore } from '@/store/modal.store';
 import DiscordTimeoutModal from '../modals/DiscordTimeoutModal';
+import DiscordUserProfileModal from '../DiscordUserProfileModal';
 
 const DiscordUserContextMenu = ({
   author,
@@ -156,7 +157,13 @@ const DiscordUserContextMenu = ({
 
   return (
     <ContextMenuContent className="w-48">
-      <ContextMenuItem className="justify-between" onSelect={onViewProfile}>
+      <ContextMenuItem className="justify-between" onSelect={() => {
+        if (onViewProfile) {
+          onViewProfile();
+        } else {
+          useModalStore.getState().push(DiscordUserProfileModal, { userId: author.id, guildId });
+        }
+      }}>
         View Profile
         <User className="ml-auto size-[18px]" weight="fill" />
       </ContextMenuItem>

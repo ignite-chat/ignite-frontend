@@ -101,7 +101,7 @@ const ActiveUserCard = ({ userId, activities }) => {
   const elapsed = activity.timestamps?.start || activity.created_at;
 
   return (
-    <div className="cursor-pointer rounded-lg bg-[#111214] p-3 transition-colors hover:bg-[#1a1a1e]" onClick={() => useModalStore.getState().push(DiscordUserProfileModal, { author: user })}>
+    <div className="cursor-pointer rounded-lg bg-[#111214] p-3 transition-colors hover:bg-[#1a1a1e]" onClick={() => useModalStore.getState().push(DiscordUserProfileModal, { userId: user.id })}>
       <div className="flex items-center gap-2.5">
         <div className="relative shrink-0">
           <img src={avatarUrl} alt="" className="size-8 rounded-full object-cover" />

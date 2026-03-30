@@ -160,7 +160,7 @@ const UserProfilePopoverMenu = ({ igniteUser, activeDisplay, onSwitch }) => {
         type="button"
         onClick={() => {
           if (activeDisplay === 'discord' && discordUser) {
-            useSharedModalStore.getState().push(DiscordUserProfileModal, { author: discordUser });
+            useSharedModalStore.getState().push(DiscordUserProfileModal, { userId: discordUser.id });
           } else if (igniteUser?.id) {
             useModalStore.getState().push(UserProfileModal, { userId: igniteUser.id });
           }

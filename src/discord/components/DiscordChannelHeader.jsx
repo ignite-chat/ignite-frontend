@@ -5,6 +5,7 @@ import { parseMarkdown } from '@/components/message/markdown/parser';
 import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
 import { useDiscordMessageLogStore } from '../store/discord-message-log.store';
 import DiscordUserProfileModal from './DiscordUserProfileModal';
+import { useModalStore } from '@/store/modal.store';
 
 const TopicRenderer = ({ topic, guildId }) => {
   const ast = useMemo(() => parseMarkdown(topic), [topic]);
@@ -47,7 +48,7 @@ const DiscordChannelHeader = ({ channel, displayName, isDM, dmInfo, dmRecipient,
     <div className="flex h-12 shrink-0 items-center border-b border-white/5 px-2 shadow-sm">
       <div
         className={`flex min-w-0 items-center px-2 select-none ${dmRecipient ? 'cursor-pointer' : ''}`}
-        onClick={dmRecipient ? () => useModalStore.getState().push(DiscordUserProfileModal, { author: dmRecipient }) : undefined}
+        onClick={dmRecipient ? () => useModalStore.getState().push(DiscordUserProfileModal, { userId: dmRecipient.id }) : undefined}
       >
         {icon}
         <span className="truncate text-[15px] font-semibold text-white">{displayName || channel?.name}</span>

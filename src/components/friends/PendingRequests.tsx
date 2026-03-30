@@ -233,7 +233,7 @@ const PendingRequests = ({ requests, currentUser, discordRequests, searchQuery, 
   };
 
   const openDiscordProfile = (user: DiscordUser) => {
-    useSharedModalStore.getState().push(DiscordUserProfileModal, { author: user });
+    useSharedModalStore.getState().push(DiscordUserProfileModal, { userId: user.id });
   };
 
   const { incoming, outgoing } = useMemo(() => {

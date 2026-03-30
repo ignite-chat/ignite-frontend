@@ -49,8 +49,7 @@ const MemberItem = ({ member: rawMember, guildId, ownerId, popoverOpen, setPopov
 
   const openProfile = () => {
     useModalStore.getState().push(DiscordUserProfileModal, {
-      author: user,
-      member: { ...member, user },
+      userId,
       guildId,
     });
   };

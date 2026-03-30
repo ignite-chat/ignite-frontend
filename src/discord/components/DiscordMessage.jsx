@@ -125,8 +125,8 @@ const DiscordUserName = ({ author, member, guildId, fallbackColor = 'white', pre
   const displayName = member?.nick || author?.global_name || author?.username || 'Unknown';
 
   const openProfile = useCallback(() => {
-    useModalStore.getState().push(DiscordUserProfileModal, { author, member, guildId });
-  }, [author, member, guildId]);
+    useModalStore.getState().push(DiscordUserProfileModal, { userId: author?.id, guildId });
+  }, [author?.id, guildId]);
 
   return (
     <span
@@ -237,7 +237,7 @@ const DiscordAttachments = ({ attachments }) => {
               key={att.id}
               type="button"
               className="block cursor-pointer"
-              onClick={() => openAttachmentViewModal(att.url)}
+              onClick={() => openAttachmentViewModal(att.url, undefined, att.width, att.height)}
             >
               <img
                 src={att.proxy_url || att.url}
@@ -367,19 +367,15 @@ const DiscordEmbeds = ({ embeds, guildId }) => {
         // gifv embeds (tenor, giphy, imgur gifv) — render as inline auto-playing gif
         if (embed.type === 'gifv' && embed.video) {
           const gifVideoUrl = embed.video.proxy_url || embed.video.url;
-          const { width, height } = fitDimensions(
-            embed.video.width || embed.thumbnail?.width || 400,
-            embed.video.height || embed.thumbnail?.height || 300,
-            400,
-            300,
-          );
+          const origW = embed.video.width || embed.thumbnail?.width || 400;
+          const origH = embed.video.height || embed.thumbnail?.height || 300;
+          const { width, height } = fitDimensions(origW, origH, 400, 300);
           return (
-            <a
+            <button
               key={i}
-              href={embed.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block"
+              type="button"
+              className="block cursor-pointer"
+              onClick={() => openAttachmentViewModal(gifVideoUrl, undefined, origW, origH)}
             >
               <video
                 src={gifVideoUrl}
@@ -391,7 +387,7 @@ const DiscordEmbeds = ({ embeds, guildId }) => {
                 width={width}
                 height={height}
               />
-            </a>
+            </button>
           );
         }
 
@@ -482,7 +478,7 @@ const DiscordEmbeds = ({ embeds, guildId }) => {
                   <button
                     type="button"
                     className="mt-2 block cursor-pointer"
-                    onClick={() => openAttachmentViewModal(embed.image.url)}
+                    onClick={() => openAttachmentViewModal(embed.image.url, undefined, embed.image.width, embed.image.height)}
                   >
                     <img
                       src={embed.image.proxy_url || embed.image.url}
@@ -742,7 +738,7 @@ const DiscordReplyBar = ({ referencedMessage, guildId }) => {
               author={referencedMessage.author}
               member={member}
               guildId={guildId}
-              onOpenProfile={() => useModalStore.getState().push(DiscordUserProfileModal, { author: referencedMessage.author, member, guildId })}
+              onOpenProfile={() => useModalStore.getState().push(DiscordUserProfileModal, { userId: referencedMessage.author?.id, guildId })}
             />
           </PopoverContent>
         </Popover>
@@ -1064,8 +1060,8 @@ const DiscordSystemMessage = memo(({ message, prevMessage, guildId }) => {
                   tabIndex={0}
                   className="cursor-pointer font-semibold hover:underline"
                   style={{ color: nameColor || '#e5e7eb' }}
-                  onClick={() => useModalStore.getState().push(DiscordUserProfileModal, { author: message.author, member, guildId })}
-                  onKeyDown={(e) => e.key === 'Enter' && useModalStore.getState().push(DiscordUserProfileModal, { author: message.author, member, guildId })}
+                  onClick={() => useModalStore.getState().push(DiscordUserProfileModal, { userId: message.author?.id, guildId })}
+                  onKeyDown={(e) => e.key === 'Enter' && useModalStore.getState().push(DiscordUserProfileModal, { userId: message.author?.id, guildId })}
                 >
                   {p.text}
                 </span>
@@ -1174,7 +1170,7 @@ const DiscordNormalMessage = memo(({ message, prevMessage, currentUserId, channe
 
   const openProfile = () => {
     setPopoverOpen(false);
-    useModalStore.getState().push(DiscordUserProfileModal, { author: message.author, member: message.member, guildId });
+    useModalStore.getState().push(DiscordUserProfileModal, { userId: message.author?.id, guildId });
   };
 
   const isFailed = pending && message.status === 'failed';

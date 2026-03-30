@@ -92,7 +92,7 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
               if (onOpenProfile) {
                 onOpenProfile();
               } else {
-                useModalStore.getState().push(DiscordUserProfileModal, { author: user, member, guildId });
+                useModalStore.getState().push(DiscordUserProfileModal, { userId: user.id, guildId });
               }
             }}
             className="group relative rounded-full ring-[5px] ring-[#111214]"

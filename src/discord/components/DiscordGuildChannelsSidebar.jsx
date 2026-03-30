@@ -749,8 +749,7 @@ const VoiceMemberItem = memo(({ vs, guildId, channelId, users, memberStore }) =>
   const openProfile = useCallback(() => {
     if (!user) return;
     useModalStore.getState().push(DiscordUserProfileModal, {
-      author: user,
-      member: memberData || vs.member,
+      userId: vs.user_id,
       guildId,
     });
   }, [user, memberData, vs.member, guildId]);

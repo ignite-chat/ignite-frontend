@@ -1,7 +1,4 @@
-@import '@fontsource/ibm-plex-sans/400.css';
-@import '@fontsource/ibm-plex-sans/500.css';
-@import '@fontsource/ibm-plex-sans/600.css';
-@import '@fontsource/ibm-plex-sans/700.css';
+@import '@fontsource-variable/ibm-plex-sans';
 
 @tailwind base;
 @tailwind components;
@@ -122,7 +119,7 @@
 html,
 body {
   touch-action: pan-x pan-y;
-  font-family: 'IBM Plex Sans';
+  font-family: 'IBM Plex Sans Variable', 'IBM Plex Sans', sans-serif;
   -webkit-user-select: text;
   user-select: text;
 }

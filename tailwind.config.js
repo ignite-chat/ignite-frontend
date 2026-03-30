@@ -80,7 +80,7 @@ export default {
   			}
   		},
   		fontFamily: {
-  			main: ["'IBM Plex Sans'", 'sans-serif'],
+  			main: ["'IBM Plex Sans Variable'", "'IBM Plex Sans'", 'sans-serif'],
   		},
   		borderRadius: {
   			lg: 'var(--radius)',

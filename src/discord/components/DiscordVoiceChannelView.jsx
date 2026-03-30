@@ -672,8 +672,8 @@ const VoiceParticipantTile = ({ vs, guildId, onWatchStream, onFocus }) => {
   const author = user || { id: vs.user_id, username: displayName };
 
   const openProfile = useCallback(() => {
-    useModalStore.getState().push(DiscordUserProfileModal, { author, member, guildId });
-  }, [author, member, guildId]);
+    useModalStore.getState().push(DiscordUserProfileModal, { userId: vs.user_id, guildId });
+  }, [vs.user_id, guildId]);
 
   const handleContextMenu = useCallback((e) => {
     e.preventDefault();

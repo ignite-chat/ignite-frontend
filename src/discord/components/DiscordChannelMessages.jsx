@@ -472,18 +472,18 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
       // Snapshot it — this is the single ID used by the separator
       setFirstUnreadId(firstUnreadMsg?.id ?? null);
 
-      // Restore saved scroll position if returning to a previously visited channel
-      const savedScroll = scrollPositions.getChannel(channelId);
-      if (savedScroll != null) {
-        isProgrammaticScrollRef.current = true;
-        messagesRef.current.scrollTop = savedScroll;
-        requestAnimationFrame(() => { isProgrammaticScrollRef.current = false; });
-        const nearBottom = messagesRef.current.scrollHeight - savedScroll - messagesRef.current.clientHeight < 100;
-        wasNearBottomRef.current = nearBottom;
-        initialScrollDoneRef.current = true;
-        if (nearBottom) ackIfAtBottom();
-        return;
-      }
+      // // Restore saved scroll position if returning to a previously visited channel
+      // const savedScroll = scrollPositions.getChannel(channelId);
+      // if (savedScroll != null) {
+      //   isProgrammaticScrollRef.current = true;
+      //   messagesRef.current.scrollTop = savedScroll;
+      //   requestAnimationFrame(() => { isProgrammaticScrollRef.current = false; });
+      //   const nearBottom = messagesRef.current.scrollHeight - savedScroll - messagesRef.current.clientHeight < 100;
+      //   wasNearBottomRef.current = nearBottom;
+      //   initialScrollDoneRef.current = true;
+      //   if (nearBottom) ackIfAtBottom();
+      //   return;
+      // }
 
       if (firstUnreadMsg) {
         const el = messagesRef.current.querySelector(`[data-message-id="${firstUnreadMsg.id}"]`);
@@ -540,8 +540,8 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
       scrollAnchorRef.current = null;
     }
 
-    // Save scroll position on every scroll
-    scrollPositions.saveChannel(channelId, el.scrollTop);
+    // // Save scroll position on every scroll
+    // scrollPositions.saveChannel(channelId, el.scrollTop);
 
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
     wasNearBottomRef.current = nearBottom;

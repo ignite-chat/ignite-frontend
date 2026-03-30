@@ -43,7 +43,7 @@ const ContextMenuSubContent = React.forwardRef<
 >(({ className, style, ...props }, ref) => (
   <ContextMenuPrimitive.SubContent
     ref={ref}
-    style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontWeight: 500, ...style }}
+    style={{ fontFamily: "'IBM Plex Sans Variable', 'IBM Plex Sans', sans-serif", fontWeight: 500, ...style }}
     className={cn(
       'z-50 min-w-[12rem] origin-[--radix-context-menu-content-transform-origin] overflow-hidden rounded-[4px] border-none bg-[#111214] px-2 py-[6px] text-[#dbdee1] shadow-[0_8px_16px_rgba(0,0,0,0.24)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
       className
@@ -60,7 +60,7 @@ const ContextMenuContent = React.forwardRef<
   <ContextMenuPrimitive.Portal>
     <ContextMenuPrimitive.Content
       ref={ref}
-      style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontWeight: 500, ...style }}
+      style={{ fontFamily: "'IBM Plex Sans Variable', 'IBM Plex Sans', sans-serif", fontWeight: 500, ...style }}
       className={cn(
         'z-50 max-h-[--radix-context-menu-content-available-height] min-w-[12rem] origin-[--radix-context-menu-content-transform-origin] overflow-y-auto overflow-x-hidden rounded-[4px] border-none bg-[#111214] px-2 py-[6px] text-[#dbdee1] shadow-[0_8px_16px_rgba(0,0,0,0.24)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
         className

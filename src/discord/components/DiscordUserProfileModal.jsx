@@ -169,22 +169,23 @@ const ActivitySection = ({ activity }) => {
   );
 };
 
-const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId }) => {
+const DiscordUserProfileModal = ({ modalId, userId, author: authorProp, member: memberProp, guildId }) => {
+  const resolvedUserId = userId || authorProp?.id;
   const showAvatarDecorations = useDiscordPreferencesStore((s) => s.showAvatarDecorations);
   const closeModal = () => useModalStore.getState().close(modalId);
   const guilds = useDiscordGuildsStore((s) => s.guilds);
-  const storeUser = useDiscordUsersStore((s) => s.users[author?.id]);
-  const storeMember = useDiscordMembersStore((s) => guildId && author?.id ? s.members[guildId]?.[author.id] : undefined);
-  const profile = useDiscordProfilesStore((s) => author?.id ? s.getProfile(author.id, guildId) : undefined);
+  const storeUser = useDiscordUsersStore((s) => s.users[resolvedUserId]);
+  const storeMember = useDiscordMembersStore((s) => guildId && resolvedUserId ? s.members[guildId]?.[resolvedUserId] : undefined);
+  const profile = useDiscordProfilesStore((s) => resolvedUserId ? s.getProfile(resolvedUserId, guildId) : undefined);
   const fetchProfile = useDiscordProfilesStore((s) => s.fetchProfile);
   const [note, setNote] = useState('');
   const [rolesExpanded, setRolesExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('activity');
 
-  const userActivities = useDiscordActivitiesStore((s) => author?.id ? s.activities[author.id] : undefined);
+  const userActivities = useDiscordActivitiesStore((s) => resolvedUserId ? s.activities[resolvedUserId] : undefined);
 
   const member = memberProp || storeMember;
-  const user = { ...author, ...storeUser };
+  const user = { ...authorProp, ...storeUser };
   const guild = guildId ? guilds.find((g) => g.id === guildId) : null;
 
   const relevantActivities = useMemo(() => {
@@ -224,16 +225,16 @@ const DiscordUserProfileModal = ({ modalId, author, member: memberProp, guildId 
   }, [member, guild, guildId]);
 
   useEffect(() => {
-    if (!author?.id) return;
-    fetchProfile(author.id, guildId);
-  }, [author?.id, guildId, fetchProfile]);
+    if (!resolvedUserId) return;
+    fetchProfile(resolvedUserId, guildId);
+  }, [resolvedUserId, guildId, fetchProfile]);
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(user.id);
     toast.success('Copied User ID');
   };
 
-  if (!author) return null;
+  if (!resolvedUserId) return null;
 
   return (
     <Dialog open onOpenChange={closeModal}>
