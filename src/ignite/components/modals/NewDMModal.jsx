@@ -16,6 +16,11 @@ import { useGuildsStore } from '@/ignite/store/guilds.store';
 import { ChannelsService } from '@/ignite/services/channels.service';
 import { ChannelType } from '@/ignite/constants/ChannelType';
 import { useModalStore } from '@/ignite/store/modal.store';
+import { useDiscordChannelsStore } from '@/discord/store/discord-channels.store';
+import { useDiscordUsersStore } from '@/discord/store/discord-users.store';
+import { useDiscordStore } from '@/discord/store/discord.store';
+import { useDiscordGuildsStore } from '@/discord/store/discord-guilds.store';
+import { DiscordService } from '@/discord/services/discord.service';
 
 const PREFIXES = {
   '@': 'users',
@@ -36,6 +41,11 @@ const NewDMModal = ({ modalId }) => {
   const { friends } = useFriendsStore();
   const { channels } = useChannelsStore();
   const { guilds } = useGuildsStore();
+
+  const discordConnected = useDiscordStore((s) => s.isConnected);
+  const discordChannels = useDiscordChannelsStore((s) => s.channels);
+  const discordUsers = useDiscordUsersStore((s) => s.users);
+  const discordGuilds = useDiscordGuildsStore((s) => s.guilds);
 
   const friendIds = useMemo(() => new Set(friends.map((f) => f.id)), [friends]);
 
@@ -77,9 +87,68 @@ const NewDMModal = ({ modalId }) => {
       });
   }, [channels, currentUser?.id]);
 
+  // Check if the search term looks like a snowflake ID
+  const isIdSearch = useMemo(() => /^\d{17,20}$/.test(searchTerm), [searchTerm]);
+
   const results = useMemo(() => {
     const currentUserId = currentUser?.id;
     const items = [];
+    const addedIds = new Set();
+
+    // ID-based lookup: search by channel ID or user ID across both Ignite and Discord
+    if (isIdSearch && !activeFilter) {
+      // Ignite channel by ID
+      const igniteChannel = channels.find((c) => String(c.channel_id) === searchTerm || String(c.id) === searchTerm);
+      if (igniteChannel) {
+        if (igniteChannel.type === ChannelType.DM) {
+          const otherUser = (igniteChannel.recipients || []).find((r) => r.id !== currentUserId) || igniteChannel.user || {};
+          items.push({ type: 'dm', data: { ...igniteChannel, user: otherUser } });
+          addedIds.add(searchTerm);
+        } else if (igniteChannel.type === ChannelType.GUILD_TEXT) {
+          const guild = guilds.find((g) => String(g.id) === String(igniteChannel.guild_id));
+          items.push({ type: 'text_channel', data: { ...igniteChannel, guild } });
+          addedIds.add(searchTerm);
+        } else if (igniteChannel.type === ChannelType.GUILD_VOICE) {
+          const guild = guilds.find((g) => String(g.id) === String(igniteChannel.guild_id));
+          items.push({ type: 'voice_channel', data: { ...igniteChannel, guild } });
+          addedIds.add(searchTerm);
+        }
+      }
+
+      // Discord channel by ID
+      if (discordConnected) {
+        const discordChannel = discordChannels.find((c) => c.id === searchTerm);
+        if (discordChannel && !addedIds.has(searchTerm)) {
+          const guild = discordGuilds.find((g) => g.id === discordChannel.guild_id);
+          items.push({ type: 'discord_channel', data: discordChannel, guild });
+          addedIds.add(searchTerm);
+        }
+      }
+
+      // Ignite user by ID
+      const igniteUser = allUsers[searchTerm];
+      if (igniteUser && igniteUser.id !== currentUserId && !addedIds.has(searchTerm)) {
+        items.push({ type: 'user', data: igniteUser });
+        addedIds.add(searchTerm);
+      }
+
+      // Discord user by ID
+      if (discordConnected) {
+        const discordUser = discordUsers[searchTerm];
+        if (discordUser && !addedIds.has(searchTerm)) {
+          items.push({ type: 'discord_user', data: discordUser });
+          addedIds.add(searchTerm);
+        }
+      }
+
+      // Ignite guild by ID
+      const igniteGuild = guilds.find((g) => String(g.id) === searchTerm);
+      if (igniteGuild && !addedIds.has(searchTerm)) {
+        items.push({ type: 'server', data: igniteGuild });
+      }
+
+      return items;
+    }
 
     // Users (@ prefix or no prefix)
     if (!activeFilter || activeFilter === 'users') {
@@ -99,6 +168,19 @@ const NewDMModal = ({ modalId }) => {
         return (a.name || a.username || '').localeCompare(b.name || b.username || '');
       });
       users.slice(0, 15).forEach((u) => items.push({ type: 'user', data: u }));
+
+      // Discord users by name
+      if (discordConnected && searchTerm) {
+        const igniteUserIds = new Set(users.map((u) => u.id));
+        const dUsers = Object.values(discordUsers).filter((u) => {
+          if (igniteUserIds.has(u.id)) return false;
+          return (
+            u.username?.toLowerCase().includes(searchTerm) ||
+            u.global_name?.toLowerCase().includes(searchTerm)
+          );
+        });
+        dUsers.slice(0, 10).forEach((u) => items.push({ type: 'discord_user', data: u }));
+      }
     }
 
     // Text channels (# prefix or no prefix)
@@ -121,6 +203,19 @@ const NewDMModal = ({ modalId }) => {
         return c.name?.toLowerCase().includes(searchTerm);
       });
       voiceChannels.slice(0, 15).forEach((c) => items.push({ type: 'voice_channel', data: c }));
+
+      // Discord channels by name
+      if (discordConnected && searchTerm) {
+        const dChannels = discordChannels.filter((c) => {
+          if (!c.name) return false;
+          if (c.type === 1 || c.type === 3) return false; // skip DMs
+          return c.name.toLowerCase().includes(searchTerm);
+        });
+        dChannels.slice(0, 10).forEach((c) => {
+          const guild = discordGuilds.find((g) => g.id === c.guild_id);
+          items.push({ type: 'discord_channel', data: c, guild });
+        });
+      }
     }
 
     // Servers (* prefix or no prefix)
@@ -134,7 +229,7 @@ const NewDMModal = ({ modalId }) => {
     }
 
     return items;
-  }, [allUsers, guildChannels, guilds, searchTerm, activeFilter, currentUser?.id, friendIds]);
+  }, [allUsers, guildChannels, guilds, channels, searchTerm, activeFilter, currentUser?.id, friendIds, isIdSearch, discordConnected, discordChannels, discordUsers, discordGuilds]);
 
   // Default view: recent DMs when no query
   const showDefault = !query.trim();
@@ -216,6 +311,21 @@ const NewDMModal = ({ modalId }) => {
       }
       case 'server': {
         navigate(`/channels/${item.data.id}`);
+        close();
+        break;
+      }
+      case 'discord_channel': {
+        const ch = item.data;
+        if (ch.type === 1 || ch.type === 3) {
+          navigate(`/channels/@me/${ch.id}`);
+        } else if (ch.guild_id) {
+          navigate(`/discord/${ch.guild_id}/${ch.id}`);
+        }
+        close();
+        break;
+      }
+      case 'discord_user': {
+        navigate(`/channels/@me/${item.data.id}`);
         close();
         break;
       }
@@ -400,6 +510,54 @@ const ResultItem = ({ item, isSelected, onClick, onMouseEnter, friendIds, loadin
           </span>
         </button>
       );
+
+    case 'discord_channel': {
+      const ch = item.data;
+      const guild = item.guild;
+      const guildName = guild?.properties?.name || guild?.name;
+      const isDm = ch.type === 1 || ch.type === 3;
+      return (
+        <button
+          type="button"
+          onClick={onClick}
+          onMouseEnter={onMouseEnter}
+          className={baseClass}
+        >
+          <div className="flex size-8 shrink-0 items-center justify-center">
+            {isDm ? (
+              <span className="text-[18px] text-[#949ba4]">@</span>
+            ) : (
+              <Hash className="size-[22px] text-[#949ba4]" weight="bold" />
+            )}
+          </div>
+          <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-5 text-[#dbdee1]">
+            {ch.name || ch.id}
+          </span>
+          {guildName && (
+            <span className="shrink-0 text-[12px] text-[#949ba4]">{guildName}</span>
+          )}
+        </button>
+      );
+    }
+
+    case 'discord_user': {
+      const u = item.data;
+      const avatarUrl = DiscordService.getUserAvatarUrl(u.id, u.avatar, 32);
+      return (
+        <button
+          type="button"
+          onClick={onClick}
+          onMouseEnter={onMouseEnter}
+          className={baseClass}
+        >
+          <img src={avatarUrl} alt="" className="size-8 shrink-0 rounded-full object-cover" />
+          <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-5 text-[#dbdee1]">
+            {u.global_name || u.username}
+          </span>
+          <span className="shrink-0 text-[12px] text-[#949ba4]">{u.username}</span>
+        </button>
+      );
+    }
 
     default:
       return null;

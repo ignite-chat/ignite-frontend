@@ -21,6 +21,7 @@ import DiscordClanTag from '@/discord/components/DiscordClanTag';
 import DiscordUserContextMenu from '@/discord/components/context-menus/DiscordUserContextMenu';
 import { useContextMenuStore } from '@/store/context-menu.store';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useDiscordPreferencesStore } from '@/discord/store/discord-preferences.store';
 import DMChannelItem from './DMChannelItem';
 import DMRowBase from './DMRowBase';
 import NewDMModal from '@/ignite/components/modals/NewDMModal';
@@ -144,7 +145,7 @@ const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onCli
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-1.5">
-          <span className={cn('truncate text-[16px]', isUnread ? 'font-bold text-gray-100' : 'font-[450]')}>
+          <span className={cn('truncate text-[16px]', isUnread ? 'font-semibold text-gray-100' : 'font-[450]')}>
             {info.name}
           </span>
           {info.user?.id === '643945264868098049' && (
@@ -210,11 +211,6 @@ const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onCli
         )}
       </div>
 
-      {mentionCount > 0 && (
-        <div className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-bold text-white">
-          {mentionCount > 99 ? '99+' : mentionCount}
-        </div>
-      )}
     </DMRowBase>
   );
 };
@@ -236,6 +232,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
   const { isConnected: discordConnected, user: discordUser } = useDiscordStore();
   const discordChannels = useDiscordChannelsStore((s) => s.channels);
   const discordUsersMap = useDiscordUsersStore((s) => s.users);
+  const disableMessageRequests = useDiscordPreferencesStore((s) => s.disableMessageRequests);
 
   const normalizeThread = useCallback(
     (thread) => {
@@ -262,10 +259,10 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
       data: c,
     }));
 
-    // Tag Discord channels with real timestamps (exclude message requests)
+    // Tag Discord channels with real timestamps (exclude message requests unless disabled)
     const discordItems = discordConnected
       ? discordChannels
-          .filter((c) => (c.type === 1 || c.type === 3) && !c.is_message_request)
+          .filter((c) => (c.type === 1 || c.type === 3) && (disableMessageRequests || !c.is_message_request))
           .map((c) => ({
             _source: 'discord',
             _id: c.id,
@@ -302,11 +299,11 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
   }, [activeChannelId, onNavigate]);
 
   const messageRequestCount = useMemo(() => {
-    if (!discordConnected) return 0;
+    if (!discordConnected || disableMessageRequests) return 0;
     return discordChannels.filter(
       (c) => (c.type === 1 || c.type === 3) && (c.is_message_request)
     ).length;
-  }, [discordConnected, discordChannels]);
+  }, [discordConnected, discordChannels, disableMessageRequests]);
 
   return (
     <>
@@ -335,7 +332,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
           )}
         </DMRowBase>
 
-        {discordConnected && (
+        {discordConnected && !disableMessageRequests && (
           <DMRowBase
             isActive={activeChannelId === 'message-requests'}
             onClick={() => onNavigate('message-requests')}

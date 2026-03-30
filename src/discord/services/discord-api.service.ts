@@ -485,6 +485,12 @@ export const DiscordApiService = {
     );
   },
 
+  async updateChannelOverrides(channelId: string, overrides: Record<string, any>): Promise<void> {
+    await discordApi.patch(`/users/@me/settings`, {
+      channel_overrides: { [channelId]: overrides },
+    });
+  },
+
   /**
    * Modify a guild's settings (name, icon, afk channel, etc.)
    */

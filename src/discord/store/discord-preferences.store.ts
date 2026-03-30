@@ -11,12 +11,18 @@ type DiscordPreferencesStore = {
   showAvatarDecorations: boolean;
   /** Show guild banner images in the sidebar header */
   showGuildBanners: boolean;
+  /** Number of messages to fetch per request (25-100, default 50) */
+  messageFetchLimit: number;
+  /** Treat message requests as regular DMs instead of filtering them */
+  disableMessageRequests: boolean;
 
   setChatFontSize: (size: number) => void;
   setShowHiddenChannels: (show: boolean) => void;
   setAnimateEmojis: (v: boolean) => void;
   setShowAvatarDecorations: (v: boolean) => void;
   setShowGuildBanners: (v: boolean) => void;
+  setMessageFetchLimit: (limit: number) => void;
+  setDisableMessageRequests: (v: boolean) => void;
   clear: () => void;
 };
 
@@ -28,6 +34,8 @@ type Persisted = {
   animateEmojis?: boolean;
   showAvatarDecorations?: boolean;
   showGuildBanners?: boolean;
+  messageFetchLimit?: number;
+  disableMessageRequests?: boolean;
 };
 
 function loadFromStorage(): Persisted {
@@ -46,6 +54,8 @@ function saveToStorage(state: Persisted) {
     animateEmojis: state.animateEmojis,
     showAvatarDecorations: state.showAvatarDecorations,
     showGuildBanners: state.showGuildBanners,
+    messageFetchLimit: state.messageFetchLimit,
+    disableMessageRequests: state.disableMessageRequests,
   }));
 }
 
@@ -57,6 +67,8 @@ export const useDiscordPreferencesStore = create<DiscordPreferencesStore>((set, 
   animateEmojis: saved.animateEmojis ?? true,
   showAvatarDecorations: saved.showAvatarDecorations ?? true,
   showGuildBanners: saved.showGuildBanners ?? true,
+  messageFetchLimit: saved.messageFetchLimit ?? 50,
+  disableMessageRequests: saved.disableMessageRequests ?? false,
 
   setChatFontSize: (size) => {
     const clamped = Math.min(24, Math.max(12, size));
@@ -84,8 +96,19 @@ export const useDiscordPreferencesStore = create<DiscordPreferencesStore>((set, 
     saveToStorage({ ...get(), showGuildBanners: v });
   },
 
+  setDisableMessageRequests: (v) => {
+    set({ disableMessageRequests: v });
+    saveToStorage({ ...get(), disableMessageRequests: v });
+  },
+
+  setMessageFetchLimit: (limit) => {
+    const clamped = Math.min(100, Math.max(25, limit));
+    set({ messageFetchLimit: clamped });
+    saveToStorage({ ...get(), messageFetchLimit: clamped });
+  },
+
   clear: () => {
-    set({ chatFontSize: 16, showHiddenChannels: false, animateEmojis: true, showAvatarDecorations: true, showGuildBanners: true });
+    set({ chatFontSize: 16, showHiddenChannels: false, animateEmojis: true, showAvatarDecorations: true, showGuildBanners: true, messageFetchLimit: 50, disableMessageRequests: false });
     localStorage.removeItem(STORAGE_KEY);
   },
 }));

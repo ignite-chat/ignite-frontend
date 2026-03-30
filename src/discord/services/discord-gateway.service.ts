@@ -405,6 +405,7 @@ export const DiscordGatewayService = {
         this._handleMessageDeleteBulk(data);
         break;
       case 'MESSAGE_ACK':
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleMessageAck(data);
         break;
       case 'RELATIONSHIP_ADD':
@@ -981,7 +982,7 @@ export const DiscordGatewayService = {
 
   _handleMessageAck(data: any) {
     if (data.channel_id && data.message_id) {
-      useDiscordReadStatesStore.getState().ackChannel(data.channel_id, data.message_id);
+      useDiscordReadStatesStore.getState().ackChannel(data.channel_id, data.message_id, data.mention_count);
     }
   },
 

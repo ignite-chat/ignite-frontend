@@ -11,6 +11,7 @@ import { MANAGE_MESSAGES, KICK_MEMBERS, BAN_MEMBERS, READ_MESSAGE_HISTORY, ADD_R
 import { scrollPositions } from '@/store/last-channel.store';
 import { DiscordService } from '../services/discord.service';
 import { DiscordApiService } from '../services/discord-api.service';
+import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
 import { Check, Hash, Megaphone, SpeakerHigh, MicrophoneStage, ChatsTeardrop, At } from '@phosphor-icons/react';
 
 import * as DiscordChannelType from '../constants/channel-types';
@@ -111,7 +112,7 @@ const ChannelWelcome = ({ channel }) => {
   );
 
   return (
-    <div className="px-4 pb-2 pt-16">
+    <div className="px-4 pb-2 pt-16 select-none">
       {isDM && avatarUrl ? (
         <img src={avatarUrl} alt={name} className="mb-2 size-20 rounded-full object-cover" />
       ) : (
@@ -327,6 +328,7 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const hasSendMessages = useDiscordHasPermission(guildId, channel, SEND_MESSAGES);
   const _hasReadMessageHistory = useDiscordHasPermission(guildId, channel, READ_MESSAGE_HISTORY);
   const hasReadMessageHistory = !guildId || _hasReadMessageHistory;
+  const messageFetchLimit = useDiscordPreferencesStore((s) => s.messageFetchLimit);
 
   const messages = useDiscordChannelsStore(
     useCallback((s) => s.channelMessages[channelId] || [], [channelId])
@@ -392,6 +394,10 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     if (!lastMessageId || lastAckedRef.current === lastMessageId) return;
     if (!initialScrollDoneRef.current || scrollAnchorRef.current) return;
 
+    // Skip if the channel is already read
+    const readState = useDiscordReadStatesStore.getState().readStates[channelId];
+    if (readState?.last_message_id && readState.last_message_id >= lastMessageId) return;
+
     if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
     ackTimerRef.current = setTimeout(() => {
       lastAckedRef.current = lastMessageId;
@@ -425,12 +431,12 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
     setIsLoading(true);
     setHasMore(true);
     scrollTopOnRenderRef.current = true;
-    DiscordService.loadChannelMessages(channelId)
+    DiscordService.loadChannelMessages(channelId, undefined, messageFetchLimit)
       .then((data) => {
-        setHasMore(data.length >= 50);
+        setHasMore(data.length >= messageFetchLimit);
       })
       .finally(() => setIsLoading(false));
-  }, [channelId, hasReadMessageHistory]);
+  }, [channelId, hasReadMessageHistory, messageFetchLimit]);
 
   // Load older messages on scroll to top
   const onLoadMore = useCallback(async () => {
@@ -441,10 +447,10 @@ const DiscordChannelMessages = ({ channel, messageSentCount }) => {
 
     setLoadingMore(true);
 
-    const data = await DiscordService.loadChannelMessages(channelId, oldestMessage.id);
-    setHasMore(data.length >= 50);
+    const data = await DiscordService.loadChannelMessages(channelId, oldestMessage.id, messageFetchLimit);
+    setHasMore(data.length >= messageFetchLimit);
     setLoadingMore(false);
-  }, [messages, loadingMore, hasMore, channelId]);
+  }, [messages, loadingMore, hasMore, channelId, messageFetchLimit]);
 
   // Clear separator when the current user sends a message
   useEffect(() => {

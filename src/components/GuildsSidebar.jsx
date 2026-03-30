@@ -53,6 +53,8 @@ import { useDiscordRelationshipsStore, RelationshipType } from '../discord/store
 import { useDiscordUsersStore } from '../discord/store/discord-users.store';
 import { useDiscordVoiceStatesStore } from '../discord/store/discord-voice-states.store';
 import { useDiscordGuildFoldersStore } from '../discord/store/discord-guild-folders.store';
+import DiscordUserContextMenu from '@/discord/components/context-menus/DiscordUserContextMenu';
+import { useDiscordPreferencesStore } from '../discord/store/discord-preferences.store';
 import { snowflakeToTimestamp } from '../discord/utils/snowflake';
 import { useLastChannelStore } from '@/store/last-channel.store';
 import { ChannelType } from '@/ignite/constants/ChannelType';
@@ -797,7 +799,6 @@ const GuildsSidebar = () => {
   const discordFoldersByAccount = useDiscordGuildFoldersStore((s) => s.foldersByAccount);
   const discordUsersMap = useDiscordUsersStore((s) => s.users);
   const discordChannels = useDiscordChannelsStore((s) => s.channels);
-  const discordChannelMessages = useDiscordChannelsStore((s) => s.channelMessages);
   const discordReadStates = useDiscordReadStatesStore((s) => s.readStates);
 
   // Build ordered Discord sidebar entries per account
@@ -924,6 +925,7 @@ const GuildsSidebar = () => {
   );
 
   const discordRelationships = useDiscordRelationshipsStore((s) => s.relationships);
+  const disableMessageRequests = useDiscordPreferencesStore((s) => s.disableMessageRequests);
 
   const pendingCount = useMemo(() => {
     const igniteCount = user
@@ -932,11 +934,11 @@ const GuildsSidebar = () => {
     const discordCount = discordConnected
       ? discordRelationships.filter((r) => r.type === RelationshipType.INCOMING_REQUEST).length
       : 0;
-    const discordMessageRequestCount = discordConnected
+    const discordMessageRequestCount = discordConnected && !disableMessageRequests
       ? discordChannels.filter((c) => (c.type === 1 || c.type === 3) && c.is_message_request).length
       : 0;
     return igniteCount + discordCount + discordMessageRequestCount;
-  }, [requests, user, discordConnected, discordRelationships, discordChannels]);
+  }, [requests, user, discordConnected, discordRelationships, discordChannels, disableMessageRequests]);
 
   const unreadDmChannels = useMemo(() => {
     if (!channelUnreadsLoaded || !user) return [];
@@ -988,15 +990,10 @@ const GuildsSidebar = () => {
         const recipientIds = channel.recipient_ids || [];
         const entry = discordReadStates[channel.id];
 
-        // Count unread messages from loaded messages
-        const messages = discordChannelMessages[channel.id];
-        let unreadCount = 0;
-        if (entry?.last_message_id && messages?.length > 0) {
-          unreadCount = messages.filter((msg) => msg.id > entry.last_message_id).length;
-        }
-        if (unreadCount === 0) unreadCount = 1; // fallback if messages aren't loaded
+        // Use mention_count from the read state, fallback to 1 if unread but no count
+        const unreadCount = entry?.mention_count > 0 ? entry.mention_count : 1;
 
-        let name, icon;
+        let name, icon, user;
         if (channel.type === 3) {
           const recipients = recipientIds.map((id) => discordUsersMap[id]).filter(Boolean);
           name = channel.name || recipients.map((r) => r.global_name || r.username).join(', ');
@@ -1006,13 +1003,14 @@ const GuildsSidebar = () => {
         } else {
           const otherId = recipientIds.find((id) => !discordUserIds.has(id)) || recipientIds[0];
           const other = otherId ? discordUsersMap[otherId] : null;
+          user = other;
           name = other?.global_name || other?.username || 'Unknown User';
           icon = other ? DiscordService.getUserAvatarUrl(other.id, other.avatar, 64) : null;
         }
 
-        return { id: channel.id, name, icon, mentionCount: unreadCount };
+        return { id: channel.id, name, icon, mentionCount: unreadCount, user, isGroup: channel.type === 3 };
       });
-  }, [discordConnected, discordUserIds, discordChannels, discordReadStates, discordUsersMap, discordChannelMessages]);
+  }, [discordConnected, discordUserIds, discordChannels, discordReadStates, discordUsersMap]);
 
   const confirmLeave = async () => {
     if (!leaveGuild?.id) return;
@@ -1028,7 +1026,7 @@ const GuildsSidebar = () => {
 
   return (
     <>
-      <div className="scrollbar-none relative left-0 top-0 m-0 flex h-full min-w-min flex-col items-center overflow-y-auto bg-[#121214] pb-36 text-white shadow">
+      <div className="scrollbar-none relative left-0 top-0 m-0 flex h-full min-w-min select-none flex-col items-center overflow-y-auto bg-[#121214] pb-36 text-white shadow">
         {/* Home / Friends */}
         <Link to={lastDmChannelId ? `/channels/@me/${lastDmChannelId}` : '/channels/@me'}>
           <SidebarIcon
@@ -1055,7 +1053,15 @@ const GuildsSidebar = () => {
           </Link>
         ))}
         {unreadDiscordDmChannels.map((dm) => (
-          <Link key={`discord-dm-${dm.id}`} to={`/channels/@me/${dm.id}`}>
+          <Link
+            key={`discord-dm-${dm.id}`}
+            to={`/channels/@me/${dm.id}`}
+            onContextMenu={(e) => {
+              if (dm.user && !dm.isGroup) {
+                useContextMenuStore.getState().open(DiscordUserContextMenu, { author: dm.user, channelId: dm.id }, e);
+              }
+            }}
+          >
             <SidebarIcon
               iconUrl={dm.icon || ''}
               text={dm.name}

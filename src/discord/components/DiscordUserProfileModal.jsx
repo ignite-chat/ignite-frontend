@@ -17,6 +17,8 @@ import DiscordMarkdownRenderer from './DiscordMarkdownRenderer';
 import { getConnectionIconUrl } from '../constants/connection-icons';
 import DiscordStatusIndicator from './DiscordStatusIndicator';
 import DiscordClanTag from './DiscordClanTag';
+import { useAverageColor } from '@/ignite/hooks/useAverageColor';
+import DiscordBadges from './DiscordBadges';
 
 const DISCORD_EPOCH = 1420070400000;
 
@@ -86,6 +88,15 @@ const ActivityTypeIcon = ({ type, size = 24 }) => {
   }
 };
 
+const ElapsedTimer = ({ start }) => {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <div className="text-[11px] text-gray-500">{formatElapsed(start)}</div>;
+};
+
 const ActivitySection = ({ activity }) => {
   const appIcon = useDiscordActivitiesStore((s) =>
     activity.application_id ? s.appIcons[activity.application_id] : undefined
@@ -147,9 +158,7 @@ const ActivitySection = ({ activity }) => {
                 {activity.party.size[0]} of {activity.party.size[1]}
               </div>
             )}
-            {elapsed && (
-              <div className="text-[11px] text-gray-500">{formatElapsed(elapsed)}</div>
-            )}
+            {elapsed && <ElapsedTimer start={elapsed} />}
           </div>
         </div>
         {activity.buttons?.length > 0 && (
@@ -195,6 +204,7 @@ const DiscordUserProfileModal = ({ modalId, userId, author: authorProp, member: 
 
   const displayName = member?.nick || user?.global_name || user?.username;
   const avatarUrl = user?.id ? DiscordService.getUserAvatarUrl(user.id, user.avatar, 128) : null;
+  const avatarAvgColor = useAverageColor(avatarUrl);
 
   const createdAt = useMemo(() => (user?.id ? getCreatedAt(user.id) : null), [user?.id]);
 
@@ -213,8 +223,11 @@ const DiscordUserProfileModal = ({ modalId, userId, author: authorProp, member: 
         : bannerColor;
       return { backgroundColor: color };
     }
+    if (avatarAvgColor) {
+      return { backgroundColor: avatarAvgColor };
+    }
     return { backgroundColor: '#5865f2' };
-  }, [profile, user?.id]);
+  }, [profile, user?.id, avatarAvgColor]);
 
   const roles = useMemo(() => {
     const guildRoles = guild?.roles || guild?.properties?.roles;
@@ -282,20 +295,23 @@ const DiscordUserProfileModal = ({ modalId, userId, author: authorProp, member: 
             {/* Profile Body */}
             <div className="mt-4 space-y-4 px-1">
               <div className="space-y-1">
-                <h2 className="flex items-center gap-2 text-2xl font-bold text-white">
-                  {displayName}
-                  {user.bot && (
-                    <span className="inline-flex items-center gap-0.5 rounded bg-[#5865f2] px-1.5 py-0.5 text-[10px] font-medium text-white">
-                      {(user.public_flags & 65536) !== 0 && (
-                        <svg className="size-2.5" viewBox="0 0 16 16" fill="currentColor">
-                          <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
-                        </svg>
-                      )}
-                      {user.id === '643945264868098049' ? 'OFFICIAL' : 'APP'}
-                    </span>
-                  )}
-                  {!user.bot && <DiscordClanTag userId={user.id} size="md" />}
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="flex items-center gap-2 text-2xl font-bold text-white">
+                    {displayName}
+                    {user.bot && (
+                      <span className="inline-flex items-center gap-0.5 rounded bg-[#5865f2] px-1.5 py-0.5 text-[10px] font-medium text-white">
+                        {(user.public_flags & 65536) !== 0 && (
+                          <svg className="size-2.5" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
+                          </svg>
+                        )}
+                        {user.id === '643945264868098049' ? 'OFFICIAL' : 'APP'}
+                      </span>
+                    )}
+                    {!user.bot && <DiscordClanTag userId={user.id} size="md" />}
+                  </h2>
+                  <DiscordBadges badges={profile?.badges} />
+                </div>
                 <div className="text-sm font-medium text-gray-300">{user.username}</div>
               </div>
 

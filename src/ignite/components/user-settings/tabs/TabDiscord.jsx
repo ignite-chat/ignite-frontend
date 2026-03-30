@@ -9,6 +9,8 @@ const TabDiscord = () => {
   const setShowHiddenChannels = useDiscordPreferencesStore((s) => s.setShowHiddenChannels);
   const chatFontSize = useDiscordPreferencesStore((s) => s.chatFontSize);
   const setChatFontSize = useDiscordPreferencesStore((s) => s.setChatFontSize);
+  const disableMessageRequests = useDiscordPreferencesStore((s) => s.disableMessageRequests);
+  const setDisableMessageRequests = useDiscordPreferencesStore((s) => s.setDisableMessageRequests);
 
   const inputSensitivity = useDiscordVoiceStore((s) => s.inputSensitivity);
   const echoCancellation = useDiscordVoiceStore((s) => s.echoCancellation);
@@ -49,6 +51,19 @@ const TabDiscord = () => {
           <Switch
             checked={showHiddenChannels}
             onCheckedChange={setShowHiddenChannels}
+          />
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg bg-white/5 p-4">
+          <div>
+            <p className="font-medium text-gray-200">Disable Message Requests</p>
+            <p className="text-sm text-gray-400">
+              Treat message requests as regular DMs instead of requiring approval.
+            </p>
+          </div>
+          <Switch
+            checked={disableMessageRequests}
+            onCheckedChange={setDisableMessageRequests}
           />
         </div>
 

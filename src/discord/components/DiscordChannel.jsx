@@ -12,6 +12,7 @@ import DiscordSearchPanel from './DiscordSearchPanel';
 import DiscordForumView from './DiscordForumView';
 import MessageLogViewer from './MessageLogViewer';
 import DiscordVoiceChannelView from './DiscordVoiceChannelView';
+import DiscordDMProfilePanel from './DiscordDMProfilePanel';
 
 const DiscordChannel = ({ channel }) => {
   const currentUser = useDiscordStore((s) => s.user);
@@ -106,7 +107,7 @@ const DiscordChannel = ({ channel }) => {
         dmRecipient={dmRecipient}
         guildName={guildName}
         memberListOpen={memberListOpen}
-        onToggleMemberList={!isDM ? toggleMemberList : undefined}
+        onToggleMemberList={toggleMemberList}
         searchOpen={searchOpen}
         onSearch={!isDM ? handleSearch : undefined}
         messageLogOpen={messageLogOpen}
@@ -129,6 +130,9 @@ const DiscordChannel = ({ channel }) => {
         </div>
 
         {guildId && memberListOpen && !searchOpen && !messageLogOpen && !isDM && <DiscordMemberList guildId={guildId} />}
+        {isDM && channel?.type === DM && !messageLogOpen && (
+          <DiscordDMProfilePanel channel={channel} isOpen={memberListOpen} />
+        )}
         {guildId && searchOpen && !messageLogOpen && !isDM && (
           <DiscordSearchPanel key={searchQuery} guildId={guildId} initialQuery={searchQuery} onClose={closeSearch} />
         )}

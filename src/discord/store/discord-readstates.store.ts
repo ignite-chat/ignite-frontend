@@ -7,7 +7,7 @@ type DiscordReadStatesStore = {
 
   setReadStates: (entries: ReadStateEntry[]) => void;
   updateReadState: (id: string, updates: Partial<ReadStateEntry>) => void;
-  ackChannel: (channelId: string, messageId: string) => void;
+  ackChannel: (channelId: string, messageId: string, mentionCount?: number) => void;
 
   /** Check if a channel has unread messages by comparing its last_message_id with the read state */
   isUnread: (channelId: string, channelLastMessageId: string | null | undefined) => boolean;
@@ -32,7 +32,7 @@ export const useDiscordReadStatesStore = create<DiscordReadStatesStore>((set, ge
       },
     })),
 
-  ackChannel: (channelId, messageId) =>
+  ackChannel: (channelId, messageId, mentionCount) =>
     set((state) => ({
       readStates: {
         ...state.readStates,
@@ -40,7 +40,7 @@ export const useDiscordReadStatesStore = create<DiscordReadStatesStore>((set, ge
           ...state.readStates[channelId],
           id: channelId,
           last_message_id: messageId,
-          mention_count: 0,
+          mention_count: mentionCount ?? 0,
         },
       },
     })),

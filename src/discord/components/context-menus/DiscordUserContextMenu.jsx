@@ -12,6 +12,9 @@ import {
   Timer,
   SpeakerHigh,
   SpeakerSlash,
+  BellSlash,
+  Check,
+  Copy,
 } from '@phosphor-icons/react';
 import {
   ContextMenuContent,
@@ -23,6 +26,8 @@ import { DiscordApiService } from '../../services/discord-api.service';
 import { useDiscordStore } from '../../store/discord.store';
 import { useDiscordRelationshipsStore, RelationshipType } from '../../store/discord-relationships.store';
 import { useDiscordMembersStore } from '../../store/discord-members.store';
+import { useDiscordReadStatesStore } from '../../store/discord-readstates.store';
+import { useDiscordChannelsStore } from '../../store/discord-channels.store';
 import { useDiscordVoiceStore } from '../../store/discord-voice.store';
 import { useDiscordVoiceStatesStore } from '../../store/discord-voice-states.store';
 import { useDiscordUserVolumeStore } from '../../store/discord-user-volume.store';
@@ -34,6 +39,7 @@ import DiscordUserProfileModal from '../DiscordUserProfileModal';
 const DiscordUserContextMenu = ({
   author,
   guildId,
+  channelId,
   canKick,
   canBan,
   canManageNicknames,
@@ -153,6 +159,32 @@ const DiscordUserContextMenu = ({
     } catch {
       toast.error('Failed to remove timeout');
     }
+  };
+
+  // Channel-specific state
+  const channel = useDiscordChannelsStore((s) => channelId ? s.channels.find((c) => c.id === channelId) : undefined);
+  const isMuted = channel?.muted ?? false;
+
+  const handleMarkAsRead = async () => {
+    if (!channelId || !channel?.last_message_id) return;
+    useDiscordReadStatesStore.getState().ackChannel(channelId, channel.last_message_id);
+    DiscordApiService.ackMessage(channelId, channel.last_message_id).catch(() => {});
+  };
+
+  const handleToggleMute = async () => {
+    if (!channelId) return;
+    try {
+      await DiscordApiService.updateChannelOverrides(channelId, { muted: !isMuted, mute_config: !isMuted ? { selected_time_window: -1, end_time: null } : null });
+      useDiscordChannelsStore.getState().updateChannel(channelId, { muted: !isMuted });
+      toast.success(isMuted ? 'Unmuted channel' : 'Muted channel');
+    } catch {
+      toast.error('Failed to update mute');
+    }
+  };
+
+  const handleCopyChannelId = () => {
+    navigator.clipboard.writeText(channelId);
+    toast.success('Copied Channel ID');
   };
 
   return (
@@ -284,6 +316,22 @@ const DiscordUserContextMenu = ({
         </>
       )}
 
+      {channelId && (
+        <>
+          <ContextMenuSeparator />
+
+          <ContextMenuItem className="justify-between" onSelect={handleMarkAsRead}>
+            Mark as Read
+            <Check className="ml-auto size-[18px]" weight="bold" />
+          </ContextMenuItem>
+
+          <ContextMenuItem className="justify-between" onSelect={handleToggleMute}>
+            {isMuted ? 'Unmute' : 'Mute'}
+            <BellSlash className="ml-auto size-[18px]" weight={isMuted ? 'regular' : 'fill'} />
+          </ContextMenuItem>
+        </>
+      )}
+
       <ContextMenuSeparator />
 
       <ContextMenuItem className="justify-between" onSelect={handleCopyId}>
@@ -292,6 +340,15 @@ const DiscordUserContextMenu = ({
           ID
         </span>
       </ContextMenuItem>
+
+      {channelId && (
+        <ContextMenuItem className="justify-between" onSelect={handleCopyChannelId}>
+          Copy Channel ID
+          <span className="ml-auto flex h-[18px] items-center rounded-[3px] bg-[#b5bac1] px-1 text-[10px] font-bold leading-none text-[#111214]">
+            ID
+          </span>
+        </ContextMenuItem>
+      )}
     </ContextMenuContent>
   );
 };

@@ -14,6 +14,8 @@ import DiscordClanTag from '../DiscordClanTag';
 import DiscordUserProfileModal from '../DiscordUserProfileModal';
 import { useModalStore } from '@/store/modal.store';
 import { useDiscordPreferencesStore } from '../../store/discord-preferences.store';
+import { useAverageColor } from '@/ignite/hooks/useAverageColor';
+import DiscordBadges from '../DiscordBadges';
 
 const DISCORD_EPOCH = 1420070400000;
 
@@ -42,6 +44,7 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
 
   const displayName = member?.nick || user.global_name || user.username;
   const avatarUrl = DiscordService.getUserAvatarUrl(user.id, user.avatar, 80);
+  const avatarAvgColor = useAverageColor(avatarUrl);
 
   const createdAt = useMemo(() => getCreatedAt(user.id), [user.id]);
 
@@ -60,8 +63,11 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
         : bannerColor;
       return { backgroundColor: color };
     }
+    if (avatarAvgColor) {
+      return { backgroundColor: avatarAvgColor };
+    }
     return { backgroundColor: '#5865f2' };
-  }, [profile, user.id]);
+  }, [profile, user.id, avatarAvgColor]);
 
   const roles = useMemo(() => {
     const guildRoles = guild?.roles || guild?.properties?.roles;
@@ -123,20 +129,23 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
 
       <div className="mt-10 px-4 pb-4">
         <div className="rounded-md bg-[#111214] p-1">
-          <h2 className="flex items-center gap-1.5 text-lg font-bold text-white">
-            {displayName}
-            {user.bot && (
-              <span className="inline-flex items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
-                {(user.public_flags & 65536) !== 0 && (
-                  <svg className="size-2.5" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
-                  </svg>
-                )}
-                {user.id === '643945264868098049' ? 'OFFICIAL' : 'APP'}
-              </span>
-            )}
-            {!user.bot && <DiscordClanTag userId={user.id} size="md" />}
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-1.5 text-lg font-bold text-white">
+              {displayName}
+              {user.bot && (
+                <span className="inline-flex items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
+                  {(user.public_flags & 65536) !== 0 && (
+                    <svg className="size-2.5" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
+                    </svg>
+                  )}
+                  {user.id === '643945264868098049' ? 'OFFICIAL' : 'APP'}
+                </span>
+              )}
+              {!user.bot && <DiscordClanTag userId={user.id} size="md" />}
+            </h2>
+            <DiscordBadges badges={profile?.badges} />
+          </div>
           <p className="text-xs font-medium text-gray-300">{user.username}</p>
 
           {profile?.user?.bio && (

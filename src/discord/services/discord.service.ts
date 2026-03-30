@@ -121,9 +121,9 @@ export const DiscordService = {
    * Load messages for a specific channel via REST API.
    * Messages are returned newest-first from Discord, we reverse for chronological order.
    */
-  async loadChannelMessages(channelId: string, before?: string) {
+  async loadChannelMessages(channelId: string, before?: string, limit?: number) {
     try {
-      const messages = await DiscordApiService.getChannelMessages(channelId, before);
+      const messages = await DiscordApiService.getChannelMessages(channelId, before, limit);
 
       // Store author and mentioned user objects in the users store
       const authors = messages.map((m: any) => m.author).filter(Boolean);
