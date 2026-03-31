@@ -12,9 +12,10 @@ const AppLayout = () => {
   const isDM = location.pathname.startsWith('/channels/@me');
   const isDiscordGuild = location.pathname.startsWith('/discord/') && !location.pathname.startsWith('/discord/@me');
   const isDiscordDM = location.pathname.startsWith('/discord/@me');
+  const isTelegram = location.pathname.startsWith('/telegram');
 
-  const sidebarId = isDM ? 'dm-sidebar' : isDiscordDM ? 'discord-dm-sidebar' : isDiscordGuild ? 'discord-guild-sidebar' : 'guild-sidebar';
-  const defaultWidth = isDiscordGuild ? 360 : 320;
+  const sidebarId = isDM ? 'dm-sidebar' : isDiscordDM ? 'discord-dm-sidebar' : isDiscordGuild ? 'discord-guild-sidebar' : isTelegram ? 'telegram-chat-sidebar' : 'guild-sidebar';
+  const defaultWidth = isDiscordGuild || isTelegram ? 360 : 320;
   const sidebarWidth = useSidebarWidthStore((s) => s.widths[sidebarId] ?? defaultWidth);
 
   const isDragOver = useDiscordFileDropStore((s) => s.isDragOver);

@@ -11,6 +11,8 @@ import InvitePage from './ignite/pages/InvitePage';
 import GuildDiscoveryPage from './ignite/pages/GuildDiscovery';
 import DiscordGuildPage from './discord/pages/DiscordGuildPage';
 import DiscordLandingPage from './discord/pages/DiscordLandingPage';
+import TelegramLandingPage from './telegram/pages/TelegramLandingPage';
+import TelegramChatPage from './telegram/pages/TelegramChatPage';
 import AppLayout from './layouts/AppLayout';
 import { InitializationService } from './ignite/services/initialization.service';
 import { EchoService } from './ignite/services/echo.service';
@@ -28,6 +30,7 @@ const AuthRoute = ({ children }) => {
 
   const hasIgniteToken = !!localStorage.getItem('token');
   const hasDiscordToken = !!localStorage.getItem('discord_accounts') || !!localStorage.getItem('discord_token');
+  const hasTelegramSession = !!localStorage.getItem('telegram_session');
 
   // Sync taskbar badge with unread/mention state (Electron only)
   useElectronBadge();
@@ -75,27 +78,27 @@ const AuthRoute = ({ children }) => {
     EchoService.subscribeToGuilds(guilds);
   }, [guilds, initialized, userId]);
 
-  if (failed) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 bg-body">
-        <div className="text-xl font-semibold text-red-500">Server Error</div>
-        <div className="text-center text-muted-foreground">
-          The server appears to be down. Please try again later.
-        </div>
-        <button
-          className="rounded bg-primary px-4 py-2 text-white"
-          onClick={() => {
-            window.location.reload();
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
+  // if (failed) {
+  //   return (
+  //     <div className="flex h-full flex-col items-center justify-center gap-4 bg-body">
+  //       <div className="text-xl font-semibold text-red-500">Server Error</div>
+  //       <div className="text-center text-muted-foreground">
+  //         The server appears to be down. Please try again later.
+  //       </div>
+  //       <button
+  //         className="rounded bg-primary px-4 py-2 text-white"
+  //         onClick={() => {
+  //           window.location.reload();
+  //         }}
+  //       >
+  //         Retry
+  //       </button>
+  //     </div>
+  //   );
+  // }
 
   // No auth at all → redirect to login
-  if (!hasIgniteToken && !hasDiscordToken) {
+  if (!hasIgniteToken && !hasDiscordToken && !hasTelegramSession) {
     return <Navigate to="/login" replace />;
   }
 
@@ -118,6 +121,10 @@ const GuestRoute = ({ children }) => {
 
   if (window.IgniteNative && (localStorage.getItem('discord_accounts') || localStorage.getItem('discord_token'))) {
     return <Navigate to="/discord" replace />;
+  }
+
+  if (window.IgniteNative && localStorage.getItem('telegram_session')) {
+    return <Navigate to="/telegram" replace />;
   }
 
   return children ? children : <Outlet />;
@@ -159,6 +166,8 @@ function App() {
               <Navigate to="/channels/@me" replace />
             ) : window.IgniteNative && (localStorage.getItem('discord_accounts') || localStorage.getItem('discord_token')) ? (
               <Navigate to="/discord" replace />
+            ) : window.IgniteNative && localStorage.getItem('telegram_session') ? (
+              <Navigate to="/telegram" replace />
             ) : (
               <Navigate to="/login" replace />
             )
@@ -229,6 +238,11 @@ function App() {
                 <Route
                   path="/discord/:guildId/:channelId?"
                   element={<DiscordGuildPage />}
+                />
+                <Route path="/telegram" element={<TelegramLandingPage />} />
+                <Route
+                  path="/telegram/:chatId"
+                  element={<TelegramChatPage />}
                 />
               </>
             )}

@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Fire, Plus, Compass, DiscordLogo, SignOut } from '@phosphor-icons/react';
+import { Fire, Plus, Compass, DiscordLogo, TelegramLogo, SignOut } from '@phosphor-icons/react';
 import {
   DndContext,
   DragOverlay,
@@ -58,6 +58,10 @@ import { useDiscordPreferencesStore } from '../discord/store/discord-preferences
 import { snowflakeToTimestamp } from '../discord/utils/snowflake';
 import { useLastChannelStore } from '@/store/last-channel.store';
 import { ChannelType } from '@/ignite/constants/ChannelType';
+import ConnectTelegramDialog from '../telegram/components/ConnectTelegramDialog';
+import { useTelegramStore } from '../telegram/store/telegram.store';
+import { useTelegramChatsStore } from '../telegram/store/telegram-chats.store';
+import { TelegramService } from '../telegram/services/telegram.service';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { SpeakerSimpleHigh, Monitor, FolderSimple } from '@phosphor-icons/react';
@@ -790,7 +794,15 @@ const GuildsSidebar = () => {
   const [leaveGuild, setLeaveGuild] = useState(null);
   const [isDiscordDialogOpen, setIsDiscordDialogOpen] = useState(false);
   const [disconnectingAccount, setDisconnectingAccount] = useState(null);
+  const [isTelegramDialogOpen, setIsTelegramDialogOpen] = useState(false);
+  const [disconnectingTelegram, setDisconnectingTelegram] = useState(false);
   const lastDmChannelId = useLastChannelStore((s) => s.lastChannels['@me']);
+
+  // Telegram state
+  const telegramSession = useTelegramStore((s) => s.session);
+  const telegramUser = useTelegramStore((s) => s.user);
+  const telegramConnected = useTelegramStore((s) => s.isConnected);
+  const telegramChats = useTelegramChatsStore((s) => s.chats);
 
   // Discord state — multi-account
   const discordAccounts = useDiscordStore((s) => s.accounts);
@@ -861,6 +873,13 @@ const GuildsSidebar = () => {
       }
     }
   }, [discordAccounts.length]);
+
+  // Auto-connect Telegram if session exists (Electron only)
+  useEffect(() => {
+    if (window.IgniteNative && telegramSession && !telegramConnected) {
+      TelegramService.connect();
+    }
+  }, [telegramSession]);
 
   const { orderedGuilds, reorder } = useGuildOrder(guilds);
 
@@ -1137,20 +1156,20 @@ const GuildsSidebar = () => {
                   account={account}
                   onDisconnect={() => setDisconnectingAccount(account)}
                 />
-                {account.isConnected ? (
-                  entries.length > 0 && (
+                {!account.isConnected && (
+                  <div className="mx-3 mb-2 flex items-center justify-center gap-1.5 rounded-lg bg-yellow-500/10 px-2 py-1.5">
+                    <div className="size-1.5 shrink-0 animate-pulse rounded-full bg-yellow-500" />
+                    <span className="text-[10px] font-medium text-yellow-500">Reconnecting…</span>
+                  </div>
+                )}
+                {entries.length > 0 && (
+                  <div className={!account.isConnected ? 'opacity-50' : undefined}>
                     <DiscordGuildsDnd
                       entries={entries}
                       folders={accountFolders}
                       pathname={location.pathname}
                     />
-                  )
-                ) : (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="mb-2 flex justify-center px-3">
-                      <Skeleton className="size-12 rounded-2xl" />
-                    </div>
-                  ))
+                  </div>
                 )}
               </div>
             ))}
@@ -1165,6 +1184,49 @@ const GuildsSidebar = () => {
                 text="Connect Discord"
               />
             </button>
+
+            {/* Telegram section */}
+            {telegramConnected && telegramUser ? (
+              <div>
+                <button
+                  type="button"
+                  className="group relative mb-2 flex w-full justify-center px-3"
+                  onClick={() => {
+                    if (telegramChats.length > 0) {
+                      navigate(`/telegram/${telegramChats[0].id}`);
+                    } else {
+                      navigate('/telegram');
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setDisconnectingTelegram(true);
+                  }}
+                >
+                  <div
+                    className={`flex size-12 items-center justify-center rounded-2xl bg-[#2AABEE] text-white transition-all hover:rounded-xl ${
+                      location.pathname.startsWith('/telegram') ? 'rounded-xl' : ''
+                    }`}
+                  >
+                    <TelegramLogo className="size-6" weight="fill" />
+                  </div>
+                  {/* Unread indicator */}
+                  {telegramChats.some((c) => c.unreadCount > 0) && (
+                    <div className="absolute -bottom-0.5 right-2 size-2.5 rounded-full bg-white" />
+                  )}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsTelegramDialogOpen(true)}
+              >
+                <SidebarIcon
+                  icon={<TelegramLogo className="size-6" />}
+                  text="Connect Telegram"
+                />
+              </button>
+            )}
           </>
         )}
 
@@ -1184,6 +1246,41 @@ const GuildsSidebar = () => {
         open={isDiscordDialogOpen}
         onOpenChange={setIsDiscordDialogOpen}
       />
+
+      <ConnectTelegramDialog
+        open={isTelegramDialogOpen}
+        onOpenChange={setIsTelegramDialogOpen}
+      />
+
+      <AlertDialog open={disconnectingTelegram} onOpenChange={setDisconnectingTelegram}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect Telegram</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to disconnect{' '}
+              <span className="font-bold text-white">
+                {telegramUser?.firstName || 'your Telegram account'}
+              </span>
+              ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                await TelegramService.logout();
+                setDisconnectingTelegram(false);
+                if (location.pathname.startsWith('/telegram')) {
+                  navigate(hasIgniteToken ? '/channels/@me' : '/login');
+                }
+              }}
+              className="bg-red-500 text-white hover:bg-red-600"
+            >
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!disconnectingAccount} onOpenChange={(open) => !open && setDisconnectingAccount(null)}>
         <AlertDialogContent>

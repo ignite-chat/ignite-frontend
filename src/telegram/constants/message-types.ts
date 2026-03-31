@@ -1,0 +1,22 @@
+/** Media types for Telegram messages */
+export const MEDIA_PHOTO = 'photo' as const;
+export const MEDIA_DOCUMENT = 'document' as const;
+export const MEDIA_VIDEO = 'video' as const;
+export const MEDIA_AUDIO = 'audio' as const;
+export const MEDIA_VOICE = 'voice' as const;
+export const MEDIA_STICKER = 'sticker' as const;
+export const MEDIA_ANIMATION = 'animation' as const;
+export const MEDIA_VIDEO_NOTE = 'videoNote' as const;
+export const MEDIA_CONTACT = 'contact' as const;
+export const MEDIA_LOCATION = 'location' as const;
+export const MEDIA_POLL = 'poll' as const;
+
+/** Action types for service messages */
+export const ACTION_CHAT_CREATE = 'chatCreate' as const;
+export const ACTION_CHAT_EDIT_TITLE = 'chatEditTitle' as const;
+export const ACTION_CHAT_EDIT_PHOTO = 'chatEditPhoto' as const;
+export const ACTION_CHAT_ADD_USER = 'chatAddUser' as const;
+export const ACTION_CHAT_DELETE_USER = 'chatDeleteUser' as const;
+export const ACTION_CHAT_JOIN = 'chatJoinedByLink' as const;
+export const ACTION_PIN_MESSAGE = 'pinMessage' as const;
+export const ACTION_PHONE_CALL = 'phoneCall' as const;
