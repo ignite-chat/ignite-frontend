@@ -1,18 +1,33 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import { GameController, MusicNote, Broadcast, Eye, Trophy } from '@phosphor-icons/react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useContextMenuStore } from '@/store/context-menu.store';
 import { useModalStore } from '@/store/modal.store';
 import { useDiscordMemberListStore } from '../store/discord-member-list.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
+import { useDiscordActivitiesStore, ActivityType } from '../store/discord-activities.store';
 import { DiscordService } from '../services/discord.service';
 import DiscordUserPopoverContent from './popovers/DiscordUserPopoverContent';
 import DiscordUserContextMenu from './context-menus/DiscordUserContextMenu';
 import DiscordUserProfileModal from './DiscordUserProfileModal';
 import OwnerCrown from '@/components/OwnerCrown';
 import DiscordStatusIndicator from './DiscordStatusIndicator';
+
+const ActivityIcon = ({ type, size = 12 }) => {
+  const style = { color: '#22c55e' };
+  switch (type) {
+    case ActivityType.PLAYING: return <GameController size={size} weight="fill" style={style} />;
+    case ActivityType.STREAMING: return <Broadcast size={size} weight="fill" style={style} />;
+    case ActivityType.LISTENING: return <MusicNote size={size} weight="fill" style={style} />;
+    case ActivityType.WATCHING: return <Eye size={size} weight="fill" style={style} />;
+    case ActivityType.COMPETING: return <Trophy size={size} weight="fill" style={style} />;
+    default: return null;
+  }
+};
 
 const MemberItem = ({ member: rawMember, guildId, ownerId, popoverOpen, setPopoverOpen }) => {
   // Resolve the user ID from whatever shape the SYNC item has
@@ -29,6 +44,20 @@ const MemberItem = ({ member: rawMember, guildId, ownerId, popoverOpen, setPopov
 
   const status = member.presence?.status || storeUser?.status || 'offline';
   const avatarUrl = DiscordService.getUserAvatarUrl(user.id, user.avatar, 32);
+
+  const activities = useDiscordActivitiesStore((s) => s.activities[userId]);
+  const nonCustomActivities = useMemo(() => {
+    const activityPriority = { [ActivityType.PLAYING]: 0, [ActivityType.STREAMING]: 1, [ActivityType.COMPETING]: 2, [ActivityType.LISTENING]: 3, [ActivityType.WATCHING]: 4 };
+    return (activities || [])
+      .filter((a) => a.type !== ActivityType.CUSTOM && a.type !== 6)
+      .sort((a, b) => (activityPriority[a.type] ?? 99) - (activityPriority[b.type] ?? 99));
+  }, [activities]);
+  const customStatus = useMemo(
+    () => (activities || []).find((a) => a.type === ActivityType.CUSTOM),
+    [activities]
+  );
+  const primaryActivity = nonCustomActivities[0];
+  const extraCount = nonCustomActivities.length - 1;
 
   const guild = useDiscordGuildsStore((s) => s.guilds.find((g) => g.id === guildId));
   const guildRoles = guild?.roles || guild?.properties?.roles || [];
@@ -74,23 +103,66 @@ const MemberItem = ({ member: rawMember, guildId, ownerId, popoverOpen, setPopov
             />
             <DiscordStatusIndicator status={status} clientStatus={storeUser?.client_status} processedAt={storeUser?.processed_at_timestamp} invisible={storeUser?.invisible} size="xs" borderColor="#1a1a1e" />
           </div>
-          <div className="flex min-w-0 flex-1 items-center gap-1">
-            <span
-              className="min-w-0 truncate text-sm font-medium text-gray-300"
-              style={nameColor ? { color: nameColor } : undefined}
-            >
-              {displayName}
-            </span>
-            {isOwner && <OwnerCrown />}
-            {isBot && (
-              <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
-                {isVerifiedBot && (
-                  <svg className="size-2.5" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
-                  </svg>
-                )}
-                {userId === '643945264868098049' ? 'OFFICIAL' : 'APP'}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="flex items-center gap-1">
+              <span
+                className="min-w-0 truncate text-sm font-medium text-gray-300"
+                style={nameColor ? { color: nameColor } : undefined}
+              >
+                {displayName}
               </span>
+              {isOwner && <OwnerCrown />}
+              {isBot && (
+                <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-[#5865f2] px-1 py-px text-[10px] font-medium text-white">
+                  {isVerifiedBot && (
+                    <svg className="size-2.5" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M7.4,11.17,4,8.62,5,7.26l2,1.53L10.64,4l1.36,1Z" />
+                    </svg>
+                  )}
+                  {userId === '643945264868098049' ? 'OFFICIAL' : 'APP'}
+                </span>
+              )}
+            </div>
+            {userId !== '643945264868098049' && (primaryActivity || customStatus?.state) && (
+              <div className="flex items-center gap-1 truncate text-[11px] text-gray-400">
+                {primaryActivity && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex shrink-0 items-center gap-0.5 text-green-500">
+                        <ActivityIcon type={primaryActivity.type} size={12} />
+                        {extraCount > 0 && (
+                          <span className="text-[10px] font-medium text-green-500">+{extraCount}</span>
+                        )}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="p-2">
+                      <div className="flex flex-col gap-1.5">
+                        {nonCustomActivities.map((a, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs">
+                            <span className="shrink-0 text-green-500">
+                              <ActivityIcon type={a.type} size={14} />
+                            </span>
+                            <div className="min-w-0">
+                              <div className="text-gray-200">{a.name}</div>
+                              {a.details && (
+                                <div className="text-[11px] text-gray-400">{a.details}</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                {primaryActivity && (customStatus?.state || primaryActivity.details) && (
+                  <span className="text-gray-600">·</span>
+                )}
+                {primaryActivity?.type === ActivityType.LISTENING && primaryActivity.details ? (
+                  <span className="truncate">{primaryActivity.details}</span>
+                ) : customStatus?.state ? (
+                  <span className="truncate">{customStatus.state}</span>
+                ) : null}
+              </div>
             )}
           </div>
         </div>
