@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import Avatar from '@/ignite/components/Avatar';
 import { Button } from '@/components/ui/button';
 import { SheetDescription } from '@/components/ui/sheet';
-import { User, UserCircle, Mic, Bot, LogOut, X, Menu, Bell, Activity, MessageSquare, History } from 'lucide-react';
+import { User, UserCircle, Mic, Bot, LogOut, X, Menu, Bell, Activity, MessageSquare, History, Volume2 } from 'lucide-react';
 import { useAuthStore } from '@/ignite/store/auth.store';
 import { useModalStore } from '@/ignite/store/modal.store';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,7 @@ import TabBots from '@/ignite/components/user-settings/tabs/TabBots';
 import TabPerformance from '@/ignite/components/user-settings/tabs/TabPerformance';
 import TabDiscord from '@/ignite/components/user-settings/tabs/TabDiscord';
 import TabMessageLogger from '@/ignite/components/user-settings/tabs/TabMessageLogger';
+import TabDiscordAudio from '@/ignite/components/user-settings/tabs/TabDiscordAudio';
 
 const navigationSections = [
   {
@@ -31,7 +32,10 @@ const navigationSections = [
       { id: 'voice', title: 'Voice & Audio', icon: Mic },
       { id: 'notifications', title: 'Notification Sounds', icon: Bell },
       { id: 'performance', title: 'Performance', icon: Activity },
-      { id: 'discord', title: 'Discord', icon: MessageSquare },
+      ...(window.IgniteNative ? [
+        { id: 'discord', title: 'Discord', icon: MessageSquare },
+        { id: 'discord-audio', title: 'User Volumes', icon: Volume2 },
+      ] : []),
       { id: 'message-logger', title: 'Message Logger', icon: History },
     ],
   },
@@ -77,6 +81,8 @@ const UserSettingsModal = ({ modalId }) => {
         return <TabPerformance />;
       case 'discord':
         return <TabDiscord />;
+      case 'discord-audio':
+        return <TabDiscordAudio />;
       case 'message-logger':
         return <TabMessageLogger />;
       default:

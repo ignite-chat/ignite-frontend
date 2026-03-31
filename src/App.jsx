@@ -116,7 +116,7 @@ const GuestRoute = ({ children }) => {
     return <Navigate to="/channels/@me" replace />;
   }
 
-  if (localStorage.getItem('discord_accounts') || localStorage.getItem('discord_token')) {
+  if (window.IgniteNative && (localStorage.getItem('discord_accounts') || localStorage.getItem('discord_token'))) {
     return <Navigate to="/discord" replace />;
   }
 
@@ -157,7 +157,7 @@ function App() {
           element={
             userId ? (
               <Navigate to="/channels/@me" replace />
-            ) : localStorage.getItem('discord_accounts') || localStorage.getItem('discord_token') ? (
+            ) : window.IgniteNative && (localStorage.getItem('discord_accounts') || localStorage.getItem('discord_token')) ? (
               <Navigate to="/discord" replace />
             ) : (
               <Navigate to="/login" replace />
@@ -223,11 +223,15 @@ function App() {
               path="/channels/:guildId/:channelId?/:messageId?"
               element={<GuildChannelPage />}
             />
-            <Route path="/discord" element={<DiscordLandingPage />} />
-            <Route
-              path="/discord/:guildId/:channelId?"
-              element={<DiscordGuildPage />}
-            />
+            {!!window.IgniteNative && (
+              <>
+                <Route path="/discord" element={<DiscordLandingPage />} />
+                <Route
+                  path="/discord/:guildId/:channelId?"
+                  element={<DiscordGuildPage />}
+                />
+              </>
+            )}
           </Route>
         </Route>
       </Routes>

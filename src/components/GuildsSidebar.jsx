@@ -1128,41 +1128,45 @@ const GuildsSidebar = () => {
 
         <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
 
-        {/* Discord accounts */}
-        {discordAccountSections.map(({ account, entries, folders: accountFolders }) => (
-          <div key={account.token}>
-            <DiscordAccountPopover
-              account={account}
-              onDisconnect={() => setDisconnectingAccount(account)}
-            />
-            {account.isConnected ? (
-              entries.length > 0 && (
-                <DiscordGuildsDnd
-                  entries={entries}
-                  folders={accountFolders}
-                  pathname={location.pathname}
+        {/* Discord accounts — desktop only */}
+        {!!window.IgniteNative && (
+          <>
+            {discordAccountSections.map(({ account, entries, folders: accountFolders }) => (
+              <div key={account.token}>
+                <DiscordAccountPopover
+                  account={account}
+                  onDisconnect={() => setDisconnectingAccount(account)}
                 />
-              )
-            ) : (
-              Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="mb-2 flex justify-center px-3">
-                  <Skeleton className="size-12 rounded-2xl" />
-                </div>
-              ))
-            )}
-          </div>
-        ))}
+                {account.isConnected ? (
+                  entries.length > 0 && (
+                    <DiscordGuildsDnd
+                      entries={entries}
+                      folders={accountFolders}
+                      pathname={location.pathname}
+                    />
+                  )
+                ) : (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="mb-2 flex justify-center px-3">
+                      <Skeleton className="size-12 rounded-2xl" />
+                    </div>
+                  ))
+                )}
+              </div>
+            ))}
 
-        {/* Connect Discord button */}
-        <button
-          type="button"
-          onClick={() => setIsDiscordDialogOpen(true)}
-        >
-          <SidebarIcon
-            icon={<DiscordLogo className="size-6" />}
-            text="Connect Discord"
-          />
-        </button>
+            {/* Connect Discord button */}
+            <button
+              type="button"
+              onClick={() => setIsDiscordDialogOpen(true)}
+            >
+              <SidebarIcon
+                icon={<DiscordLogo className="size-6" />}
+                text="Connect Discord"
+              />
+            </button>
+          </>
+        )}
 
         {hasIgniteToken && (
           <>

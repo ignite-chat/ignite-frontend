@@ -97,8 +97,9 @@ const DiscordClanTag = ({ userId, size = 'sm' }) => {
   return (
     <Popover onOpenChange={(open) => open && fetchProfile()}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <span
+          role="button"
+          tabIndex={0}
           className={cn(
             'inline-flex cursor-pointer items-center gap-0.5 rounded bg-[#333338] no-underline transition-colors hover:bg-[#3f3f46]',
             size === 'sm' && 'px-1 py-[3px] text-[11px]',
@@ -118,7 +119,7 @@ const DiscordClanTag = ({ userId, size = 'sm' }) => {
             />
           )}
           <span className="font-semibold text-gray-300">{clanData.tag}</span>
-        </button>
+        </span>
       </PopoverTrigger>
       <PopoverContent
         className="w-[280px] overflow-hidden rounded-lg border-none bg-[#111214] p-0 shadow-xl"

@@ -7,6 +7,8 @@ import {
   PreloadedUserSettings,
   PreloadedUserSettings_GuildFolders,
   PreloadedUserSettings_GuildFolder,
+  PreloadedUserSettings_AudioSettings,
+  PreloadedUserSettings_AudioContextSetting,
 } from '../generated/PreloadedUserSettings';
 import { Int64Value, StringValue, UInt64Value } from '../generated/google/protobuf/wrappers';
 
@@ -80,6 +82,41 @@ export function encodeGuildFolders(folders: GuildFolder[]): string {
   const settings = PreloadedUserSettings.create({
     guildFolders: PreloadedUserSettings_GuildFolders.create({
       folders: protoFolders,
+    }),
+  });
+
+  const buf = PreloadedUserSettings.toBinary(settings);
+  return bytesToBase64(buf);
+}
+
+
+type AudioEntry = { id: string; muted: boolean; volume: number; soundboardMuted: boolean; modifiedAt: bigint };
+
+function toProtoMap(entries: AudioEntry[]): Record<string, PreloadedUserSettings_AudioContextSetting> {
+  const map: Record<string, PreloadedUserSettings_AudioContextSetting> = {};
+  for (const e of entries) {
+    map[e.id] = PreloadedUserSettings_AudioContextSetting.create({
+      muted: e.muted,
+      volume: e.volume,
+      soundboardMuted: e.soundboardMuted,
+      modifiedAt: e.modifiedAt,
+    });
+  }
+  return map;
+}
+
+/**
+ * Encode audio context settings (users + streams) into a base64 proto string for
+ * PATCH /users/@me/settings-proto/1
+ */
+export function encodeAudioContextSettings(
+  userEntries: AudioEntry[],
+  streamEntries: AudioEntry[] = [],
+): string {
+  const settings = PreloadedUserSettings.create({
+    audioContextSettings: PreloadedUserSettings_AudioSettings.create({
+      user: toProtoMap(userEntries),
+      stream: toProtoMap(streamEntries),
     }),
   });
 

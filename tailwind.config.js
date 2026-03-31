@@ -86,6 +86,15 @@ export default {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		keyframes: {
+  			'typing-dot': {
+  				'0%, 60%, 100%': { opacity: '0.3', transform: 'scale(0.8)' },
+  				'30%': { opacity: '1', transform: 'scale(1)' },
+  			},
+  		},
+  		animation: {
+  			'typing-dot': 'typing-dot 1.2s ease-in-out infinite',
   		}
   	}
   },

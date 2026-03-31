@@ -77,6 +77,7 @@ const DiscordStatusIndicator = ({
   clientStatus,
   processedAt,
   invisible = false,
+  isTyping = false,
   size = 'xs',
   borderColor = '#1a1a1e',
   className = '',
@@ -98,7 +99,32 @@ const DiscordStatusIndicator = ({
   const isOffline = status === 'offline';
 
   let indicator;
-  if (invisible) {
+  if (isTyping) {
+    const dotSize = config.icon * 0.15;
+    indicator = (
+      <div
+        className="flex items-center justify-center gap-[1.5px] rounded-full"
+        style={{
+          width: config.badge || config.icon,
+          height: config.badge || config.icon,
+          backgroundColor: fill,
+          border: `2px solid ${borderColor}`,
+        }}
+      >
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="inline-block rounded-full bg-white animate-typing-dot"
+            style={{
+              width: dotSize,
+              height: dotSize,
+              animationDelay: `${i * 0.2}s`,
+            }}
+          />
+        ))}
+      </div>
+    );
+  } else if (invisible) {
     indicator = (
       <div
         className="flex items-center justify-center rounded-md"
@@ -178,7 +204,8 @@ const DiscordStatusIndicator = ({
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5">
             <span className="font-semibold">{statusLabel}</span>
-            {elapsed != null && elapsed > 0 && (
+            {isTyping && <span className="text-gray-400">· Typing...</span>}
+            {!isTyping && elapsed != null && elapsed > 0 && (
               <span className="text-gray-400">· {formatElapsed(elapsed)}</span>
             )}
           </div>

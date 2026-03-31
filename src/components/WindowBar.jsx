@@ -28,7 +28,6 @@ function WindowBar() {
       style={{
         WebkitAppRegion: 'drag',
         userSelect: 'none',
-        zIndex: 100,
       }}
     >
       {/* Centered app name */}

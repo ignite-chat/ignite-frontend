@@ -13,7 +13,8 @@ import { useDiscordVoiceStatesStore } from '../store/discord-voice-states.store'
 import { useDiscordGuildSettingsStore } from '../store/discord-guild-settings.store';
 import { useDiscordGuildFoldersStore } from '../store/discord-guild-folders.store';
 import { useDiscordInteractionsStore } from '../store/discord-interactions.store';
-import { decodeGuildFolders, decodeUserSettings } from '../utils/proto-decode';
+import { decodeGuildFolders, decodeUserSettings, decodeAudioContextSettings } from '../utils/proto-decode';
+import { useDiscordAudioSettingsStore } from '../store/discord-audio-settings.store';
 import { DiscordVoiceService } from './discord-voice.service';
 import { GatewayOp } from '../constants/gateway-opcodes';
 import { DiscordMessageLogService } from './discord-message-log.service';
@@ -532,6 +533,15 @@ export const DiscordGatewayService = {
           if (folders.length > 0) {
             useDiscordGuildFoldersStore.getState().setFolders(folders, accountUserId);
           }
+
+          // Update audio context settings if present
+          const decoded = decodeUserSettings(data.settings.proto);
+          if (decoded.audioContextSettings) {
+            useDiscordAudioSettingsStore.getState().loadFromProto(
+              decoded.audioContextSettings.user,
+              decoded.audioContextSettings.stream,
+            );
+          }
         }
         break;
       }
@@ -637,7 +647,7 @@ export const DiscordGatewayService = {
       useDiscordGuildSettingsStore.getState().setAllSettings(guildSettingsEntries);
     }
 
-    // Decode guild folders from protobuf user settings
+    // Decode guild folders + audio context settings from protobuf user settings
     if (data.user_settings_proto) {
       const decoded = decodeUserSettings(data.user_settings_proto);
       console.log('[Discord Gateway] Decoded user_settings_proto:', decoded);
@@ -646,6 +656,14 @@ export const DiscordGatewayService = {
       console.log(`[Discord Gateway] Decoded ${folders.length} guild folders:`, folders);
       if (folders.length > 0) {
         useDiscordGuildFoldersStore.getState().setFolders(folders, accountUserId);
+      }
+
+      // Load per-user and per-stream audio context settings (volume/mute)
+      if (decoded.audioContextSettings) {
+        useDiscordAudioSettingsStore.getState().loadFromProto(
+          decoded.audioContextSettings.user,
+          decoded.audioContextSettings.stream,
+        );
       }
     } else {
       console.log('[Discord Gateway] No user_settings_proto in READY payload');
