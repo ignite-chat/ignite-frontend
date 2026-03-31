@@ -15,6 +15,7 @@ import {
   BellSlash,
   Check,
   Copy,
+  PushPin,
 } from '@phosphor-icons/react';
 import {
   ContextMenuContent,
@@ -46,6 +47,8 @@ const DiscordUserContextMenu = ({
   canTimeout,
   isOwnMessage,
   onViewProfile,
+  isPinned,
+  onTogglePin,
 }) => {
   const navigate = useNavigate();
   const currentUser = useDiscordStore((s) => s.user);
@@ -204,6 +207,13 @@ const DiscordUserContextMenu = ({
         <ContextMenuItem className="justify-between" onSelect={handleMessage}>
           Message
           <ChatText className="ml-auto size-[18px]" weight="fill" />
+        </ContextMenuItem>
+      )}
+
+      {onTogglePin && (
+        <ContextMenuItem className="justify-between" onSelect={onTogglePin}>
+          {isPinned ? 'Unpin' : 'Pin'}
+          <PushPin className={`ml-auto size-[18px] ${isPinned ? '' : 'rotate-45'}`} weight="fill" />
         </ContextMenuItem>
       )}
 

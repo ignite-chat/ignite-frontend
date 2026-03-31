@@ -27,6 +27,7 @@ import DMRowBase from './DMRowBase';
 import NewDMModal from '@/ignite/components/modals/NewDMModal';
 import { useModalStore } from '@/ignite/store/modal.store';
 import { DISCORD_EPOCH } from '@/discord/utils/snowflake';
+import { PushPin } from '@phosphor-icons/react';
 
 const IGNITE_EPOCH = 1444521600000; // Oct 10, 2015
 
@@ -74,7 +75,7 @@ const DMActivityIcon = ({ type, size = 12 }) => {
   }
 };
 
-const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onClick, onClose }) => {
+const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onClick, onClose, isPinned, onTogglePin }) => {
   const readStates = useDiscordReadStatesStore((s) => s.readStates);
   const entry = readStates[channel.id];
 
@@ -112,6 +113,9 @@ const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onCli
     if (!info.user || info.isGroup) return;
     useContextMenuStore.getState().open(DiscordUserContextMenu, {
       author: info.user,
+      channelId: channel.id,
+      isPinned,
+      onTogglePin,
     }, e);
   };
 
@@ -157,6 +161,9 @@ const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onCli
           {!info.isGroup && info.user && <DiscordClanTag userId={info.user.id} size="sm" />}
           {info.isGroup && (
             <span className="shrink-0 text-xs text-gray-500">({info.recipientCount})</span>
+          )}
+          {isPinned && (
+            <PushPin size={12} weight="fill" className="shrink-0 rotate-45 text-gray-500" />
           )}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -224,7 +231,7 @@ const DMChannelSkeleton = () => (
 
 const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
   const currentUser = useUsersStore((s) => s.getCurrentUser()) || { id: 'me' };
-  const { channels, pinnedChannelIds } = useChannelsStore();
+  const { channels, pinnedChannelIds, togglePin } = useChannelsStore();
   const { channelUnreads, channelUnreadsLoaded } = useUnreadsStore();
   const { requests } = useFriendsStore();
 
@@ -245,8 +252,8 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
     [currentUser.id, pinnedChannelIds]
   );
 
-  // Build a single merged + sorted list of pinned Ignite DMs and all unpinned DMs (Ignite + Discord)
-  const { pinnedDms, mergedDms } = useMemo(() => {
+  // Build a single merged + sorted list of pinned DMs (Ignite + Discord) and all unpinned DMs
+  const { pinnedDms, pinnedDiscordDms, mergedDms } = useMemo(() => {
     const igniteDms = channels.filter((c) => c.type === 1).map(normalizeThread);
     const pinned = igniteDms.filter((c) => c.isPinned).sort(sortByLastMessage);
     const unpinned = igniteDms.filter((c) => !c.isPinned);
@@ -260,22 +267,28 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
     }));
 
     // Tag Discord channels with real timestamps (exclude message requests unless disabled)
-    const discordItems = discordConnected
-      ? discordChannels
-          .filter((c) => (c.type === 1 || c.type === 3) && (disableMessageRequests || !c.is_message_request))
-          .map((c) => ({
-            _source: 'discord',
-            _id: c.id,
-            _timestamp: c.last_message_id ? snowflakeToTimestamp(c.last_message_id, DISCORD_EPOCH) : 0,
-            data: c,
-          }))
+    const allDiscordDms = discordConnected
+      ? discordChannels.filter((c) => (c.type === 1 || c.type === 3) && (disableMessageRequests || !c.is_message_request))
       : [];
 
-    // Merge and sort by timestamp descending (most recent first)
-    const merged = [...igniteItems, ...discordItems].sort((a, b) => b._timestamp - a._timestamp);
+    const pinnedDiscord = allDiscordDms
+      .filter((c) => pinnedChannelIds.includes(c.id))
+      .sort(sortByLastMessage);
 
-    return { pinnedDms: pinned, mergedDms: merged };
-  }, [channels, normalizeThread, discordConnected, discordChannels]);
+    const unpinnedDiscord = allDiscordDms
+      .filter((c) => !pinnedChannelIds.includes(c.id))
+      .map((c) => ({
+        _source: 'discord',
+        _id: c.id,
+        _timestamp: c.last_message_id ? snowflakeToTimestamp(c.last_message_id, DISCORD_EPOCH) : 0,
+        data: c,
+      }));
+
+    // Merge and sort by timestamp descending (most recent first)
+    const merged = [...igniteItems, ...unpinnedDiscord].sort((a, b) => b._timestamp - a._timestamp);
+
+    return { pinnedDms: pinned, pinnedDiscordDms: pinnedDiscord, mergedDms: merged };
+  }, [channels, normalizeThread, discordConnected, discordChannels, pinnedChannelIds]);
 
   const discordRelationships = useDiscordRelationshipsStore((s) => s.relationships);
 
@@ -350,8 +363,8 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
 
         <div className="mx-2 my-2 border-b border-white/5" />
 
-        {/* Pinned (Ignite only) */}
-        {pinnedDms.length > 0 && (
+        {/* Pinned */}
+        {(pinnedDms.length > 0 || pinnedDiscordDms.length > 0) && (
           <>
             <div className="mt-4 flex cursor-default select-none items-center px-2 text-[11px] font-bold uppercase tracking-wider text-gray-500">
               Pinned
@@ -366,6 +379,19 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                   onClose={() => handleCloseIgniteDM(channel.channel_id)}
                   channelUnreads={channelUnreads}
                   channelUnreadsLoaded={channelUnreadsLoaded}
+                />
+              ))}
+              {pinnedDiscordDms.map((channel) => (
+                <DiscordDMChannelRow
+                  key={`discord-pinned-${channel.id}`}
+                  channel={channel}
+                  isActive={activeChannelId === channel.id}
+                  currentUserId={discordUser?.id}
+                  usersMap={discordUsersMap}
+                  onClick={() => onNavigate(channel.id)}
+                  onClose={() => handleCloseDiscordDM(channel.id)}
+                  isPinned={true}
+                  onTogglePin={() => togglePin(channel.id)}
                 />
               ))}
             </div>
@@ -388,6 +414,8 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                   usersMap={discordUsersMap}
                   onClick={() => onNavigate(item._id)}
                   onClose={() => handleCloseDiscordDM(item._id)}
+                  isPinned={false}
+                  onTogglePin={() => togglePin(item._id)}
                 />
               ) : (
                 <DMChannelItem
