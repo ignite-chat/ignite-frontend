@@ -1,6 +1,19 @@
 # Ignite
 
-A Discord-inspired chat platform built with React, featuring real-time messaging, guild management, role-based permissions.
+A unified desktop and web chat client for **Ignite Chat**, **Discord**, and **Telegram** — built with React.
+
+## Supported Platforms
+
+### Ignite Chat
+Native chat platform with guilds, channels, direct messages, voice chat, role-based permissions, and real-time messaging.
+
+### Discord
+Full-featured Discord client with multi-account support, voice channels, forums, threads, slash commands, message logging, and real-time messaging via Discord's gateway. Desktop only.
+
+> **Warning:** The Discord integration is a third-party client and violates [Discord's Terms of Service](https://discord.com/terms). Your account may be suspended or banned. Use at your own risk — only use alt/throwaway accounts.
+
+### Telegram
+Telegram client with support for private chats, groups, supergroups, and channels. Authenticate via QR code or phone number. Real-time message updates via MTProto. Desktop only.
 
 ## Features
 
@@ -11,6 +24,7 @@ A Discord-inspired chat platform built with React, featuring real-time messaging
 - **Friends System** — Send/accept friend requests, manage your friends list, and start direct message conversations
 - **Mentions & Unreads** — `@user` mention support with inline suggestions, per-channel unread tracking, and badge indicators
 - **Invite System** — Generate invite links with preview pages and quick sign-up for new users
+- **Multi-Platform Integration** — Seamlessly switch between Ignite, Discord, and Telegram from a single sidebar
 - **Dark Theme** — Dark UI inspired by modern chat platforms
 
 ## Tech Stack
