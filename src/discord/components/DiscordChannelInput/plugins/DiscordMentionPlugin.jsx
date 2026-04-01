@@ -7,7 +7,7 @@ import {
 import { $createTextNode, $getSelection, $isRangeSelection } from 'lexical';
 import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { $createMentionNode } from '@/ignite/components/channel/ChannelInput/nodes/MentionNode';
+import { $createDiscordMentionNode } from '../nodes/DiscordMentionNode';
 import { DiscordService } from '@/discord/services/discord.service';
 
 const SUGGESTIONS_LIMIT = 7;
@@ -71,10 +71,9 @@ export default function DiscordMentionPlugin({ members, guildRoles, guildId, men
   const onSelectOption = useCallback(
     (option, textNodeContainingQuery, closeMenu) => {
       editor.update(() => {
-        const mentionNode = $createMentionNode(
+        const mentionNode = $createDiscordMentionNode(
           option.userId,
           option.label,
-          option.color
         );
         const spaceNode = $createTextNode(' ');
 

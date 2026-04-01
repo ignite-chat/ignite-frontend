@@ -48,9 +48,9 @@ import { EditorRefPlugin } from '@lexical/react/LexicalEditorRefPlugin';
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
 import { CLEAR_EDITOR_COMMAND, $getSelection, $isRangeSelection } from 'lexical';
 
-// Reuse nodes from Ignite
-import { MentionNode } from '@/ignite/components/channel/ChannelInput/nodes/MentionNode';
-import { ChannelMentionNode } from '@/ignite/components/channel/ChannelInput/nodes/ChannelMentionNode';
+// Discord-specific Lexical nodes
+import { DiscordMentionNode } from './nodes/DiscordMentionNode';
+import { DiscordChannelMentionNode } from './nodes/DiscordChannelMentionNode';
 import { channelInputTheme } from '@/ignite/components/channel/ChannelInput/theme';
 
 // Discord plugins
@@ -428,7 +428,7 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   const initialConfig = useMemo(() => ({
     namespace: 'DiscordChannelInput',
     theme: channelInputTheme,
-    nodes: [MentionNode, ChannelMentionNode],
+    nodes: [DiscordMentionNode, DiscordChannelMentionNode],
     onError: (error) => console.error('Lexical error:', error),
   }), []);
 

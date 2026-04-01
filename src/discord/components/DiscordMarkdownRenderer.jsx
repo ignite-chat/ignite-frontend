@@ -1,8 +1,10 @@
-import { Fragment, useMemo } from 'react';
+import { Fragment, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getTwemojiUrl } from '@/utils/emoji.utils';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
+import { useModalStore } from '@/store/modal.store';
 import ExternalLink from '@/components/message/components/ExternalLink';
 import SpoilerText from '@/components/message/markdown/SpoilerText';
 import TimestampDisplay from '@/components/message/markdown/TimestampDisplay';
@@ -34,12 +36,23 @@ const BLOCK_TYPES = new Set([
 
 // ─── Discord mention components ──────────────────────────────────
 
-const DiscordUserMention = ({ userId }) => {
+const DiscordUserMention = ({ userId, guildId }) => {
   const user = useDiscordUsersStore((s) => s.users[userId]);
   const name = user?.global_name || user?.username || userId;
 
+  const handleClick = useCallback(async () => {
+    const { default: DiscordUserProfileModal } = await import('./DiscordUserProfileModal');
+    useModalStore.getState().push(DiscordUserProfileModal, { userId, guildId });
+  }, [userId, guildId]);
+
   return (
-    <span className="cursor-pointer rounded bg-blue-500/20 px-1 font-medium text-blue-400 hover:bg-blue-500/30">
+    <span
+      className="cursor-pointer rounded bg-blue-500/20 px-1 font-medium text-blue-400 hover:bg-blue-500/30"
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && handleClick()}
+    >
       @{name}
     </span>
   );
@@ -47,10 +60,25 @@ const DiscordUserMention = ({ userId }) => {
 
 const DiscordChannelMention = ({ channelId }) => {
   const channel = useDiscordChannelsStore((s) => s.channels.find((c) => c.id === channelId));
-  const name = channel?.name || " unknown";
+  const name = channel?.name || "unknown";
+  const navigate = useNavigate();
+
+  const handleClick = useCallback(() => {
+    if (!channel) return;
+    const guildId = channel.guild_id;
+    if (guildId) {
+      navigate(`/discord/${guildId}/${channelId}`);
+    }
+  }, [channel, channelId, navigate]);
 
   return (
-    <span className="cursor-pointer rounded bg-blue-500/20 px-1 font-medium text-blue-400 hover:bg-blue-500/30">
+    <span
+      className="cursor-pointer rounded bg-blue-500/20 px-1 font-medium text-blue-400 hover:bg-blue-500/30"
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && handleClick()}
+    >
       #{name}
     </span>
   );
@@ -145,7 +173,7 @@ function renderInlineNode(node, index, guildId) {
 
     case 'Mention':
       if (node.kind.kind === 'User') {
-        return <DiscordUserMention key={key} userId={node.kind.id} />;
+        return <DiscordUserMention key={key} userId={node.kind.id} guildId={guildId} />;
       }
       if (node.kind.kind === 'Channel') {
         return <DiscordChannelMention key={key} channelId={node.kind.id} />;

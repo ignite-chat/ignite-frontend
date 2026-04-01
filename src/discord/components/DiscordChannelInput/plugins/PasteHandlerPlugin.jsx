@@ -7,8 +7,8 @@ import {
   $createTextNode,
 } from 'lexical';
 import { useEffect } from 'react';
-import { $createMentionNode } from '@/ignite/components/channel/ChannelInput/nodes/MentionNode';
-import { $createChannelMentionNode } from '@/ignite/components/channel/ChannelInput/nodes/ChannelMentionNode';
+import { $createDiscordMentionNode } from '../nodes/DiscordMentionNode';
+import { $createDiscordChannelMentionNode } from '../nodes/DiscordChannelMentionNode';
 
 export default function PasteHandlerPlugin({ members, resolveUser, channels }) {
   const [editor] = useLexicalComposerContext();
@@ -47,12 +47,12 @@ export default function PasteHandlerPlugin({ members, resolveUser, channels }) {
               const resolved = resolveUser
                 ? resolveUser(userId)
                 : { label: `@user`, color: 'inherit' };
-              nodes.push($createMentionNode(userId, resolved.label, resolved.color));
+              nodes.push($createDiscordMentionNode(userId, resolved.label));
             } else if (match[2]) {
               const channelId = match[2];
               const channel = channels?.find((c) => c.id === channelId);
               const channelName = channel?.name || 'unknown';
-              nodes.push($createChannelMentionNode(channelId, channelName));
+              nodes.push($createDiscordChannelMentionNode(channelId, channelName));
             }
 
             lastIndex = match.index + match[0].length;

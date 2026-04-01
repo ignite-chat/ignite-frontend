@@ -7,7 +7,7 @@ import {
 import { $createTextNode, $getSelection, $isRangeSelection } from 'lexical';
 import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { $createChannelMentionNode } from '@/ignite/components/channel/ChannelInput/nodes/ChannelMentionNode';
+import { $createDiscordChannelMentionNode } from '../nodes/DiscordChannelMentionNode';
 import { Hash, Megaphone, SpeakerHigh } from '@phosphor-icons/react';
 import { GUILD_TEXT, GUILD_VOICE, GUILD_ANNOUNCEMENT } from '@/discord/constants/channel-types';
 
@@ -60,7 +60,7 @@ export default function DiscordChannelMentionPlugin({ channels, menuContainer })
   const onSelectOption = useCallback(
     (option, textNodeContainingQuery, closeMenu) => {
       editor.update(() => {
-        const channelNode = $createChannelMentionNode(option.channel.id, option.channel.name);
+        const channelNode = $createDiscordChannelMentionNode(option.channel.id, option.channel.name);
         const spaceNode = $createTextNode(' ');
 
         if (textNodeContainingQuery) {
