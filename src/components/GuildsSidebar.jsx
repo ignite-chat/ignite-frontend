@@ -1156,12 +1156,12 @@ const GuildsSidebar = () => {
                   account={account}
                   onDisconnect={() => setDisconnectingAccount(account)}
                 />
-                {!account.isConnected && (
+                {/* {!account.isConnected && (
                   <div className="mx-3 mb-2 flex items-center justify-center gap-1.5 rounded-lg bg-yellow-500/10 px-2 py-1.5">
                     <div className="size-1.5 shrink-0 animate-pulse rounded-full bg-yellow-500" />
                     <span className="text-[10px] font-medium text-yellow-500">Reconnecting…</span>
                   </div>
-                )}
+                )} */}
                 {entries.length > 0 && (
                   <div className={!account.isConnected ? 'opacity-50' : undefined}>
                     <DiscordGuildsDnd
