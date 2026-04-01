@@ -30,7 +30,8 @@ import DiscordClanTag from './DiscordClanTag';
 import { openAttachmentViewModal } from '@/components/modals/AttachmentViewModal';
 import { ArrowBendUpLeft, Smiley, Plus, ArrowSquareOut, ArrowClockwise, Trash, WarningCircle, Eye, Play, DownloadSimple, File } from '@phosphor-icons/react';
 import { useDiscordChannelsStore } from '../store/discord-channels.store';
-import { generateNonce } from '../utils/snowflake';
+import { generateNonce, snowflakeToTimestamp } from '../utils/snowflake';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
 import { DiscordBurstReaction, DiscordReaction, getReactionEmojiString } from './DiscordEmojiIcon';
 import {
@@ -142,6 +143,41 @@ const DiscordUserName = ({ author, member, guildId, fallbackColor = 'white', pre
   );
 };
 
+const MessageLatency = ({ message }) => {
+  const latencyMs = useMemo(() => {
+    if (!message.nonce || !message.id) return null;
+    try {
+      const nonceTimestamp = snowflakeToTimestamp(String(message.nonce));
+      const idTimestamp = snowflakeToTimestamp(message.id);
+      const diff = idTimestamp - nonceTimestamp;
+      // Sanity check: ignore if negative or unreasonably large (>30s)
+      if (diff < 0 || diff > 30000) return null;
+      return diff;
+    } catch {
+      return null;
+    }
+  }, [message.nonce, message.id]);
+
+  if (latencyMs === null) return null;
+
+  const color = latencyMs < 200 ? 'text-green-500' : latencyMs < 500 ? 'text-yellow-500' : 'text-red-400';
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={`inline-flex cursor-default items-center gap-0.5 text-[11px] ${color}`}>
+          <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+          </svg>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="text-xs">
+        Latency: {latencyMs}ms
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
 const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
   const storeMember = useDiscordMembersStore((s) =>
     guildId ? s.members[guildId]?.[message.author.id] : undefined
@@ -205,6 +241,7 @@ const DiscordMessageHeader = ({ message, guildId, onClickName }) => {
         )
       )}
       <time className="cursor-default text-xs font-medium text-gray-500" dateTime={message.timestamp}>{formattedDateTime}</time>
+      <MessageLatency message={message} />
     </header>
   );
 };
