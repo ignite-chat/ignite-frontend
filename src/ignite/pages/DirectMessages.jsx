@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChannelContextProvider } from '@/ignite/contexts/ChannelContext';
 import Channel from '@/ignite/components/channel/Channel';
@@ -18,6 +18,14 @@ import { useDiscordRelationshipsStore, RelationshipType } from '@/discord/store/
 import { useLastChannelStore } from '@/store/last-channel.store';
 import DiscordChannel from '@/discord/components/DiscordChannel';
 import ResizableSidebar from '@/components/ResizableSidebar';
+import { useTelegramStore } from '@/telegram/store/telegram.store';
+import { useTelegramChatsStore } from '@/telegram/store/telegram-chats.store';
+import { useTelegramUsersStore } from '@/telegram/store/telegram-users.store';
+import { getChatDisplayName } from '@/telegram/utils/helpers';
+import TelegramChatHeader from '@/telegram/components/TelegramChatHeader';
+import TelegramChatMessages from '@/telegram/components/TelegramChatMessages';
+import TelegramChatInput from '@/telegram/components/TelegramChatInput';
+import { TelegramService } from '@/telegram/services/telegram.service';
 
 const DirectMessagesPage = () => {
   const { channelId, messageId } = useParams();
@@ -27,11 +35,20 @@ const DirectMessagesPage = () => {
   const discordConnected = useDiscordStore((s) => s.isConnected);
   const discordUsersMap = useDiscordUsersStore((s) => s.users);
 
+  // Telegram state
+  const telegramConnected = useTelegramStore((s) => s.isConnected);
+  const telegramConnecting = useTelegramStore((s) => s.isConnecting);
+  const telegramSession = useTelegramStore((s) => s.session);
+  const telegramChats = useTelegramChatsStore((s) => s.chats);
+  const telegramUsersMap = useTelegramUsersStore((s) => s.users);
+
   // Determine active view
   const isFriendsView = !channelId || channelId === 'friends';
   const isMessageRequestsView = channelId === 'message-requests';
+  const isTelegramChannel = channelId?.startsWith('tg-');
+  const telegramChatId = isTelegramChannel ? channelId.slice(3) : null;
 
-  // Find active channel — check Ignite first, then Discord
+  // Find active channel — check Ignite first, then Discord, then Telegram
   const isSpecialView = isFriendsView || isMessageRequestsView;
 
   // Tab state for friends/message-requests views
@@ -41,15 +58,26 @@ const DirectMessagesPage = () => {
   // Pending count for badge
   const { requests } = useFriendsStore();
   const discordRelationships = useDiscordRelationshipsStore((s) => s.relationships);
-  const activeIgniteChannel = !isSpecialView
+  const activeIgniteChannel = !isSpecialView && !isTelegramChannel
     ? channels.find((c) => c.channel_id === channelId)
     : null;
 
-  const activeDiscordChannel = !isSpecialView && !activeIgniteChannel && discordConnected
+  const activeDiscordChannel = !isSpecialView && !activeIgniteChannel && !isTelegramChannel && discordConnected
     ? discordChannels.find((c) => c.id === channelId && (c.type === 1 || c.type === 3))
     : null;
 
   const isDiscordChannel = !!activeDiscordChannel;
+
+  const activeTelegramChat = isTelegramChannel
+    ? telegramChats.find((c) => c.id === telegramChatId)
+    : null;
+
+  // Auto-connect telegram if needed
+  useEffect(() => {
+    if (isTelegramChannel && telegramSession && !telegramConnected && !telegramConnecting) {
+      TelegramService.connect();
+    }
+  }, [isTelegramChannel, telegramSession, telegramConnected, telegramConnecting]);
 
   // Get the other user's name for the page title
   const currentUser = useUsersStore((s) => s.getCurrentUser());
@@ -90,9 +118,18 @@ const DirectMessagesPage = () => {
     return () => useNotificationStore.getState().setActiveChannelId(null);
   }, [channelId]);
 
-  const pageTitle = isDiscordChannel
-    ? `@${discordDmName}` || 'Discord DMs'
-    : `@${dmRecipient?.name}` || 'Direct Messages';
+  const telegramDisplayName = activeTelegramChat
+    ? getChatDisplayName(activeTelegramChat, telegramUsersMap)
+    : null;
+
+  const [telegramMsgSentCount, setTelegramMsgSentCount] = useState(0);
+  const onTelegramMessageSent = useCallback(() => setTelegramMsgSentCount((c) => c + 1), []);
+
+  const pageTitle = isTelegramChannel
+    ? telegramDisplayName || 'Telegram'
+    : isDiscordChannel
+      ? `@${discordDmName}` || 'Discord DMs'
+      : `@${dmRecipient?.name}` || 'Direct Messages';
 
   return (
     <>
@@ -119,6 +156,25 @@ const DirectMessagesPage = () => {
               ) : (
                 <MessageRequests />
               )}
+            </div>
+          ) : isTelegramChannel && activeTelegramChat ? (
+            <div className="flex h-full flex-col">
+              <TelegramChatHeader chat={activeTelegramChat} />
+              <TelegramChatMessages chatId={telegramChatId} chatType={activeTelegramChat.type} messageSentCount={telegramMsgSentCount} />
+              {activeTelegramChat.type !== 'channel' && (
+                <TelegramChatInput
+                  chatId={telegramChatId}
+                  chatName={telegramDisplayName}
+                  onMessageSent={onTelegramMessageSent}
+                />
+              )}
+            </div>
+          ) : isTelegramChannel ? (
+            <div className="flex h-full items-center justify-center text-gray-500">
+              <div className="flex flex-col items-center gap-2">
+                <div className="size-8 animate-spin rounded-full border-2 border-solid border-[#2AABEE] border-t-transparent" />
+                <p className="text-sm">{telegramConnected ? 'Loading chat...' : 'Connecting to Telegram...'}</p>
+              </div>
             </div>
           ) : isDiscordChannel ? (
             <DiscordChannel channel={activeDiscordChannel} />

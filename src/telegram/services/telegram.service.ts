@@ -296,6 +296,124 @@ export const TelegramService = {
   },
 
   /**
+   * Delete messages from a chat.
+   */
+  async deleteMessages(chatId: string, messageIds: number[], revoke: boolean = true) {
+    const client = TelegramClientService.getClient();
+    if (!client) return false;
+
+    try {
+      const peer = await this._resolvePeer(chatId);
+      if (!peer) return false;
+
+      await client.invoke(
+        new Api.messages.DeleteMessages({
+          id: messageIds,
+          revoke,
+        }),
+      );
+
+      // Remove from local store
+      const store = useTelegramMessagesStore.getState();
+      for (const id of messageIds) {
+        store.removeMessage(chatId, id);
+      }
+
+      return true;
+    } catch (error: any) {
+      // Try channel delete for channels/supergroups
+      try {
+        const peer = await this._resolvePeer(chatId);
+        if (peer instanceof Api.PeerChannel) {
+          await client.invoke(
+            new Api.channels.DeleteMessages({
+              channel: new Api.InputChannel({ channelId: (peer as Api.PeerChannel).channelId, accessHash: bigInt(0) }),
+              id: messageIds,
+            }),
+          );
+          const store = useTelegramMessagesStore.getState();
+          for (const id of messageIds) {
+            store.removeMessage(chatId, id);
+          }
+          return true;
+        }
+      } catch {}
+
+      console.error(`[Telegram] Failed to delete messages:`, error);
+      toast.error('Failed to delete message.');
+      return false;
+    }
+  },
+
+  /**
+   * Edit a message in a chat.
+   */
+  async editMessage(chatId: string, messageId: number, newText: string) {
+    const client = TelegramClientService.getClient();
+    if (!client) return false;
+
+    try {
+      const peer = await this._resolvePeer(chatId);
+      if (!peer) return false;
+
+      await client.invoke(
+        new Api.messages.EditMessage({
+          peer,
+          id: messageId,
+          message: newText,
+        }),
+      );
+
+      // Update local store
+      useTelegramMessagesStore.getState().updateMessage(chatId, messageId, {
+        text: newText,
+        editDate: Math.floor(Date.now() / 1000),
+      });
+
+      return true;
+    } catch (error: any) {
+      console.error(`[Telegram] Failed to edit message:`, error);
+      toast.error(error.errorMessage === 'MESSAGE_NOT_MODIFIED' ? 'Message not modified.' : 'Failed to edit message.');
+      return false;
+    }
+  },
+
+  /**
+   * Download media from a message and return a blob URL.
+   */
+  async downloadMedia(chatId: string, messageId: number): Promise<string | null> {
+    const client = TelegramClientService.getClient();
+    if (!client) return null;
+
+    const cacheKey = `media_${chatId}_${messageId}`;
+
+    // Check cache first
+    const cached = await TelegramClientService.getCachedPhotoUrl(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const peer = await this._resolvePeer(chatId);
+      if (!peer) return null;
+
+      const messages = await client.getMessages(peer, { ids: [messageId] });
+      const msg = messages[0];
+      if (!msg || !(msg instanceof Api.Message) || !msg.media) return null;
+
+      const buffer = await client.downloadMedia(msg.media, {});
+      if (!buffer) return null;
+
+      const data = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer as any);
+      if (data.length === 0) return null;
+
+      const url = await (await import('./telegram-photo-cache.service')).TelegramPhotoCacheService.saveToDisk(cacheKey, data);
+      return url;
+    } catch (error) {
+      console.error(`[Telegram] Failed to download media:`, error);
+      return null;
+    }
+  },
+
+  /**
    * Send typing action to a chat.
    */
   async sendTypingAction(chatId: string) {

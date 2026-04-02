@@ -251,8 +251,25 @@ const UserBar = () => {
 
   const discordStatus = useDiscordStatus(discordUser?.id);
 
-  const showDiscord = activeDisplay === 'discord' && isDiscordConnected && discordUser;
-  const showTelegram = activeDisplay === 'telegram' && telegramConnected && telegramUser;
+  // Determine what to show — if active display has no data yet, fall back to any connected account
+  const canShowIgnite = !!user;
+  const canShowDiscord = isDiscordConnected && !!discordUser;
+  const canShowTelegram = telegramConnected && !!telegramUser;
+
+  let effectiveDisplay = activeDisplay;
+  if (effectiveDisplay === 'ignite' && !canShowIgnite) {
+    if (canShowDiscord) effectiveDisplay = 'discord';
+    else if (canShowTelegram) effectiveDisplay = 'telegram';
+  } else if (effectiveDisplay === 'discord' && !canShowDiscord) {
+    if (canShowIgnite) effectiveDisplay = 'ignite';
+    else if (canShowTelegram) effectiveDisplay = 'telegram';
+  } else if (effectiveDisplay === 'telegram' && !canShowTelegram) {
+    if (canShowIgnite) effectiveDisplay = 'ignite';
+    else if (canShowDiscord) effectiveDisplay = 'discord';
+  }
+
+  const showDiscord = effectiveDisplay === 'discord' && canShowDiscord;
+  const showTelegram = effectiveDisplay === 'telegram' && canShowTelegram;
   const displayName = showTelegram
     ? `${telegramUser.firstName} ${telegramUser.lastName || ''}`.trim()
     : showDiscord

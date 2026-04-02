@@ -27,10 +27,12 @@ import DMRowBase from './DMRowBase';
 import NewDMModal from '@/ignite/components/modals/NewDMModal';
 import { useModalStore } from '@/ignite/store/modal.store';
 import { DISCORD_EPOCH } from '@/discord/utils/snowflake';
-import { PushPin } from '@phosphor-icons/react';
+import { PushPin, Megaphone, UsersThree } from '@phosphor-icons/react';
 import { useAuthStore } from '@/ignite/store/auth.store';
 import { useTelegramStore } from '@/telegram/store/telegram.store';
 import { useTelegramChatsStore } from '@/telegram/store/telegram-chats.store';
+import { useTelegramUsersStore } from '@/telegram/store/telegram-users.store';
+import { getChatDisplayName, formatTelegramDate } from '@/telegram/utils/helpers';
 import Avatar from '@/ignite/components/Avatar';
 
 const AccountBadge = ({ source, accountId }) => {
@@ -78,6 +80,26 @@ const AccountBadge = ({ source, accountId }) => {
           </div>
         </TooltipTrigger>
         <TooltipContent side="top">{igniteUser?.username || 'Ignite'}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  if (source === 'telegram') {
+    const telegramUser = useTelegramStore.getState().user;
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="ml-auto flex shrink-0 items-center self-center">
+            {telegramUser?.photo ? (
+              <img src={telegramUser.photo} alt="" className="size-6 rounded-full object-cover" />
+            ) : (
+              <div className="flex size-6 items-center justify-center rounded-full bg-[#2AABEE]">
+                <TelegramLogo size={14} weight="fill" style={{ color: 'white' }} />
+              </div>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top">{telegramUser?.firstName || 'Telegram'}</TooltipContent>
       </Tooltip>
     );
   }
@@ -273,6 +295,67 @@ const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onCli
   );
 };
 
+const TelegramDMRow = ({ chat, isActive, onClick, displayName }) => {
+  const isUnread = !isActive && chat.unreadCount > 0;
+  const isGroup = chat.type === 'group' || chat.type === 'supergroup';
+
+  const lastMsg = chat.lastMessage;
+  const previewText = lastMsg?.action
+    ? lastMsg.action
+    : lastMsg?.text
+      ? lastMsg.text.replace(/\n/g, ' ')
+      : lastMsg?.media
+        ? `[${lastMsg.media.type}]`
+        : '';
+
+  return (
+    <DMRowBase isActive={isActive} isUnread={isUnread} onClick={onClick}>
+      <div className="relative shrink-0">
+        {chat.photo ? (
+          <img src={chat.photo} alt={displayName} className="size-8 rounded-full object-cover" />
+        ) : (
+          <div className={`flex size-8 items-center justify-center rounded-full ${
+            isGroup ? 'bg-green-500' : 'bg-blue-500'
+          }`}>
+            {isGroup ? (
+              <UsersThree size={16} weight="fill" style={{ color: 'white' }} />
+            ) : (
+              <span className="text-sm font-semibold text-white">{displayName?.[0]?.toUpperCase() || '?'}</span>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col text-left">
+        <div className="flex items-baseline gap-1">
+          <span className={cn('min-w-0 truncate text-[16px] leading-tight', isUnread ? 'font-semibold text-gray-100' : 'font-[450]')}>
+            {displayName}
+          </span>
+          {lastMsg?.date && (
+            <>
+              <span className="shrink-0 text-[11px] leading-tight text-gray-500">·</span>
+              <span className="shrink-0 text-[11px] font-medium leading-tight text-gray-500">{formatTelegramDate(lastMsg.date)}</span>
+            </>
+          )}
+        </div>
+        {previewText && (
+          <span className="truncate text-[11px] text-gray-400">
+            {lastMsg?.senderName && isGroup && (
+              <span className="font-medium text-gray-300">{lastMsg.senderName}: </span>
+            )}
+            {previewText}
+          </span>
+        )}
+      </div>
+      {chat.unreadCount > 0 && (
+        <Badge className="ml-auto h-4 min-w-4 shrink-0 bg-[#f23f42] p-1 text-[11px] font-bold hover:bg-[#f23f42]">
+          {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+        </Badge>
+      )}
+      <AccountBadge source="telegram" />
+    </DMRowBase>
+  );
+};
+
 const DMChannelSkeleton = () => (
   <div className="flex items-center gap-3 rounded-md px-2 py-1.5">
     <Skeleton className="size-8 shrink-0 rounded-full" />
@@ -296,8 +379,10 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
   const { userId: igniteUserId } = useAuthStore();
   const igniteUser = useUsersStore((s) => s.getCurrentUser());
   const telegramSession = useTelegramStore((s) => s.session);
+  const telegramConnected = useTelegramStore((s) => s.isConnected);
   const telegramUser = useTelegramStore((s) => s.user);
   const telegramChats = useTelegramChatsStore((s) => s.chats);
+  const telegramUsersMap = useTelegramUsersStore((s) => s.users);
   const [hiddenSources, setHiddenSources] = useState({});
   const toggleSource = useCallback((source) => {
     setHiddenSources((prev) => ({ ...prev, [source]: !prev[source] }));
@@ -346,11 +431,23 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
         data: c,
       }));
 
+    // Tag Telegram DM chats with timestamps
+    const telegramItems = telegramConnected
+      ? telegramChats
+          .filter((c) => c.type === 'private')
+          .map((c) => ({
+            _source: 'telegram',
+            _id: `tg-${c.id}`,
+            _timestamp: c.lastMessage?.date ? c.lastMessage.date * 1000 : 0,
+            data: c,
+          }))
+      : [];
+
     // Merge and sort by timestamp descending (most recent first)
-    const merged = [...igniteItems, ...unpinnedDiscord].sort((a, b) => b._timestamp - a._timestamp);
+    const merged = [...igniteItems, ...unpinnedDiscord, ...telegramItems].sort((a, b) => b._timestamp - a._timestamp);
 
     return { pinnedDms: pinned, pinnedDiscordDms: pinnedDiscord, mergedDms: merged };
-  }, [channels, normalizeThread, discordConnected, discordChannels, pinnedChannelIds]);
+  }, [channels, normalizeThread, discordConnected, discordChannels, pinnedChannelIds, telegramConnected, telegramChats]);
 
   const discordRelationships = useDiscordRelationshipsStore((s) => s.relationships);
 
@@ -563,6 +660,14 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                   onClose={() => handleCloseDiscordDM(item._id)}
                   isPinned={false}
                   onTogglePin={() => togglePin(item._id)}
+                />
+              ) : item._source === 'telegram' ? (
+                <TelegramDMRow
+                  key={item._id}
+                  chat={item.data}
+                  isActive={activeChannelId === `tg-${item.data.id}`}
+                  onClick={() => onNavigate(`tg-${item.data.id}`)}
+                  displayName={getChatDisplayName(item.data, telegramUsersMap)}
                 />
               ) : (
                 <DMChannelItem
