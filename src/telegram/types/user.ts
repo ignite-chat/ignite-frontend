@@ -6,6 +6,7 @@ export type TelegramUser = {
   phone?: string;
   photo?: string | null;
   bot?: boolean;
+  deleted?: boolean;
   status?: 'online' | 'offline' | 'recently' | 'lastWeek' | 'lastMonth' | 'longAgo';
   lastOnline?: number;
 };

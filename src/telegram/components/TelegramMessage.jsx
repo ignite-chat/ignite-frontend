@@ -255,7 +255,7 @@ const TelegramMessage = ({ message, showSender, isPending, isGroupChat }) => {
     if (message.senderName) return message.senderName;
     if (message.senderId) {
       const user = users[message.senderId];
-      if (user) return [user.firstName, user.lastName].filter(Boolean).join(' ');
+      if (user) return user.deleted ? 'Deleted Account' : [user.firstName, user.lastName].filter(Boolean).join(' ');
     }
     return message.out ? (currentUser?.firstName || 'You') : 'Unknown';
   }, [message, users, currentUser, isPending]);

@@ -41,6 +41,8 @@ import VoiceSettingsModal from '@/ignite/components/modals/VoiceSettingsModal';
 import ScreenShareModal from '@/ignite/components/modals/ScreenShareModal';
 import { useDiscordVoiceStore } from '@/discord/store/discord-voice.store';
 import { DiscordVoiceService } from '@/discord/services/discord-voice.service';
+import { useTelegramStore } from '@/telegram/store/telegram.store';
+import { TelegramLogo } from '@phosphor-icons/react';
 
 function getPingInfo(ping) {
   if (ping === null || ping == 0) return { Icon: WifiHigh, color: 'text-gray-400', label: 'Measuring...' };
@@ -88,6 +90,8 @@ const UserProfilePopoverMenu = ({ igniteUser, activeDisplay, onSwitch }) => {
   const discordUser = useDiscordStore((s) => s.user);
   const isDiscordConnected = useDiscordStore((s) => s.isConnected);
   const discordStatus = useDiscordStatus(discordUser?.id);
+  const telegramUser = useTelegramStore((s) => s.user);
+  const telegramConnected = useTelegramStore((s) => s.isConnected);
 
   const discordAvatarUrl = discordUser
     ? DiscordService.getUserAvatarUrl(discordUser.id, discordUser.avatar, 64)
@@ -156,6 +160,34 @@ const UserProfilePopoverMenu = ({ igniteUser, activeDisplay, onSwitch }) => {
         </button>
       )}
 
+      {/* Telegram user */}
+      {telegramConnected && telegramUser && (
+        <button
+          type="button"
+          onClick={() => onSwitch('telegram')}
+          className={`flex items-center gap-2.5 rounded-sm px-2.5 py-2 text-sm transition-colors ${
+            activeDisplay === 'telegram'
+              ? 'bg-white/5 text-white'
+              : 'text-gray-400 hover:bg-white/5 hover:text-white'
+          }`}
+        >
+          <div className="shrink-0">
+            {telegramUser.photo ? (
+              <img src={telegramUser.photo} alt="" className="size-7 rounded-full object-cover" />
+            ) : (
+              <div className="flex size-7 items-center justify-center rounded-full bg-[#2AABEE]">
+                <TelegramLogo size={16} weight="fill" className="text-white" />
+              </div>
+            )}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col text-left">
+            <span className="truncate text-sm font-medium">{telegramUser.firstName} {telegramUser.lastName || ''}</span>
+            <span className="truncate text-[11px] text-gray-500">Telegram{telegramUser.username ? ` - @${telegramUser.username}` : ''}</span>
+          </div>
+          {activeDisplay === 'telegram' && <Check size={14} weight="bold" className="shrink-0 text-primary" />}
+        </button>
+      )}
+
       <button
         type="button"
         onClick={() => useLoginDialogStore.getState().setOpen(true)}
@@ -193,6 +225,8 @@ const UserBar = () => {
   const user = useUsersStore((state) => state.getCurrentUser());
   const discordUser = useDiscordStore((s) => s.user);
   const isDiscordConnected = useDiscordStore((s) => s.isConnected);
+  const telegramUser = useTelegramStore((s) => s.user);
+  const telegramConnected = useTelegramStore((s) => s.isConnected);
   const hasIgniteToken = !!localStorage.getItem('token');
 
   const location = useLocation();
@@ -201,12 +235,15 @@ const UserBar = () => {
   // Auto-switch based on current route
   useEffect(() => {
     const isOnDiscordRoute = location.pathname.startsWith('/discord/');
-    if (isOnDiscordRoute && isDiscordConnected && discordUser) {
+    const isOnTelegramRoute = location.pathname.startsWith('/telegram');
+    if (isOnTelegramRoute && telegramConnected && telegramUser) {
+      setActiveDisplay('telegram');
+    } else if (isOnDiscordRoute && isDiscordConnected && discordUser) {
       setActiveDisplay('discord');
     } else if (hasIgniteToken) {
       setActiveDisplay('ignite');
     }
-  }, [location.pathname, isDiscordConnected, discordUser, hasIgniteToken]);
+  }, [location.pathname, isDiscordConnected, discordUser, telegramConnected, telegramUser, hasIgniteToken]);
 
   const handleSwitch = (mode) => {
     setActiveDisplay(mode);
@@ -215,12 +252,17 @@ const UserBar = () => {
   const discordStatus = useDiscordStatus(discordUser?.id);
 
   const showDiscord = activeDisplay === 'discord' && isDiscordConnected && discordUser;
-  const displayName = showDiscord
-    ? (discordUser.global_name || discordUser.username)
-    : user?.name;
-  const displayStatus = showDiscord
-    ? (DISCORD_STATUS[discordStatus]?.label || 'Online')
-    : (user?.status || 'Online');
+  const showTelegram = activeDisplay === 'telegram' && telegramConnected && telegramUser;
+  const displayName = showTelegram
+    ? `${telegramUser.firstName} ${telegramUser.lastName || ''}`.trim()
+    : showDiscord
+      ? (discordUser.global_name || discordUser.username)
+      : user?.name;
+  const displayStatus = showTelegram
+    ? (telegramUser.username ? `@${telegramUser.username}` : 'Telegram')
+    : showDiscord
+      ? (DISCORD_STATUS[discordStatus]?.label || 'Online')
+      : (user?.status || 'Online');
   const discordAvatarUrl = showDiscord
     ? DiscordService.getUserAvatarUrl(discordUser.id, discordUser.avatar, 64)
     : null;
@@ -442,7 +484,7 @@ const UserBar = () => {
 
       {/* User Info Bar */}
       <div className="flex items-center rounded-lg bg-[#1a1a1d] px-2.5 py-2.5">
-        {!user && !showDiscord ? (
+        {!user && !showDiscord && !showTelegram ? (
           <div className="flex min-w-0 flex-1 items-center gap-2.5 px-0.5 py-0.5 mr-2">
             <Skeleton className="size-9 shrink-0 rounded-full" />
             <div className="flex min-w-0 flex-col gap-1.5">
@@ -455,7 +497,15 @@ const UserBar = () => {
             <PopoverTrigger asChild>
               <button type="button" className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-0.5 py-0.5 transition-colors hover:bg-white/5 mr-2">
                 <div className="shrink-0">
-                  {showDiscord ? (
+                  {showTelegram ? (
+                    telegramUser.photo ? (
+                      <img src={telegramUser.photo} alt="" className="size-9 rounded-full object-cover" />
+                    ) : (
+                      <div className="flex size-9 items-center justify-center rounded-full bg-[#2AABEE]">
+                        <TelegramLogo size={20} weight="fill" className="text-white" />
+                      </div>
+                    )
+                  ) : showDiscord ? (
                     <DiscordAvatarWithStatus
                       avatarUrl={discordAvatarUrl}
                       name={displayName}

@@ -64,7 +64,7 @@ import { useTelegramChatsStore } from '../telegram/store/telegram-chats.store';
 import { TelegramService } from '../telegram/services/telegram.service';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { SpeakerSimpleHigh, Monitor, FolderSimple } from '@phosphor-icons/react';
+import { SpeakerSimpleHigh, Monitor, FolderSimple, Megaphone, UsersThree } from '@phosphor-icons/react';
 import GuildIcon from '@/ignite/components/GuildIcon';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -815,6 +815,7 @@ const GuildsSidebar = () => {
   const telegramSession = useTelegramStore((s) => s.session);
   const telegramUser = useTelegramStore((s) => s.user);
   const telegramConnected = useTelegramStore((s) => s.isConnected);
+  const telegramConnecting = useTelegramStore((s) => s.isConnecting);
   const telegramChats = useTelegramChatsStore((s) => s.chats);
 
   // Discord state — multi-account
@@ -1213,7 +1214,7 @@ const GuildsSidebar = () => {
 
             {/* Telegram section */}
             {telegramConnected && telegramUser ? (
-              <div>
+              <>
                 <Popover>
                   <PopoverTrigger asChild>
                     <button
@@ -1254,6 +1255,82 @@ const GuildsSidebar = () => {
                         <TelegramLogo className="size-4" />
                         Open Telegram
                       </button>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 transition-colors hover:bg-red-500/10"
+                        onClick={() => setDisconnectingTelegram(true)}
+                      >
+                        <Power className="size-4" />
+                        Disconnect
+                      </button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                {telegramChats.filter((c) => c.pinned).map((chat) => {
+                  const tgFallbackIcon = !chat.photo ? (
+                    <div className={`flex size-full items-center justify-center ${
+                      chat.type === 'channel' ? 'bg-rose-500' :
+                      chat.type === 'group' || chat.type === 'supergroup' ? 'bg-green-500' :
+                      'bg-blue-500'
+                    }`}>
+                      {chat.type === 'channel' ? (
+                        <Megaphone size={22} weight="fill" className="text-white" />
+                      ) : chat.type === 'group' || chat.type === 'supergroup' ? (
+                        <UsersThree size={22} weight="fill" className="text-white" />
+                      ) : (
+                        <span className="text-base font-semibold text-white">{chat.title?.[0]?.toUpperCase() || '?'}</span>
+                      )}
+                    </div>
+                  ) : null;
+                  return (
+                    <Link key={`tg-pinned-${chat.id}`} to={`/telegram/${chat.id}`}>
+                      <SidebarIcon
+                        {...(chat.photo ? { iconUrl: chat.photo } : { icon: tgFallbackIcon })}
+                        text={chat.title}
+                        isServerIcon={true}
+                        isDm={chat.type === 'private'}
+                        isActive={location.pathname === `/telegram/${chat.id}`}
+                        isUnread={chat.unreadCount > 0}
+                        mentionCount={chat.unreadMentionCount}
+                      />
+                    </Link>
+                  );
+                })}
+              </>
+            ) : telegramSession ? (
+              <div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="group relative mb-2 flex w-full justify-center px-3"
+                    >
+                      <div
+                        className={`flex size-12 items-center justify-center rounded-2xl bg-[#2AABEE] text-white transition-all hover:rounded-xl ${
+                          telegramConnecting ? 'opacity-50' : ''
+                        }`}
+                      >
+                        <TelegramLogo className="size-6" weight="fill" />
+                      </div>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="right" align="center" className="w-56 p-0" sideOffset={8}>
+                    <div className="flex flex-col">
+                      <div className="border-b border-white/5 px-3 py-2.5">
+                        <div className="text-sm font-semibold text-white">
+                          {telegramConnecting ? 'Connecting...' : 'Connection failed'}
+                        </div>
+                      </div>
+                      {!telegramConnecting && (
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-white/5"
+                          onClick={() => TelegramService.connect()}
+                        >
+                          <TelegramLogo className="size-4" />
+                          Reconnect
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 transition-colors hover:bg-red-500/10"

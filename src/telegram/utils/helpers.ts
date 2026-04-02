@@ -64,11 +64,12 @@ export function gramUserToTelegramUser(user: Api.User): TelegramUser {
 
   return {
     id: user.id.toString(),
-    firstName: user.firstName || '',
-    lastName: user.lastName || undefined,
-    username: user.username || undefined,
+    firstName: user.deleted ? 'Deleted Account' : user.firstName || '',
+    lastName: user.deleted ? undefined : user.lastName || undefined,
+    username: user.deleted ? undefined : user.username || undefined,
     phone: user.phone || undefined,
     bot: user.bot || false,
+    deleted: user.deleted || false,
     status,
     lastOnline,
   };
@@ -96,7 +97,7 @@ export function gramDialogToTelegramChat(dialog: Dialog): TelegramChat {
   let memberCount: number | undefined;
 
   if (dialog.entity instanceof Api.User) {
-    title = [dialog.entity.firstName, dialog.entity.lastName].filter(Boolean).join(' ') || dialog.entity.username || 'Unknown';
+    title = dialog.entity.deleted ? 'Deleted Account' : [dialog.entity.firstName, dialog.entity.lastName].filter(Boolean).join(' ') || dialog.entity.username || 'Unknown';
     username = dialog.entity.username || undefined;
   } else if (dialog.entity instanceof Api.Chat) {
     title = dialog.entity.title || 'Group';
@@ -367,6 +368,7 @@ export function getChatDisplayName(
   if (chat.type === 'private') {
     const user = users[chat.id];
     if (user) {
+      if (user.deleted) return 'Deleted Account';
       return [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Unknown';
     }
   }
