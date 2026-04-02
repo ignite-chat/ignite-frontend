@@ -29,6 +29,7 @@ interface Window {
     saveMessageLogMessages?: (channelId: string, jsonData: string) => Promise<string>;
     loadMessageLogMessages?: (channelId: string) => Promise<string | null>;
     getMessageLogBasePath?: () => Promise<string>;
+    platform: 'win32' | 'darwin' | 'linux';
     onWindowOpen: (callback: (url: string) => void) => () => void;
   };
   Echo: any;

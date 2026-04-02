@@ -6,7 +6,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -62,7 +61,9 @@ export function QrAuthContent({
     return (
       <div className="flex flex-col items-center gap-3 py-4">
         <Skeleton className="size-[200px] rounded-lg" />
-        <p className="text-sm text-gray-400">Generating QR code...</p>
+        <p className="whitespace-nowrap text-sm text-gray-400">
+          Scan with the Discord mobile app
+        </p>
       </div>
     );
   }
@@ -73,7 +74,7 @@ export function QrAuthContent({
         <div className="rounded-lg bg-white p-3">
           <QRCodeSVG value={state.qrUrl} size={176} />
         </div>
-        <p className="text-sm text-gray-400">
+        <p className="whitespace-nowrap text-sm text-gray-400">
           Scan with the Discord mobile app
         </p>
       </div>
@@ -512,9 +513,9 @@ export function LoginAuthContent({
         } else {
           setError(
             data?.errors?.login?._errors?.[0]?.message ||
-              data?.errors?.password?._errors?.[0]?.message ||
-              data?.message ||
-              'Login failed',
+            data?.errors?.password?._errors?.[0]?.message ||
+            data?.message ||
+            'Login failed',
           );
         }
       } finally {
@@ -558,21 +559,25 @@ export function LoginAuthContent({
   // MFA screen
   if (mfaTicket) {
     return (
-      <div className="flex flex-col gap-3 py-2">
+      <div className="flex flex-col gap-4 py-2">
         <p className="text-center text-sm text-gray-400">
           Enter the 6-digit code from your authenticator app
         </p>
-        <Input
-          type="text"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          placeholder="6-digit code"
-          value={mfaCode}
-          onChange={(e) => setMfaCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') doMfa();
-          }}
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium uppercase text-gray-400">Authentication Code</label>
+          <Input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="000000"
+            className="bg-[#1e1f22] text-center font-mono text-lg tracking-widest focus-visible:ring-[#5865f2]"
+            value={mfaCode}
+            onChange={(e) => setMfaCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') doMfa();
+            }}
+          />
+        </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex gap-2">
           <Button
@@ -587,7 +592,7 @@ export function LoginAuthContent({
             Back
           </Button>
           <Button
-            className="flex-1"
+            className="flex-1 bg-[#5865f2] hover:bg-[#4752c4]"
             disabled={loading || mfaCode.length < 6}
             onClick={doMfa}
           >
@@ -599,27 +604,35 @@ export function LoginAuthContent({
   }
 
   return (
-    <div className="flex flex-col gap-3 py-2">
-      <Input
-        type="text"
-        autoComplete="username"
-        placeholder="Email or phone number"
-        value={login}
-        onChange={(e) => setLogin(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && login.trim() && password) doLogin();
-        }}
-      />
-      <Input
-        type="password"
-        autoComplete="current-password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && login.trim() && password) doLogin();
-        }}
-      />
+    <div className="flex flex-col gap-4 py-2">
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium uppercase text-gray-400">Email or Phone Number</label>
+        <Input
+          type="text"
+          autoComplete="username"
+          placeholder="name@example.com"
+          className="bg-[#1e1f22] focus-visible:ring-[#5865f2]"
+          value={login}
+          onChange={(e) => setLogin(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && login.trim() && password) doLogin();
+          }}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium uppercase text-gray-400">Password</label>
+        <Input
+          type="password"
+          autoComplete="current-password"
+          placeholder="Enter your password"
+          className="bg-[#1e1f22] focus-visible:ring-[#5865f2]"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && login.trim() && password) doLogin();
+          }}
+        />
+      </div>
 
       {captcha && (
         <div className="flex justify-center py-2">
@@ -639,6 +652,7 @@ export function LoginAuthContent({
       <Button
         disabled={loading || !login.trim() || !password}
         onClick={() => doLogin()}
+        className="bg-[#5865f2] hover:bg-[#4752c4]"
       >
         {loading ? 'Logging in...' : 'Log In'}
       </Button>
@@ -648,10 +662,8 @@ export function LoginAuthContent({
 
 export function TokenAuthContent({
   onAuthenticated,
-  onCancel,
 }: {
   onAuthenticated: (token: string) => void;
-  onCancel: () => void;
 }) {
   const [tokenInput, setTokenInput] = useState('');
 
@@ -663,26 +675,25 @@ export function TokenAuthContent({
   };
 
   return (
-    <div className="flex flex-col gap-3 py-2">
-      <Input
-        type="password"
-        name="ignite-discord-token"
-        autoComplete="off"
-        placeholder="Discord token"
-        value={tokenInput}
-        onChange={(e) => setTokenInput(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') handleSubmit();
-        }}
-      />
-      <DialogFooter>
-        <Button variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button disabled={!tokenInput.trim()} onClick={handleSubmit}>
-          Connect
-        </Button>
-      </DialogFooter>
+    <div className="flex flex-col gap-4 py-2">
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium uppercase text-gray-400">Discord Token</label>
+        <Input
+          type="password"
+          name="ignite-discord-token"
+          autoComplete="off"
+          placeholder="Paste your token here"
+          className="bg-[#1e1f22] font-mono text-sm focus-visible:ring-[#5865f2]"
+          value={tokenInput}
+          onChange={(e) => setTokenInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSubmit();
+          }}
+        />
+      </div>
+      <Button className="bg-[#5865f2] hover:bg-[#4752c4]" disabled={!tokenInput.trim()} onClick={handleSubmit}>
+        Connect
+      </Button>
     </div>
   );
 }
@@ -695,7 +706,8 @@ export default function ConnectDiscordDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const isNative = !!window.IgniteNative;
-  const defaultTab = isNative ? 'detect' : 'login';
+  const hasAutoDetect = isNative && window.IgniteNative?.platform === 'win32';
+  const defaultTab = hasAutoDetect ? 'detect' : 'login';
   const [activeTab, setActiveTab] = useState(defaultTab);
 
   const handleAuthenticated = useCallback((token: string) => {
@@ -712,7 +724,7 @@ export default function ConnectDiscordDialog({
         if (!o) setActiveTab(defaultTab);
       }}
     >
-      <DialogContent className="!max-w-sm">
+      <DialogContent className="!max-w-[680px]">
         <DialogHeader>
           <DialogTitle>Connect Discord</DialogTitle>
           <DialogDescription>
@@ -720,40 +732,42 @@ export default function ConnectDiscordDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full">
-            {isNative && <TabsTrigger value="detect">Auto Detect</TabsTrigger>}
-            <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="qr">QR Code</TabsTrigger>
-            <TabsTrigger value="token">Token</TabsTrigger>
-          </TabsList>
+        <div className="flex gap-6">
+          <div className="min-w-0 flex-1">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="w-full">
+                {hasAutoDetect && <TabsTrigger value="detect">Auto Detect</TabsTrigger>}
+                <TabsTrigger value="login">Login</TabsTrigger>
+                <TabsTrigger value="token">Token</TabsTrigger>
+              </TabsList>
 
-          {isNative && (
-            <TabsContent value="detect">
-              <AutoDetectContent
-                onAuthenticated={handleAuthenticated}
-              />
-            </TabsContent>
-          )}
+              {hasAutoDetect && (
+                <TabsContent value="detect">
+                  <AutoDetectContent
+                    onAuthenticated={handleAuthenticated}
+                  />
+                </TabsContent>
+              )}
 
-          <TabsContent value="login">
-            <LoginAuthContent onAuthenticated={handleAuthenticated} />
-          </TabsContent>
+              <TabsContent value="login">
+                <LoginAuthContent onAuthenticated={handleAuthenticated} />
+              </TabsContent>
 
-          <TabsContent value="qr">
+              <TabsContent value="token">
+                <TokenAuthContent
+                  onAuthenticated={handleAuthenticated}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          <div className="flex w-[250px] shrink-0 flex-col items-center justify-center border-l border-white/10 pl-6">
             <QrAuthContent
-              active={open && activeTab === 'qr'}
+              active={open}
               onAuthenticated={handleAuthenticated}
             />
-          </TabsContent>
-
-          <TabsContent value="token">
-            <TokenAuthContent
-              onAuthenticated={handleAuthenticated}
-              onCancel={() => onOpenChange(false)}
-            />
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

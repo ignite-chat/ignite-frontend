@@ -21,6 +21,7 @@ const DMChannelItem = ({
   onClose,
   channelUnreads,
   channelUnreadsLoaded,
+  badge,
 }) => {
   const { togglePin } = useChannelsStore();
   const [showDebugInfo, setShowDebugInfo] = useState(false);
@@ -65,15 +66,16 @@ const DMChannelItem = ({
         <Avatar user={channel.user} size={32} showStatus showOffline />
       </div>
 
-      <div className="flex min-w-0 flex-1 items-center justify-between">
+      <div className="flex min-w-0 flex-1 items-center gap-1">
         <span
           className={`truncate ${unreadState ? 'font-bold text-gray-100' : 'font-medium'}`}
         >
           {channel.user.name}
         </span>
         {channel.isPinned && (
-          <PushPin size={12} weight="fill" className="rotate-45 text-gray-500" />
+          <PushPin size={12} weight="fill" className="shrink-0 rotate-45 text-gray-500" />
         )}
+        {badge}
       </div>
     </DMRowBase>
 

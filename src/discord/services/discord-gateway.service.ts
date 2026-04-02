@@ -385,9 +385,11 @@ export const DiscordGatewayService = {
         this._handleGuildDelete(data);
         break;
       case 'CHANNEL_CREATE':
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleChannelCreate(data);
         break;
       case 'CHANNEL_UPDATE':
+        console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
         this._handleChannelUpdate(data);
         break;
       case 'CHANNEL_DELETE':

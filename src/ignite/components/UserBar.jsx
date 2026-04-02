@@ -24,8 +24,9 @@ import UserSettingsModal from '@/components/modals/UserSettingsModal';
 import UserProfileModal from '@/ignite/components/modals/UserProfileModal';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { LogOut } from 'lucide-react';
+import { LogOut, Plus } from 'lucide-react';
 import Avatar from './Avatar';
+import { useLoginDialogStore } from '@/store/login-dialog.store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useVoiceStore } from '@/ignite/store/voice.store';
 import { useUsersStore } from '@/ignite/store/users.store';
@@ -154,6 +155,17 @@ const UserProfilePopoverMenu = ({ igniteUser, activeDisplay, onSwitch }) => {
           {activeDisplay === 'discord' && <Check size={14} weight="bold" className="shrink-0 text-primary" />}
         </button>
       )}
+
+      <button
+        type="button"
+        onClick={() => useLoginDialogStore.getState().setOpen(true)}
+        className="flex items-center gap-2.5 rounded-sm px-2.5 py-2 text-sm text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+      >
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-full border border-dashed border-gray-500">
+          <Plus size={14} />
+        </div>
+        <span className="text-sm font-medium">Add Account</span>
+      </button>
 
       <div className="my-0.5 h-px bg-white/5" />
       <button
@@ -519,6 +531,15 @@ const UserBar = () => {
             ) : (
               <SpeakerHigh className="size-5 text-gray-400 hover:text-gray-200" weight="fill" />
             )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => useLoginDialogStore.getState().setOpen(true)}
+            className="flex size-9 items-center justify-center rounded hover:bg-white/5"
+            title="Add Account"
+          >
+            <Plus className="size-5 text-gray-400 hover:text-gray-200" />
           </button>
 
           <button

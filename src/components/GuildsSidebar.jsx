@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Fire, Plus, Compass, DiscordLogo, TelegramLogo, SignOut } from '@phosphor-icons/react';
+import { Fire, Plus, Compass, DiscordLogo, TelegramLogo, SignOut, Power } from '@phosphor-icons/react';
 import {
   DndContext,
   DragOverlay,
@@ -712,21 +712,33 @@ const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
   );
 };
 
-const DiscordAccountPopover = ({ account, onDisconnect }) => {
+const DiscordAccountPopover = ({ account, onDisconnect, collapsed, onToggleCollapse }) => {
   const discordUser = account?.user;
   const avatarUrl = discordUser
     ? DiscordService.getUserAvatarUrl(discordUser.id, discordUser.avatar, 128)
     : null;
   const displayName = discordUser?.global_name || discordUser?.username || 'Discord';
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
   return (
-    <Popover>
+    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
       <Tooltip>
         <TooltipTrigger asChild>
           <PopoverTrigger asChild>
-            <button type="button" className="group relative mb-2 min-w-min px-3">
+            <button
+              type="button"
+              className="group relative mb-2 min-w-min px-3"
+              onClick={(e) => {
+                e.preventDefault();
+                onToggleCollapse();
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setPopoverOpen(true);
+              }}
+            >
               <div className="relative mx-auto h-12 w-12">
-                <div className="absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden rounded-full transition-all duration-300 ease-out ring-2 ring-transparent hover:ring-[#5865f2]">
+                <div className={`absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden rounded-full transition-all duration-300 ease-out ring-2 ring-transparent hover:ring-[#5865f2] ${collapsed ? 'opacity-50' : ''}`}>
                   {avatarUrl ? (
                     <img src={avatarUrl} alt={displayName} className="size-full object-cover" draggable="false" />
                   ) : (
@@ -769,7 +781,7 @@ const DiscordAccountPopover = ({ account, onDisconnect }) => {
         <div className="h-px bg-white/10" />
         <button
           type="button"
-          onClick={onDisconnect}
+          onClick={() => { setPopoverOpen(false); onDisconnect(); }}
           className="mt-1.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-red-400 hover:bg-white/5 hover:text-red-300"
         >
           <SignOut className="size-4" />
@@ -796,6 +808,7 @@ const GuildsSidebar = () => {
   const [disconnectingAccount, setDisconnectingAccount] = useState(null);
   const [isTelegramDialogOpen, setIsTelegramDialogOpen] = useState(false);
   const [disconnectingTelegram, setDisconnectingTelegram] = useState(false);
+  const [collapsedAccounts, setCollapsedAccounts] = useState({});
   const lastDmChannelId = useLastChannelStore((s) => s.lastChannels['@me']);
 
   // Telegram state
@@ -850,11 +863,15 @@ const GuildsSidebar = () => {
           }
         }
 
-        // Any guilds not in folders
+        // Any guilds not in folders go at the top
+        const unplaced = [];
         for (const g of accountGuilds) {
           if (!placed.has(g.id)) {
-            entries.push({ type: 'guild', guild: g });
+            unplaced.push({ type: 'guild', guild: g });
           }
+        }
+        if (unplaced.length > 0) {
+          entries = [...unplaced, ...entries];
         }
       } else {
         entries = accountGuilds.map((g) => ({ type: 'guild', guild: g }));
@@ -1150,11 +1167,16 @@ const GuildsSidebar = () => {
         {/* Discord accounts — desktop only */}
         {!!window.IgniteNative && (
           <>
-            {discordAccountSections.map(({ account, entries, folders: accountFolders }) => (
+            {discordAccountSections.map(({ account, entries, folders: accountFolders }) => {
+              const accountKey = account.user?.id || account.token;
+              const isCollapsed = !!collapsedAccounts[accountKey];
+              return (
               <div key={account.token}>
                 <DiscordAccountPopover
                   account={account}
                   onDisconnect={() => setDisconnectingAccount(account)}
+                  collapsed={isCollapsed}
+                  onToggleCollapse={() => setCollapsedAccounts((prev) => ({ ...prev, [accountKey]: !prev[accountKey] }))}
                 />
                 {/* {!account.isConnected && (
                   <div className="mx-3 mb-2 flex items-center justify-center gap-1.5 rounded-lg bg-yellow-500/10 px-2 py-1.5">
@@ -1162,7 +1184,7 @@ const GuildsSidebar = () => {
                     <span className="text-[10px] font-medium text-yellow-500">Reconnecting…</span>
                   </div>
                 )} */}
-                {entries.length > 0 && (
+                {!isCollapsed && entries.length > 0 && (
                   <div className={!account.isConnected ? 'opacity-50' : undefined}>
                     <DiscordGuildsDnd
                       entries={entries}
@@ -1172,7 +1194,8 @@ const GuildsSidebar = () => {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
 
             {/* Connect Discord button */}
             <button
@@ -1188,33 +1211,57 @@ const GuildsSidebar = () => {
             {/* Telegram section */}
             {telegramConnected && telegramUser ? (
               <div>
-                <button
-                  type="button"
-                  className="group relative mb-2 flex w-full justify-center px-3"
-                  onClick={() => {
-                    if (telegramChats.length > 0) {
-                      navigate(`/telegram/${telegramChats[0].id}`);
-                    } else {
-                      navigate('/telegram');
-                    }
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setDisconnectingTelegram(true);
-                  }}
-                >
-                  <div
-                    className={`flex size-12 items-center justify-center rounded-2xl bg-[#2AABEE] text-white transition-all hover:rounded-xl ${
-                      location.pathname.startsWith('/telegram') ? 'rounded-xl' : ''
-                    }`}
-                  >
-                    <TelegramLogo className="size-6" weight="fill" />
-                  </div>
-                  {/* Unread indicator */}
-                  {telegramChats.some((c) => c.unreadCount > 0) && (
-                    <div className="absolute -bottom-0.5 right-2 size-2.5 rounded-full bg-white" />
-                  )}
-                </button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="group relative mb-2 flex w-full justify-center px-3"
+                    >
+                      <div
+                        className={`flex size-12 items-center justify-center rounded-2xl bg-[#2AABEE] text-white transition-all hover:rounded-xl ${
+                          location.pathname.startsWith('/telegram') ? 'rounded-xl' : ''
+                        }`}
+                      >
+                        <TelegramLogo className="size-6" weight="fill" />
+                      </div>
+                      {telegramChats.some((c) => c.unreadCount > 0) && (
+                        <div className="absolute -bottom-0.5 right-2 size-2.5 rounded-full bg-white" />
+                      )}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="right" align="center" className="w-56 p-0" sideOffset={8}>
+                    <div className="flex flex-col">
+                      <div className="border-b border-white/5 px-3 py-2.5">
+                        <div className="text-sm font-semibold text-white">{telegramUser.firstName} {telegramUser.lastName || ''}</div>
+                        {telegramUser.username && (
+                          <div className="text-xs text-gray-400">@{telegramUser.username}</div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-white/5"
+                        onClick={() => {
+                          if (telegramChats.length > 0) {
+                            navigate(`/telegram/${telegramChats[0].id}`);
+                          } else {
+                            navigate('/telegram');
+                          }
+                        }}
+                      >
+                        <TelegramLogo className="size-4" />
+                        Open Telegram
+                      </button>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 transition-colors hover:bg-red-500/10"
+                        onClick={() => setDisconnectingTelegram(true)}
+                      >
+                        <Power className="size-4" />
+                        Disconnect
+                      </button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             ) : (
               <button
@@ -1271,7 +1318,7 @@ const GuildsSidebar = () => {
                 await TelegramService.logout();
                 setDisconnectingTelegram(false);
                 if (location.pathname.startsWith('/telegram')) {
-                  navigate(hasIgniteToken ? '/channels/@me' : '/login');
+                  navigate('/channels/@me');
                 }
               }}
               className="bg-red-500 text-white hover:bg-red-600"
@@ -1303,7 +1350,7 @@ const GuildsSidebar = () => {
                   // If no accounts left and no ignite token, redirect
                   const remaining = useDiscordStore.getState().accounts;
                   if (remaining.length === 0 && !hasIgniteToken) {
-                    navigate('/login');
+                    navigate('/channels/@me');
                   } else if (location.pathname.startsWith('/discord')) {
                     navigate(hasIgniteToken ? '/channels/@me' : '/discord');
                   }

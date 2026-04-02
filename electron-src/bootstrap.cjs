@@ -52,7 +52,7 @@ const startCore = () => {
     height: 800,
     center: true,
     titleBarStyle: 'hidden',
-    backgroundColor: '#2f3136',
+    backgroundColor: '#121214',
     webPreferences: {
       preload: join(__dirname, "preload.js"),
       contextIsolation: true,

@@ -4,10 +4,22 @@ import { GuildContextProvider } from '@/ignite/contexts/GuildContext';
 import GuildsSidebar from '@/components/GuildsSidebar';
 import UserBar from '@/ignite/components/UserBar';
 import WindowBar from '@/components/WindowBar';
+import LoginDialog from '@/components/LoginDialog';
 import { useSidebarWidthStore } from '@/store/sidebar-width.store';
 import { useDiscordFileDropStore } from '@/discord/store/discord-file-drop.store';
+import { useAuthStore } from '@/ignite/store/auth.store';
+import { useDiscordStore } from '@/discord/store/discord.store';
+import { useTelegramStore } from '@/telegram/store/telegram.store';
+import { useLoginDialogStore } from '@/store/login-dialog.store';
 
 const AppLayout = () => {
+  const { userId } = useAuthStore();
+  const discordAccounts = useDiscordStore((s) => s.accounts);
+  const telegramSession = useTelegramStore((s) => s.session);
+  const isLoggedIn = !!(userId || discordAccounts.length > 0 || telegramSession);
+  const loginDialogOpen = useLoginDialogStore((s) => s.open);
+  const setLoginDialogOpen = useLoginDialogStore((s) => s.setOpen);
+
   const location = useLocation();
   const isDM = location.pathname.startsWith('/channels/@me');
   const isDiscordGuild = location.pathname.startsWith('/discord/') && !location.pathname.startsWith('/discord/@me');
@@ -82,6 +94,10 @@ const AppLayout = () => {
           </div>
         )}
       </div>
+      <LoginDialog
+        open={!isLoggedIn || loginDialogOpen}
+        onOpenChange={(open) => setLoginDialogOpen(open)}
+      />
     </GuildContextProvider>
   );
 };

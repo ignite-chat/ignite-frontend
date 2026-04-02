@@ -6,9 +6,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { QRCodeSVG } from 'qrcode.react';
 import { TelegramClientService } from '../services/telegram-client.service';
 import { TelegramService } from '../services/telegram.service';
@@ -163,8 +163,8 @@ function QrCodeStep({
 
   if (status === 'loading') {
     return (
-      <div className="flex flex-col items-center gap-3 py-6">
-        <div className="size-5 animate-spin rounded-full border-2 border-solid border-[#2AABEE] border-t-transparent" />
+      <div className="flex flex-col items-center gap-3 py-4">
+        <Skeleton className="size-[200px] rounded-lg" />
         <p className="text-sm text-gray-400">Connecting to Telegram...</p>
       </div>
     );
@@ -172,23 +172,27 @@ function QrCodeStep({
 
   if (status === 'password') {
     return (
-      <div className="flex flex-col gap-3 py-2">
+      <div className="flex flex-col gap-4 py-2">
         <p className="text-sm text-gray-400">
           Two-factor authentication is enabled. Enter your cloud password.
         </p>
-        <Input
-          type="password"
-          autoComplete="current-password"
-          placeholder="Cloud password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handlePasswordSubmit();
-          }}
-          autoFocus
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium uppercase text-gray-400">Cloud Password</label>
+          <Input
+            type="password"
+            autoComplete="current-password"
+            placeholder="Enter your password"
+            className="bg-[#1e1f22] focus-visible:ring-[#2AABEE]"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handlePasswordSubmit();
+            }}
+            autoFocus
+          />
+        </div>
         {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
-        <Button disabled={passwordLoading || !password} onClick={handlePasswordSubmit}>
+        <Button className="bg-[#2AABEE] hover:bg-[#229ED9]" disabled={passwordLoading || !password} onClick={handlePasswordSubmit}>
           {passwordLoading ? (
             <span className="flex items-center gap-2">
               <span className="size-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
@@ -246,7 +250,7 @@ function QrCodeStep({
         </>
       ) : (
         <div className="flex flex-col items-center gap-3">
-          <div className="size-5 animate-spin rounded-full border-2 border-solid border-[#2AABEE] border-t-transparent" />
+          <Skeleton className="size-[200px] rounded-lg" />
           <p className="text-sm text-gray-400">Generating QR code...</p>
         </div>
       )}
@@ -325,75 +329,74 @@ function PhoneStep({
   };
 
   return (
-    <div className="flex flex-col gap-3 py-2">
-      <p className="text-sm text-gray-400">
-        Enter your phone number to receive a verification code via Telegram or SMS.
-      </p>
+    <div className="flex flex-col gap-4 py-2">
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium uppercase text-gray-400">Phone Number</label>
+        <div className="flex gap-2">
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              className="flex h-9 items-center gap-1.5 rounded-md border border-input bg-[#1e1f22] px-2.5 text-sm transition-colors hover:bg-accent"
+              onClick={() => { setDropdownOpen(!dropdownOpen); setSearch(''); }}
+            >
+              <span>{selectedCountry.flag}</span>
+              <span className="font-mono text-gray-300">{countryCode}</span>
+              <svg className={`size-3 text-gray-500 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
 
-      <div className="flex gap-2">
-        <div className="relative" ref={dropdownRef}>
-          <button
-            type="button"
-            className="flex h-9 items-center gap-1.5 rounded-md border border-input bg-transparent px-2.5 text-sm transition-colors hover:bg-accent"
-            onClick={() => { setDropdownOpen(!dropdownOpen); setSearch(''); }}
-          >
-            <span>{selectedCountry.flag}</span>
-            <span className="font-mono text-gray-300">{countryCode}</span>
-            <svg className={`size-3 text-gray-500 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+            {dropdownOpen && (
+              <div className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-md border border-white/10 bg-[#1e1f22] shadow-xl">
+                <div className="border-b border-white/5 p-2">
+                  <input
+                    type="text"
+                    className="w-full rounded bg-white/5 px-2 py-1.5 text-sm text-white placeholder:text-gray-500 focus:outline-none"
+                    placeholder="Search countries..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  {filteredCountries.map((c) => (
+                    <button
+                      key={`${c.country}-${c.code}`}
+                      type="button"
+                      className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-white/5 ${
+                        c.code === countryCode && c.country === selectedCountry.country ? 'bg-white/10' : ''
+                      }`}
+                      onClick={() => { setCountryCode(c.code); setDropdownOpen(false); setSearch(''); phoneInputRef.current?.focus(); }}
+                    >
+                      <span>{c.flag}</span>
+                      <span className="flex-1 text-gray-200">{c.name}</span>
+                      <span className="font-mono text-xs text-gray-500">{c.code}</span>
+                    </button>
+                  ))}
+                  {filteredCountries.length === 0 && (
+                    <div className="px-3 py-3 text-center text-xs text-gray-500">No results</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
-          {dropdownOpen && (
-            <div className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-md border border-white/10 bg-[#1e1f22] shadow-xl">
-              <div className="border-b border-white/5 p-2">
-                <input
-                  type="text"
-                  className="w-full rounded bg-white/5 px-2 py-1.5 text-sm text-white placeholder:text-gray-500 focus:outline-none"
-                  placeholder="Search countries..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  autoFocus
-                />
-              </div>
-              <div className="max-h-48 overflow-y-auto">
-                {filteredCountries.map((c) => (
-                  <button
-                    key={`${c.country}-${c.code}`}
-                    type="button"
-                    className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-white/5 ${
-                      c.code === countryCode && c.country === selectedCountry.country ? 'bg-white/10' : ''
-                    }`}
-                    onClick={() => { setCountryCode(c.code); setDropdownOpen(false); setSearch(''); phoneInputRef.current?.focus(); }}
-                  >
-                    <span>{c.flag}</span>
-                    <span className="flex-1 text-gray-200">{c.name}</span>
-                    <span className="font-mono text-xs text-gray-500">{c.code}</span>
-                  </button>
-                ))}
-                {filteredCountries.length === 0 && (
-                  <div className="px-3 py-3 text-center text-xs text-gray-500">No results</div>
-                )}
-              </div>
-            </div>
-          )}
+          <Input
+            ref={phoneInputRef}
+            type="tel"
+            autoComplete="tel-national"
+            placeholder="Phone number"
+            className="flex-1 bg-[#1e1f22] focus-visible:ring-[#2AABEE]"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9\s\-()]/g, ''))}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+          />
         </div>
-
-        <Input
-          ref={phoneInputRef}
-          type="tel"
-          autoComplete="tel-national"
-          placeholder="Phone number"
-          className="flex-1"
-          value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9\s\-()]/g, ''))}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-        />
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Button disabled={loading || !phoneNumber.trim()} onClick={handleSubmit}>
+      <Button className="w-full bg-[#2AABEE] hover:bg-[#229ED9]" disabled={loading || !phoneNumber.trim()} onClick={handleSubmit}>
         {loading ? (
           <span className="flex items-center gap-2">
             <span className="size-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
@@ -453,25 +456,29 @@ function CodeStep({
     : phone;
 
   return (
-    <div className="flex flex-col gap-3 py-2">
+    <div className="flex flex-col gap-4 py-2">
       <p className="text-sm text-gray-400">
         Enter the verification code sent to{' '}
         <span className="font-mono font-medium text-white">{maskedPhone}</span>
       </p>
-      <Input
-        type="text"
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        placeholder="Verification code"
-        value={code}
-        onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-        onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-        autoFocus
-      />
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium uppercase text-gray-400">Verification Code</label>
+        <Input
+          type="text"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="00000"
+          className="bg-[#1e1f22] text-center font-mono text-lg tracking-widest focus-visible:ring-[#2AABEE]"
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+          autoFocus
+        />
+      </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onBack}>Back</Button>
-        <Button className="flex-1" disabled={loading || code.length < 5} onClick={handleSubmit}>
+        <Button className="flex-1 bg-[#2AABEE] hover:bg-[#229ED9]" disabled={loading || code.length < 5} onClick={handleSubmit}>
           {loading ? (
             <span className="flex items-center gap-2">
               <span className="size-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
@@ -518,23 +525,27 @@ function PasswordStep({
   };
 
   return (
-    <div className="flex flex-col gap-3 py-2">
+    <div className="flex flex-col gap-4 py-2">
       <p className="text-sm text-gray-400">
         Two-factor authentication is enabled. Enter your cloud password.
       </p>
-      <Input
-        type="password"
-        autoComplete="current-password"
-        placeholder="Cloud password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-        autoFocus
-      />
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium uppercase text-gray-400">Cloud Password</label>
+        <Input
+          type="password"
+          autoComplete="current-password"
+          placeholder="Enter your password"
+          className="bg-[#1e1f22] focus-visible:ring-[#2AABEE]"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+          autoFocus
+        />
+      </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onBack}>Back</Button>
-        <Button className="flex-1" disabled={loading || !password} onClick={handleSubmit}>
+        <Button className="flex-1 bg-[#2AABEE] hover:bg-[#229ED9]" disabled={loading || !password} onClick={handleSubmit}>
           {loading ? (
             <span className="flex items-center gap-2">
               <span className="size-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
@@ -559,7 +570,6 @@ export default function ConnectTelegramDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [step, setStep] = useState<AuthStep>('phone');
-  const [activeTab, setActiveTab] = useState('qr');
   const [phone, setPhone] = useState('');
   const [phoneCodeHash, setPhoneCodeHash] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -580,7 +590,6 @@ export default function ConnectTelegramDialog({
     setTimeout(() => {
       onOpenChange(false);
       setStep('phone');
-      setActiveTab('qr');
     }, 1000);
   }, [onOpenChange]);
 
@@ -594,7 +603,6 @@ export default function ConnectTelegramDialog({
       onOpenChange(o);
       if (!o) {
         setStep('phone');
-        setActiveTab('qr');
         setPhone('');
         setPhoneCodeHash('');
         setErrorMsg('');
@@ -608,12 +616,12 @@ export default function ConnectTelegramDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="!max-w-sm">
+      <DialogContent className="!max-w-[680px]">
         <DialogHeader>
           <DialogTitle>Connect Telegram</DialogTitle>
           <DialogDescription>
             {showTabs
-              ? 'Scan a QR code with your phone or log in with your phone number.'
+              ? 'Log in with your phone number or scan a QR code.'
               : step === 'code'
                 ? 'Enter the verification code.'
                 : step === 'password'
@@ -625,23 +633,18 @@ export default function ConnectTelegramDialog({
         </DialogHeader>
 
         {showTabs && (
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full">
-              <TabsTrigger value="qr">QR Code</TabsTrigger>
-              <TabsTrigger value="phone">Phone Number</TabsTrigger>
-            </TabsList>
+          <div className="flex gap-6">
+            <div className="min-w-0 flex-1">
+              <PhoneStep onCodeSent={handleCodeSent} onError={handleError} />
+            </div>
 
-            <TabsContent value="qr">
+            <div className="flex w-[250px] shrink-0 flex-col items-center justify-center border-l border-white/10 pl-6">
               <QrCodeStep
-                active={open && activeTab === 'qr'}
+                active={open}
                 onSuccess={handleSuccess}
               />
-            </TabsContent>
-
-            <TabsContent value="phone">
-              <PhoneStep onCodeSent={handleCodeSent} onError={handleError} />
-            </TabsContent>
-          </Tabs>
+            </div>
+          </div>
         )}
 
         {step === 'code' && (

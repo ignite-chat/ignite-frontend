@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Users, Clock, XCircle, CheckCircle } from '@phosphor-icons/react';
 import { useUsersStore } from '../store/users.store';
@@ -276,15 +276,6 @@ const InvitePage = () => {
                     >
                       {joining ? 'Joining...' : 'Continue'}
                     </Button>
-                    <p className="text-center text-sm text-muted-foreground">
-                      Already have an account?{' '}
-                      <Link
-                        to={`/login?redirect=/invite/${code}`}
-                        className="text-primary underline-offset-2 hover:underline"
-                      >
-                        Login
-                      </Link>
-                    </p>
                   </div>
                 )}
               </div>

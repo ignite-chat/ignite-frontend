@@ -37,7 +37,7 @@ const TelegramChatPage = () => {
   useEffect(() => {
     if (!session) {
       const hasIgniteToken = !!localStorage.getItem('token');
-      navigate(hasIgniteToken ? '/channels/@me' : '/login', { replace: true });
+      navigate('/channels/@me', { replace: true });
     }
   }, [session, navigate]);
 

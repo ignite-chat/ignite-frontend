@@ -1,17 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useMountEffect } from './hooks/useMountEffect';
-import { Navigate, Outlet, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
 import { useAuthStore } from './ignite/store/auth.store';
 import PageTitle from './ignite/components/PageTitle';
-import LoginPage from './ignite/pages/Login';
-import RegisterPage from './ignite/pages/Register';
 import DirectMessagesPage from './ignite/pages/DirectMessages';
 import GuildChannelPage from './ignite/pages/GuildChannel';
 import InvitePage from './ignite/pages/InvitePage';
 import GuildDiscoveryPage from './ignite/pages/GuildDiscovery';
 import DiscordGuildPage from './discord/pages/DiscordGuildPage';
 import DiscordLandingPage from './discord/pages/DiscordLandingPage';
-import TelegramLandingPage from './telegram/pages/TelegramLandingPage';
 import TelegramChatPage from './telegram/pages/TelegramChatPage';
 import AppLayout from './layouts/AppLayout';
 import { InitializationService } from './ignite/services/initialization.service';
@@ -26,11 +23,8 @@ const AuthRoute = ({ children }) => {
   const { guilds } = useGuildsStore();
 
   const [initialized, setInitialized] = useState(false);
-  const [failed, setFailed] = useState(false);
 
   const hasIgniteToken = !!localStorage.getItem('token');
-  const hasDiscordToken = !!localStorage.getItem('discord_accounts') || !!localStorage.getItem('discord_token');
-  const hasTelegramSession = !!localStorage.getItem('telegram_session');
 
   // Sync taskbar badge with unread/mention state (Electron only)
   useElectronBadge();
@@ -47,10 +41,6 @@ const AuthRoute = ({ children }) => {
 
     const init = async () => {
       const result = await InitializationService.initialize();
-
-      if (result.error) {
-        setFailed(true);
-      }
 
       setInitialized(true);
     };
@@ -97,34 +87,9 @@ const AuthRoute = ({ children }) => {
   //   );
   // }
 
-  // No auth at all → redirect to login
-  if (!hasIgniteToken && !hasDiscordToken && !hasTelegramSession) {
-    return <Navigate to="/login" replace />;
-  }
-
   // While initializing, render the app layout so skeletons show instead of a spinner
   if (hasIgniteToken && !initialized) {
     return children ? children : <Outlet />;
-  }
-
-  if (hasIgniteToken && !userId) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return children ? children : <Outlet />;
-};
-
-const GuestRoute = ({ children }) => {
-  if (localStorage.getItem('token')) {
-    return <Navigate to="/channels/@me" replace />;
-  }
-
-  if (window.IgniteNative && (localStorage.getItem('discord_accounts') || localStorage.getItem('discord_token'))) {
-    return <Navigate to="/discord" replace />;
-  }
-
-  if (window.IgniteNative && localStorage.getItem('telegram_session')) {
-    return <Navigate to="/telegram" replace />;
   }
 
   return children ? children : <Outlet />;
@@ -153,25 +118,13 @@ const DiscordDMRedirect = () => {
 };
 
 function App() {
-  const { userId } = useAuthStore();
-
   return (
     <>
       <VoiceAudioRenderer />
       <Routes>
         <Route
           index
-          element={
-            userId ? (
-              <Navigate to="/channels/@me" replace />
-            ) : window.IgniteNative && (localStorage.getItem('discord_accounts') || localStorage.getItem('discord_token')) ? (
-              <Navigate to="/discord" replace />
-            ) : window.IgniteNative && localStorage.getItem('telegram_session') ? (
-              <Navigate to="/telegram" replace />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
+          element={<Navigate to="/channels/@me" replace />}
         />
         <Route element={<PublicRoute />}>
           <Route
@@ -180,26 +133,6 @@ function App() {
               <>
                 <PageTitle title="Server Invite" />
                 <InvitePage />
-              </>
-            }
-          />
-        </Route>
-        <Route element={<GuestRoute />}>
-          <Route
-            path="login"
-            element={
-              <>
-                <PageTitle title="Login" />
-                <LoginPage />
-              </>
-            }
-          />
-          <Route
-            path="register"
-            element={
-              <>
-                <PageTitle title="Register" />
-                <RegisterPage />
               </>
             }
           />
@@ -239,7 +172,6 @@ function App() {
                   path="/discord/:guildId/:channelId?"
                   element={<DiscordGuildPage />}
                 />
-                <Route path="/telegram" element={<TelegramLandingPage />} />
                 <Route
                   path="/telegram/:chatId"
                   element={<TelegramChatPage />}

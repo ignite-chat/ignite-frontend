@@ -1,6 +1,6 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { UserStarIcon, MailIcon } from 'lucide-react';
-import { DiscordLogo, GameController, MusicNote, Broadcast, Eye, Trophy, Check } from '@phosphor-icons/react';
+import { DiscordLogo, TelegramLogo, GameController, MusicNote, Broadcast, Eye, Trophy, Check } from '@phosphor-icons/react';
 import { useDiscordActivitiesStore, ActivityType } from '@/discord/store/discord-activities.store';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -28,6 +28,56 @@ import NewDMModal from '@/ignite/components/modals/NewDMModal';
 import { useModalStore } from '@/ignite/store/modal.store';
 import { DISCORD_EPOCH } from '@/discord/utils/snowflake';
 import { PushPin } from '@phosphor-icons/react';
+import { useAuthStore } from '@/ignite/store/auth.store';
+import { useTelegramStore } from '@/telegram/store/telegram.store';
+import { useTelegramChatsStore } from '@/telegram/store/telegram-chats.store';
+import Avatar from '@/ignite/components/Avatar';
+
+const AccountBadge = ({ source }) => {
+  const discordUser = useDiscordStore((s) => s.user);
+  const igniteUser = useUsersStore((s) => s.getCurrentUser());
+
+  if (source === 'discord') {
+    const avatarUrl = discordUser
+      ? DiscordService.getUserAvatarUrl(discordUser.id, discordUser.avatar, 32)
+      : null;
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="ml-auto flex shrink-0 items-center self-center">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="size-6 rounded-full object-cover" />
+            ) : (
+              <DiscordLogo size={18} weight="fill" className="text-[#5865f2]" />
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top">{discordUser?.global_name || discordUser?.username || 'Discord'}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  if (source === 'ignite') {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="ml-auto flex shrink-0 items-center self-center">
+            {igniteUser?.avatar_url ? (
+              <img src={igniteUser.avatar_url} alt="" className="size-6 rounded-full object-cover" />
+            ) : (
+              <div className="flex size-6 items-center justify-center rounded-full bg-orange-500/20 text-[9px] font-bold text-orange-400">
+                {igniteUser?.username?.slice(0, 1).toUpperCase() || 'I'}
+              </div>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top">{igniteUser?.username || 'Ignite'}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return null;
+};
 
 const IGNITE_EPOCH = 1444521600000; // Oct 10, 2015
 
@@ -165,12 +215,6 @@ const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onCli
           {isPinned && (
             <PushPin size={12} weight="fill" className="shrink-0 rotate-45 text-gray-500" />
           )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DiscordLogo size={14} weight="fill" className="ml-auto shrink-0 text-[#5865f2]" />
-            </TooltipTrigger>
-            <TooltipContent side="top">Discord</TooltipContent>
-          </Tooltip>
         </div>
         {info.user?.id === '643945264868098049' && (
           <div className="truncate text-left text-[12px] text-gray-400/60">Official Discord Message</div>
@@ -218,6 +262,7 @@ const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onCli
         )}
       </div>
 
+      <AccountBadge source="discord" />
     </DMRowBase>
   );
 };
@@ -240,6 +285,17 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
   const discordChannels = useDiscordChannelsStore((s) => s.channels);
   const discordUsersMap = useDiscordUsersStore((s) => s.users);
   const disableMessageRequests = useDiscordPreferencesStore((s) => s.disableMessageRequests);
+
+  // Account filter state
+  const { userId: igniteUserId } = useAuthStore();
+  const igniteUser = useUsersStore((s) => s.getCurrentUser());
+  const telegramSession = useTelegramStore((s) => s.session);
+  const telegramUser = useTelegramStore((s) => s.user);
+  const telegramChats = useTelegramChatsStore((s) => s.chats);
+  const [hiddenSources, setHiddenSources] = useState({});
+  const toggleSource = useCallback((source) => {
+    setHiddenSources((prev) => ({ ...prev, [source]: !prev[source] }));
+  }, []);
 
   const normalizeThread = useCallback(
     (thread) => {
@@ -363,14 +419,96 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
 
         <div className="mx-2 my-2 border-b border-white/5" />
 
+        {/* Account filters */}
+        <div className="flex items-center justify-center gap-1.5 py-1.5">
+          {!!igniteUserId && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => toggleSource('ignite')}
+                  className={`flex size-8 items-center justify-center rounded-full transition-all ${
+                    hiddenSources.ignite
+                      ? 'opacity-30 grayscale hover:opacity-50'
+                      : 'ring-2 ring-transparent hover:ring-white/20'
+                  }`}
+                >
+                  {igniteUser?.avatar_url ? (
+                    <img src={igniteUser.avatar_url} alt="Ignite" className="size-8 rounded-full object-cover" />
+                  ) : (
+                    <div className="flex size-8 items-center justify-center rounded-full bg-orange-500/20 text-xs font-semibold text-orange-400">
+                      {igniteUser?.username?.slice(0, 1).toUpperCase() || 'I'}
+                    </div>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {hiddenSources.ignite ? 'Show' : 'Hide'} {igniteUser?.username || 'Ignite'} (Ignite)
+              </TooltipContent>
+            </Tooltip>
+          )}
+          {discordConnected && discordUser && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => toggleSource('discord')}
+                  className={`flex size-8 items-center justify-center rounded-full transition-all ${
+                    hiddenSources.discord
+                      ? 'opacity-30 grayscale hover:opacity-50'
+                      : 'ring-2 ring-transparent hover:ring-white/20'
+                  }`}
+                >
+                  {discordUser.avatar ? (
+                    <img
+                      src={DiscordService.getUserAvatarUrl(discordUser.id, discordUser.avatar, 64)}
+                      alt="Discord"
+                      className="size-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex size-8 items-center justify-center rounded-full bg-[#5865f2] text-white">
+                      <DiscordLogo size={16} weight="fill" />
+                    </div>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {hiddenSources.discord ? 'Show' : 'Hide'} {discordUser.global_name || discordUser.username} (Discord)
+              </TooltipContent>
+            </Tooltip>
+          )}
+          {!!telegramSession && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => toggleSource('telegram')}
+                  className={`flex size-8 items-center justify-center rounded-full transition-all ${
+                    hiddenSources.telegram
+                      ? 'opacity-30 grayscale hover:opacity-50'
+                      : 'ring-2 ring-transparent hover:ring-white/20'
+                  }`}
+                >
+                  <div className="flex size-8 items-center justify-center rounded-full bg-[#2AABEE] text-white">
+                    <TelegramLogo size={16} weight="fill" />
+                  </div>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {hiddenSources.telegram ? 'Show' : 'Hide'} {telegramUser?.firstName || 'Telegram'} (Telegram)
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+
         {/* Pinned */}
-        {(pinnedDms.length > 0 || pinnedDiscordDms.length > 0) && (
+        {((!hiddenSources.ignite && pinnedDms.length > 0) || (!hiddenSources.discord && pinnedDiscordDms.length > 0)) && (
           <>
             <div className="mt-4 flex cursor-default select-none items-center px-2 text-[11px] font-bold uppercase tracking-wider text-gray-500">
               Pinned
             </div>
             <div className="mt-2 space-y-0.5">
-              {pinnedDms.map((channel) => (
+              {!hiddenSources.ignite && pinnedDms.map((channel) => (
                 <DMChannelItem
                   key={channel.channel_id}
                   channel={channel}
@@ -379,9 +517,10 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                   onClose={() => handleCloseIgniteDM(channel.channel_id)}
                   channelUnreads={channelUnreads}
                   channelUnreadsLoaded={channelUnreadsLoaded}
+                  badge={<AccountBadge source="ignite" />}
                 />
               ))}
-              {pinnedDiscordDms.map((channel) => (
+              {!hiddenSources.discord && pinnedDiscordDms.map((channel) => (
                 <DiscordDMChannelRow
                   key={`discord-pinned-${channel.id}`}
                   channel={channel}
@@ -404,7 +543,9 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
         </div>
         {mergedDms.length > 0 ? (
           <div className="mt-2 space-y-0.5">
-            {mergedDms.map((item) =>
+            {mergedDms
+              .filter((item) => !hiddenSources[item._source])
+              .map((item) =>
               item._source === 'discord' ? (
                 <DiscordDMChannelRow
                   key={`discord-${item._id}`}
@@ -426,6 +567,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                   onClose={() => handleCloseIgniteDM(item._id)}
                   channelUnreads={channelUnreads}
                   channelUnreadsLoaded={channelUnreadsLoaded}
+                  badge={<AccountBadge source="ignite" />}
                 />
               )
             )}
