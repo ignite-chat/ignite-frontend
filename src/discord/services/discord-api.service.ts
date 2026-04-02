@@ -20,6 +20,7 @@ import type {
   ApplicationIdentitiesResponse,
 } from '../types';
 import { useDiscordStore } from '../store/discord.store';
+import { useDiscordChannelsStore } from '../store/discord-channels.store';
 import { requestCaptchaSolution } from './discord-captcha-bridge';
 
 const buildSuperProperties = () => {
@@ -64,6 +65,16 @@ discordApi.interceptors.request.use((config) => {
     token = configAny._accountToken;
   } else if (configAny._accountId) {
     token = useDiscordStore.getState().getAccountByUserId(configAny._accountId)?.token ?? null;
+  }
+  // Auto-detect account from channel ID in URL
+  if (!token && config.url) {
+    const channelMatch = config.url.match(/\/channels\/(\d+)/);
+    if (channelMatch) {
+      const channel = useDiscordChannelsStore.getState().channels.find((c: any) => c.id === channelMatch[1]);
+      if (channel && (channel as any)._accountId) {
+        token = useDiscordStore.getState().getAccountByUserId((channel as any)._accountId)?.token ?? null;
+      }
+    }
   }
   if (!token) {
     token = useDiscordStore.getState().token;

@@ -20,9 +20,12 @@ export const useDiscordReadStatesStore = create<DiscordReadStatesStore>((set, ge
   readStates: {},
 
   setReadStates: (entries) =>
-    set({
-      readStates: Object.fromEntries(entries.map((e) => [e.id, e])),
-    }),
+    set((state) => ({
+      readStates: {
+        ...state.readStates,
+        ...Object.fromEntries(entries.map((e) => [e.id, e])),
+      },
+    })),
 
   updateReadState: (id, updates) =>
     set((state) => ({

@@ -14,10 +14,11 @@ export type { DiscordRelationship } from '../types';
 type DiscordRelationshipsStore = {
   relationships: DiscordRelationship[];
 
-  setRelationships: (relationships: DiscordRelationship[]) => void;
+  setRelationships: (relationships: DiscordRelationship[], accountId?: string) => void;
   addRelationship: (relationship: DiscordRelationship) => void;
   removeRelationship: (userId: string) => void;
   updateRelationship: (userId: string, updates: Partial<DiscordRelationship>) => void;
+  clearAccount: (accountId: string) => void;
 
   clear: () => void;
 };
@@ -25,7 +26,16 @@ type DiscordRelationshipsStore = {
 export const useDiscordRelationshipsStore = create<DiscordRelationshipsStore>((set) => ({
   relationships: [],
 
-  setRelationships: (relationships) => set({ relationships }),
+  setRelationships: (relationships, accountId) => {
+    if (accountId) {
+      const tagged = relationships.map((r) => ({ ...r, _accountId: accountId }));
+      set((state) => ({
+        relationships: [...state.relationships.filter((r) => (r as any)._accountId !== accountId), ...tagged],
+      }));
+    } else {
+      set({ relationships });
+    }
+  },
 
   addRelationship: (relationship) =>
     set((state) => {
@@ -43,6 +53,11 @@ export const useDiscordRelationshipsStore = create<DiscordRelationshipsStore>((s
       relationships: state.relationships.map((r) =>
         r.id === userId ? { ...r, ...updates } : r
       ),
+    })),
+
+  clearAccount: (accountId) =>
+    set((state) => ({
+      relationships: state.relationships.filter((r) => (r as any)._accountId !== accountId),
     })),
 
   clear: () => set({ relationships: [] }),

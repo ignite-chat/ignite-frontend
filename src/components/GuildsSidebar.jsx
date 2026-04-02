@@ -1167,16 +1167,19 @@ const GuildsSidebar = () => {
         {/* Discord accounts — desktop only */}
         {!!window.IgniteNative && (
           <>
-            {discordAccountSections.map(({ account, entries, folders: accountFolders }) => {
+            {discordAccountSections.map(({ account, entries, folders: accountFolders }, idx) => {
               const accountKey = account.user?.id || account.token;
-              const isCollapsed = !!collapsedAccounts[accountKey];
+              const isCollapsed = collapsedAccounts[accountKey] !== false;
               return (
               <div key={account.token}>
+                {idx > 0 && (
+                  <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
+                )}
                 <DiscordAccountPopover
                   account={account}
                   onDisconnect={() => setDisconnectingAccount(account)}
                   collapsed={isCollapsed}
-                  onToggleCollapse={() => setCollapsedAccounts((prev) => ({ ...prev, [accountKey]: !prev[accountKey] }))}
+                  onToggleCollapse={() => setCollapsedAccounts((prev) => ({ ...prev, [accountKey]: prev[accountKey] === false }))}
                 />
                 {/* {!account.isConnected && (
                   <div className="mx-3 mb-2 flex items-center justify-center gap-1.5 rounded-lg bg-yellow-500/10 px-2 py-1.5">

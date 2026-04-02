@@ -22,8 +22,12 @@ export const useDiscordUsersStore = create<DiscordUsersStore>((set, get) => ({
   users: {},
 
   setUsers: (users) =>
-    set({
-      users: Object.fromEntries(users.map((u) => [u.id, u])),
+    set((state) => {
+      const updated = { ...state.users };
+      for (const u of users) {
+        updated[u.id] = { ...updated[u.id], ...u };
+      }
+      return { users: updated };
     }),
 
   addUser: (user) =>

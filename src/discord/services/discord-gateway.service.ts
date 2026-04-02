@@ -386,7 +386,7 @@ export const DiscordGatewayService = {
         break;
       case 'CHANNEL_CREATE':
         console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
-        this._handleChannelCreate(data);
+        this._handleChannelCreate(accountToken, data);
         break;
       case 'CHANNEL_UPDATE':
         console.log(`[Discord Gateway] DISPATCH: ${eventName}`, data);
@@ -624,7 +624,7 @@ export const DiscordGatewayService = {
       }
     }
     if (allGuildChannels.length > 0) {
-      useDiscordChannelsStore.getState().setChannels(allGuildChannels);
+      useDiscordChannelsStore.getState().setChannels(allGuildChannels, accountUserId);
     }
 
     for (const guild of guilds) {
@@ -674,7 +674,7 @@ export const DiscordGatewayService = {
     if (private_channels && private_channels.length > 0) {
       const channelsStore = useDiscordChannelsStore.getState();
       for (const channel of private_channels) {
-        channelsStore.addChannel(channel);
+        channelsStore.addChannel({ ...channel, _accountId: accountUserId });
       }
     }
 
@@ -684,7 +684,8 @@ export const DiscordGatewayService = {
         useDiscordUsersStore.getState().addUsers(relationshipUsers);
       }
       useDiscordRelationshipsStore.getState().setRelationships(
-        relationships.map((r: any) => ({ id: r.id, type: r.type, nickname: r.nickname, since: r.since }))
+        relationships.map((r: any) => ({ id: r.id, type: r.type, nickname: r.nickname, since: r.since })),
+        accountUserId,
       );
     }
 
@@ -856,12 +857,13 @@ export const DiscordGatewayService = {
     useDiscordGuildsStore.getState().removeGuild(data.id);
     useDiscordMembersStore.getState().removeGuild(data.id);
     useDiscordVoiceStatesStore.getState().removeGuild(data.id);
-    const { channels, setChannels } = useDiscordChannelsStore.getState();
-    setChannels(channels.filter((c) => c.guild_id !== data.id));
+    const store = useDiscordChannelsStore.getState();
+    useDiscordChannelsStore.setState({ channels: store.channels.filter((c) => c.guild_id !== data.id) });
   },
 
-  _handleChannelCreate(data: any) {
-    useDiscordChannelsStore.getState().addChannel(data);
+  _handleChannelCreate(accountToken: string, data: any) {
+    const accountUserId = getAccountUserId(accountToken);
+    useDiscordChannelsStore.getState().addChannel({ ...data, _accountId: accountUserId });
   },
 
   _handleChannelUpdate(data: any) {

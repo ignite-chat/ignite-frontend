@@ -33,13 +33,19 @@ import { useTelegramStore } from '@/telegram/store/telegram.store';
 import { useTelegramChatsStore } from '@/telegram/store/telegram-chats.store';
 import Avatar from '@/ignite/components/Avatar';
 
-const AccountBadge = ({ source }) => {
-  const discordUser = useDiscordStore((s) => s.user);
+const AccountBadge = ({ source, accountId }) => {
+  const discordAccounts = useDiscordStore((s) => s.accounts);
+  const defaultDiscordUser = useDiscordStore((s) => s.user);
   const igniteUser = useUsersStore((s) => s.getCurrentUser());
 
   if (source === 'discord') {
-    const avatarUrl = discordUser
-      ? DiscordService.getUserAvatarUrl(discordUser.id, discordUser.avatar, 32)
+    // Find the specific account by accountId, fallback to active user
+    const account = accountId
+      ? discordAccounts.find((a) => a.user?.id === accountId)
+      : null;
+    const user = account?.user || defaultDiscordUser;
+    const avatarUrl = user
+      ? DiscordService.getUserAvatarUrl(user.id, user.avatar, 32)
       : null;
     return (
       <Tooltip>
@@ -52,7 +58,7 @@ const AccountBadge = ({ source }) => {
             )}
           </div>
         </TooltipTrigger>
-        <TooltipContent side="top">{discordUser?.global_name || discordUser?.username || 'Discord'}</TooltipContent>
+        <TooltipContent side="top">{user?.global_name || user?.username || 'Discord'}</TooltipContent>
       </Tooltip>
     );
   }
@@ -262,7 +268,7 @@ const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onCli
         )}
       </div>
 
-      <AccountBadge source="discord" />
+      <AccountBadge source="discord" accountId={channel._accountId} />
     </DMRowBase>
   );
 };
@@ -281,7 +287,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
   const { requests } = useFriendsStore();
 
   // Discord state
-  const { isConnected: discordConnected, user: discordUser } = useDiscordStore();
+  const { isConnected: discordConnected, user: discordUser, accounts: discordAccounts } = useDiscordStore();
   const discordChannels = useDiscordChannelsStore((s) => s.channels);
   const discordUsersMap = useDiscordUsersStore((s) => s.users);
   const disableMessageRequests = useDiscordPreferencesStore((s) => s.disableMessageRequests);
@@ -447,36 +453,31 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
               </TooltipContent>
             </Tooltip>
           )}
-          {discordConnected && discordUser && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => toggleSource('discord')}
-                  className={`flex size-8 items-center justify-center rounded-full transition-all ${
-                    hiddenSources.discord
-                      ? 'opacity-30 grayscale hover:opacity-50'
-                      : 'ring-2 ring-transparent hover:ring-white/20'
-                  }`}
-                >
-                  {discordUser.avatar ? (
-                    <img
-                      src={DiscordService.getUserAvatarUrl(discordUser.id, discordUser.avatar, 64)}
-                      alt="Discord"
-                      className="size-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex size-8 items-center justify-center rounded-full bg-[#5865f2] text-white">
-                      <DiscordLogo size={16} weight="fill" />
-                    </div>
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                {hiddenSources.discord ? 'Show' : 'Hide'} {discordUser.global_name || discordUser.username} (Discord)
-              </TooltipContent>
-            </Tooltip>
-          )}
+          {discordAccounts.filter((a) => a.isConnected && a.user).map((account) => {
+            const u = account.user;
+            const filterKey = `discord-${u.id}`;
+            const avatarUrl = DiscordService.getUserAvatarUrl(u.id, u.avatar, 64);
+            return (
+              <Tooltip key={u.id}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => toggleSource(filterKey)}
+                    className={`flex size-8 items-center justify-center rounded-full transition-all ${
+                      hiddenSources[filterKey]
+                        ? 'opacity-30 grayscale hover:opacity-50'
+                        : 'ring-2 ring-transparent hover:ring-white/20'
+                    }`}
+                  >
+                    <img src={avatarUrl} alt={u.global_name || u.username} className="size-8 rounded-full object-cover" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {hiddenSources[filterKey] ? 'Show' : 'Hide'} {u.global_name || u.username} (Discord)
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
           {!!telegramSession && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -502,7 +503,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
         </div>
 
         {/* Pinned */}
-        {((!hiddenSources.ignite && pinnedDms.length > 0) || (!hiddenSources.discord && pinnedDiscordDms.length > 0)) && (
+        {((!hiddenSources.ignite && pinnedDms.length > 0) || pinnedDiscordDms.some((c) => !hiddenSources[`discord-${c._accountId}`])) && (
           <>
             <div className="mt-4 flex cursor-default select-none items-center px-2 text-[11px] font-bold uppercase tracking-wider text-gray-500">
               Pinned
@@ -520,12 +521,12 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                   badge={<AccountBadge source="ignite" />}
                 />
               ))}
-              {!hiddenSources.discord && pinnedDiscordDms.map((channel) => (
+              {pinnedDiscordDms.filter((c) => !hiddenSources[`discord-${c._accountId}`]).map((channel) => (
                 <DiscordDMChannelRow
                   key={`discord-pinned-${channel.id}`}
                   channel={channel}
                   isActive={activeChannelId === channel.id}
-                  currentUserId={discordUser?.id}
+                  currentUserId={channel._accountId || discordUser?.id}
                   usersMap={discordUsersMap}
                   onClick={() => onNavigate(channel.id)}
                   onClose={() => handleCloseDiscordDM(channel.id)}
@@ -544,14 +545,19 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
         {mergedDms.length > 0 ? (
           <div className="mt-2 space-y-0.5">
             {mergedDms
-              .filter((item) => !hiddenSources[item._source])
+              .filter((item) => {
+                if (item._source === 'discord') {
+                  return !hiddenSources[`discord-${item.data._accountId}`];
+                }
+                return !hiddenSources[item._source];
+              })
               .map((item) =>
               item._source === 'discord' ? (
                 <DiscordDMChannelRow
                   key={`discord-${item._id}`}
                   channel={item.data}
                   isActive={activeChannelId === item._id}
-                  currentUserId={discordUser?.id}
+                  currentUserId={item.data._accountId || discordUser?.id}
                   usersMap={discordUsersMap}
                   onClick={() => onNavigate(item._id)}
                   onClose={() => handleCloseDiscordDM(item._id)}

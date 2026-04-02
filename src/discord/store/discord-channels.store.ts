@@ -7,11 +7,12 @@ type DiscordChannelsStore = {
   channelMessages: { [channelId: string]: DiscordMessage[] };
   channelPendingMessages: { [channelId: string]: PendingMessage[] };
 
-  setChannels: (channels: DiscordChannel[]) => void;
+  setChannels: (channels: DiscordChannel[], accountId?: string) => void;
   addChannel: (channel: DiscordChannel) => void;
   updateChannel: (channelId: string, updates: Partial<DiscordChannel>) => void;
   removeChannel: (channelId: string) => void;
   setGuildChannels: (guildId: string, channels: DiscordChannel[]) => void;
+  clearAccount: (accountId: string) => void;
 
   setChannelMessages: (channelId: string, messages: DiscordMessage[]) => void;
   appendMessage: (channelId: string, message: DiscordMessage) => void;
@@ -34,7 +35,16 @@ export const useDiscordChannelsStore = create<DiscordChannelsStore>((set) => ({
   channelMessages: {},
   channelPendingMessages: {},
 
-  setChannels: (channels) => set({ channels }),
+  setChannels: (channels, accountId) => {
+    if (accountId) {
+      const tagged = channels.map((c) => ({ ...c, _accountId: accountId }));
+      set((state) => ({
+        channels: [...state.channels.filter((c) => (c as any)._accountId !== accountId), ...tagged],
+      }));
+    } else {
+      set({ channels });
+    }
+  },
 
   addChannel: (channel) =>
     set((state) => {
@@ -162,6 +172,11 @@ export const useDiscordChannelsStore = create<DiscordChannelsStore>((set) => ({
       }
       return { channelMessages: kept };
     }),
+
+  clearAccount: (accountId) =>
+    set((state) => ({
+      channels: state.channels.filter((c) => (c as any)._accountId !== accountId),
+    })),
 
   clear: () => set({ channels: [], channelMessages: {}, channelPendingMessages: {} }),
 }));

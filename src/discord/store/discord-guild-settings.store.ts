@@ -30,11 +30,14 @@ export const useDiscordGuildSettingsStore = create<DiscordGuildSettingsStore>((s
   settings: {},
 
   setAllSettings: (entries) =>
-    set({
-      settings: Object.fromEntries(
-        entries.map((e) => [e.guild_id, { ...DEFAULT_SETTINGS, ...e }])
-      ),
-    }),
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        ...Object.fromEntries(
+          entries.map((e) => [e.guild_id, { ...DEFAULT_SETTINGS, ...e }])
+        ),
+      },
+    })),
 
   updateGuildSettings: (guildId, updates) =>
     set((state) => ({

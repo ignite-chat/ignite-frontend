@@ -94,6 +94,8 @@ export const DiscordService = {
     if (accountUserId) {
       useDiscordGuildsStore.getState().clearAccount(accountUserId);
       useDiscordGuildFoldersStore.getState().clearAccount(accountUserId);
+      useDiscordChannelsStore.getState().clearAccount(accountUserId);
+      useDiscordRelationshipsStore.getState().clearAccount(accountUserId);
     }
 
     console.log(`[Discord] Account disconnected: ${accountUserId || token}`);
