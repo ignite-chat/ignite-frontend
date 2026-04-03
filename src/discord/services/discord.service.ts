@@ -114,6 +114,7 @@ export const DiscordService = {
    * Fully disconnect and remove a single account.
    */
   logoutAccount(token: string) {
+    DiscordApiService.logout(token);
     this.disconnectAccount(token);
     useDiscordStore.getState().removeAccountByToken(token);
     toast.success('Discord account disconnected.');

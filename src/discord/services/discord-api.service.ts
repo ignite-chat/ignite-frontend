@@ -147,6 +147,17 @@ export { discordApi };
 
 export const DiscordApiService = {
   /**
+   * Log out from Discord, invalidating the token server-side.
+   */
+  async logout(token: string): Promise<void> {
+    try {
+      await discordApi.post('/auth/logout', { provider: null, voip_provider: null }, { _accountToken: token } as any);
+    } catch {
+      // Best-effort — don't block local cleanup if the API call fails
+    }
+  },
+
+  /**
    * Get the current authenticated Discord user.
    */
   async getUser(): Promise<DiscordUser> {

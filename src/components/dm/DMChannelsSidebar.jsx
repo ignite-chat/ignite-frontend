@@ -52,7 +52,7 @@ const AccountBadge = ({ source, accountId }) => {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="ml-auto flex shrink-0 items-center self-center">
+          <div className="ml-auto flex shrink-0 items-center self-center order-last">
             {avatarUrl ? (
               <img src={avatarUrl} alt="" className="size-6 rounded-full object-cover" />
             ) : (
@@ -69,7 +69,7 @@ const AccountBadge = ({ source, accountId }) => {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="ml-auto flex shrink-0 items-center self-center">
+          <div className="ml-auto flex shrink-0 items-center self-center order-last">
             {igniteUser?.avatar_url ? (
               <img src={igniteUser.avatar_url} alt="" className="size-6 rounded-full object-cover" />
             ) : (
@@ -89,7 +89,7 @@ const AccountBadge = ({ source, accountId }) => {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="ml-auto flex shrink-0 items-center self-center">
+          <div className="ml-auto flex shrink-0 items-center self-center order-last">
             {telegramUser?.photo ? (
               <img src={telegramUser.photo} alt="" className="size-6 rounded-full object-cover" />
             ) : (

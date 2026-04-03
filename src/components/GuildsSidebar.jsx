@@ -1170,7 +1170,7 @@ const GuildsSidebar = () => {
           <>
             {discordAccountSections.map(({ account, entries, folders: accountFolders }, idx) => {
               const accountKey = account.user?.id || account.token;
-              const isCollapsed = collapsedAccounts[accountKey] !== false;
+              const isCollapsed = discordAccountSections.length > 1 && collapsedAccounts[accountKey] !== false;
               return (
               <div key={account.token}>
                 {idx > 0 && (
@@ -1201,18 +1201,7 @@ const GuildsSidebar = () => {
               );
             })}
 
-            {/* Connect Discord button */}
-            <button
-              type="button"
-              onClick={() => setIsDiscordDialogOpen(true)}
-            >
-              <SidebarIcon
-                icon={<DiscordLogo className="size-6" />}
-                text="Connect Discord"
-              />
-            </button>
-
-            {/* Telegram section */}
+            {/* Telegram section — above Connect Discord when connected */}
             {telegramConnected && telegramUser ? (
               <>
                 <Popover>
@@ -1296,9 +1285,12 @@ const GuildsSidebar = () => {
                     </Link>
                   );
                 })}
+                
+                <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
               </>
             ) : telegramSession ? (
-              <div>
+              <>
+                <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
                 <Popover>
                   <PopoverTrigger asChild>
                     <button
@@ -1342,8 +1334,21 @@ const GuildsSidebar = () => {
                     </div>
                   </PopoverContent>
                 </Popover>
-              </div>
-            ) : (
+              </>
+            ) : null}
+
+            {/* Connect buttons */}
+            <button
+              type="button"
+              onClick={() => setIsDiscordDialogOpen(true)}
+            >
+              <SidebarIcon
+                icon={<DiscordLogo className="size-6" />}
+                text="Connect Discord"
+              />
+            </button>
+
+            {!telegramSession && (
               <button
                 type="button"
                 onClick={() => setIsTelegramDialogOpen(true)}
