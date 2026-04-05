@@ -1,16 +1,15 @@
 /**
  * Discord Gateway Connection — runs on the main thread.
  *
- * Handles WebSocket connection, zlib-stream decompression, heartbeat,
- * identify/resume, and reconnection for a single Discord account.
+ * Handles WebSocket connection, heartbeat, identify/resume, and reconnection
+ * for a single Discord account.
  */
 
-import * as pako from 'pako';
 import { GatewayOp } from '../constants/gateway-opcodes';
 
 // ─── Constants ─────────────────────────────────────────────────
 
-const GATEWAY_URL = 'wss://gateway.discord.gg/?encoding=json&v=9&compress=zlib-stream';
+const GATEWAY_URL = 'wss://gateway.discord.gg/?encoding=json&v=9';
 
 const IDENTIFY_PROPERTIES = {
   os: 'Windows',
@@ -34,8 +33,6 @@ const IDENTIFY_PROPERTIES = {
 
 const CAPABILITIES = 1734653;
 const MAX_RECONNECT_ATTEMPTS = 10;
-const Z_SYNC_FLUSH = (pako as any).constants?.Z_SYNC_FLUSH ?? 2;
-const textDecoder = new TextDecoder();
 
 export type GatewayEvent =
   | { type: 'dispatch'; eventName: string; data: any }
@@ -57,10 +54,6 @@ export class GatewayConnection {
   private sessionId: string | null = null;
   private reconnectAttempts = 0;
   private intentionalClose = false;
-
-  // zlib-stream state
-  private inflate: pako.Inflate | null = null;
-  private zlibChunks: Uint8Array[] = [];
 
   constructor(token: string, onEvent: (event: GatewayEvent) => void) {
     this.token = token;
@@ -88,8 +81,6 @@ export class GatewayConnection {
     this.resumeGatewayUrl = null;
     this.sessionId = null;
     this.reconnectAttempts = 0;
-    this.inflate = null;
-    this.zlibChunks = [];
     this.onEvent({ type: 'connectionState', connected: false });
   }
 
@@ -106,9 +97,7 @@ export class GatewayConnection {
     const url = this.resumeGatewayUrl || GATEWAY_URL;
     console.log(`[Discord Gateway] Connecting to ${url}`);
 
-    this._resetInflate();
     this.ws = new WebSocket(url);
-    this.ws.binaryType = 'arraybuffer';
 
     this.ws.onopen = () => {
       console.log('[Discord Gateway] WebSocket connected');
@@ -116,8 +105,12 @@ export class GatewayConnection {
     };
 
     this.ws.onmessage = (event) => {
-      const payload = this._decompressMessage(event.data as ArrayBuffer);
-      if (payload) this._handleMessage(payload);
+      try {
+        const payload = JSON.parse(event.data);
+        this._handleMessage(payload);
+      } catch (e) {
+        console.warn('[Discord Gateway] Failed to parse message:', e);
+      }
     };
 
     this.ws.onclose = (event) => {
@@ -298,76 +291,5 @@ export class GatewayConnection {
   private _sendHeartbeat() {
     this.heartbeatAcked = false;
     this.send({ op: GatewayOp.HEARTBEAT, d: this.lastSequence });
-  }
-
-  // ─── Zlib Decompression ──────────────────────────────────────
-
-  private _resetInflate() {
-    this.inflate = new pako.Inflate();
-    this.zlibChunks = [];
-  }
-
-  private _endsWithFlush(data: Uint8Array): boolean {
-    const len = data.length;
-    if (len < 4) return false;
-    return data[len - 4] === 0x00 && data[len - 3] === 0x00 && data[len - 2] === 0xff && data[len - 1] === 0xff;
-  }
-
-  private _decompressMessage(data: ArrayBuffer): any | null {
-    if (!this.inflate) this._resetInflate();
-
-    const chunk = new Uint8Array(data);
-    this.zlibChunks.push(chunk);
-
-    if (!this._endsWithFlush(chunk)) {
-      return null;
-    }
-
-    let totalLen = 0;
-    for (const c of this.zlibChunks) totalLen += c.length;
-    const combined = new Uint8Array(totalLen);
-    let offset = 0;
-    for (const c of this.zlibChunks) {
-      combined.set(c, offset);
-      offset += c.length;
-    }
-    this.zlibChunks = [];
-
-    const strm = (this.inflate as any).strm;
-    strm.avail_out = 0;
-
-    const outputChunks: Uint8Array[] = [];
-    this.inflate!.onData = (chunk: Uint8Array) => {
-      outputChunks.push(chunk.slice());
-    };
-
-    this.inflate!.push(combined, Z_SYNC_FLUSH);
-
-    if (this.inflate!.err) {
-      console.warn('[Discord Gateway] zlib inflate error:', this.inflate!.err, this.inflate!.msg);
-      this._resetInflate();
-      return null;
-    }
-
-    if (strm.next_out > 0) {
-      outputChunks.push(strm.output.slice(0, strm.next_out));
-      strm.avail_out = 0;
-    }
-
-    if (outputChunks.length === 0) return null;
-
-    if (outputChunks.length === 1) {
-      return JSON.parse(textDecoder.decode(outputChunks[0]));
-    }
-
-    let outLen = 0;
-    for (const c of outputChunks) outLen += c.length;
-    const result = new Uint8Array(outLen);
-    let pos = 0;
-    for (const c of outputChunks) {
-      result.set(c, pos);
-      pos += c.length;
-    }
-    return JSON.parse(textDecoder.decode(result));
   }
 }
