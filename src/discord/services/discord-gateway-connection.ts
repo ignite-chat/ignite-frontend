@@ -30,7 +30,6 @@ const IDENTIFY_PROPERTIES = {
   client_event_source: null,
   has_client_mods: false,
   client_launch_id: crypto.randomUUID(),
-  is_fast_connect: true,
 };
 
 const CAPABILITIES = 1734653;
@@ -63,9 +62,6 @@ export class GatewayConnection {
   private inflate: pako.Inflate | null = null;
   private zlibChunks: Uint8Array[] = [];
 
-  // Fast-connect: when true, WS is managed externally
-  private fastWs: WebSocket | null = null;
-
   constructor(token: string, onEvent: (event: GatewayEvent) => void) {
     this.token = token;
     this.onEvent = onEvent;
@@ -88,7 +84,6 @@ export class GatewayConnection {
       this.ws.close(1000, 'Intentional disconnect');
       this.ws = null;
     }
-    this.fastWs = null;
     this.lastSequence = null;
     this.resumeGatewayUrl = null;
     this.sessionId = null;
@@ -100,57 +95,9 @@ export class GatewayConnection {
 
   send(data: any) {
     const json = JSON.stringify(data);
-    if (this.fastWs && this.fastWs.readyState === WebSocket.OPEN) {
-      this.fastWs.send(json);
-      return;
-    }
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(json);
     }
-  }
-
-  /**
-   * Adopt a fast-connect WebSocket and replay buffered messages.
-   */
-  adoptFastConnect(fastWs: WebSocket, bufferedMessages: ArrayBuffer[]) {
-    this.fastWs = fastWs;
-    this._resetInflate();
-
-    console.log(`[Discord Gateway] Replaying ${bufferedMessages.length} fast-connect messages`);
-    for (const raw of bufferedMessages) {
-      try {
-        const payload = this._decompressMessage(raw);
-        if (!payload) continue;
-        if (payload.op === GatewayOp.HELLO) {
-          this._startHeartbeat(payload.d.heartbeat_interval);
-          continue;
-        }
-        this._handleMessage(payload);
-      } catch (e) {
-        console.warn('[Discord Gateway] Failed to parse fast-connect message:', e);
-      }
-    }
-    this.onEvent({ type: 'connectionState', connected: true });
-    console.log('[Discord Gateway] Fast-connect replay done');
-
-    // Forward future messages from the fast WS
-    fastWs.onmessage = (event: MessageEvent) => {
-      try {
-        const payload = this._decompressMessage(event.data as ArrayBuffer);
-        if (payload) this._handleMessage(payload);
-      } catch (e) {
-        console.warn('[Discord Gateway] Failed to parse proxied WS message:', e);
-      }
-    };
-
-    fastWs.onclose = () => {
-      console.log('[Discord Gateway] Fast-connect WS closed, reconnecting with own WS');
-      this.fastWs = null;
-      this._stopHeartbeat();
-      this._reconnect();
-    };
-
-    fastWs.onerror = null;
   }
 
   // ─── Connection ──────────────────────────────────────────────
@@ -170,11 +117,7 @@ export class GatewayConnection {
 
     this.ws.onmessage = (event) => {
       const payload = this._decompressMessage(event.data as ArrayBuffer);
-      if (payload) {
-        this._handleMessage(payload);
-      } else {
-        console.warn('[Discord Gateway] _decompressMessage returned null, data size:', event.data?.byteLength);
-      }
+      if (payload) this._handleMessage(payload);
     };
 
     this.ws.onclose = (event) => {

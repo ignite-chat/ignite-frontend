@@ -216,14 +216,7 @@ export const DiscordGatewayService = {
 
     this._connections[token] = connection;
 
-    // Check for fast-connect WebSocket and adopt it (only for first connection)
-    const fastWs = (window as any)._ws;
-    if (fastWs && fastWs.ws.readyState === WebSocket.OPEN && Object.keys(this._connections).length === 1) {
-      connection.adoptFastConnect(fastWs.ws, fastWs.state.messages);
-      (window as any)._ws = null;
-    } else {
-      connection.connect();
-    }
+    connection.connect();
   },
 
   /**
