@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useState } from 'react';
 import { UserStarIcon, MailIcon } from 'lucide-react';
-import { DiscordLogo, TelegramLogo, GameController, MusicNote, Broadcast, Eye, Trophy, Check } from '@phosphor-icons/react';
+import { DiscordLogo, TelegramLogo, CaretDown, CaretRight, GameController, MusicNote, Broadcast, Eye, Trophy, Check } from '@phosphor-icons/react';
 import { useDiscordActivitiesStore, ActivityType } from '@/discord/store/discord-activities.store';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -35,7 +35,8 @@ import { useTelegramUsersStore } from '@/telegram/store/telegram-users.store';
 import { getChatDisplayName, formatTelegramDate } from '@/telegram/utils/helpers';
 import Avatar from '@/ignite/components/Avatar';
 
-const AccountBadge = ({ source, accountId }) => {
+const AccountBadge = ({ source, accountId, show = true }) => {
+  if (!show) return null;
   const discordAccounts = useDiscordStore((s) => s.accounts);
   const defaultDiscordUser = useDiscordStore((s) => s.user);
   const igniteUser = useUsersStore((s) => s.getCurrentUser());
@@ -153,7 +154,7 @@ const DMActivityIcon = ({ type, size = 12 }) => {
   }
 };
 
-const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onClick, onClose, isPinned, onTogglePin }) => {
+const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onClick, onClose, isPinned, onTogglePin, showAccountBadge = true }) => {
   const readStates = useDiscordReadStatesStore((s) => s.readStates);
   const entry = readStates[channel.id];
 
@@ -290,12 +291,12 @@ const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onCli
         )}
       </div>
 
-      <AccountBadge source="discord" accountId={channel._accountId} />
+      <AccountBadge source="discord" accountId={channel._accountId} show={showAccountBadge} />
     </DMRowBase>
   );
 };
 
-const TelegramDMRow = ({ chat, isActive, onClick, displayName }) => {
+const TelegramDMRow = ({ chat, isActive, onClick, displayName, showAccountBadge = true }) => {
   const isUnread = !isActive && chat.unreadCount > 0;
   const isGroup = chat.type === 'group' || chat.type === 'supergroup';
 
@@ -351,7 +352,7 @@ const TelegramDMRow = ({ chat, isActive, onClick, displayName }) => {
           {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
         </Badge>
       )}
-      <AccountBadge source="telegram" />
+      <AccountBadge source="telegram" show={showAccountBadge} />
     </DMRowBase>
   );
 };
@@ -387,6 +388,9 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
   const toggleSource = useCallback((source) => {
     setHiddenSources((prev) => ({ ...prev, [source]: !prev[source] }));
   }, []);
+  const connectedAccountCount = (igniteUserId ? 1 : 0) + discordAccounts.filter((a) => a.isConnected).length + (telegramSession ? 1 : 0);
+  const showAccountUI = connectedAccountCount > 1;
+  const [unreadTelegramCollapsed, setUnreadTelegramCollapsed] = useState(false);
 
   const normalizeThread = useCallback(
     (thread) => {
@@ -448,6 +452,16 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
 
     return { pinnedDms: pinned, pinnedDiscordDms: pinnedDiscord, mergedDms: merged };
   }, [channels, normalizeThread, discordConnected, discordChannels, pinnedChannelIds, telegramConnected, telegramChats]);
+
+  const unreadTelegramChats = useMemo(() => {
+    if (!telegramConnected) return [];
+    return telegramChats.filter((c) => {
+      if (c.unreadCount <= 0) return false;
+      if (c.type === 'private') return true;
+      if ((c.type === 'group') && (c.memberCount || 0) <= 10) return true;
+      return false;
+    });
+  }, [telegramConnected, telegramChats]);
 
   const discordRelationships = useDiscordRelationshipsStore((s) => s.relationships);
 
@@ -523,7 +537,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
         <div className="mx-2 my-2 border-b border-white/5" />
 
         {/* Account filters */}
-        <div className="flex items-center justify-center gap-1.5 py-1.5">
+        {showAccountUI && <div className="flex items-center justify-center gap-1.5 py-1.5">
           {!!igniteUserId && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -597,7 +611,35 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
               </TooltipContent>
             </Tooltip>
           )}
-        </div>
+        </div>}
+
+        {/* Unread Telegram */}
+        {!hiddenSources.telegram && unreadTelegramChats.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => setUnreadTelegramCollapsed((v) => !v)}
+              className="mt-2 flex w-full cursor-pointer select-none items-center gap-1 px-2 text-[11px] font-bold uppercase tracking-wider text-gray-500 hover:text-gray-300"
+            >
+              {unreadTelegramCollapsed ? <CaretRight size={10} weight="bold" /> : <CaretDown size={10} weight="bold" />}
+              Unread Telegram DMs ({unreadTelegramChats.length})
+            </button>
+            {!unreadTelegramCollapsed && (
+              <div className="mt-1.5 space-y-0.5">
+                {unreadTelegramChats.map((chat) => (
+                  <TelegramDMRow
+                    key={`tg-unread-${chat.id}`}
+                    chat={chat}
+                    isActive={activeChannelId === `tg-${chat.id}`}
+                    onClick={() => onNavigate(`tg-${chat.id}`)}
+                    displayName={getChatDisplayName(chat, telegramUsersMap)}
+                    showAccountBadge={showAccountUI}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
 
         {/* Pinned */}
         {((!hiddenSources.ignite && pinnedDms.length > 0) || pinnedDiscordDms.some((c) => !hiddenSources[`discord-${c._accountId}`])) && (
@@ -615,7 +657,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                   onClose={() => handleCloseIgniteDM(channel.channel_id)}
                   channelUnreads={channelUnreads}
                   channelUnreadsLoaded={channelUnreadsLoaded}
-                  badge={<AccountBadge source="ignite" />}
+                  badge={showAccountUI ? <AccountBadge source="ignite" /> : undefined}
                 />
               ))}
               {pinnedDiscordDms.filter((c) => !hiddenSources[`discord-${c._accountId}`]).map((channel) => (
@@ -629,6 +671,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                   onClose={() => handleCloseDiscordDM(channel.id)}
                   isPinned={true}
                   onTogglePin={() => togglePin(channel.id)}
+                  showAccountBadge={showAccountUI}
                 />
               ))}
             </div>
@@ -660,6 +703,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                   onClose={() => handleCloseDiscordDM(item._id)}
                   isPinned={false}
                   onTogglePin={() => togglePin(item._id)}
+                  showAccountBadge={showAccountUI}
                 />
               ) : item._source === 'telegram' ? (
                 <TelegramDMRow
@@ -668,6 +712,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                   isActive={activeChannelId === `tg-${item.data.id}`}
                   onClick={() => onNavigate(`tg-${item.data.id}`)}
                   displayName={getChatDisplayName(item.data, telegramUsersMap)}
+                  showAccountBadge={showAccountUI}
                 />
               ) : (
                 <DMChannelItem
@@ -678,7 +723,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
                   onClose={() => handleCloseIgniteDM(item._id)}
                   channelUnreads={channelUnreads}
                   channelUnreadsLoaded={channelUnreadsLoaded}
-                  badge={<AccountBadge source="ignite" />}
+                  badge={showAccountUI ? <AccountBadge source="ignite" /> : undefined}
                 />
               )
             )}
