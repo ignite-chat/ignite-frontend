@@ -6,6 +6,7 @@ import { DiscordService } from '../../services/discord.service';
 import { useDiscordGuildsStore } from '../../store/discord-guilds.store';
 import { useDiscordUsersStore } from '../../store/discord-users.store';
 import { useDiscordMembersStore } from '../../store/discord-members.store';
+import { useDiscordStore } from '../../store/discord.store';
 import { useDiscordProfilesStore } from '../../store/discord-profiles.store';
 import { parseMarkdown } from '@/components/message/markdown/parser';
 import DiscordMarkdownRenderer from '../DiscordMarkdownRenderer';
@@ -78,7 +79,8 @@ const DiscordUserPopoverContent = ({ author, member: memberProp, guildId, onOpen
   }, [member, guild, guildId]);
 
   useEffect(() => {
-    fetchProfile(author.id, guildId);
+    const accountToken = guild?._accountId ? useDiscordStore.getState().getAccountByUserId(guild._accountId)?.token : undefined;
+    fetchProfile(author.id, guildId, accountToken);
   }, [author.id, guildId, fetchProfile]);
 
   const handleCopyId = () => {

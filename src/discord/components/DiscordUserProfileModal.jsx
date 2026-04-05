@@ -10,6 +10,7 @@ import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordMembersStore } from '../store/discord-members.store';
 import { useDiscordActivitiesStore, ActivityType } from '../store/discord-activities.store';
+import { useDiscordStore } from '../store/discord.store';
 import { useDiscordProfilesStore } from '../store/discord-profiles.store';
 import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
 import { parseMarkdown } from '@/components/message/markdown/parser';
@@ -239,7 +240,8 @@ const DiscordUserProfileModal = ({ modalId, userId, author: authorProp, member: 
 
   useEffect(() => {
     if (!resolvedUserId) return;
-    fetchProfile(resolvedUserId, guildId);
+    const accountToken = guild?._accountId ? useDiscordStore.getState().getAccountByUserId(guild._accountId)?.token : undefined;
+    fetchProfile(resolvedUserId, guildId, accountToken);
   }, [resolvedUserId, guildId, fetchProfile]);
 
   const handleCopyId = () => {

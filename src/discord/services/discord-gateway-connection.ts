@@ -146,6 +146,7 @@ export class GatewayConnection {
     fastWs.onclose = () => {
       console.log('[Discord Gateway] Fast-connect WS closed, reconnecting with own WS');
       this.fastWs = null;
+      this._stopHeartbeat();
       this._reconnect();
     };
 
@@ -169,7 +170,11 @@ export class GatewayConnection {
 
     this.ws.onmessage = (event) => {
       const payload = this._decompressMessage(event.data as ArrayBuffer);
-      if (payload) this._handleMessage(payload);
+      if (payload) {
+        this._handleMessage(payload);
+      } else {
+        console.warn('[Discord Gateway] _decompressMessage returned null, data size:', event.data?.byteLength);
+      }
     };
 
     this.ws.onclose = (event) => {
@@ -396,7 +401,7 @@ export class GatewayConnection {
     this.inflate!.push(combined, Z_SYNC_FLUSH);
 
     if (this.inflate!.err) {
-      console.warn('[Discord Gateway] zlib inflate error:', this.inflate!.msg);
+      console.warn('[Discord Gateway] zlib inflate error:', this.inflate!.err, this.inflate!.msg);
       this._resetInflate();
       return null;
     }

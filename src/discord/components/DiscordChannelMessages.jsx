@@ -42,7 +42,10 @@ const WelcomeIcon = ({ type }) => {
 
 const ChannelWelcome = ({ channel }) => {
   const isDM = channel.type === DiscordChannelType.DM || channel.type === DiscordChannelType.GROUP_DM;
-  const currentUser = useDiscordStore((s) => s.user);
+  const channelAccountId = channel._accountId;
+  const currentUser = useDiscordStore((s) =>
+    channelAccountId ? s.getAccountByUserId(channelAccountId)?.user : s.user
+  );
   const usersMap = useDiscordUsersStore((s) => s.users);
   const guilds = useDiscordGuildsStore((s) => s.guilds);
   const [mutualGuilds, setMutualGuilds] = useState([]);
@@ -81,7 +84,8 @@ const ChannelWelcome = ({ channel }) => {
   useEffect(() => {
     if (!dmUser?.id) return;
     const { fetchProfile } = useDiscordProfilesStore.getState();
-    fetchProfile(dmUser.id).then((profile) => {
+    const accountToken = channel._accountId ? useDiscordStore.getState().getAccountByUserId(channel._accountId)?.token : undefined;
+    fetchProfile(dmUser.id, undefined, accountToken).then((profile) => {
       if (profile?.mutual_guilds) setMutualGuilds(profile.mutual_guilds);
     });
   }, [dmUser?.id]);
@@ -319,7 +323,10 @@ const DateSeparator = ({ timestamp }) => {
 const DiscordChannelMessages = ({ channel, messageSentCount }) => {
   const channelId = channel.id;
   const guildId = channel.guild_id || null;
-  const currentUser = useDiscordStore((s) => s.user);
+  const accountId = channel._accountId;
+  const currentUser = useDiscordStore((s) =>
+    accountId ? s.getAccountByUserId(accountId)?.user : s.user
+  );
 
   const hasManageMessages = useDiscordHasPermission(guildId, channel, MANAGE_MESSAGES);
   const hasKickMembers = useDiscordHasPermission(guildId, channel, KICK_MEMBERS);

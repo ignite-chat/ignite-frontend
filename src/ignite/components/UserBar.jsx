@@ -86,16 +86,44 @@ const useDiscordStatus = (userId) => {
   return storedUser?.status || (isConnected ? 'online' : 'offline');
 };
 
+const DiscordAccountEntry = ({ account, activeDisplay, onSwitch }) => {
+  const user = account.user;
+  const status = useDiscordStatus(user?.id);
+  const avatarUrl = user ? DiscordService.getUserAvatarUrl(user.id, user.avatar, 64) : null;
+  const isActive = activeDisplay === `discord-${user?.id}` || activeDisplay === 'discord';
+
+  if (!account.isConnected || !user) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSwitch(`discord-${user.id}`)}
+      className={`flex items-center gap-2.5 rounded-sm px-2.5 py-2 text-sm transition-colors ${
+        isActive ? 'bg-white/5 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+      }`}
+    >
+      <div className="shrink-0">
+        {avatarUrl ? (
+          <DiscordAvatarWithStatus avatarUrl={avatarUrl} name="" status={status} size={28} />
+        ) : (
+          <div className="flex size-7 items-center justify-center rounded-full bg-[#5865f2]">
+            <DiscordLogo size={16} weight="fill" className="text-white" />
+          </div>
+        )}
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col text-left">
+        <span className="truncate text-sm font-medium">{user.global_name || user.username}</span>
+        <span className="truncate text-[11px] text-gray-500">Discord - {DISCORD_STATUS[status]?.label || 'Online'}</span>
+      </div>
+      {isActive && <Check size={14} weight="bold" className="shrink-0 text-primary" />}
+    </button>
+  );
+};
+
 const UserProfilePopoverMenu = ({ igniteUser, activeDisplay, onSwitch }) => {
-  const discordUser = useDiscordStore((s) => s.user);
-  const isDiscordConnected = useDiscordStore((s) => s.isConnected);
-  const discordStatus = useDiscordStatus(discordUser?.id);
+  const discordAccounts = useDiscordStore((s) => s.accounts);
   const telegramUser = useTelegramStore((s) => s.user);
   const telegramConnected = useTelegramStore((s) => s.isConnected);
-
-  const discordAvatarUrl = discordUser
-    ? DiscordService.getUserAvatarUrl(discordUser.id, discordUser.avatar, 64)
-    : null;
 
   return (
     <div className="flex flex-col gap-0.5">
@@ -132,33 +160,15 @@ const UserProfilePopoverMenu = ({ igniteUser, activeDisplay, onSwitch }) => {
         </button>
       )}
 
-      {/* Discord user */}
-      {isDiscordConnected && discordUser && (
-        <button
-          type="button"
-          onClick={() => onSwitch('discord')}
-          className={`flex items-center gap-2.5 rounded-sm px-2.5 py-2 text-sm transition-colors ${
-            activeDisplay === 'discord'
-              ? 'bg-white/5 text-white'
-              : 'text-gray-400 hover:bg-white/5 hover:text-white'
-          }`}
-        >
-          <div className="shrink-0">
-            {discordAvatarUrl ? (
-              <DiscordAvatarWithStatus avatarUrl={discordAvatarUrl} name="" status={discordStatus} size={28} />
-            ) : (
-              <div className="flex size-7 items-center justify-center rounded-full bg-[#5865f2]">
-                <DiscordLogo size={16} weight="fill" className="text-white" />
-              </div>
-            )}
-          </div>
-          <div className="flex min-w-0 flex-1 flex-col text-left">
-            <span className="truncate text-sm font-medium">{discordUser.global_name || discordUser.username}</span>
-            <span className="truncate text-[11px] text-gray-500">Discord - {DISCORD_STATUS[discordStatus]?.label || 'Online'}</span>
-          </div>
-          {activeDisplay === 'discord' && <Check size={14} weight="bold" className="shrink-0 text-primary" />}
-        </button>
-      )}
+      {/* Discord accounts */}
+      {discordAccounts.map((account) => (
+        <DiscordAccountEntry
+          key={account.token}
+          account={account}
+          activeDisplay={activeDisplay}
+          onSwitch={onSwitch}
+        />
+      ))}
 
       {/* Telegram user */}
       {telegramConnected && telegramUser && (
@@ -203,8 +213,14 @@ const UserProfilePopoverMenu = ({ igniteUser, activeDisplay, onSwitch }) => {
       <button
         type="button"
         onClick={() => {
-          if (activeDisplay === 'discord' && discordUser) {
-            useSharedModalStore.getState().push(DiscordUserProfileModal, { userId: discordUser.id });
+          if (activeDisplay.startsWith('discord')) {
+            const discordUserId = activeDisplay.startsWith('discord-') ? activeDisplay.slice(8) : null;
+            const account = discordUserId
+              ? useDiscordStore.getState().getAccountByUserId(discordUserId)
+              : useDiscordStore.getState().accounts.find((a) => a.isConnected);
+            if (account?.user) {
+              useSharedModalStore.getState().push(DiscordUserProfileModal, { userId: account.user.id });
+            }
           } else if (igniteUser?.id) {
             useModalStore.getState().push(UserProfileModal, { userId: igniteUser.id });
           }
@@ -223,11 +239,13 @@ const UserBar = () => {
   const { channelName, connectionState, isMuted, isDeafened, isCameraOn, isScreenSharing, room, ping } =
     useVoiceStore();
   const user = useUsersStore((state) => state.getCurrentUser());
-  const discordUser = useDiscordStore((s) => s.user);
-  const isDiscordConnected = useDiscordStore((s) => s.isConnected);
+  const discordAccounts = useDiscordStore((s) => s.accounts);
   const telegramUser = useTelegramStore((s) => s.user);
   const telegramConnected = useTelegramStore((s) => s.isConnected);
   const hasIgniteToken = !!localStorage.getItem('token');
+
+  const connectedDiscordAccounts = discordAccounts.filter((a) => a.isConnected && a.user);
+  const firstDiscordAccount = connectedDiscordAccounts[0];
 
   const location = useLocation();
   const [activeDisplay, setActiveDisplay] = useState(hasIgniteToken ? 'ignite' : 'discord');
@@ -238,50 +256,58 @@ const UserBar = () => {
     const isOnTelegramRoute = location.pathname.startsWith('/telegram');
     if (isOnTelegramRoute && telegramConnected && telegramUser) {
       setActiveDisplay('telegram');
-    } else if (isOnDiscordRoute && isDiscordConnected && discordUser) {
-      setActiveDisplay('discord');
+    } else if (isOnDiscordRoute && firstDiscordAccount) {
+      setActiveDisplay(`discord-${firstDiscordAccount.user.id}`);
     } else if (hasIgniteToken) {
       setActiveDisplay('ignite');
     }
-  }, [location.pathname, isDiscordConnected, discordUser, telegramConnected, telegramUser, hasIgniteToken]);
+  }, [location.pathname, firstDiscordAccount, telegramConnected, telegramUser, hasIgniteToken]);
 
   const handleSwitch = (mode) => {
     setActiveDisplay(mode);
   };
 
-  const discordStatus = useDiscordStatus(discordUser?.id);
+  // Resolve the active discord account from the display mode
+  const isDiscordDisplay = activeDisplay.startsWith('discord');
+  const activeDiscordUserId = activeDisplay.startsWith('discord-') ? activeDisplay.slice(8) : null;
+  const activeDiscordAccount = activeDiscordUserId
+    ? discordAccounts.find((a) => a.user?.id === activeDiscordUserId)
+    : firstDiscordAccount;
+  const activeDiscordUser = activeDiscordAccount?.user;
+
+  const discordStatus = useDiscordStatus(activeDiscordUser?.id);
 
   // Determine what to show — if active display has no data yet, fall back to any connected account
   const canShowIgnite = !!user;
-  const canShowDiscord = isDiscordConnected && !!discordUser;
+  const canShowDiscord = connectedDiscordAccounts.length > 0;
   const canShowTelegram = telegramConnected && !!telegramUser;
 
   let effectiveDisplay = activeDisplay;
   if (effectiveDisplay === 'ignite' && !canShowIgnite) {
-    if (canShowDiscord) effectiveDisplay = 'discord';
+    if (canShowDiscord) effectiveDisplay = `discord-${firstDiscordAccount.user.id}`;
     else if (canShowTelegram) effectiveDisplay = 'telegram';
-  } else if (effectiveDisplay === 'discord' && !canShowDiscord) {
+  } else if (isDiscordDisplay && !activeDiscordAccount?.isConnected) {
     if (canShowIgnite) effectiveDisplay = 'ignite';
     else if (canShowTelegram) effectiveDisplay = 'telegram';
   } else if (effectiveDisplay === 'telegram' && !canShowTelegram) {
     if (canShowIgnite) effectiveDisplay = 'ignite';
-    else if (canShowDiscord) effectiveDisplay = 'discord';
+    else if (canShowDiscord) effectiveDisplay = `discord-${firstDiscordAccount.user.id}`;
   }
 
-  const showDiscord = effectiveDisplay === 'discord' && canShowDiscord;
+  const showDiscord = effectiveDisplay.startsWith('discord') && canShowDiscord;
   const showTelegram = effectiveDisplay === 'telegram' && canShowTelegram;
   const displayName = showTelegram
     ? `${telegramUser.firstName} ${telegramUser.lastName || ''}`.trim()
     : showDiscord
-      ? (discordUser.global_name || discordUser.username)
+      ? (activeDiscordUser?.global_name || activeDiscordUser?.username)
       : user?.name;
   const displayStatus = showTelegram
     ? (telegramUser.username ? `@${telegramUser.username}` : 'Telegram')
     : showDiscord
       ? (DISCORD_STATUS[discordStatus]?.label || 'Online')
       : (user?.status || 'Online');
-  const discordAvatarUrl = showDiscord
-    ? DiscordService.getUserAvatarUrl(discordUser.id, discordUser.avatar, 64)
+  const discordAvatarUrl = showDiscord && activeDiscordUser
+    ? DiscordService.getUserAvatarUrl(activeDiscordUser.id, activeDiscordUser.avatar, 64)
     : null;
 
   const isConnected = connectionState !== 'disconnected';

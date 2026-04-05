@@ -28,6 +28,7 @@ export const TelegramService = {
     if (!store.session) return false;
 
     store.setConnecting(true);
+    store.setConnectionFailed(false);
 
     try {
       TelegramClientService.initialize(store.session);
@@ -35,6 +36,7 @@ export const TelegramService = {
 
       if (!authorized) {
         store.setConnecting(false);
+        store.setConnectionFailed(true);
         return false;
       }
 
@@ -61,6 +63,7 @@ export const TelegramService = {
 
       store.setConnected(true);
       store.setConnecting(false);
+      store.setConnectionFailed(false);
       console.log(`[Telegram] Connected as ${me.firstName} ${me.lastName || ''}`);
 
       // Load initial chats
@@ -70,6 +73,7 @@ export const TelegramService = {
     } catch (error: any) {
       console.error('[Telegram] Connection failed:', error);
       store.setConnecting(false);
+      store.setConnectionFailed(true);
       const msg = error?.message?.includes('WebSocket')
         ? 'Could not reach Telegram servers. Check your network connection.'
         : 'Failed to connect to Telegram.';

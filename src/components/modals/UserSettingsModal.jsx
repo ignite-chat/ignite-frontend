@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import Avatar from '@/ignite/components/Avatar';
 import { Button } from '@/components/ui/button';
 import { SheetDescription } from '@/components/ui/sheet';
-import { User, UserCircle, Mic, Bot, LogOut, X, Menu, Bell, Activity, History, Volume2, Settings, Smartphone, Shield, UserX, Edit } from 'lucide-react';
+import { User, UserCircle, Mic, Bot, LogOut, X, Menu, Bell, Activity, History, Volume2, Settings, Smartphone, Shield, UserX, Edit, WifiOff } from 'lucide-react';
 import { useAuthStore } from '@/ignite/store/auth.store';
 import { useModalStore } from '@/ignite/store/modal.store';
 import { useDiscordStore } from '@/discord/store/discord.store';
@@ -499,6 +499,18 @@ const TabTelegramBlocked = () => {
   );
 };
 
+// ─── Telegram: Not Connected ─────────────────────────────────────
+
+const TelegramNotConnected = () => (
+  <div className="flex flex-col items-center justify-center py-20 text-center">
+    <WifiOff className="size-10 text-gray-500 mb-3" />
+    <h3 className="text-lg font-semibold text-white">Telegram not connected</h3>
+    <p className="mt-1 text-sm text-gray-400 max-w-xs">
+      Telegram failed to connect or is not connected. Please check your connection and try again.
+    </p>
+  </div>
+);
+
 // ─── Telegram: Settings ──────────────────────────────────────────
 
 const TabTelegram = () => {
@@ -534,6 +546,7 @@ const UserSettingsModal = ({ modalId }) => {
   const hasIgnite = !!localStorage.getItem('token');
   const hasDiscord = useDiscordStore((s) => s.accounts.length > 0);
   const hasTelegram = !!useTelegramStore((s) => s.session);
+  const telegramConnected = useTelegramStore((s) => s.isConnected);
 
   const navigationSections = buildNavigationSections(hasIgnite, hasDiscord, hasTelegram);
   const defaultTab = hasIgnite ? 'account' : hasDiscord ? 'discord' : hasTelegram ? 'telegram' : 'performance';
@@ -576,13 +589,13 @@ const UserSettingsModal = ({ modalId }) => {
       case 'telegram':
         return <TabTelegram />;
       case 'tg-profile':
-        return <TabTelegramProfile />;
+        return telegramConnected ? <TabTelegramProfile /> : <TelegramNotConnected />;
       case 'tg-devices':
-        return <TabTelegramDevices />;
+        return telegramConnected ? <TabTelegramDevices /> : <TelegramNotConnected />;
       case 'tg-privacy':
-        return <TabTelegramPrivacy />;
+        return telegramConnected ? <TabTelegramPrivacy /> : <TelegramNotConnected />;
       case 'tg-blocked':
-        return <TabTelegramBlocked />;
+        return telegramConnected ? <TabTelegramBlocked /> : <TelegramNotConnected />;
       default:
         return null;
     }

@@ -409,7 +409,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
   const toggleSource = useCallback((source) => {
     setHiddenSources((prev) => ({ ...prev, [source]: !prev[source] }));
   }, []);
-  const connectedAccountCount = (igniteUserId ? 1 : 0) + discordAccounts.filter((a) => a.isConnected).length + (telegramSession ? 1 : 0);
+  const connectedAccountCount = (igniteUserId ? 1 : 0) + discordAccounts.filter((a) => a.isConnected).length + (telegramConnected ? 1 : 0);
   const showAccountUI = connectedAccountCount > 1;
   const [unreadTelegramCollapsed, setUnreadTelegramCollapsed] = useState(false);
 
@@ -614,7 +614,7 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
               </Tooltip>
             );
           })}
-          {!!telegramSession && (
+          {telegramConnected && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button

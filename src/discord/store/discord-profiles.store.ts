@@ -15,7 +15,7 @@ type DiscordProfilesStore = {
 
   getProfile: (userId: string, guildId?: string) => UserProfile | undefined;
   setProfile: (userId: string, guildId: string | undefined, profile: UserProfile) => void;
-  fetchProfile: (userId: string, guildId?: string) => Promise<UserProfile | null>;
+  fetchProfile: (userId: string, guildId?: string, accountToken?: string) => Promise<UserProfile | null>;
   removeProfile: (userId: string, guildId?: string) => void;
   clear: () => void;
 };
@@ -32,7 +32,7 @@ export const useDiscordProfilesStore = create<DiscordProfilesStore>((set, get) =
     }));
   },
 
-  fetchProfile: async (userId, guildId) => {
+  fetchProfile: async (userId, guildId, accountToken) => {
     const key = makeKey(userId, guildId);
     const existing = get().profiles[key];
     if (existing) return existing;
@@ -43,7 +43,7 @@ export const useDiscordProfilesStore = create<DiscordProfilesStore>((set, get) =
 
     const request = (async () => {
       try {
-        const profile = await DiscordApiService.getUserProfile(userId, guildId);
+        const profile = await DiscordApiService.getUserProfile(userId, guildId, accountToken);
         get().setProfile(userId, guildId, profile);
         return profile;
       } catch {

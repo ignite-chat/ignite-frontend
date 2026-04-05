@@ -6,12 +6,14 @@ type TelegramStore = {
   user: TelegramUser | null;
   isConnected: boolean;
   isConnecting: boolean;
+  connectionFailed: boolean;
   phoneNumber: string | null;
 
   setSession: (session: string | null) => void;
   setUser: (user: TelegramUser | null) => void;
   setConnected: (connected: boolean) => void;
   setConnecting: (connecting: boolean) => void;
+  setConnectionFailed: (failed: boolean) => void;
   setPhoneNumber: (phone: string | null) => void;
   disconnect: () => void;
 };
@@ -37,6 +39,7 @@ export const useTelegramStore = create<TelegramStore>((set) => ({
   user: null,
   isConnected: false,
   isConnecting: false,
+  connectionFailed: false,
   phoneNumber: null,
 
   setSession: (session) => {
@@ -47,6 +50,7 @@ export const useTelegramStore = create<TelegramStore>((set) => ({
   setUser: (user) => set({ user }),
   setConnected: (isConnected) => set({ isConnected }),
   setConnecting: (isConnecting) => set({ isConnecting }),
+  setConnectionFailed: (connectionFailed) => set({ connectionFailed }),
   setPhoneNumber: (phoneNumber) => set({ phoneNumber }),
 
   disconnect: () => {
@@ -56,6 +60,7 @@ export const useTelegramStore = create<TelegramStore>((set) => ({
       user: null,
       isConnected: false,
       isConnecting: false,
+      connectionFailed: false,
       phoneNumber: null,
     });
   },

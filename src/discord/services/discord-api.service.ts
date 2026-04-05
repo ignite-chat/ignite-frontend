@@ -347,14 +347,14 @@ export const DiscordApiService = {
   /**
    * Get a user's profile (banner, bio, etc.)
    */
-  async getUserProfile(userId: string, guildId?: string): Promise<UserProfile> {
+  async getUserProfile(userId: string, guildId?: string, accountToken?: string): Promise<UserProfile> {
     const params: any = {
       with_mutual_guilds: true,
       with_mutual_friends_count: true,
       with_mutual_friends: true,
     };
     if (guildId) params.guild_id = guildId;
-    const { data } = await discordApi.get<UserProfile>(`/users/${userId}/profile`, { params });
+    const { data } = await discordApi.get<UserProfile>(`/users/${userId}/profile`, { params, _accountToken: accountToken } as any);
     return data;
   },
 

@@ -7,6 +7,7 @@ import { DiscordApiService } from '../services/discord-api.service';
 import { useDiscordUsersStore } from '../store/discord-users.store';
 import { useDiscordGuildsStore } from '../store/discord-guilds.store';
 import { useDiscordProfilesStore } from '../store/discord-profiles.store';
+import { useDiscordStore } from '../store/discord.store';
 import { useDiscordActivitiesStore, ActivityType } from '../store/discord-activities.store';
 import { useDiscordPreferencesStore } from '../store/discord-preferences.store';
 import { useDiscordRelationshipsStore, RelationshipType } from '../store/discord-relationships.store';
@@ -84,7 +85,8 @@ const DiscordDMProfilePanel = ({ channel, isOpen }) => {
 
   useEffect(() => {
     if (!recipientId) return;
-    fetchProfile(recipientId);
+    const accountToken = channel?._accountId ? useDiscordStore.getState().getAccountByUserId(channel._accountId)?.token : undefined;
+    fetchProfile(recipientId, undefined, accountToken);
   }, [recipientId, fetchProfile]);
 
   const displayName = user?.global_name || user?.username;

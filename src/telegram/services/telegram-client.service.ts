@@ -27,23 +27,31 @@ export const TelegramClientService = {
   },
 
   /**
-   * Connect using existing session. Returns true if connected successfully.
+   * Connect using existing session. Returns true if connected and authorized.
+   * The entire connect + auth check is wrapped in a timeout so it can't hang.
    */
   async connect(): Promise<boolean> {
     if (!this._client) {
       this.initialize();
     }
-    try {
-      await this.connectWithTimeout();
-
-      // Check if we're authorized
+    const timeoutMs = 10000; // 3 retries take ~3s, plus margin for auth check
+    const work = async () => {
+      await this._client!.connect();
       const authorized = await this._client!.checkAuthorization();
       if (authorized) {
-        // Save the session string in case it changed
         const sessionStr = (this._client!.session as InstanceType<typeof StringSession>).save();
         useTelegramStore.getState().setSession(sessionStr);
       }
       return authorized;
+    };
+    try {
+      const result = await Promise.race([
+        work(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Connection timed out. Could not reach Telegram servers.')), timeoutMs),
+        ),
+      ]);
+      return result;
     } catch (error) {
       console.error('[Telegram] Connection failed:', error);
       return false;
@@ -51,12 +59,12 @@ export const TelegramClientService = {
   },
 
   /**
-   * Connect with a timeout. Throws if connection takes too long.
+   * Simple connect with timeout for auth flows (sendCode, QR login).
    */
   async connectWithTimeout(timeoutMs: number = 15000): Promise<void> {
     const connectPromise = this._client!.connect();
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Connection timed out. Could not reach Telegram servers.')), timeoutMs),
+      setTimeout(() => reject(new Error('Connection timed out.')), timeoutMs),
     );
     await Promise.race([connectPromise, timeoutPromise]);
   },

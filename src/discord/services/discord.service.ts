@@ -181,7 +181,11 @@ export const DiscordService = {
    */
   async sendMessage(channelId: string, content: string, replyToMessageId?: string | null, attachments?: { file: File; uploaded_filename: string }[]) {
     const nonce = generateNonce();
-    const currentUser = useDiscordStore.getState().user;
+    const channel = useDiscordChannelsStore.getState().channels.find((c) => c.id === channelId);
+    const accountId = (channel as any)?._accountId;
+    const currentUser = accountId
+      ? useDiscordStore.getState().getAccountByUserId(accountId)?.user
+      : useDiscordStore.getState().user;
 
     const messageReference = replyToMessageId
       ? { message_id: replyToMessageId }

@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Fire, Plus, Compass, DiscordLogo, TelegramLogo, SignOut, Power } from '@phosphor-icons/react';
+import { Fire, Plus, Compass, DiscordLogo, TelegramLogo, SignOut, Power, Warning } from '@phosphor-icons/react';
 import {
   DndContext,
   DragOverlay,
@@ -816,7 +816,15 @@ const GuildsSidebar = () => {
   const telegramUser = useTelegramStore((s) => s.user);
   const telegramConnected = useTelegramStore((s) => s.isConnected);
   const telegramConnecting = useTelegramStore((s) => s.isConnecting);
+  const telegramConnectionFailed = useTelegramStore((s) => s.connectionFailed);
+  const [telegramReconnectCooldown, setTelegramReconnectCooldown] = useState(0);
   const telegramChats = useTelegramChatsStore((s) => s.chats);
+
+  useEffect(() => {
+    if (telegramReconnectCooldown <= 0) return;
+    const timer = setTimeout(() => setTelegramReconnectCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [telegramReconnectCooldown]);
 
   // Discord state — multi-account
   const discordAccounts = useDiscordStore((s) => s.accounts);
@@ -1298,11 +1306,15 @@ const GuildsSidebar = () => {
                       className="group relative mb-2 flex w-full justify-center px-3"
                     >
                       <div
-                        className={`flex size-12 items-center justify-center rounded-2xl bg-[#2AABEE] text-white transition-all hover:rounded-xl ${
-                          telegramConnecting ? 'opacity-50' : ''
-                        }`}
+                        className={`flex size-12 items-center justify-center rounded-2xl text-white transition-all hover:rounded-xl ${
+                          telegramConnectionFailed ? 'bg-red-500/80' : 'bg-[#2AABEE]'
+                        } ${telegramConnecting ? 'opacity-50 animate-pulse' : ''}`}
                       >
-                        <TelegramLogo className="size-6" weight="fill" />
+                        {telegramConnectionFailed && !telegramConnecting ? (
+                          <Warning className="size-6" weight="fill" />
+                        ) : (
+                          <TelegramLogo className="size-6" weight="fill" />
+                        )}
                       </div>
                     </button>
                   </PopoverTrigger>
@@ -1312,15 +1324,29 @@ const GuildsSidebar = () => {
                         <div className="text-sm font-semibold text-white">
                           {telegramConnecting ? 'Connecting...' : 'Connection failed'}
                         </div>
+                        {telegramConnectionFailed && !telegramConnecting && (
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            Could not connect after retries
+                          </div>
+                        )}
                       </div>
                       {!telegramConnecting && (
                         <button
                           type="button"
-                          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-white/5"
-                          onClick={() => TelegramService.connect()}
+                          disabled={telegramReconnectCooldown > 0}
+                          className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                            telegramReconnectCooldown > 0
+                              ? 'text-gray-500 cursor-not-allowed'
+                              : 'text-gray-300 hover:bg-white/5'
+                          }`}
+                          onClick={() => {
+                            TelegramService.connect().finally(() => {
+                              setTelegramReconnectCooldown(5);
+                            });
+                          }}
                         >
                           <TelegramLogo className="size-4" />
-                          Reconnect
+                          {telegramReconnectCooldown > 0 ? `Reconnect (${telegramReconnectCooldown})` : 'Reconnect'}
                         </button>
                       )}
                       <button
