@@ -28,7 +28,6 @@ const IDENTIFY_PROPERTIES = {
   client_build_number: 500334,
   client_event_source: null,
   has_client_mods: false,
-  client_launch_id: crypto.randomUUID(),
 };
 
 const CAPABILITIES = 1734653;
@@ -55,9 +54,12 @@ export class GatewayConnection {
   private reconnectAttempts = 0;
   private intentionalClose = false;
 
+  private tag: string;
+
   constructor(token: string, onEvent: (event: GatewayEvent) => void) {
     this.token = token;
     this.onEvent = onEvent;
+    this.tag = token.slice(-4);
   }
 
   // ─── Public API ──────────────────────────────────────────────
@@ -100,21 +102,24 @@ export class GatewayConnection {
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
-      console.log('[Discord Gateway] WebSocket connected');
+      console.log(`[Discord Gateway:${this.tag}] WebSocket connected`);
       this.reconnectAttempts = 0;
     };
 
     this.ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
+        if (payload.op === GatewayOp.DISPATCH) {
+          console.log(`[Discord Gateway:${this.tag}] DISPATCH ${payload.t}`);
+        }
         this._handleMessage(payload);
       } catch (e) {
-        console.warn('[Discord Gateway] Failed to parse message:', e);
+        console.warn(`[Discord Gateway:${this.tag}] Failed to parse message:`, e);
       }
     };
 
     this.ws.onclose = (event) => {
-      console.log(`[Discord Gateway] WebSocket closed: ${event.code} ${event.reason}`);
+      console.log(`[Discord Gateway:${this.tag}] WebSocket closed: ${event.code} ${event.reason}`);
       this._stopHeartbeat();
       this.onEvent({ type: 'connectionState', connected: false });
 
@@ -240,7 +245,7 @@ export class GatewayConnection {
       d: {
         token: this.token,
         capabilities: CAPABILITIES,
-        properties: IDENTIFY_PROPERTIES,
+        properties: { ...IDENTIFY_PROPERTIES, client_launch_id: crypto.randomUUID() },
         client_state: {
           guild_versions: {},
         },

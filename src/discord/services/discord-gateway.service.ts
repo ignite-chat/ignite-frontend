@@ -694,6 +694,7 @@ export const DiscordGatewayService = {
       useDiscordUsersStore.getState().setPresences(mapped, true);
       syncActivities(mapped);
     }
+
   },
 
   _handleReadySupplemental(accountToken: string, data: any) {
