@@ -113,6 +113,19 @@ const IGNITE_EPOCH = 1444521600000; // Oct 10, 2015
 const snowflakeToTimestamp = (id, epoch) =>
   Number(BigInt(id) >> 22n) + epoch;
 
+const formatRelativeDate = (ms) => {
+  const date = new Date(ms);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((today.getTime() - msgDay.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return date.toLocaleDateString(undefined, { weekday: 'short' });
+  if (date.getFullYear() === now.getFullYear()) return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 const sortByLastMessage = (a, b) => {
   if (!a.last_message_id) return 1;
   if (!b.last_message_id) return -1;
@@ -227,10 +240,18 @@ const DiscordDMChannelRow = ({ channel, isActive, currentUserId, usersMap, onCli
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-1.5">
-          <span className={cn('truncate text-[16px]', isUnread ? 'font-semibold text-gray-100' : 'font-[450]')}>
+        <div className="flex items-baseline gap-1.5">
+          <span className={cn('truncate text-[16px] leading-tight', isUnread ? 'font-semibold text-gray-100' : 'font-[450]')}>
             {info.name}
           </span>
+          {channel.last_message_id && (
+            <>
+              <span className="shrink-0 text-[11px] leading-tight text-gray-500">·</span>
+              <span className="shrink-0 text-[11px] font-medium leading-tight text-gray-500">
+                {formatRelativeDate(snowflakeToTimestamp(channel.last_message_id, DISCORD_EPOCH))}
+              </span>
+            </>
+          )}
           {info.user?.id === '643945264868098049' && (
             <span className="inline-flex h-3.5 shrink-0 items-center gap-0.5 rounded bg-[#5865f2] px-1 text-[12px] font-medium leading-none text-white">
               <Check size={13} weight="bold" color="white" />
@@ -428,12 +449,16 @@ const DMChannelsSidebar = ({ activeChannelId, onNavigate }) => {
 
     const unpinnedDiscord = allDiscordDms
       .filter((c) => !pinnedChannelIds.includes(c.id))
-      .map((c) => ({
-        _source: 'discord',
-        _id: c.id,
-        _timestamp: c.last_message_id ? snowflakeToTimestamp(c.last_message_id, DISCORD_EPOCH) : 0,
-        data: c,
-      }));
+      .map((c) => {
+        const msgTs = c.last_message_id ? snowflakeToTimestamp(c.last_message_id, DISCORD_EPOCH) : 0;
+        const createdTs = snowflakeToTimestamp(c.id, DISCORD_EPOCH);
+        return {
+          _source: 'discord',
+          _id: c.id,
+          _timestamp: Math.max(msgTs, createdTs),
+          data: c,
+        };
+      });
 
     // Tag Telegram DM chats with timestamps
     const telegramItems = telegramConnected

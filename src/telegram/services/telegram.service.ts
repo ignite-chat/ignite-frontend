@@ -517,4 +517,157 @@ export const TelegramService = {
       } catch {}
     }
   },
+
+  // ─── Account / Profile ───────────────────────────────────────────
+
+  async getMe() {
+    const client = TelegramClientService.getClient();
+    if (!client) return null;
+    try {
+      return await client.getMe();
+    } catch (error) {
+      console.error('[Telegram] Failed to get current user:', error);
+      return null;
+    }
+  },
+
+  async updateProfile(updates: { firstName?: string; lastName?: string; about?: string }) {
+    const client = TelegramClientService.getClient();
+    if (!client) return;
+    try {
+      await client.invoke(new Api.account.UpdateProfile(updates));
+      toast.success('Profile updated');
+    } catch (error: any) {
+      console.error('[Telegram] Failed to update profile:', error);
+      toast.error(error.errorMessage || 'Failed to update profile');
+    }
+  },
+
+  async updateUsername(username: string) {
+    const client = TelegramClientService.getClient();
+    if (!client) return;
+    try {
+      await client.invoke(new Api.account.UpdateUsername({ username }));
+      toast.success('Username updated');
+    } catch (error: any) {
+      console.error('[Telegram] Failed to update username:', error);
+      toast.error(error.errorMessage || 'Failed to update username');
+    }
+  },
+
+  // ─── Linked Devices / Sessions ───────────────────────────────────
+
+  async getAuthorizations() {
+    const client = TelegramClientService.getClient();
+    if (!client) return [];
+    try {
+      const result = await client.invoke(new Api.account.GetAuthorizations());
+      return result.authorizations || [];
+    } catch (error) {
+      console.error('[Telegram] Failed to get authorizations:', error);
+      return [];
+    }
+  },
+
+  async terminateSession(hash: bigInt.BigInteger) {
+    const client = TelegramClientService.getClient();
+    if (!client) return false;
+    try {
+      await client.invoke(new Api.account.ResetAuthorization({ hash }));
+      toast.success('Session terminated');
+      return true;
+    } catch (error: any) {
+      console.error('[Telegram] Failed to terminate session:', error);
+      toast.error(error.errorMessage || 'Failed to terminate session');
+      return false;
+    }
+  },
+
+  async terminateAllOtherSessions() {
+    const client = TelegramClientService.getClient();
+    if (!client) return false;
+    try {
+      await client.invoke(new Api.auth.ResetAuthorizations());
+      toast.success('All other sessions terminated');
+      return true;
+    } catch (error: any) {
+      console.error('[Telegram] Failed to terminate all sessions:', error);
+      toast.error(error.errorMessage || 'Failed to terminate sessions');
+      return false;
+    }
+  },
+
+  // ─── Privacy ─────────────────────────────────────────────────────
+
+  async getPrivacy(key: Api.TypeInputPrivacyKey) {
+    const client = TelegramClientService.getClient();
+    if (!client) return null;
+    try {
+      return await client.invoke(new Api.account.GetPrivacy({ key }));
+    } catch (error) {
+      console.error('[Telegram] Failed to get privacy:', error);
+      return null;
+    }
+  },
+
+  async setPrivacy(key: Api.TypeInputPrivacyKey, rules: Api.TypeInputPrivacyRule[]) {
+    const client = TelegramClientService.getClient();
+    if (!client) return false;
+    try {
+      await client.invoke(new Api.account.SetPrivacy({ key, rules }));
+      return true;
+    } catch (error: any) {
+      console.error('[Telegram] Failed to set privacy:', error);
+      toast.error(error.errorMessage || 'Failed to update privacy');
+      return false;
+    }
+  },
+
+  // ─── Blocked Users ───────────────────────────────────────────────
+
+  async getBlockedUsers(offset = 0, limit = 100) {
+    const client = TelegramClientService.getClient();
+    if (!client) return { users: [], count: 0 };
+    try {
+      const result = await client.invoke(new Api.contacts.GetBlocked({ offset, limit }));
+      const users = (result as any).users || [];
+      const blocked = (result as any).blocked || [];
+      return { users, blocked, count: blocked.length };
+    } catch (error) {
+      console.error('[Telegram] Failed to get blocked users:', error);
+      return { users: [], blocked: [], count: 0 };
+    }
+  },
+
+  async blockUser(userId: string) {
+    const client = TelegramClientService.getClient();
+    if (!client) return false;
+    try {
+      const peer = await this._resolvePeer(userId);
+      if (!peer) return false;
+      await client.invoke(new Api.contacts.Block({ id: peer as Api.TypeInputPeer }));
+      toast.success('User blocked');
+      return true;
+    } catch (error: any) {
+      console.error('[Telegram] Failed to block user:', error);
+      toast.error(error.errorMessage || 'Failed to block user');
+      return false;
+    }
+  },
+
+  async unblockUser(userId: string) {
+    const client = TelegramClientService.getClient();
+    if (!client) return false;
+    try {
+      const peer = await this._resolvePeer(userId);
+      if (!peer) return false;
+      await client.invoke(new Api.contacts.Unblock({ id: peer as Api.TypeInputPeer }));
+      toast.success('User unblocked');
+      return true;
+    } catch (error: any) {
+      console.error('[Telegram] Failed to unblock user:', error);
+      toast.error(error.errorMessage || 'Failed to unblock user');
+      return false;
+    }
+  },
 };

@@ -1,7 +1,10 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { Check } from '@phosphor-icons/react';
 import { useTelegramMessagesStore } from '../store/telegram-messages.store';
 import { useTelegramTypingStore } from '../store/telegram-typing.store';
+import { useTelegramChatsStore } from '../store/telegram-chats.store';
 import { useTelegramStore } from '../store/telegram.store';
+import { useTelegramPreferencesStore } from '../store/telegram-preferences.store';
 import { TelegramService } from '../services/telegram.service';
 import TelegramMessage from './TelegramMessage';
 import MessageSkeletonList from '@/components/message/MessageSkeleton';
@@ -12,6 +15,11 @@ const TelegramChatMessages = ({ chatId, chatType, messageSentCount }) => {
   const messages = useTelegramMessagesStore((s) => chatId ? s.chatMessages[chatId] || [] : []);
   const pendingMessages = useTelegramMessagesStore((s) => chatId ? s.chatPendingMessages[chatId] || [] : []);
   const typingUsers = useTelegramTypingStore((s) => chatId ? s.typing[chatId] || [] : []);
+  const unreadCount = useTelegramChatsStore((s) => {
+    const chat = s.chats.find((c) => c.id === chatId);
+    return chat?.unreadCount || 0;
+  });
+  const showUnreadBanner = useTelegramPreferencesStore((s) => s.showUnreadBanner);
 
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -107,15 +115,22 @@ const TelegramChatMessages = ({ chatId, chatType, messageSentCount }) => {
     [handleScroll, loadOlder],
   );
 
-  // Mark as read when viewing messages
+  // Mark as read when viewing messages (only when banner is disabled)
   useEffect(() => {
+    if (showUnreadBanner) return;
     if (!chatId || messages.length === 0) return;
     const lastMsg = messages[messages.length - 1];
     const timer = setTimeout(() => {
       TelegramService.markAsRead(chatId, lastMsg.id);
     }, 1000);
     return () => clearTimeout(timer);
-  }, [chatId, messages.length]);
+  }, [chatId, messages.length, showUnreadBanner]);
+
+  const handleMarkAsRead = useCallback(() => {
+    if (!chatId || messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    TelegramService.markAsRead(chatId, lastMsg.id);
+  }, [chatId, messages]);
 
   // Determine which messages should show sender header (group by sender + 5min window)
   const messageGroups = useMemo(() => {
@@ -140,9 +155,26 @@ const TelegramChatMessages = ({ chatId, chatType, messageSentCount }) => {
   return (
     <div
       ref={containerRef}
-      className="flex flex-1 flex-col overflow-y-auto"
+      className="relative flex flex-1 flex-col overflow-y-auto"
       onScroll={handleScrollContainer}
     >
+      {/* Unread banner */}
+      {showUnreadBanner && unreadCount > 0 && (
+        <div className="sticky left-0 right-0 top-0 z-10 flex items-center justify-between bg-[#2AABEE] px-4 py-2 text-sm">
+          <span className="font-medium text-white">
+            {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}
+          </span>
+          <button
+            type="button"
+            onClick={handleMarkAsRead}
+            className="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold text-white transition-colors hover:text-white/80"
+          >
+            Mark as Read
+            <Check size={14} weight="bold" />
+          </button>
+        </div>
+      )}
+
       {/* Loading indicator for older messages */}
       {isLoading && (
         <div className="flex shrink-0 justify-center py-3">
