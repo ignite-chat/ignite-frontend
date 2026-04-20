@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserMinus } from 'lucide-react';
-import { ChatCircle, DiscordLogo } from '@phosphor-icons/react';
+import { ChatCircle } from '@phosphor-icons/react';
+import AccountBadge from '@/components/AccountBadge';
 import { toast } from 'sonner';
 import Avatar from '@/ignite/components/Avatar';
 import { ChannelsService } from '@/ignite/services/channels.service';
@@ -42,9 +43,10 @@ function getDiscordStatusText(activities: any[] | undefined): string | null {
 
 type FriendRowProps = {
   friend: Friend;
+  showAccountBadge?: boolean;
 };
 
-const FriendRow = ({ friend }: FriendRowProps) => {
+const FriendRow = ({ friend, showAccountBadge }: FriendRowProps) => {
   const navigate = useNavigate();
   const { channels } = useChannelsStore();
   const getUser = useUsersStore((s) => s.getUser);
@@ -99,19 +101,22 @@ const FriendRow = ({ friend }: FriendRowProps) => {
           <div className="truncate text-xs text-gray-400">{friend.status}</div>
         </div>
       </div>
-      <div className="flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-        <button
-          onClick={(e) => { e.stopPropagation(); messageUser(); }}
-          className="flex size-9 items-center justify-center rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
-        >
-          <ChatCircle size={18} weight="fill" />
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); deleteFriend(); }}
-          className="flex size-9 items-center justify-center rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-red-400"
-        >
-          <UserMinus size={18} />
-        </button>
+      <div className="flex items-center gap-2">
+        <AccountBadge source="ignite" show={!!showAccountBadge} />
+        <div className="flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+          <button
+            onClick={(e) => { e.stopPropagation(); messageUser(); }}
+            className="flex size-9 items-center justify-center rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+          >
+            <ChatCircle size={18} weight="fill" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); deleteFriend(); }}
+            className="flex size-9 items-center justify-center rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-red-400"
+          >
+            <UserMinus size={18} />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -119,9 +124,11 @@ const FriendRow = ({ friend }: FriendRowProps) => {
 
 type DiscordFriendRowProps = {
   user: DiscordUser;
+  accountId?: string;
+  showAccountBadge?: boolean;
 };
 
-const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
+const DiscordFriendRow = ({ user, accountId, showAccountBadge }: DiscordFriendRowProps) => {
   const navigate = useNavigate();
   const channels = useDiscordChannelsStore((s) => s.channels);
   const storeActivities = useDiscordActivitiesStore((s) => s.activities[user.id]);
@@ -179,12 +186,6 @@ const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
                 {user.username}
               </span>
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DiscordLogo size={14} weight="fill" className="shrink-0 text-[#5865f2]" />
-              </TooltipTrigger>
-              <TooltipContent side="top">Discord</TooltipContent>
-            </Tooltip>
           </div>
           <div className="truncate text-xs text-gray-400">
             {(() => {
@@ -211,13 +212,16 @@ const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
           </div>
         </div>
       </div>
-      <div className="flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-        <button
-          onClick={(e) => { e.stopPropagation(); messageUser(); }}
-          className="flex size-9 items-center justify-center rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
-        >
-          <ChatCircle size={18} weight="fill" />
-        </button>
+      <div className="flex items-center gap-2">
+        <AccountBadge source="discord" accountId={accountId} show={!!showAccountBadge} />
+        <div className="flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+          <button
+            onClick={(e) => { e.stopPropagation(); messageUser(); }}
+            className="flex size-9 items-center justify-center rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+          >
+            <ChatCircle size={18} weight="fill" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -225,7 +229,7 @@ const DiscordFriendRow = ({ user }: DiscordFriendRowProps) => {
 
 type MergedFriend =
   | { source: 'ignite'; data: Friend; sortName: string }
-  | { source: 'discord'; data: DiscordUser; sortName: string };
+  | { source: 'discord'; data: DiscordUser; accountId?: string; sortName: string };
 
 const FriendRowSkeleton = () => (
   <div className="flex items-center justify-between px-2 py-3">
@@ -245,13 +249,14 @@ const FriendRowSkeleton = () => (
 
 type FriendsListProps = {
   friends: Friend[];
-  discordFriends: DiscordUser[];
+  discordFriends: { user: DiscordUser; accountId?: string }[];
   filter: string;
   searchQuery: string;
   loading?: boolean;
+  showAccountBadges?: boolean;
 };
 
-const FriendsList = ({ friends, discordFriends, filter, searchQuery, loading }: FriendsListProps) => {
+const FriendsList = ({ friends, discordFriends, filter, searchQuery, loading, showAccountBadges }: FriendsListProps) => {
   const merged = useMemo(() => {
     const igniteFiltered = filter === 'online' ? friends.filter((f) => f.status !== 'offline') : friends;
 
@@ -259,11 +264,11 @@ const FriendsList = ({ friends, discordFriends, filter, searchQuery, loading }: 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       discordFiltered = discordFiltered.filter(
-        (u) => u.username?.toLowerCase().includes(query) || u.global_name?.toLowerCase().includes(query)
+        ({ user: u }) => u.username?.toLowerCase().includes(query) || u.global_name?.toLowerCase().includes(query)
       );
     }
     if (filter === 'online') {
-      discordFiltered = discordFiltered.filter((u) => (u.status || 'offline') !== 'offline');
+      discordFiltered = discordFiltered.filter(({ user: u }) => (u.status || 'offline') !== 'offline');
     }
 
     const items: MergedFriend[] = [
@@ -272,9 +277,10 @@ const FriendsList = ({ friends, discordFriends, filter, searchQuery, loading }: 
         data: f,
         sortName: (f.name || f.username || '').toLowerCase(),
       })),
-      ...discordFiltered.map((u): MergedFriend => ({
+      ...discordFiltered.map(({ user: u, accountId }): MergedFriend => ({
         source: 'discord',
         data: u,
+        accountId,
         sortName: (u.global_name || u.username || '').toLowerCase(),
       })),
     ];
@@ -306,9 +312,14 @@ const FriendsList = ({ friends, discordFriends, filter, searchQuery, loading }: 
       <div className="[&>*+*]:border-t [&>*+*]:border-white/5/30">
         {merged.map((item) =>
           item.source === 'ignite' ? (
-            <FriendRow key={item.data.id} friend={item.data} />
+            <FriendRow key={item.data.id} friend={item.data} showAccountBadge={showAccountBadges} />
           ) : (
-            <DiscordFriendRow key={`discord-${item.data.id}`} user={item.data} />
+            <DiscordFriendRow
+              key={`discord-${item.accountId ?? 'x'}-${item.data.id}`}
+              user={item.data}
+              accountId={item.accountId}
+              showAccountBadge={showAccountBadges}
+            />
           )
         )}
       </div>

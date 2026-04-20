@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { AuthService } from '@/ignite/services/auth.service';
 
 const HCAPTCHA_SITE_KEY = '78b0437e-9a22-4e50-aae6-26ae467445d8';
+const CAPTCHA_ENABLED = import.meta.env.VITE_CAPTCHA_ENABLED !== 'false';
 
 export default function ConnectIgniteDialog({
   open,
@@ -72,13 +73,16 @@ function LoginContent({
 
   const onSubmit = useCallback(
     async (data: any) => {
-      if (!captchaToken) {
+      if (CAPTCHA_ENABLED && !captchaToken) {
         setSubmitError('Please complete the captcha.');
         return;
       }
 
       try {
-        await AuthService.login({ ...data, hcaptcha_captcha_token: captchaToken });
+        const payload = CAPTCHA_ENABLED
+          ? { ...data, hcaptcha_captcha_token: captchaToken }
+          : data;
+        await AuthService.login(payload);
         onSuccess();
       } catch (error: any) {
         setSubmitError(error.response?.data?.message || 'An unknown error occurred during login.');
@@ -134,15 +138,20 @@ function LoginContent({
               )}
             />
           </div>
-          <HCaptcha
-            ref={captchaRef}
-            sitekey={HCAPTCHA_SITE_KEY}
-            theme="dark"
-            onVerify={(token: string) => setCaptchaToken(token)}
-            onExpire={() => setCaptchaToken(null)}
-          />
+          {CAPTCHA_ENABLED && (
+            <HCaptcha
+              ref={captchaRef}
+              sitekey={HCAPTCHA_SITE_KEY}
+              theme="dark"
+              onVerify={(token: string) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+            />
+          )}
           {submitError && <FieldError>{submitError}</FieldError>}
-          <Button type="submit" disabled={form.formState.isSubmitting || !captchaToken}>
+          <Button
+            type="submit"
+            disabled={form.formState.isSubmitting || (CAPTCHA_ENABLED && !captchaToken)}
+          >
             {form.formState.isSubmitting ? 'Logging in...' : 'Login'}
           </Button>
           <p className="text-center text-sm text-muted-foreground">
@@ -173,13 +182,16 @@ function RegisterContent({
 
   const onSubmit = useCallback(
     async (data: any) => {
-      if (!captchaToken) {
+      if (CAPTCHA_ENABLED && !captchaToken) {
         setSubmitError('Please complete the captcha.');
         return;
       }
 
       try {
-        await AuthService.register({ ...data, hcaptcha_captcha_token: captchaToken });
+        const payload = CAPTCHA_ENABLED
+          ? { ...data, hcaptcha_captcha_token: captchaToken }
+          : data;
+        await AuthService.register(payload);
         onSuccess();
       } catch (error: any) {
         setSubmitError(
@@ -267,15 +279,20 @@ function RegisterContent({
               />
             </div>
           </div>
-          <HCaptcha
-            ref={captchaRef}
-            sitekey={HCAPTCHA_SITE_KEY}
-            theme="dark"
-            onVerify={(token: string) => setCaptchaToken(token)}
-            onExpire={() => setCaptchaToken(null)}
-          />
+          {CAPTCHA_ENABLED && (
+            <HCaptcha
+              ref={captchaRef}
+              sitekey={HCAPTCHA_SITE_KEY}
+              theme="dark"
+              onVerify={(token: string) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+            />
+          )}
           {submitError && <FieldError>{submitError}</FieldError>}
-          <Button type="submit" disabled={form.formState.isSubmitting || !captchaToken}>
+          <Button
+            type="submit"
+            disabled={form.formState.isSubmitting || (CAPTCHA_ENABLED && !captchaToken)}
+          >
             {form.formState.isSubmitting ? 'Creating account...' : 'Create Account'}
           </Button>
           <p className="text-center text-sm text-muted-foreground">

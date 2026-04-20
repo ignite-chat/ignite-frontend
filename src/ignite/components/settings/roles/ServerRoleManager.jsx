@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { EVERYONE_ROLE_ID, isEveryone, hexToInt, intToHex } from '@/ignite/constants/Roles';
 import RoleList from './RoleList';
 import RoleEditor from './RoleEditor';
+import UnsavedChangesBar from '@/components/ui/unsaved-changes-bar';
 
 const ServerRoleManager = ({ guild }) => {
   const [localRoles, setLocalRoles] = useState([]);
@@ -136,34 +137,35 @@ const ServerRoleManager = ({ guild }) => {
               })
           );
         }
-      } else {
-        // Regular role update
-        if (
-          roleName !== originalName ||
-          activePermissions !== originalPermissions ||
-          roleColor !== originalColor
-        ) {
-          promises.push(
-            RolesService.updateGuildRole(guild.id, selectedRoleId, {
-              name: roleName,
-              permissions: activePermissions.toString(),
-              color: hexToInt(roleColor),
-            })
-          );
-        }
+      } else if (
+        roleName !== originalName ||
+        activePermissions !== originalPermissions ||
+        roleColor !== originalColor
+      ) {
+        // Regular role detail update — only fires when the currently-selected
+        // role has unsaved detail edits.
+        promises.push(
+          RolesService.updateGuildRole(guild.id, selectedRoleId, {
+            name: roleName,
+            permissions: activePermissions.toString(),
+            color: hexToInt(roleColor),
+          })
+        );
+      }
 
-        // Order changes
-        const currentOrderIds = localRoles.map((r) => r.id);
-        const hasOrderChanged =
-          JSON.stringify(currentOrderIds) !== JSON.stringify(originalRoleOrder);
+      // Order changes — always evaluated, regardless of which role (including
+      // @everyone) is currently selected. Reordering is a guild-level edit, not
+      // tied to the focused role.
+      const currentOrderIds = localRoles.map((r) => r.id);
+      const hasOrderChanged =
+        JSON.stringify(currentOrderIds) !== JSON.stringify(originalRoleOrder);
 
-        if (hasOrderChanged) {
-          const positions = localRoles.map((role, index) => ({
-            id: role.id,
-            position: localRoles.length - index - 1,
-          }));
-          promises.push(RolesService.updateRolePositions(guild.id, positions));
-        }
+      if (hasOrderChanged) {
+        const positions = localRoles.map((role, index) => ({
+          id: role.id,
+          position: localRoles.length - index - 1,
+        }));
+        promises.push(RolesService.updateRolePositions(guild.id, positions));
       }
 
       await Promise.all(promises);
@@ -173,9 +175,7 @@ const ServerRoleManager = ({ guild }) => {
       setOriginalPermissions(activePermissions);
       setOriginalName(roleName);
       setOriginalColor(roleColor);
-      if (!isEveryone(selectedRoleId)) {
-        setOriginalRoleOrder(localRoles.map((r) => r.id));
-      }
+      setOriginalRoleOrder(localRoles.map((r) => r.id));
     } catch (error) {
       console.error(error);
       toast.error('Failed to save changes');
@@ -214,13 +214,12 @@ const ServerRoleManager = ({ guild }) => {
     setActivePermissions(originalPermissions);
     setRoleName(originalName);
     setRoleColor(originalColor);
-    // Reset order for real roles
-    if (!isEveryone(selectedRoleId)) {
-      const originalRoles = originalRoleOrder
-        .map((id) => localRoles.find((r) => r.id === id))
-        .filter(Boolean);
-      setLocalRoles(originalRoles);
-    }
+    // Always reset the drag order, even when @everyone is selected — the
+    // ordering is guild-wide, not tied to which role is focused.
+    const originalRoles = originalRoleOrder
+      .map((id) => localRoles.find((r) => r.id === id))
+      .filter(Boolean);
+    if (originalRoles.length > 0) setLocalRoles(originalRoles);
   };
 
   const hasChanged = useMemo(() => {
@@ -279,13 +278,18 @@ const ServerRoleManager = ({ guild }) => {
           onTogglePermission={handleToggle}
           isDeleting={isDeleting}
           onDeleteRole={handleDeleteRole}
-          hasChanged={hasChanged}
-          isSaving={isSaving}
-          onSave={handleSave}
-          onReset={handleReset}
           hasRoles={localRoles.length > 0}
         />
       </div>
+
+      {/* Spans the entire content area (both columns) rather than living
+          inside the editor card. */}
+      <UnsavedChangesBar
+        show={hasChanged}
+        saving={isSaving}
+        onSave={handleSave}
+        onReset={handleReset}
+      />
     </div>
   );
 };

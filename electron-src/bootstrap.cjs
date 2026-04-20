@@ -9,12 +9,19 @@ let mainWindow = null;
 let discordReferer = 'https://discord.com/';
 
 const createTray = () => {
-  let iconPath = join(__dirname, 'tray-icon.ico');
-
   if (process.platform === 'darwin') {
-    tray = new Tray(nativeImage.createEmpty());
+    // macOS menu bar expects a "template" image: pure black + transparent,
+    // which the OS tints for light/dark menu bars. The `*Template.png` +
+    // `@2x` filename convention is auto-detected by Electron, so both the
+    // 22×22 and 44×44 variants are picked up from the same base path and
+    // the image is treated as a template.
+    const templatePath = join(__dirname, 'assets', 'trayIconTemplate.png');
+    const icon = nativeImage.createFromPath(templatePath);
+    icon.setTemplateImage(true);
+    tray = new Tray(icon);
   } else {
-    tray = new Tray(iconPath);
+    // Windows / Linux: multi-size .ico works directly.
+    tray = new Tray(join(__dirname, 'tray-icon.ico'));
   }
 
   const contextMenu = Menu.buildFromTemplate([
@@ -601,8 +608,29 @@ module.exports = () => {
     });
   });
 
+  const isMac = process.platform === 'darwin';
+
+  if (isMac) {
+    // macOS Cmd+Q / dock "Quit Ignite" / tray "Quit" all go through
+    // `before-quit`. Flag the intent so `window-all-closed` below lets the
+    // quit actually happen instead of silently cancelling it.
+    app.on("before-quit", () => {
+      app.isQuitting = true;
+    });
+  }
+
   app.on("window-all-closed", (event) => {
-    // Prevent quit when all windows are closed, keep app in tray
+    if (isMac) {
+      // macOS: closing the last window should keep the app alive in the tray;
+      // but once the user actually asks to quit (tray "Quit", Cmd+Q, dock),
+      // let the default quit proceed.
+      if (!app.isQuitting) {
+        event.preventDefault();
+      }
+      return;
+    }
+    // Windows/Linux: preserve the previous behaviour — the app stays running
+    // in the tray no matter how the last window was closed.
     event.preventDefault();
   });
 };

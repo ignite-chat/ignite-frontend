@@ -1,6 +1,18 @@
 import Pusher from 'pusher-js';
 import Echo from 'laravel-echo';
 
+// This module wires long-lived Pusher subscriptions onto `window.Echo`. HMR
+// would replace the EchoService object with a fresh one whose guards think
+// no subscription exists, then re-register listeners on the same underlying
+// channel — causing every event to log + handle N times. Force an actual
+// page reload on update; `invalidate()` used to work here but bounces back
+// into `accept()` through parent modules, creating an HMR loop.
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    window.location.reload();
+  });
+}
+
 window.Pusher = Pusher;
 import api from '@/ignite/api';
 import { useAuthStore } from '../store/auth.store';
@@ -41,6 +53,21 @@ import {
   handleVoiceStateUpdate,
 } from '../handlers';
 
+// Wrap every `.listen(event, handler)` on a channel so events are logged to
+// the devtools console before the real handler fires. Echo's `.listen()`
+// returns the channel itself for chaining, so the patch survives across
+// every chained call.
+const withLogging = (channel: any, label: string) => {
+  const origListen = channel.listen.bind(channel);
+  channel.listen = (event: string, handler: (data: any) => void) => {
+    return origListen(event, (data: any) => {
+      console.debug(`%c[echo]%c ${label} %c${event}`, 'color:#5865f2;font-weight:bold', 'color:inherit', 'color:#e11d48', data);
+      handler(data);
+    });
+  };
+  return channel;
+};
+
 export const EchoService = {
   activeGuildSubscriptions: new Set<string>(),
   userChannelSubscription: null as any,
@@ -71,6 +98,10 @@ export const EchoService = {
   },
 
   subscribeToUserChannel(userId: string) {
+    // Self-bootstrap: when the user logs in mid-session (i.e. without an
+    // Ignite token at page load), InitializationService never ran connect().
+    this.connect();
+
     if (this.userChannelSubscription) {
       console.log('User channel already subscribed');
       return;
@@ -80,7 +111,7 @@ export const EchoService = {
 
     const context = { guildId: '', currentUserId: userId };
 
-    this.userChannelSubscription = window.Echo.private(`user.${userId}`)
+    this.userChannelSubscription = withLogging(window.Echo.private(`user.${userId}`), `user.${userId}`)
       .listen('.friendrequest.created', handleFriendRequestCreated)
       .listen('.friendrequest.deleted', handleFriendRequestDeleted)
       .listen('.friendrequest.accepted', handleFriendRequestAccepted)
@@ -107,6 +138,9 @@ export const EchoService = {
   },
 
   subscribeToGuild(guildId: string) {
+    // Self-bootstrap for the mid-session login path (see subscribeToUserChannel).
+    this.connect();
+
     if (this.activeGuildSubscriptions.has(guildId)) {
       return;
     }
@@ -116,7 +150,7 @@ export const EchoService = {
 
     console.log(`Subscribing to guild: ${guildId}`);
 
-    window.Echo.private(`guild.${guildId}`)
+    withLogging(window.Echo.private(`guild.${guildId}`), `guild.${guildId}`)
       .listen('.channel.created', (data: any) => handleChannelCreated(data, context))
       .listen('.channel.deleted', (data: any) => handleChannelDeleted(data, context))
       .listen('.channel.updated', (data: any) => handleChannelUpdated(data, context))

@@ -20,7 +20,7 @@ const ServerSettingsModal = ({ modalId, guild, initialTab = 'info' }) => {
   const navigationSections = useMemo(
     () => [
       {
-        label: guild?.name?.toUpperCase() || 'SERVER',
+        label: guild?.name || 'Server',
         items: [
           { id: 'info', label: 'Overview', icon: Info, component: <ServerInfo guild={guild} /> },
           { id: 'access', label: 'Access', icon: DoorOpen, component: <ServerAccess guild={guild} /> },
@@ -29,7 +29,7 @@ const ServerSettingsModal = ({ modalId, guild, initialTab = 'info' }) => {
         ],
       },
       {
-        label: 'USER MANAGEMENT',
+        label: 'User Management',
         items: [
           { id: 'members', label: 'Members', icon: Users, component: <ServerMemberManager guild={guild} /> },
           { id: 'bans', label: 'Bans', icon: Ban, component: <ServerBanManager guild={guild} /> },

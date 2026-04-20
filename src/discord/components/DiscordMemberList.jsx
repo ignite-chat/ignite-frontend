@@ -183,7 +183,7 @@ const MemberItem = ({ member: rawMember, guildId, ownerId, popoverOpen, setPopov
   );
 };
 
-const DiscordMemberList = ({ guildId }) => {
+const DiscordMemberList = ({ guildId, recipientIds, ownerId: ownerIdProp }) => {
   const memberList = useDiscordMemberListStore((s) => s.memberLists[guildId]);
   const guild = useDiscordGuildsStore((s) => s.guilds.find((g) => g.id === guildId));
   const [openPopoverUserId, setOpenPopoverUserId] = useState(null);
@@ -195,6 +195,29 @@ const DiscordMemberList = ({ guildId }) => {
     },
     []
   );
+
+  // Group DM: flat list of recipients, no roles/grouping
+  if (recipientIds) {
+    return (
+      <div className="flex h-full w-60 shrink-0 flex-col border-l border-white/5">
+        <div className="flex-1 overflow-y-auto px-2 py-4">
+          <div className="mb-0.5 px-1 text-xs font-semibold tracking-wide text-gray-400">
+            Members — {recipientIds.length}
+          </div>
+          {recipientIds.map((userId) => (
+            <MemberItem
+              key={userId}
+              member={{ user_id: userId }}
+              guildId={undefined}
+              ownerId={ownerIdProp}
+              popoverOpen={openPopoverUserId === userId}
+              setPopoverOpen={makePopoverHandler(userId)}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const ownerId = guild?.owner_id || guild?.properties?.owner_id;
 

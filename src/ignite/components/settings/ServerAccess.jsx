@@ -5,9 +5,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Lock, Globe } from 'lucide-react';
 import UnsavedChangesBar from '@/components/ui/unsaved-changes-bar';
+import { useGuildProfilesStore } from '@/ignite/store/guild-profiles.store';
 
 const ServerAccess = ({ guild }) => {
-  const [profile, setProfile] = useState(null);
+  const profile = useGuildProfilesStore((s) => (guild?.id ? s.profiles[guild.id]?.data : undefined));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -17,15 +18,15 @@ const ServerAccess = ({ guild }) => {
     if (!guild?.id) return;
 
     let active = true;
-    setLoading(true);
+    // Only show the skeleton when we have no cached copy. With the cache
+    // primed by a sibling tab, switching to Access is instant.
+    const hadCached = !!useGuildProfilesStore.getState().profiles[guild.id];
+    if (!hadCached) setLoading(true);
     setError('');
 
-    api
-      .get(`/guilds/${guild.id}/profile`)
-      .then((response) => {
-        if (!active) return;
-        setProfile(response.data);
-      })
+    useGuildProfilesStore
+      .getState()
+      .fetchProfile(guild.id)
       .catch((err) => {
         if (!active) return;
         setError(err.response?.data?.message || err.message || 'Could not load server profile.');
@@ -51,7 +52,11 @@ const ServerAccess = ({ guild }) => {
 
     try {
       await api.patch(`/guilds/${guild.id}/profile`, { is_discoverable: pendingValue });
-      setProfile((prev) => ({ ...prev, is_discoverable: pendingValue }));
+      // Merge the new value into the cache so other tabs see it immediately
+      // and the next fetch-on-mount gets fresh data without a network hit.
+      const store = useGuildProfilesStore.getState();
+      const current = store.profiles[guild.id]?.data || {};
+      store.setProfile(guild.id, { ...current, is_discoverable: pendingValue });
       setPendingValue(null);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Could not update access setting.');

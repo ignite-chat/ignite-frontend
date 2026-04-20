@@ -19,6 +19,7 @@ import { Camera, Pencil, Trash2 } from 'lucide-react';
 import ImageCropperModal from '@/ignite/components/modals/ImageCropperModal';
 import GuildCard from '../guild/GuildCard';
 import UnsavedChangesBar from '@/components/ui/unsaved-changes-bar';
+import { useGuildProfilesStore } from '@/ignite/store/guild-profiles.store';
 
 const AFK_TIMEOUT_OPTIONS = [
   { label: '1 Minute', value: 60 },
@@ -68,7 +69,7 @@ const fileToDataUrl = (file) =>
 const REMOVE = '';
 
 const ServerInfo = ({ guild }) => {
-  const [profile, setProfile] = useState(null);
+  const profile = useGuildProfilesStore((s) => (guild?.id ? s.profiles[guild.id]?.data : undefined)) ?? null;
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -120,19 +121,15 @@ const ServerInfo = ({ guild }) => {
     if (!guild?.id) return;
 
     let active = true;
-    setLoading(true);
+    // Only show the skeleton when we have no cached copy. With the cache
+    // primed by a sibling tab, switching to Overview is instant.
+    const hadCached = !!useGuildProfilesStore.getState().profiles[guild.id];
+    if (!hadCached) setLoading(true);
     setError('');
 
-    api
-      .get(`/guilds/${guild.id}/profile`)
-      .then((response) => {
-        if (!active) return;
-        setProfile(response.data);
-        ownerForm.reset({
-          owner_id: response.data?.owner_id ? String(response.data.owner_id) : '',
-          confirm_transfer: false,
-        });
-      })
+    useGuildProfilesStore
+      .getState()
+      .fetchProfile(guild.id)
       .catch((err) => {
         if (!active) return;
         const msg = err.response?.data?.message || err.message || 'Could not load server profile.';
@@ -147,6 +144,17 @@ const ServerInfo = ({ guild }) => {
       active = false;
     };
   }, [guild?.id]);
+
+  // Keep the owner transfer form in sync with whatever profile is currently
+  // in the store (covers both the initial fetch and cache-primed mounts).
+  useEffect(() => {
+    if (!profile) return;
+    ownerForm.reset({
+      owner_id: profile.owner_id ? String(profile.owner_id) : '',
+      confirm_transfer: false,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.owner_id]);
 
   useEffect(() => {
     ownerForm.register('confirm_transfer');
@@ -173,9 +181,13 @@ const ServerInfo = ({ guild }) => {
 
     try {
       await api.patch(`/guilds/${guild.id}/profile`, body);
-      const response = await api.get(`/guilds/${guild.id}/profile`);
-      setProfile(response.data);
-      resetForm?.(response.data);
+      // Force a refetch so the cache holds the server's authoritative shape
+      // (in case the PATCH normalises fields). Returns the fresh data so we
+      // can feed it straight into the form reset.
+      const fresh = await useGuildProfilesStore
+        .getState()
+        .fetchProfile(guild.id, { force: true });
+      resetForm?.(fresh);
       setOwnerWarning('');
       return true;
     } catch (err) {

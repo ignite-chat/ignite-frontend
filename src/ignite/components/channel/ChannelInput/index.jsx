@@ -11,7 +11,7 @@ import { useChannelInputContext, useChannelContext } from '../../../contexts/Cha
 import Avatar from '../../Avatar.jsx';
 import { cn } from '@/lib/utils';
 import { useChannelsStore } from '@/ignite/store/channels.store';
-import { X, Hash, Megaphone, SpeakerHigh, Keyboard, Smiley, Sticker as StickerIcon, MagnifyingGlass } from '@phosphor-icons/react';
+import { X, Hash, Megaphone, SpeakerHigh, Keyboard, Smiley, Sticker as StickerIcon, MagnifyingGlass, Infinity as InfinityIcon } from '@phosphor-icons/react';
 import { useGuildsStore } from '@/ignite/store/guilds.store';
 import { useGuildContext } from '../../../contexts/GuildContext';
 import { ChannelType } from '../../../constants/ChannelType';

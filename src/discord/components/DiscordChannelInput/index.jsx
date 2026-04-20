@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/emoji-picker';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { X, Smiley, Timer, Keyboard, Plus, File as FileIcon } from '@phosphor-icons/react';
+import { X, Smiley, Timer, Keyboard, Plus, File as FileIcon, Infinity as InfinityIcon } from '@phosphor-icons/react';
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -137,6 +137,8 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   const [inputMessage, setInputMessage] = useState('');
   const [stagedFiles, setStagedFiles] = useState([]);
   const [silentTyping, setSilentTyping] = useState(() => localStorage.getItem('silentTyping') === 'true');
+  const [infiniteTyping, setInfiniteTyping] = useState(false);
+
   const [activeCommand, setActiveCommand] = useState(null);
   const [activeCommandApp, setActiveCommandApp] = useState(null);
   const editorRef = useRef(null);
@@ -146,6 +148,20 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
   const channelId = channel?.id;
   const guildId = channel?.guild_id;
   const isDM = channel?.type === 1 || channel?.type === 3;
+
+  // Infinite typing: re-send the Discord typing indicator every 7s so the
+  // typing dots never stop. Discord's indicator lasts 10s — 7s leaves headroom.
+  useEffect(() => {
+    if (!infiniteTyping || !channelId) return;
+    DiscordApiService.sendTyping(channelId).catch(() => {});
+    const id = window.setInterval(() => {
+      DiscordApiService.sendTyping(channelId).catch(() => {});
+    }, 7000);
+    return () => window.clearInterval(id);
+  }, [infiniteTyping, channelId]);
+  useEffect(() => {
+    setInfiniteTyping(false);
+  }, [channelId]);
 
   // Permissions
   const canSend = useDiscordHasPermission(guildId, channel, SEND_MESSAGES);
@@ -664,6 +680,27 @@ const DiscordChannelInput = ({ channel, channelName, onMessageSent }) => {
               </TooltipTrigger>
               <TooltipContent side="top">
                 {silentTyping ? 'Silent typing enabled' : 'Silent typing disabled'}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setInfiniteTyping((v) => !v)}
+                  className={cn(
+                    'size-8 p-0',
+                    '[&_svg]:size-5',
+                    infiniteTyping
+                      ? 'animate-pulse text-primary'
+                      : 'text-[#949ba4] hover:text-[#dbdee1]',
+                  )}
+                >
+                  <InfinityIcon weight={infiniteTyping ? 'bold' : 'regular'} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {infiniteTyping ? 'Stop infinite typing' : 'Start Infinite typing'}
               </TooltipContent>
             </Tooltip>
             <Popover.Root open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen} modal={false}>

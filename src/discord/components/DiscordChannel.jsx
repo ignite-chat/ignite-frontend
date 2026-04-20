@@ -84,6 +84,13 @@ const DiscordChannel = ({ channel }) => {
     return other ? usersMap[other] : null;
   }, [channel, currentUser?.id, isDM, usersMap]);
 
+  const groupDMMemberIds = useMemo(() => {
+    if (channel?.type !== GROUP_DM) return null;
+    const ids = [...(channel.recipient_ids || [])];
+    if (currentUser?.id) ids.push(currentUser.id);
+    return Array.from(new Set(ids));
+  }, [channel, currentUser?.id]);
+
   if (!channel) return null;
 
   if (isForum) {
@@ -130,6 +137,9 @@ const DiscordChannel = ({ channel }) => {
         </div>
 
         {guildId && memberListOpen && !searchOpen && !messageLogOpen && !isDM && <DiscordMemberList guildId={guildId} />}
+        {channel?.type === GROUP_DM && memberListOpen && !messageLogOpen && groupDMMemberIds && (
+          <DiscordMemberList recipientIds={groupDMMemberIds} ownerId={channel.owner_id} />
+        )}
         {isDM && channel?.type === DM && !messageLogOpen && (
           <DiscordDMProfilePanel channel={channel} isOpen={memberListOpen} />
         )}

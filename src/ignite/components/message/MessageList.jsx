@@ -205,20 +205,19 @@ const DMWelcome = ({ channel }) => {
 const GuildChannelWelcome = ({ channel }) => {
   const isVoice = channel.type === ChannelType.GUILD_VOICE;
   return (
-    <div className="px-4 pb-2 pt-16">
-      <div className="mb-2 flex size-[68px] items-center justify-center rounded-full bg-white/10">
+    <div className="select-none px-4 pb-2 pt-16">
+      <div className="mb-2 flex size-20 items-center justify-center rounded-full bg-white/10">
         {isVoice
           ? <SpeakerHigh className="size-10 text-white" weight="fill" />
           : <Hash className="size-10 text-white" weight="bold" />}
       </div>
-      <h1 className="text-[28px] font-bold leading-tight text-white">
+      <h1 className="text-[32px] font-bold leading-tight text-white">
         Welcome to #{channel.name}!
       </h1>
-      {channel.topic && (
-        <p className="mt-1 text-sm text-gray-400">
-          This is the start of the #{channel.name} channel. {channel.topic}
-        </p>
-      )}
+      <p className="mt-1.5 text-[15px] text-gray-400">
+        This is the start of the #{channel.name} channel.
+        {channel.topic ? ` ${channel.topic}` : ''}
+      </p>
     </div>
   );
 };

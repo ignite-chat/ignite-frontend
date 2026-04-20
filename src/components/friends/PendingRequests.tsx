@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { Check, X } from 'lucide-react';
-import { DiscordLogo } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import Avatar from '@/ignite/components/Avatar';
+import AccountBadge from '@/components/AccountBadge';
 import { timeAgo } from './timeAgo';
 
 function formatExactDate(dateStr: string): string {
@@ -30,9 +30,10 @@ type PendingRequestRowProps = {
   request: FriendRequest;
   currentUser: User;
   onClickUser: (userId: string) => void;
+  showAccountBadge?: boolean;
 };
 
-const PendingRequestRow = ({ request, currentUser, onClickUser }: PendingRequestRowProps) => {
+const PendingRequestRow = ({ request, currentUser, onClickUser, showAccountBadge }: PendingRequestRowProps) => {
   const getUser = useUsersStore((s) => s.getUser);
   const isOutgoing = request.sender_id === currentUser.id;
   const userId = isOutgoing ? request.receiver?.id : request.sender?.id;
@@ -54,45 +55,48 @@ const PendingRequestRow = ({ request, currentUser, onClickUser }: PendingRequest
           <div className="text-xs text-gray-400">{user?.username}</div>
         </div>
       </div>
-      <div className="flex gap-2">
-        {!isOutgoing && (
+      <div className="flex items-center gap-2">
+        <AccountBadge source="ignite" show={!!showAccountBadge} />
+        <div className="flex gap-2">
+          {!isOutgoing && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAction(
+                      FriendsService.acceptRequest(request.id),
+                      'Request accepted',
+                      'Failed to accept'
+                    );
+                  }}
+                  className="flex size-9 items-center justify-center rounded-full text-gray-500 hover:text-green-500 hover:bg-gray-900"
+                >
+                  <Check size={18} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Accept</TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handleAction(
-                    FriendsService.acceptRequest(request.id),
-                    'Request accepted',
-                    'Failed to accept'
+                    FriendsService.cancelRequest(request.id),
+                    'Request cancelled',
+                    'Failed to cancel'
                   );
                 }}
-                className="flex size-9 items-center justify-center rounded-full text-gray-500 hover:text-green-500 hover:bg-gray-900"
+                className="flex size-9 items-center justify-center rounded-full text-gray-500 hover:text-red-500 hover:bg-gray-900"
               >
-                <Check size={18} />
+                <X size={18} />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Accept</TooltipContent>
+            <TooltipContent>{isOutgoing ? 'Cancel' : 'Ignore'}</TooltipContent>
           </Tooltip>
-        )}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAction(
-                  FriendsService.cancelRequest(request.id),
-                  'Request cancelled',
-                  'Failed to cancel'
-                );
-              }}
-              className="flex size-9 items-center justify-center rounded-full text-gray-500 hover:text-red-500 hover:bg-gray-900"
-            >
-              <X size={18} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{isOutgoing ? 'Cancel' : 'Ignore'}</TooltipContent>
-        </Tooltip>
+        </div>
       </div>
     </div>
   );
@@ -102,9 +106,11 @@ type DiscordPendingRowProps = {
   user: DiscordUser;
   isOutgoing: boolean;
   onClickUser: (user: DiscordUser) => void;
+  accountId?: string;
+  showAccountBadge?: boolean;
 };
 
-const DiscordPendingRow = ({ user, isOutgoing, onClickUser }: DiscordPendingRowProps) => {
+const DiscordPendingRow = ({ user, isOutgoing, onClickUser, accountId, showAccountBadge }: DiscordPendingRowProps) => {
   const avatarUrl = DiscordService.getUserAvatarUrl(user.id, user.avatar, 64);
   const relationship = useDiscordRelationshipsStore((s) => s.relationships.find((r) => r.id === user.id));
   const sentAgo = relationship?.since ? timeAgo(relationship.since) : null;
@@ -143,12 +149,6 @@ const DiscordPendingRow = ({ user, isOutgoing, onClickUser }: DiscordPendingRowP
         <div>
           <div className="flex items-center gap-1.5 text-sm font-bold text-white">
             {user.global_name || user.username}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DiscordLogo size={14} weight="fill" className="shrink-0 text-[#5865f2]" />
-              </TooltipTrigger>
-              <TooltipContent side="top">Discord</TooltipContent>
-            </Tooltip>
           </div>
           <div className="text-xs text-gray-400">
             {user.username}
@@ -163,31 +163,34 @@ const DiscordPendingRow = ({ user, isOutgoing, onClickUser }: DiscordPendingRowP
           </div>
         </div>
       </div>
-      <div className="flex gap-2">
-        {!isOutgoing && (
+      <div className="flex items-center gap-2">
+        <AccountBadge source="discord" accountId={accountId} show={!!showAccountBadge} />
+        <div className="flex gap-2">
+          {!isOutgoing && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleAccept}
+                  className="flex size-9 items-center justify-center rounded-full text-gray-500 hover:bg-gray-900 hover:text-green-500"
+                >
+                  <Check size={18} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Accept</TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={handleAccept}
-                className="flex size-9 items-center justify-center rounded-full text-gray-500 hover:bg-gray-900 hover:text-green-500"
+                onClick={handleDecline}
+                className="flex size-9 items-center justify-center rounded-full text-gray-500 hover:bg-gray-900 hover:text-red-500"
               >
-                <Check size={18} />
+                <X size={18} />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Accept</TooltipContent>
+            <TooltipContent>{isOutgoing ? 'Cancel' : 'Ignore'}</TooltipContent>
           </Tooltip>
-        )}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={handleDecline}
-              className="flex size-9 items-center justify-center rounded-full text-gray-500 hover:bg-gray-900 hover:text-red-500"
-            >
-              <X size={18} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{isOutgoing ? 'Cancel' : 'Ignore'}</TooltipContent>
-        </Tooltip>
+        </div>
       </div>
     </div>
   );
@@ -196,6 +199,7 @@ const DiscordPendingRow = ({ user, isOutgoing, onClickUser }: DiscordPendingRowP
 export type DiscordPendingRequest = {
   user: DiscordUser;
   isOutgoing: boolean;
+  accountId?: string;
 };
 
 const PendingRowSkeleton = () => (
@@ -220,13 +224,14 @@ type PendingRequestsProps = {
   discordRequests: DiscordPendingRequest[];
   searchQuery: string;
   loading?: boolean;
+  showAccountBadges?: boolean;
 };
 
 type MergedPending =
   | { source: 'ignite'; data: FriendRequest; sortName: string; isOutgoing: boolean }
   | { source: 'discord'; data: DiscordPendingRequest; sortName: string; isOutgoing: boolean };
 
-const PendingRequests = ({ requests, currentUser, discordRequests, searchQuery, loading }: PendingRequestsProps) => {
+const PendingRequests = ({ requests, currentUser, discordRequests, searchQuery, loading, showAccountBadges }: PendingRequestsProps) => {
   const getUser = useUsersStore((s) => s.getUser);
   const openProfile = (userId: string) => {
     useModalStore.getState().push(UserProfileModal, { userId });
@@ -274,13 +279,16 @@ const PendingRequests = ({ requests, currentUser, discordRequests, searchQuery, 
         request={item.data}
         currentUser={currentUser}
         onClickUser={openProfile}
+        showAccountBadge={showAccountBadges}
       />
     ) : (
       <DiscordPendingRow
-        key={`discord-${item.data.user.id}`}
+        key={`discord-${item.data.accountId ?? 'x'}-${item.data.user.id}`}
         user={item.data.user}
         isOutgoing={item.data.isOutgoing}
         onClickUser={openDiscordProfile}
+        accountId={item.data.accountId}
+        showAccountBadge={showAccountBadges}
       />
     );
 

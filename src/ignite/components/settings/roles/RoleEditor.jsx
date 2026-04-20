@@ -5,7 +5,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { isEveryone } from '@/ignite/constants/Roles';
 import RoleDisplay from './RoleDisplay';
 import RolePermissions from './RolePermissions';
-import UnsavedChangesBar from '@/components/ui/unsaved-changes-bar';
 
 const RoleEditor = ({
   activeRole,
@@ -18,10 +17,6 @@ const RoleEditor = ({
   onTogglePermission,
   isDeleting,
   onDeleteRole,
-  hasChanged,
-  isSaving,
-  onSave,
-  onReset,
   hasRoles,
 }) => {
   if (!activeRole) {
@@ -87,13 +82,6 @@ const RoleEditor = ({
             />
           </TabsContent>
         </div>
-
-        <UnsavedChangesBar
-          show={hasChanged}
-          saving={isSaving}
-          onSave={onSave}
-          onReset={onReset}
-        />
       </Tabs>
     </div>
   );

@@ -68,6 +68,42 @@ export const RolesService = {
   },
 
   /**
+   * Persist a new role ordering. The backend has no bulk endpoint for roles
+   * (channels do — see /guilds/{guild}/channels PATCH — but roles don't), so
+   * we fan out one PATCH per role in parallel.
+   */
+  async updateRolePositions(
+    guildId: string,
+    positions: { id: string; position: number }[],
+  ) {
+    await Promise.all(
+      positions.map(({ id, position }) =>
+        api.patch(`/guilds/${guildId}/roles/${id}`, { position }),
+      ),
+    );
+
+    // Sync local positions so the reorder survives until the next fetch /
+    // broadcast — without this the list would snap back if the component
+    // re-reads from the store before `.role.updated` events arrive.
+    const { guildRoles, setGuildRoles } = useRolesStore.getState();
+    const current = guildRoles[guildId] || [];
+    const positionById = new Map(
+      positions.map(({ id, position }) => [String(id), position] as const),
+    );
+    const updated = current.map((r) => {
+      const next = positionById.get(String(r.id));
+      return next != null ? { ...r, position: next } : r;
+    });
+    // Also re-sort the array by the new positions (DESC — higher position =
+    // higher in the UI, matching the caller's `length - index - 1` scheme).
+    // Without this the array order never changes even after the positions do,
+    // and the component's sync effect would snap the UI back to the old
+    // visual order.
+    updated.sort((a, b) => (b.position ?? 0) - (a.position ?? 0));
+    setGuildRoles(guildId, updated);
+  },
+
+  /**
    * Delete a role from the specified guild and update the local store.
    */
   async deleteGuildRole(guildId: string, roleId: string) {
@@ -180,7 +216,10 @@ export const RolesService = {
     const guildId = role.guild_id;
     const { guildRoles, setGuildRoles } = useRolesStore.getState();
     const roles = guildRoles[guildId] || [];
-    setGuildRoles(guildId, [...roles, role]);
+    // Dedupe by id — a duplicate `role.created` broadcast (reconnect replay,
+    // backend double-emit) must not produce two rows for the same role.
+    const withoutDup = roles.filter((r) => String(r.id) !== String(role.id));
+    setGuildRoles(guildId, [...withoutDup, role]);
   },
 
   handleRoleUpdated(event: RoleEvent) {
@@ -188,8 +227,10 @@ export const RolesService = {
     const guildId = role.guild_id;
     const { guildRoles, setGuildRoles } = useRolesStore.getState();
     const roles = guildRoles[guildId] || [];
-    const updatedRoles = roles.map((r) => (r.id === role.id ? role : r));
-    setGuildRoles(guildId, updatedRoles);
+    // Drop every existing copy then append once. `.map` would leave stale
+    // duplicates in place if a prior bug introduced them.
+    const withoutDup = roles.filter((r) => String(r.id) !== String(role.id));
+    setGuildRoles(guildId, [...withoutDup, role]);
   },
 
   handleRoleDeleted(event: RoleEvent) {
@@ -197,7 +238,7 @@ export const RolesService = {
     const guildId = role.guild_id;
     const { guildRoles, setGuildRoles } = useRolesStore.getState();
     const roles = guildRoles[guildId] || [];
-    const updatedRoles = roles.filter((r) => r.id !== role.id);
+    const updatedRoles = roles.filter((r) => String(r.id) !== String(role.id));
     setGuildRoles(guildId, updatedRoles);
   },
 };

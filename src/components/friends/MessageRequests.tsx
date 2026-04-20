@@ -209,25 +209,6 @@ const MessageRequests = () => {
   return (
     <div className="flex min-h-0 flex-1">
       <div className="flex flex-1 flex-col overflow-y-auto p-6">
-        <div className="mb-4 flex items-center gap-2">
-          <Button
-            variant={activeTab === 'requests' ? 'secondary' : 'ghost'}
-            size="sm"
-            className="h-7 px-3 text-sm font-medium"
-            onClick={() => setActiveTab('requests')}
-          >
-            Requests
-          </Button>
-          <Button
-            variant={activeTab === 'spam' ? 'secondary' : 'ghost'}
-            size="sm"
-            className="h-7 px-3 text-sm font-medium"
-            onClick={() => setActiveTab('spam')}
-          >
-            Spam
-          </Button>
-        </div>
-
         <div className="mb-4">
           <InputGroup className="border-white/5 bg-[#17171a]">
             <InputGroupAddon>
@@ -255,14 +236,33 @@ const MessageRequests = () => {
           </InputGroup>
         </div>
 
+        <div className="mb-4 flex items-center gap-2">
+          <Button
+            variant={activeTab === 'requests' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-7 px-3 text-sm font-medium"
+            onClick={() => setActiveTab('requests')}
+          >
+            Requests
+          </Button>
+          <Button
+            variant={activeTab === 'spam' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-7 px-3 text-sm font-medium"
+            onClick={() => setActiveTab('spam')}
+          >
+            Spam
+          </Button>
+        </div>
+
         <div className="flex-1 overflow-y-auto">
           {activeTab === 'requests' && (
-            <div className="text-[12px] font-medium text-gray-400">
+            <div className="text-[12px] font-medium text-gray-400 mb-1">
               Pending Requests — {totalRequests}
             </div>
           )}
           {activeTab === 'spam' && (
-            <div className="text-[12px] font-medium text-gray-400">
+            <div className="text-[12px] font-medium text-gray-400 mb-1">
               Spam — {totalSpam}
             </div>
           )}

@@ -135,9 +135,7 @@ discordApi.interceptors.response.use(
     if (!config?._silent) {
       const status = error.response?.status;
       const message = data?.message || error.message || 'Request failed';
-      toast.error(`Discord API Error (${status || 'network'}): ${message}`, {
-        duration: Infinity,
-      });
+      toast.error(`Discord API Error (${status || 'network'}): ${message}`);
     }
     return Promise.reject(error);
   }

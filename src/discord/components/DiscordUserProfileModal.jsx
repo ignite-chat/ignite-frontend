@@ -464,7 +464,7 @@ const DiscordUserProfileModal = ({ modalId, userId, author: authorProp, member: 
                 )}
 
                 {activeTab === 'servers' && (
-                  <div className="space-y-1.5">
+                  <div className="max-h-60 space-y-1.5 overflow-y-auto pr-1">
                     {profile?.mutual_guilds?.length > 0 ? (
                       profile.mutual_guilds.map((mg) => {
                         const mutualGuild = guilds.find((g) => g.id === mg.id);
@@ -498,7 +498,7 @@ const DiscordUserProfileModal = ({ modalId, userId, author: authorProp, member: 
                 )}
 
                 {activeTab === 'friends' && (
-                  <div className="space-y-1.5">
+                  <div className="max-h-60 space-y-1.5 overflow-y-auto pr-1">
                     {profile?.mutual_friends?.length > 0 ? (
                       profile.mutual_friends.map((friend) => {
                         const friendUser = friend.user || friend;

@@ -6,13 +6,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import ConnectDiscordDialog from '@/discord/components/ConnectDiscordDialog';
 import ConnectTelegramDialog from '@/telegram/components/ConnectTelegramDialog';
 import ConnectIgniteDialog from '@/components/ConnectIgniteDialog';
-import { Check } from '@phosphor-icons/react';
+import { Check, SignOut } from '@phosphor-icons/react';
 import { useAuthStore } from '@/ignite/store/auth.store';
 import { useDiscordStore } from '@/discord/store/discord.store';
 import { useTelegramStore } from '@/telegram/store/telegram.store';
+import { TelegramService } from '@/telegram/services/telegram.service';
 
 export default function LoginDialog({
   open,
@@ -22,10 +33,12 @@ export default function LoginDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [subDialog, setSubDialog] = useState<'ignite' | 'discord' | 'telegram' | null>(null);
+  const [disconnecting, setDisconnecting] = useState<'ignite' | 'telegram' | null>(null);
 
   const { userId } = useAuthStore();
   const discordAccounts = useDiscordStore((s) => s.accounts);
   const telegramSession = useTelegramStore((s) => s.session);
+  const telegramUser = useTelegramStore((s) => s.user);
   const hasAnyAccount = !!(userId || discordAccounts.length > 0 || telegramSession);
 
   const hasIgnite = !!userId;
@@ -59,25 +72,43 @@ export default function LoginDialog({
           </DialogHeader>
 
           <div className="flex flex-col gap-3">
-            <button
-              onClick={() => !hasIgnite && setSubDialog('ignite')}
-              className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
-                hasIgnite
-                  ? 'cursor-default border-green-500/30 bg-green-500/5'
-                  : 'border-white/10 hover:bg-white/5'
-              }`}
-            >
-              <div className="flex size-10 items-center justify-center rounded-full bg-orange-500/20">
-                <svg className="size-5 text-orange-500" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
-                </svg>
+            {hasIgnite ? (
+              <div className="group flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3">
+                <div className="flex size-10 items-center justify-center rounded-full bg-orange-500/20">
+                  <svg className="size-5 text-orange-500" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-white">Ignite</p>
+                  <p className="text-xs text-gray-400">Connected</p>
+                </div>
+                <Check size={20} weight="bold" className="shrink-0 text-green-500 group-hover:hidden" />
+                <button
+                  type="button"
+                  onClick={() => setDisconnecting('ignite')}
+                  className="hidden shrink-0 items-center gap-1 rounded-md bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300 group-hover:flex"
+                >
+                  <SignOut size={14} weight="bold" />
+                  Disconnect
+                </button>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-white">Ignite</p>
-                <p className="text-xs text-gray-400">{hasIgnite ? 'Connected' : 'Login or create an account'}</p>
-              </div>
-              {hasIgnite && <Check size={20} weight="bold" className="shrink-0 text-green-500" />}
-            </button>
+            ) : (
+              <button
+                onClick={() => setSubDialog('ignite')}
+                className="flex items-center gap-3 rounded-lg border border-white/10 px-4 py-3 text-left transition-colors hover:bg-white/5"
+              >
+                <div className="flex size-10 items-center justify-center rounded-full bg-orange-500/20">
+                  <svg className="size-5 text-orange-500" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-white">Ignite</p>
+                  <p className="text-xs text-gray-400">Login or create an account</p>
+                </div>
+              </button>
+            )}
 
             <button
               onClick={() => setSubDialog('discord')}
@@ -90,30 +121,48 @@ export default function LoginDialog({
               </div>
               <div>
                 <p className="text-sm font-medium text-white">Discord</p>
-                <p className="text-xs text-gray-400">Connect your Discord account</p>
+                <p className="text-xs text-gray-400">Connect a Discord account</p>
               </div>
             </button>
 
             {!!window.IgniteNative && (
-              <button
-                onClick={() => !hasTelegram && setSubDialog('telegram')}
-                className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
-                  hasTelegram
-                    ? 'cursor-default border-green-500/30 bg-green-500/5'
-                    : 'border-white/10 hover:bg-white/5'
-                }`}
-              >
-                <div className="flex size-10 items-center justify-center rounded-full bg-[#2AABEE]/20">
-                  <svg className="size-5 text-[#2AABEE]" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-                  </svg>
+              hasTelegram ? (
+                <div className="group flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3">
+                  <div className="flex size-10 items-center justify-center rounded-full bg-[#2AABEE]/20">
+                    <svg className="size-5 text-[#2AABEE]" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white">Telegram</p>
+                    <p className="text-xs text-gray-400">Connected</p>
+                  </div>
+                  <Check size={20} weight="bold" className="shrink-0 text-green-500 group-hover:hidden" />
+                  <button
+                    type="button"
+                    onClick={() => setDisconnecting('telegram')}
+                    className="hidden shrink-0 items-center gap-1 rounded-md bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300 group-hover:flex"
+                  >
+                    <SignOut size={14} weight="bold" />
+                    Disconnect
+                  </button>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-white">Telegram</p>
-                  <p className="text-xs text-gray-400">{hasTelegram ? 'Connected' : 'Connect your Telegram account'}</p>
-                </div>
-                {hasTelegram && <Check size={20} weight="bold" className="shrink-0 text-green-500" />}
-              </button>
+              ) : (
+                <button
+                  onClick={() => setSubDialog('telegram')}
+                  className="flex items-center gap-3 rounded-lg border border-white/10 px-4 py-3 text-left transition-colors hover:bg-white/5"
+                >
+                  <div className="flex size-10 items-center justify-center rounded-full bg-[#2AABEE]/20">
+                    <svg className="size-5 text-[#2AABEE]" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white">Telegram</p>
+                    <p className="text-xs text-gray-400">Connect your Telegram account</p>
+                  </div>
+                </button>
+              )
             )}
           </div>
         </DialogContent>
@@ -122,6 +171,41 @@ export default function LoginDialog({
       <ConnectIgniteDialog open={subDialog === 'ignite'} onOpenChange={(o) => !o && closeSubDialog()} />
       <ConnectDiscordDialog open={subDialog === 'discord'} onOpenChange={(o) => !o && closeSubDialog()} />
       <ConnectTelegramDialog open={subDialog === 'telegram'} onOpenChange={(o) => !o && closeSubDialog()} />
+
+      <AlertDialog open={!!disconnecting} onOpenChange={(o) => !o && setDisconnecting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {disconnecting === 'ignite' ? 'Disconnect Ignite' : 'Disconnect Telegram'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to disconnect{' '}
+              <span className="font-bold text-white">
+                {disconnecting === 'ignite'
+                  ? 'your Ignite account'
+                  : telegramUser?.firstName || 'your Telegram account'}
+              </span>
+              ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (disconnecting === 'ignite') {
+                  useAuthStore.getState().logout();
+                } else if (disconnecting === 'telegram') {
+                  await TelegramService.logout();
+                }
+                setDisconnecting(null);
+              }}
+              className="bg-red-500 text-white hover:bg-red-600"
+            >
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

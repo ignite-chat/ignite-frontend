@@ -315,8 +315,6 @@ export const ChannelsService = {
     } = useChannelsStore.getState();
     const channelId = event.channel.id;
 
-    console.log('New message event received on channel', channelId);
-
     // Clear typing indicator immediately when user sends a message
     useTypingStore.getState().removeTypingUser(channelId, event.message.author.id);
 
@@ -352,10 +350,6 @@ export const ChannelsService = {
      */
     const newChannels = channels.map((c) =>
       c.channel_id === channelId ? { ...c, last_message_id: event.message.id } : c
-    );
-    console.log(
-      'Updating channel last_message_id:',
-      newChannels.find((c) => c.channel_id === channelId)
     );
     setChannels(newChannels);
 

@@ -52,6 +52,19 @@ function getPingInfo(ping) {
   return { Icon: WifiSlash, color: 'text-red-500', label: `${Math.round(ping)} ms` };
 }
 
+// Icon + colour for the voice-panel header. Prioritises connection state over
+// ping so "Connecting…" is always yellow and "Voice Connected" stays green
+// even before the first RTT sample arrives.
+function getVoiceStatusStyle(connectionState, ping) {
+  if (connectionState === 'connecting') {
+    return { Icon: WifiHigh, color: 'text-yellow-500' };
+  }
+  if (ping === null || ping === 0) {
+    return { Icon: WifiHigh, color: 'text-green-500' };
+  }
+  return getPingInfo(ping);
+}
+
 const DISCORD_STATUS = {
   online: { color: 'bg-green-500', label: 'Online' },
   idle: { color: 'bg-yellow-500', label: 'Idle' },
@@ -346,17 +359,21 @@ const UserBar = () => {
               <TooltipTrigger asChild>
                 <div className="shrink-0 cursor-default">
                   {(() => {
-                    const { Icon, color } = getPingInfo(ping);
+                    const { Icon, color } = getVoiceStatusStyle(connectionState, ping);
                     return <Icon className={`size-4 ${color}`} weight="bold" />;
                   })()}
                 </div>
               </TooltipTrigger>
               <TooltipContent side="top">
-                {ping !== null ? `${Math.round(ping)} ms` : 'Measuring...'}
+                {connectionState === 'connecting'
+                  ? 'Connecting…'
+                  : ping !== null && ping !== 0
+                    ? `${Math.round(ping)} ms`
+                    : 'Measuring…'}
               </TooltipContent>
             </Tooltip>
             <div className="min-w-0 flex-1">
-              <p className={`truncate text-xs font-semibold ${getPingInfo(ping).color}`}>
+              <p className={`truncate text-xs font-semibold ${getVoiceStatusStyle(connectionState, ping).color}`}>
                 {connectionState === 'connecting' ? 'Connecting...' : 'Voice Connected'}
               </p>
               <p className="truncate text-[11px] text-gray-400">{channelName}</p>

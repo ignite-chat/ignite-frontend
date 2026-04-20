@@ -10,6 +10,12 @@ import { DiscordService } from '../services/discord.service';
 import { DiscordGatewayService } from '../services/discord-gateway.service';
 import { computeChannelPermissions } from '../utils/permissions';
 import { VIEW_CHANNEL, CONNECT } from '../constants/permissions';
+import {
+  GUILD_VOICE,
+  GUILD_STAGE_VOICE,
+  GUILD_FORUM,
+  GUILD_CATEGORY,
+} from '../constants/channel-types';
 import { useDiscordHasPermission } from '../hooks/useDiscordPermission';
 import { scrollPositions } from '@/store/last-channel.store';
 import { useDiscordTypingStore } from '../store/discord-typing.store';
@@ -124,31 +130,18 @@ const DiscordGuildHeader = memo(({ guild }) => {
 
 DiscordGuildHeader.displayName = 'DiscordGuildHeader';
 
-// Discord channel types
-const DiscordChannelType = {
-  GUILD_TEXT: 0,
-  DM: 1,
-  GUILD_VOICE: 2,
-  GROUP_DM: 3,
-  GUILD_CATEGORY: 4,
-  GUILD_ANNOUNCEMENT: 5,
-  GUILD_STAGE_VOICE: 13,
-  GUILD_FORUM: 15,
-};
-
-const isVoiceType = (type) =>
-  type === DiscordChannelType.GUILD_VOICE || type === DiscordChannelType.GUILD_STAGE_VOICE;
+const isVoiceType = (type) => type === GUILD_VOICE || type === GUILD_STAGE_VOICE;
 
 const ChannelIcon = ({ type, isRules, isLocked, className }) => {
   // if (isRules) return <CheckSquare className={className} weight='fill' />;
   switch (type) {
-    case DiscordChannelType.GUILD_VOICE:
+    case GUILD_VOICE:
       return <SpeakerHigh className={className} weight='fill' />;
-    case DiscordChannelType.GUILD_STAGE_VOICE:
+    case GUILD_STAGE_VOICE:
       return <MicrophoneStage className={className} weight='fill' />;
-    // case DiscordChannelType.GUILD_ANNOUNCEMENT:
+    // case GUILD_ANNOUNCEMENT:
     //   return <Megaphone className={`${className} -scale-x-100`} weight='fill' />;
-    case DiscordChannelType.GUILD_FORUM:
+    case GUILD_FORUM:
       return <ChatsTeardrop className={className} weight='fill' />;
     default:
       return <Hash className={className} weight="bold" />;
@@ -539,7 +532,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
     if (!userId || guildRoles.length === 0) return allGuildChannels;
 
     return allGuildChannels.map((c) => {
-      if (c.type === DiscordChannelType.GUILD_CATEGORY) return { ...c, _canView: true };
+      if (c.type === GUILD_CATEGORY) return { ...c, _canView: true };
       const perms = computeChannelPermissions(c, memberRoleIds, guildRoles, guildId, guildOwnerId, userId);
       return { ...c, _canView: (perms & VIEW_CHANNEL) === VIEW_CHANNEL };
     });
@@ -570,13 +563,13 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
 
   const categories = useMemo(() => {
     return guildChannels
-      .filter((c) => c.type === DiscordChannelType.GUILD_CATEGORY)
+      .filter((c) => c.type === GUILD_CATEGORY)
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   }, [guildChannels]);
 
   const rootChannels = useMemo(() => {
     return guildChannels.filter(
-      (c) => !c.parent_id && c.type !== DiscordChannelType.GUILD_CATEGORY
+      (c) => !c.parent_id && c.type !== GUILD_CATEGORY
     );
   }, [guildChannels]);
 
@@ -600,7 +593,7 @@ const DiscordGuildChannelsSidebar = ({ guild }) => {
     // Categories + their children
     for (const category of categories) {
       const categoryChannels = guildChannels.filter(
-        (c) => c.parent_id === category.id && c.type !== DiscordChannelType.GUILD_CATEGORY
+        (c) => c.parent_id === category.id && c.type !== GUILD_CATEGORY
       );
       const visibleCategoryChannels = showHiddenChannels
         ? categoryChannels

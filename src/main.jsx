@@ -18,7 +18,7 @@ import { useTypingStore } from './ignite/store/typing.store';
 import { useLastChannelStore } from './store/last-channel.store';
 import { useSoundStore } from './ignite/store/sound.store';
 import { useInvitesStore } from './ignite/store/invites.store';
-import { Toaster } from './components/ui/sonner';
+import { Toaster } from './components/ui/toast';
 import { ModalRoot, useModalStore } from './store/modal.store';
 import { ContextMenuRoot } from './store/context-menu.store';
 import DiscordCaptchaProvider from './discord/components/DiscordCaptchaProvider';

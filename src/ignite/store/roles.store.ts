@@ -17,6 +17,15 @@ type RolesStore = {
   setGuildRoles: (guildId: string, roles: Role[]) => void;
 };
 
+// Drop duplicate roles by id (keeps the last occurrence). Guards against
+// payloads — from either the HTTP seed or a gateway replay — that happen
+// to ship the same role more than once.
+const dedupeById = (roles: Role[]): Role[] => {
+  const byId = new Map<string, Role>();
+  for (const r of roles) byId.set(String(r.id), r);
+  return Array.from(byId.values());
+};
+
 export const useRolesStore = create<RolesStore>((set) => ({
   guildRoles: {},
 
@@ -24,7 +33,7 @@ export const useRolesStore = create<RolesStore>((set) => ({
     set((state) => ({
       guildRoles: {
         ...state.guildRoles,
-        [guildId]: roles,
+        [guildId]: dedupeById(roles),
       },
     })),
 }));

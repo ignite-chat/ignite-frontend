@@ -17,6 +17,7 @@ import GuildModal from '@/ignite/components/modals/GuildModal';
 import { useUnreadsStore } from '@/ignite/store/unreads.store';
 import { useChannelsStore } from '@/ignite/store/channels.store';
 import { useUsersStore } from '@/ignite/store/users.store';
+import { useAuthStore } from '@/ignite/store/auth.store';
 import Avatar from '@/ignite/components/Avatar';
 import { useFriendsStore } from '@/ignite/store/friends.store';
 import { ChannelsService } from '@/ignite/services/channels.service';
@@ -333,9 +334,8 @@ const DiscordFolderIcon = ({ folder, guilds, isExpanded, onToggle, totalMentions
       <TooltipTrigger asChild>
         <div className="group relative mb-2 min-w-min px-3" onContextMenu={openContextMenu}>
           <div
-            className={`absolute -left-1 top-1/2 block w-2 -translate-y-1/2 rounded-lg bg-white transition-all duration-200 ${
-              hasUnread ? 'h-2 group-hover:h-5' : 'h-0 group-hover:h-5'
-            }`}
+            className={`absolute -left-1 top-1/2 block w-2 -translate-y-1/2 rounded-lg bg-white transition-all duration-200 ${hasUnread ? 'h-2 group-hover:h-5' : 'h-0 group-hover:h-5'
+              }`}
           />
           <div className="relative mx-auto h-12 w-12">
             <button
@@ -435,12 +435,12 @@ const DiscordGuildFolderGroup = ({ folder, guilds, activeGuildPath, renderGuildI
           {renderGuildItem
             ? guilds.map((guild) => renderGuildItem(guild))
             : guilds.map((guild) => (
-                <DiscordGuildIcon
-                  key={`discord-${guild.id}`}
-                  guild={guild}
-                  isActive={activeGuildPath.startsWith(`/discord/${guild.id}`)}
-                />
-              ))}
+              <DiscordGuildIcon
+                key={`discord-${guild.id}`}
+                guild={guild}
+                isActive={activeGuildPath.startsWith(`/discord/${guild.id}`)}
+              />
+            ))}
         </div>
       )}
     </div>
@@ -542,7 +542,7 @@ const DiscordGuildsDnd = ({ entries, folders, pathname }) => {
 
     const store = useDiscordGuildFoldersStore.getState();
     const draggedMeta = flatItems.find((i) => i.kind === 'guild' && i.guildId === draggingGuildId);
-      console.log(dropTarget);
+    console.log(dropTarget);
 
     if (dropTarget.type === 'merge-guild') {
       store.createFolderFromGuilds(draggingGuildId, dropTarget.targetGuildId);
@@ -799,6 +799,7 @@ const GuildsSidebar = () => {
   const user = useUsersStore((s) => s.getCurrentUser());
   const { guilds } = useGuildsStore();
   const hasIgniteToken = !!localStorage.getItem('token');
+  const igniteInitialized = useAuthStore((s) => s.initialized);
   const { channelUnreads, channelUnreadsLoaded } = useUnreadsStore();
   const { channels, channelMessages } = useChannelsStore();
   const { requests } = useFriendsStore();
@@ -1123,8 +1124,10 @@ const GuildsSidebar = () => {
           <hr className="mx-auto mb-2 w-8 rounded-full border-1 border-white/5 bg-gray-800" />
         )}
 
-        {/* Guilds — drag-to-reorder */}
-        {hasIgniteToken && orderedGuilds.length === 0 &&
+        {/* Guilds — drag-to-reorder. Skeletons show while the initial
+            /@me/ready fetch is in-flight, not based on guild count —
+            a user with zero guilds would otherwise loop forever. */}
+        {hasIgniteToken && !igniteInitialized &&
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="mb-2 flex justify-center px-3">
               <Skeleton className="size-12 rounded-2xl" />
@@ -1171,6 +1174,17 @@ const GuildsSidebar = () => {
           </DragOverlay>
         </DndContext>
 
+        {hasIgniteToken && (
+          <>
+            <button type="button" onClick={() => useModalStore.getState().push(GuildModal)}>
+              <SidebarIcon icon={<Plus className="size-6" />} text="Add a Server" />
+            </button>
+            <Link to="/guild-discovery">
+              <SidebarIcon icon={<Compass className="size-6" />} text="Discover Servers" />
+            </Link>
+          </>
+        )}
+
         <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
 
         {/* Discord accounts — desktop only */}
@@ -1180,32 +1194,32 @@ const GuildsSidebar = () => {
               const accountKey = account.user?.id || account.token;
               const isCollapsed = discordAccountSections.length > 1 && collapsedAccounts[accountKey] !== false;
               return (
-              <div key={account.token}>
-                {idx > 0 && (
-                  <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
-                )}
-                <DiscordAccountPopover
-                  account={account}
-                  onDisconnect={() => setDisconnectingAccount(account)}
-                  collapsed={isCollapsed}
-                  onToggleCollapse={() => setCollapsedAccounts((prev) => ({ ...prev, [accountKey]: prev[accountKey] === false }))}
-                />
-                {/* {!account.isConnected && (
+                <div key={account.token}>
+                  {idx > 0 && (
+                    <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
+                  )}
+                  <DiscordAccountPopover
+                    account={account}
+                    onDisconnect={() => setDisconnectingAccount(account)}
+                    collapsed={isCollapsed}
+                    onToggleCollapse={() => setCollapsedAccounts((prev) => ({ ...prev, [accountKey]: prev[accountKey] === false }))}
+                  />
+                  {/* {!account.isConnected && (
                   <div className="mx-3 mb-2 flex items-center justify-center gap-1.5 rounded-lg bg-yellow-500/10 px-2 py-1.5">
                     <div className="size-1.5 shrink-0 animate-pulse rounded-full bg-yellow-500" />
                     <span className="text-[10px] font-medium text-yellow-500">Reconnecting…</span>
                   </div>
                 )} */}
-                {!isCollapsed && entries.length > 0 && (
-                  <div className={!account.isConnected ? 'opacity-50' : undefined}>
-                    <DiscordGuildsDnd
-                      entries={entries}
-                      folders={accountFolders}
-                      pathname={location.pathname}
-                    />
-                  </div>
-                )}
-              </div>
+                  {!isCollapsed && entries.length > 0 && (
+                    <div className={!account.isConnected ? 'opacity-50' : undefined}>
+                      <DiscordGuildsDnd
+                        entries={entries}
+                        folders={accountFolders}
+                        pathname={location.pathname}
+                      />
+                    </div>
+                  )}
+                </div>
               );
             })}
 
@@ -1219,9 +1233,8 @@ const GuildsSidebar = () => {
                       className="group relative mb-2 flex w-full justify-center px-3"
                     >
                       <div
-                        className={`flex size-12 items-center justify-center rounded-2xl bg-[#2AABEE] text-white transition-all hover:rounded-xl ${
-                          location.pathname.startsWith('/telegram') ? 'rounded-xl' : ''
-                        }`}
+                        className={`flex size-12 items-center justify-center rounded-2xl bg-[#2AABEE] text-white transition-all hover:rounded-xl ${location.pathname.startsWith('/telegram') ? 'rounded-xl' : ''
+                          }`}
                       >
                         <TelegramLogo className="size-6" weight="fill" />
                       </div>
@@ -1265,11 +1278,10 @@ const GuildsSidebar = () => {
                 </Popover>
                 {telegramChats.filter((c) => c.pinned).map((chat) => {
                   const tgFallbackIcon = !chat.photo ? (
-                    <div className={`flex size-full items-center justify-center ${
-                      chat.type === 'channel' ? 'bg-rose-500' :
-                      chat.type === 'group' || chat.type === 'supergroup' ? 'bg-green-500' :
-                      'bg-blue-500'
-                    }`}>
+                    <div className={`flex size-full items-center justify-center ${chat.type === 'channel' ? 'bg-rose-500' :
+                        chat.type === 'group' || chat.type === 'supergroup' ? 'bg-green-500' :
+                          'bg-blue-500'
+                      }`}>
                       {chat.type === 'channel' ? (
                         <Megaphone size={22} weight="fill" className="text-white" />
                       ) : chat.type === 'group' || chat.type === 'supergroup' ? (
@@ -1293,7 +1305,7 @@ const GuildsSidebar = () => {
                     </Link>
                   );
                 })}
-                
+
                 <hr className="mx-auto mb-2 w-8 rounded-full border-2 border-white/5 bg-gray-800" />
               </>
             ) : telegramSession ? (
@@ -1306,16 +1318,16 @@ const GuildsSidebar = () => {
                       className="group relative mb-2 flex w-full justify-center px-3"
                     >
                       <div
-                        className={`flex size-12 items-center justify-center rounded-2xl text-white transition-all hover:rounded-xl ${
-                          telegramConnectionFailed ? 'bg-red-500/80' : 'bg-[#2AABEE]'
-                        } ${telegramConnecting ? 'opacity-50 animate-pulse' : ''}`}
+                        className={`flex size-12 items-center justify-center rounded-2xl bg-[#2AABEE] text-white transition-all hover:rounded-xl ${telegramConnecting ? 'opacity-50 animate-pulse' : ''
+                          }`}
                       >
-                        {telegramConnectionFailed && !telegramConnecting ? (
-                          <Warning className="size-6" weight="fill" />
-                        ) : (
-                          <TelegramLogo className="size-6" weight="fill" />
-                        )}
+                        <TelegramLogo className="size-6" weight="fill" />
                       </div>
+                      {telegramConnectionFailed && !telegramConnecting && (
+                        <div className="absolute -top-0.5 right-2 flex size-4 items-center justify-center rounded-full bg-red-500 ring-2 ring-[#1e1f22]">
+                          <Warning className="size-3 text-white" weight="fill" />
+                        </div>
+                      )}
                     </button>
                   </PopoverTrigger>
                   <PopoverContent side="right" align="center" className="w-56 p-0" sideOffset={8}>
@@ -1334,11 +1346,10 @@ const GuildsSidebar = () => {
                         <button
                           type="button"
                           disabled={telegramReconnectCooldown > 0}
-                          className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                            telegramReconnectCooldown > 0
+                          className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${telegramReconnectCooldown > 0
                               ? 'text-gray-500 cursor-not-allowed'
                               : 'text-gray-300 hover:bg-white/5'
-                          }`}
+                            }`}
                           onClick={() => {
                             TelegramService.connect().finally(() => {
                               setTelegramReconnectCooldown(5);
@@ -1388,16 +1399,6 @@ const GuildsSidebar = () => {
           </>
         )}
 
-        {hasIgniteToken && (
-          <>
-            <button type="button" onClick={() => useModalStore.getState().push(GuildModal)}>
-              <SidebarIcon icon={<Plus className="size-6" />} text="Add a Server" />
-            </button>
-            <Link to="/guild-discovery">
-              <SidebarIcon icon={<Compass className="size-6" />} text="Discover Servers" />
-            </Link>
-          </>
-        )}
       </div>
 
       <ConnectDiscordDialog
